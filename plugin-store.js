@@ -6,7 +6,7 @@ let counter = 0;
 export const newPluginId = () => `pl-${Date.now().toString(36)}-${(++counter).toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 export function normalizePlugin(raw = {}) {
   const item = raw && typeof raw === 'object' ? raw : {};
-  return { id: typeof item.id === 'string' && /^[\w-]{1,64}$/.test(item.id) ? item.id : newPluginId(), name: String(item.name ?? '').trim().slice(0, MAX_NAME_CHARS) || 'Plugin sem nome',
+  return { id: typeof item.id === 'string' && /^[\w-]{1,64}$/.test(item.id) ? item.id : newPluginId(), name: String(item.name ?? '').trim().slice(0, MAX_NAME_CHARS) || 'Untitled plugin',
     code: String(item.code ?? '').slice(0, MAX_CODE_CHARS), enabled: item.enabled === true, packageFilter: String(item.packageFilter ?? '').trim().slice(0, 400),
     updates: item.updates === 'manual' ? 'manual' : 'auto', height: blockHeight(item.height) };
 }
@@ -17,9 +17,9 @@ export function blockHeight(value) {
 }
 export function validatePlugin(plugin) {
   const errors = [];
-  if (!String(plugin.name ?? '').trim()) errors.push({ field: 'name', message: 'Dê um nome ao plugin.' });
-  if (String(plugin.code ?? '').length > MAX_CODE_CHARS) errors.push({ field: 'code', message: `O código passa de ${MAX_CODE_CHARS} caracteres.` });
-  if (!String(plugin.code ?? '').trim()) errors.push({ field: 'code', message: 'Escreva o código do plugin (ou escolha um modelo).' });
+  if (!String(plugin.name ?? '').trim()) errors.push({ field: 'name', message: 'Give the plugin a name.' });
+  if (String(plugin.code ?? '').length > MAX_CODE_CHARS) errors.push({ field: 'code', message: `The code exceeds ${MAX_CODE_CHARS} characters.` });
+  if (!String(plugin.code ?? '').trim()) errors.push({ field: 'code', message: 'Write the plugin code (or choose a template).' });
   return { errors };
 }
 export function loadPlugins(storage = undefined) {
@@ -31,11 +31,11 @@ export function savePlugins(list, storage = undefined) {
 export const exportPlugins = list => JSON.stringify({ format: EXPORT_FORMAT, version: 1, plugins: list.map(normalizePlugin).map(({ id, ...rest }) => rest) }, null, 2);
 /** An exported file (or a bare array) -> { plugins, error? }; imported plugins get fresh ids and start switched off (the code is someone's: look at it first). */
 export function importPlugins(text) {
-  let data; try { data = JSON.parse(String(text)); } catch (error) { return { plugins: [], error: `O arquivo não é JSON válido: ${String(error?.message ?? error).slice(0, 120)}` }; }
+  let data; try { data = JSON.parse(String(text)); } catch (error) { return { plugins: [], error: `The file is not valid JSON: ${String(error?.message ?? error).slice(0, 120)}` }; }
   const list = Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray(data.plugins) ? data.plugins : null;
-  if (!list) return { plugins: [], error: `O arquivo não tem uma lista de plugins (esperado {"format":"${EXPORT_FORMAT}","plugins":[...]}).` };
-  return { plugins: list.slice(0, MAX_PLUGINS).filter(item => item && typeof item === 'object').map(item => ({ ...normalizePlugin({ ...item, id: undefined }), enabled: false })), ...(list.length > MAX_PLUGINS ? { error: `Só os primeiros ${MAX_PLUGINS} plugins foram importados.` } : {}) };
+  if (!list) return { plugins: [], error: `The file has no list of plugins (expected {"format":"${EXPORT_FORMAT}","plugins":[...]}).` };
+  return { plugins: list.slice(0, MAX_PLUGINS).filter(item => item && typeof item === 'object').map(item => ({ ...normalizePlugin({ ...item, id: undefined }), enabled: false })), ...(list.length > MAX_PLUGINS ? { error: `Only the first ${MAX_PLUGINS} plugins were imported.` } : {}) };
 }
-export const BLANK_TEMPLATE = { id: 'blank', name: 'Em branco', description: 'Um plugin vazio.', code: "// Escreva aqui. Exemplos prontos: plugins.html#exemplos\nlab.on('screen', tela => lab.ui.text(tela.activity ?? '—', { id: 'tela' }));\n" };
+export const BLANK_TEMPLATE = { id: 'blank', name: 'Blank', description: 'An empty plugin.', code: "// Write here. Ready-made examples: plugins.html#exemplos\nlab.on('screen', screen => lab.ui.text(screen.activity ?? '—', { id: 'screen' }));\n" };
 /** "+ Adicionar" always opens a blank plugin; the examples live in the documentation (plugins.html#exemplos). */
-export function blankPlugin() { return normalizePlugin({ name: 'Novo plugin', code: BLANK_TEMPLATE.code, enabled: true }); }
+export function blankPlugin() { return normalizePlugin({ name: 'New plugin', code: BLANK_TEMPLATE.code, enabled: true }); }

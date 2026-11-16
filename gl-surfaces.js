@@ -25,7 +25,7 @@ export function createGlSurfaces({ doc = globalThis.document } = {}) {
       }
       if (canvas.parentNode !== element) element.prepend(canvas);
       if (!element.style.position) element.style.position = 'relative';
-      element.style.overflow = 'hidden'; element.setAttribute('role', 'img'); element.setAttribute('aria-label', 'Superfície OpenGL ES');
+      element.style.overflow = 'hidden'; element.setAttribute('role', 'img'); element.setAttribute('aria-label', 'OpenGL ES surface');
       element._glInfo = info; elements.set(info.viewId, element);
       const pending = waiting.get(info.viewId); if (pending) { waiting.delete(info.viewId); draw(element, pending); }
     },

@@ -3,7 +3,7 @@
 // can send its requests through a relay instead (Controles > Dispositivo > Proxy, `{url}` placeholder; src/network-transport.js openExchange), and this is that relay: it repeats each
 // request from this machine, as the device would send it, and answers the page with CORS headers.
 //
-//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--allow-private]
+//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>]
 //
 // Then put the printed "Proxy" URL in the lab's Proxy field. Contract with src/network-transport.js:
 //  - the target is the `url` query parameter; headers a browser may not send (Cookie, User-Agent, Origin, Referer ...) arrive as `x-apkweb-<name>` and are sent under their own name;
@@ -13,14 +13,14 @@
 //    (its message), which the lab turns into the exception an Android device would throw (UnknownHostException, ConnectException, SSLHandshakeException ...).
 //
 // Safety: it listens on 127.0.0.1 only; every request must carry the random token printed at start-up in its path, and must come from one of the allowed origins (the public lab and a
-// local copy by default), so another site open in the same browser cannot use it. Targets on this machine or the local network (loopback, private, link-local addresses) are refused unless
-// --allow-private is given. It keeps no cookies and stores nothing: what the app sends passes through and is forgotten.
+// local copy by default), so another site open in the same browser cannot use it. Destinations are not restricted (the owner's decision, 2026-11-16: the relay is meant to be free): the
+// internet, this machine and the local network are all reachable. --allow-private, from older versions, is accepted and does nothing. It keeps no cookies and stores nothing: what
+// the app sends passes through and is forgotten.
 import http from 'node:http';
 import https from 'node:https';
 import { randomBytes, createHash } from 'node:crypto';
 import net, { isIP } from 'node:net';
 import tls from 'node:tls';
-import { lookup as dnsLookup } from 'node:dns/promises';
 import { fileURLToPath } from 'node:url';
 
 export const DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
@@ -29,28 +29,12 @@ const FROM_BROWSER = new Set(['origin', 'referer', 'cookie', 'accept-encoding', 
 const RESPONSE_DROP = new Set(['transfer-encoding', 'connection', 'keep-alive', 'set-cookie']);   // Content-Encoding stays: the browser decodes the body as it would from the server itself
 const MAX_BODY = 32 * 1024 * 1024;
 
-/** True for addresses on this machine or the local network: loopback, RFC 1918, link-local, CGNAT, unique-local IPv6, unspecified. */
-export function privateAddress(address) {
-  const kind = isIP(address);
-  if (kind === 4) {
-    const [a, b] = address.split('.').map(Number);
-    return a === 0 || a === 10 || a === 127 || (a === 100 && b >= 64 && b <= 127) || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-  }
-  if (kind === 6) {
-    const v = address.toLowerCase();
-    if (v === '::' || v === '::1') return true;
-    const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(v); if (mapped) return privateAddress(mapped[1]);
-    return /^f[cd]/.test(v) || /^fe[89ab]/.test(v);
-  }
-  return false;
-}
 
 /**
- * The relay as an http.Server (not listening yet). `token`: the path segment every request must carry; `origins`: the page origins allowed to use it; `allowPrivate`: also relay to
- * private addresses; `lookup`: injectable for tests. Upstream requests go through node:http(s), not fetch: fetch adds headers of its own (Sec-Fetch-Mode, Accept-Language ...) that the app
+ * The relay as an http.Server (not listening yet). `token`: the path segment every request must carry; `origins`: the page origins allowed to use it; Upstream requests go through node:http(s), not fetch: fetch adds headers of its own (Sec-Fetch-Mode, Accept-Language ...) that the app
  * never sent; here the target sees exactly the app's request.
  */
-export function createRelay({ token, origins = DEFAULT_ORIGINS, allowPrivate = false, lookup = dnsLookup, timeoutMs = 60000 } = {}) {
+export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 60000 } = {}) {
   if (!token) throw new Error('createRelay needs a token');
   const allowed = new Set(origins.map(origin => origin.replace(/\/$/, '')));
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
@@ -68,15 +52,6 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, allowPrivate = f
     let parsed; try { parsed = new URL(target ?? ''); } catch { cors(origin, res); return fail(res, 400, 'missing or invalid url parameter'); }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') { cors(origin, res); return fail(res, 400, `unsupported scheme ${parsed.protocol}`); }
     const relayError = (code, message) => { cors(origin, res, { 'x-apkweb-relay-error-code': code, 'x-apkweb-relay-error': message.replace(/[\r\n]+/g, ' ').slice(0, 300), 'Access-Control-Expose-Headers': 'x-apkweb-relay-error-code, x-apkweb-relay-error' }); fail(res, 502, `${code}: ${message}`); };
-    if (!allowPrivate) {
-      const host = parsed.hostname.replace(/^\[|\]$/g, '');
-      let addresses;
-      try { addresses = isIP(host) ? [{ address: host }] : await lookup(host, { all: true }); } catch (error) { return relayError(error.code ?? 'ENOTFOUND', error.message ?? String(error)); }
-      if (addresses.some(entry => privateAddress(entry.address))) {   // named in the relay-error headers too, so the lab reports it as a connect failure instead of handing the app a 403
-        const message = `${host} is on this machine or the local network; start the relay with --allow-private to reach it`;
-        cors(origin, res, { 'x-apkweb-relay-error-code': 'APKWEB_RELAY_PRIVATE', 'x-apkweb-relay-error': message, 'Access-Control-Expose-Headers': 'x-apkweb-relay-error-code, x-apkweb-relay-error' }); return fail(res, 403, message);
-      }
-    }
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
       const lower = name.toLowerCase(), values = Array.isArray(value) ? value : [value];
@@ -102,7 +77,7 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, allowPrivate = f
     if (req.method === 'HEAD') { response.resume(); return res.end(); }
     response.on('error', () => res.destroy()).pipe(res);
   });
-  server.on('upgrade', (req, socket) => tunnel({ req, socket, token, allowed, allowPrivate, lookup, timeoutMs }));
+  server.on('upgrade', (req, socket) => tunnel({ req, socket, token, allowed, timeoutMs }));
   return server;
 }
 
@@ -135,7 +110,7 @@ function wsDecoder() {
     return out;
   };
 }
-async function tunnel({ req, socket, token, allowed, allowPrivate, lookup, timeoutMs }) {
+async function tunnel({ req, socket, token, allowed, timeoutMs }) {
   const url = new URL(req.url, 'http://relay.invalid'), origin = req.headers.origin ?? '';
   const refuse = (status, text, message) => { socket.end(`HTTP/1.1 ${status} ${text}\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n${message}`); };
   if (url.pathname !== `/${token}/tcp`) return refuse(404, 'Not Found', 'unknown path');
@@ -149,11 +124,6 @@ async function tunnel({ req, socket, token, allowed, allowPrivate, lookup, timeo
   const closeFrame = code => wsFrame(0x8, Buffer.from([code >> 8, code & 255]));
   const fail = (code, message) => { say({ error: { code, message: String(message).replace(/[\r\n]+/g, ' ').slice(0, 300) } }); socket.end(closeFrame(1011)); };
   socket.on('error', () => {});
-  if (!allowPrivate) {
-    const name = host.replace(/^\[|\]$/g, '');
-    let addresses; try { addresses = isIP(name) ? [{ address: name }] : await lookup(name, { all: true }); } catch (error) { return fail(error.code ?? 'ENOTFOUND', error.message ?? String(error)); }
-    if (addresses.some(entry => privateAddress(entry.address))) return fail('APKWEB_RELAY_PRIVATE', `${name} is on this machine or the local network; start the relay with --allow-private to reach it`);
-  }
   let connected = false;
   const upstream = secure ? tls.connect({ host, port, servername: isIP(host) ? undefined : host, ALPNProtocols: alpn.length ? alpn : undefined }) : net.connect({ host, port });
   const timer = setTimeout(() => { if (!connected) { upstream.destroy(); fail('ETIMEDOUT', `connect to ${host}:${port} timed out after ${timeoutMs} ms`); } }, timeoutMs);
@@ -196,14 +166,14 @@ function send(url, method, headers, body, timeoutMs, hops = 0) {
 }
 
 function parseArguments(argv) {
-  const options = { port: 8787, origins: [], token: null, allowPrivate: false };
+  const options = { port: 8787, origins: [], token: null };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--port') options.port = Number(argv[++i]);
     else if (arg === '--origin') options.origins.push(argv[++i]);
     else if (arg === '--token') options.token = argv[++i];
-    else if (arg === '--allow-private') options.allowPrivate = true;
-    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--allow-private]'); process.exit(0); }
+    else if (arg === '--allow-private') continue;   // older versions refused private destinations; every destination is reachable now
+    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>]'); process.exit(0); }
     else throw new Error(`unknown argument ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65535) throw new Error('--port must be 1-65535');
@@ -213,10 +183,11 @@ function parseArguments(argv) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const options = parseArguments(process.argv.slice(2));
   const token = options.token ?? randomBytes(12).toString('hex'), origins = options.origins.length ? options.origins : DEFAULT_ORIGINS;
-  const server = createRelay({ token, origins, allowPrivate: options.allowPrivate });
+  const server = createRelay({ token, origins });
   server.listen(options.port, '127.0.0.1', () => {
     console.log(`APK Web Lab CORS relay on http://127.0.0.1:${options.port} (only this machine can reach it)`);
     console.log(`Allowed page origins: ${origins.join(', ')}`);
-    console.log(`Proxy field (Controles > Dispositivo): http://127.0.0.1:${options.port}/${token}/?url={url}`);
+    console.log('Destinations: any (the internet, this machine and the local network)');
+    console.log(`Proxy field (Controls > Device): http://127.0.0.1:${options.port}/${token}/?url={url}`);
   });
 }

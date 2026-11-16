@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=ca92aaad0948';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=ca92aaad0948';
-import { formatApiGapReport } from '../api-gap-scan.js?v=ca92aaad0948';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=ca92aaad0948';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=ca92aaad0948';
-import { parseMethodSpec } from '../method-overrides.js?v=ca92aaad0948';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=ca92aaad0948';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=ca92aaad0948';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=ca92aaad0948';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=ca92aaad0948';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=ca92aaad0948';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=ca92aaad0948';
-import { rowToEntry } from '../logcat.js?v=ca92aaad0948';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=ca92aaad0948';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=d422379a2a38';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=d422379a2a38';
+import { formatApiGapReport } from '../api-gap-scan.js?v=d422379a2a38';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=d422379a2a38';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=d422379a2a38';
+import { parseMethodSpec } from '../method-overrides.js?v=d422379a2a38';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=d422379a2a38';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=d422379a2a38';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=d422379a2a38';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=d422379a2a38';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=d422379a2a38';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=d422379a2a38';
+import { rowToEntry } from '../logcat.js?v=d422379a2a38';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=d422379a2a38';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -307,7 +307,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     async screenState() { if (!vm.worker) return null; return vm.screenState(); },
     /** "Copiar diagnóstico": the shared report (cause, stack, stubs, active debugging features, log tail), the screen state and the static API estimate. */
     async diagnostic() {
-      const { text } = buildDiagnosticReport({ error: lastError ?? { message: 'diagnóstico pedido (sem erro)' }, product: 'APK Player', packageName: packageName || 'APK', tolerateMissing: tolerateRunning, stubs: lastError ? null : [...lastStubs.void, ...lastStubs.returns, ...lastStubs.classes],
+      const { text } = buildDiagnosticReport({ error: lastError ?? { message: 'diagnostics requested (no error)' }, product: 'APK Player', packageName: packageName || 'APK', tolerateMissing: tolerateRunning, stubs: lastError ? null : [...lastStubs.void, ...lastStubs.returns, ...lastStubs.classes],
         methodOverrides: statuses.methodOverrides.filter(item => item.state === 'active').length, ignoredActivities: statuses.ignoredActivities.filter(item => item.state === 'active').length, endpointMocks: statuses.endpointMocks.filter(item => item.state === 'active').length, hostRedirects: hostRedirectLines() });
       let screen = null; if (vm.worker) { try { screen = await vm.screenState(); } catch { screen = null; } }
       return { text: [text, screen?.text ?? '', vm.apiGaps ? formatApiGapReport(vm.apiGaps) : ''].filter(Boolean).join('\n\n').slice(0, 400000) };

@@ -39,10 +39,10 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground', resume: async () => {}, navigate: async () => null };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
   const launcher = el('div', 'launcher-layer'); launcher.hidden = true; screen.prepend(launcher);
-  const wall = el('div', 'launcher-hint', launcher); wall.textContent = 'Solte um APK aqui para instalar';
+  const wall = el('div', 'launcher-hint', launcher); wall.textContent = 'Drop an APK here to install';
   const app = el('button', 'launcher-app', launcher); app.type = 'button';
   const iconBox = el('span', 'launcher-icon', app), label = el('span', 'launcher-label', app), spinner = el('span', 'launcher-installing', app); spinner.setAttribute('aria-hidden', 'true');
-  const hit = el('button', 'task-card-hit'); hit.type = 'button'; hit.hidden = true; hit.setAttribute('aria-label', 'Voltar ao aplicativo'); screen.querySelector('.system-bars')?.before(hit);
+  const hit = el('button', 'task-card-hit'); hit.type = 'button'; hit.hidden = true; hit.setAttribute('aria-label', 'Back to the app'); screen.querySelector('.system-bars')?.before(hit);
   const zone = el('div', 'task-gesture-zone'); zone.setAttribute('aria-hidden', 'true'); screen.append(zone);
   const edges = ['left', 'right'].map(side => { const strip = el('div', `task-back-edge ${side}`); strip.dataset.side = side; strip.setAttribute('aria-hidden', 'true'); screen.append(strip); return strip; });
   const bubble = el('div', 'task-back-bubble'); bubble.hidden = true; bubble.setAttribute('aria-hidden', 'true'); bubble.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; screen.append(bubble);
@@ -64,8 +64,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       button.type = 'button'; button.dataset.state = 'saved'; button.dataset.shelfId = item.id; text.textContent = name;
       if (item.icon?.bytes) { const url = URL.createObjectURL(new Blob([item.icon.bytes], { type: item.icon.mime || 'image/png' })), img = doc.createElement('img'); shelfURLs.push(url); img.alt = ''; img.src = url; img.draggable = false; box.append(img); }
       else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
-      fileLine(button, item); button.setAttribute('aria-label', `Abrir ${name}`);
-      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nAbre o arquivo de onde ele está no disco (a versão mais nova)' : '\nAbre a cópia salva neste navegador'}\nBotão direito: remover da tela inicial`;
+      fileLine(button, item); button.setAttribute('aria-label', `Open ${name}`);
+      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nRight-click: remove from the home screen`;
       button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
       button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });
       shelfButtons.push(button);
@@ -90,7 +90,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     label.textContent = info?.label || info?.packageName || savedLabel || pendingLabel || 'App'; iconBox.replaceChildren(); iconBox.classList.remove('generic');
     const url = iconURL ?? savedIconURL; if (url) { const img = doc.createElement('img'); img.alt = ''; img.src = url; img.draggable = false; iconBox.append(img); }
     else { iconBox.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; iconBox.classList.add('generic'); }
-    app.setAttribute('aria-label', mode === 'installing' ? `Instalando ${label.textContent}` : `Abrir ${label.textContent}`);
+    app.setAttribute('aria-label', mode === 'installing' ? `Installing ${label.textContent}` : `Open ${label.textContent}`);
   };
   let infoPending = Promise.resolve();   // the launcher-info request in flight: a launch started right after a load waits for it (the client takes one VM request at a time)
   const loadInfo = key => infoFor === key ? infoPending : (infoPending = loadInfoOnce(key));   // asked again for the same package (the launcher shown twice during a restart): the request in flight is the one to wait for
@@ -116,8 +116,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       await dismiss();   // the page shows the launcher with the app's icon (closed())
     } catch (error) { report?.(error?.message ?? String(error), error); } finally { dismissing = false; }
   };
-  const leave = async next => { if (mode === 'foreground' || mode === 'dragging') { show(next); await run('Saindo do aplicativo…', () => vm().home()); announce(next); } else show(next); };   // announced again: the snapshot of the stopped app repainted the status line
-  const resume = async () => { if (mode === 'installing' || mode === 'idle') return; if (mode === 'closed' || mode === 'installed') { show('foreground'); await relaunch(); return; } const ok = await run('Voltando ao aplicativo…', () => vm().resumeTask()); if (ok) show('foreground'); };
+  const leave = async next => { if (mode === 'foreground' || mode === 'dragging') { show(next); await run('Leaving the app…', () => vm().home()); announce(next); } else show(next); };   // announced again: the snapshot of the stopped app repainted the status line
+  const resume = async () => { if (mode === 'installing' || mode === 'idle') return; if (mode === 'closed' || mode === 'installed') { show('foreground'); await relaunch(); return; } const ok = await run('Returning to the app…', () => vm().resumeTask()); if (ok) show('foreground'); };
 
   // ---- the swipe-up gesture ---------------------------------------------------------------------------------------------------------------------------------------------
   const pageScale = () => { const rect = screen.getBoundingClientRect(); return screen.offsetHeight > 0 && rect.height > 0 ? rect.height / screen.offsetHeight : 1; };

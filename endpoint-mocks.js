@@ -11,8 +11,8 @@
 // URL pattern: "http(s)://host[:port]/path[?query]" or a host-less "/path[?query]" (any scheme, host and port). A host label may be "*" (one label: "*.exemplo.com"); a path segment
 // "*" is exactly one segment, "*" inside a segment is any text without "/", and "**" is any number of segments. Without a port the pattern takes any port.
 // Query "exact": the request has exactly the pattern's parameters (any order; a value "*" takes any value); "ignore": the query is not looked at.
-import { inflateRaw } from './inflate.js?v=ca92aaad0948';
-import { REASONS } from './virtual-http-socket.js?v=ca92aaad0948';
+import { inflateRaw } from './inflate.js?v=d422379a2a38';
+import { REASONS } from './virtual-http-socket.js?v=d422379a2a38';
 
 export const MOCK_METHODS = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 export const MAX_MOCKS = 50, MAX_BODY_BYTES = 4 * 1024 * 1024, MAX_DELAY_MS = 600000, MAX_HEADERS = 64;
@@ -54,28 +54,28 @@ export function normalizeMock(raw) {
   };
 }
 
-/** The URL pattern: { scheme|null, host|null, port|null, path, query|null, hostRe, pathRe } or { error } (in Portuguese, for the dialog). */
+/** The URL pattern: { scheme|null, host|null, port|null, path, query|null, hostRe, pathRe } or { error } (for the dialog). */
 export function parsePattern(input) {
   const raw = String(input ?? '').trim();
-  if (!raw) return { error: 'Informe a URL ou o caminho (ex.: https://api.exemplo.com/v1/* ou /v1/usuarios/*).' };
-  if (/\s/.test(raw)) return { error: 'A URL não pode ter espaços.' };
-  if (raw.includes('#')) return { error: 'A URL não pode ter fragmento (#): ele não vai na requisição.' };
+  if (!raw) return { error: 'Enter the URL or the path (e.g. https://api.example.com/v1/* or /v1/users/*).' };
+  if (/\s/.test(raw)) return { error: 'The URL cannot contain spaces.' };
+  if (raw.includes('#')) return { error: 'The URL cannot have a fragment (#): it is not sent in the request.' };
   let scheme = null, host = null, port = null, rest = raw;
   const full = /^([a-z][a-z0-9+.-]*):\/\/([^/?]*)(.*)$/i.exec(raw);
   if (full) {
     scheme = full[1].toLowerCase();
-    if (scheme !== 'http' && scheme !== 'https') return { error: 'Use http:// ou https:// (ou um caminho começando com / para qualquer host).' };
+    if (scheme !== 'http' && scheme !== 'https') return { error: 'Use http:// or https:// (or a path starting with / for any host).' };
     const authority = /^(\[[^\]]+\]|[^:@]+)(?::(\d{1,5}))?$/.exec(full[2]);
-    if (!authority) return { error: 'Host inválido: use nome, *.dominio, IP ou host:porta.' };
+    if (!authority) return { error: 'Invalid host: use a name, *.domain, an IP or host:port.' };
     host = authority[1].toLowerCase(); port = authority[2] === undefined ? null : Number(authority[2]);
-    if (!(HOST_PATTERN.test(host) || IPV6.test(host))) return { error: 'Host inválido: use nome, *.dominio, IP ou host:porta.' };
-    if (port !== null && (port < 1 || port > 65535)) return { error: 'Porta inválida: use um número de 1 a 65535.' };
+    if (!(HOST_PATTERN.test(host) || IPV6.test(host))) return { error: 'Invalid host: use a name, *.domain, an IP or host:port.' };
+    if (port !== null && (port < 1 || port > 65535)) return { error: 'Invalid port: use a number from 1 to 65535.' };
     rest = full[3];
-  } else if (!raw.startsWith('/')) return { error: 'Comece com http://, https:// ou / (caminho em qualquer host).' };
+  } else if (!raw.startsWith('/')) return { error: 'Start with http://, https:// or / (a path on any host).' };
   const mark = rest.indexOf('?'), path = (mark >= 0 ? rest.slice(0, mark) : rest) || '/', query = mark >= 0 ? rest.slice(mark + 1) : null;
-  if (!path.startsWith('/')) return { error: 'O caminho deve começar com /.' };
+  if (!path.startsWith('/')) return { error: 'The path must start with /.' };
   const segments = safeDecode(path).split('/').slice(1);
-  if (segments.some(segment => segment.includes('**') && segment !== '**')) return { error: '"**" deve ocupar um segmento inteiro (ex.: /v1/**/detalhe).' };
+  if (segments.some(segment => segment.includes('**') && segment !== '**')) return { error: '"**" must take a whole segment (e.g. /v1/**/details).' };
   let pathSource = '';
   for (const segment of segments) pathSource += segment === '**' ? '(?:/[^/]*)*' : '/' + (segment === '*' ? '[^/]+' : escapeRe(segment).replaceAll('*', '[^/]*'));
   const hostRe = host && !IPV6.test(host) ? new RegExp('^' + host.split('.').map(label => label === '*' ? '[^.]+' : escapeRe(label)).join('\\.') + '$') : null;
@@ -94,20 +94,20 @@ export function sameQuery(patternQuery, requestQuery) {
 
 /** The gzip member's decompressed bytes, or throws (a mock that says Content-Encoding: gzip must carry real gzip). */
 export function gunzip(bytes) {
-  if (bytes.length < 18 || bytes[0] !== 0x1f || bytes[1] !== 0x8b || bytes[2] !== 8) throw new Error('não começa com o cabeçalho gzip');
+  if (bytes.length < 18 || bytes[0] !== 0x1f || bytes[1] !== 0x8b || bytes[2] !== 8) throw new Error('does not start with the gzip header');
   const flags = bytes[3]; let at = 10;
   if (flags & 4) at += 2 + (bytes[at] | (bytes[at + 1] << 8));
   if (flags & 8) { while (at < bytes.length && bytes[at] !== 0) at++; at++; }
   if (flags & 16) { while (at < bytes.length && bytes[at] !== 0) at++; at++; }
   if (flags & 2) at += 2;
   const end = bytes.length - 8, size = (bytes[end + 4] | (bytes[end + 5] << 8) | (bytes[end + 6] << 16) | (bytes[end + 7] << 24)) >>> 0;
-  if (at > end || size > 64 * 1024 * 1024) throw new Error('cabeçalho gzip inválido');
+  if (at > end || size > 64 * 1024 * 1024) throw new Error('invalid gzip header');
   const out = inflateRaw(bytes.subarray(at, end), size);
   return out.length === size ? out : out.subarray(0, size);
 }
 
 function base64Bytes(text) {
-  if (typeof globalThis.atob !== 'function') throw new Error('base64 indisponível');
+  if (typeof globalThis.atob !== 'function') throw new Error('base64 unavailable');
   const binary = globalThis.atob(text), out = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) out[i] = binary.charCodeAt(i);
   return out;
@@ -123,41 +123,41 @@ export function bytesToBase64(bytes) {
  */
 export function validateMock(input) {
   const mock = normalizeMock(input), errors = [], warnings = [], error = (field, message) => errors.push({ field, message }), warn = (field, message) => warnings.push({ field, message });
-  if (!MOCK_METHODS.includes(mock.method)) error('method', `Método inválido: use ${MOCK_METHODS.join(', ')}.`);
+  if (!MOCK_METHODS.includes(mock.method)) error('method', `Invalid method: use ${MOCK_METHODS.join(', ')}.`);
   const pattern = parsePattern(mock.url); if (pattern.error) error('url', pattern.error);
-  if (mock.query !== 'ignore' && mock.query !== 'exact') error('query', 'Modo da query inválido: use "ignorar" ou "exata".');
-  if (!pattern.error && mock.query === 'ignore' && pattern.query) warn('query', 'A URL tem query, mas o modo é "ignorar": ela não é comparada.');
+  if (mock.query !== 'ignore' && mock.query !== 'exact') error('query', 'Invalid query mode: use "ignore" or "exact".');
+  if (!pattern.error && mock.query === 'ignore' && pattern.query) warn('query', 'The URL has a query, but the mode is "ignore": it is not compared.');
   const statusText = String(mock.status).trim(), status = /^\d{3}$/.test(statusText) ? Number(statusText) : NaN;
-  if (!(status >= 200 && status <= 599)) error('status', 'Status inválido: use um número de 200 a 599.');
-  if (/[\r\n]/.test(mock.reason)) error('reason', 'A mensagem do status não pode ter quebra de linha.');
+  if (!(status >= 200 && status <= 599)) error('status', 'Invalid status: use a number from 200 to 599.');
+  if (/[\r\n]/.test(mock.reason)) error('reason', 'The status message cannot contain a line break.');
   const headers = [];
   for (const [index, row] of mock.headers.entries()) {
     const name = row.name.trim(), value = row.value.trim();
     if (!name && !value) continue;
-    if (!TOKEN.test(name)) { error(`header-${index}`, `Cabeçalho ${index + 1}: nome inválido${name ? ` "${name.slice(0, 40)}"` : ' (vazio)'}.`); continue; }
-    if (/[\r\n\0]/.test(value)) { error(`header-${index}`, `Cabeçalho ${name}: o valor não pode ter quebra de linha.`); continue; }
+    if (!TOKEN.test(name)) { error(`header-${index}`, `Header ${index + 1}: invalid name${name ? ` "${name.slice(0, 40)}"` : ' (empty)'}.`); continue; }
+    if (/[\r\n\0]/.test(value)) { error(`header-${index}`, `Header ${name}: the value cannot contain a line break.`); continue; }
     headers.push([name, value]);
   }
-  if (headers.length > MAX_HEADERS) error('headers', `No máximo ${MAX_HEADERS} cabeçalhos.`);
+  if (headers.length > MAX_HEADERS) error('headers', `At most ${MAX_HEADERS} headers.`);
   const header = name => headers.filter(([n]) => n.toLowerCase() === name).map(([, v]) => v);
   let body = new Uint8Array(0);
-  if (mock.bodyBase64) { try { body = base64Bytes(mock.bodyBase64); } catch { error('body', 'O arquivo do corpo não pôde ser lido (base64 inválido).'); } }
+  if (mock.bodyBase64) { try { body = base64Bytes(mock.bodyBase64); } catch { error('body', 'The body file could not be read (invalid base64).'); } }
   else body = encoder.encode(mock.body);
-  if (body.length > MAX_BODY_BYTES) error('body', `O corpo passa de ${MAX_BODY_BYTES / 1048576} MiB.`);
+  if (body.length > MAX_BODY_BYTES) error('body', `The body is larger than ${MAX_BODY_BYTES / 1048576} MiB.`);
   const contentType = header('content-type')[0] ?? '';
-  if (/json/i.test(contentType) && !mock.bodyBase64 && mock.body.trim()) { try { JSON.parse(mock.body); } catch (e) { warn('body', `O corpo não é JSON válido (Content-Type ${contentType}): ${String(e?.message ?? e).slice(0, 120)}. Ele será enviado assim mesmo.`); } }
-  if ((status === 204 || status === 304) && body.length) warn('body', `Respostas ${status} não têm corpo: o corpo configurado não é enviado.`);
+  if (/json/i.test(contentType) && !mock.bodyBase64 && mock.body.trim()) { try { JSON.parse(mock.body); } catch (e) { warn('body', `The body is not valid JSON (Content-Type ${contentType}): ${String(e?.message ?? e).slice(0, 120)}. It will be sent anyway.`); } }
+  if ((status === 204 || status === 304) && body.length) warn('body', `${status} responses have no body: the configured body is not sent.`);
   const encodings = header('content-encoding').join(',').split(',').map(v => v.trim().toLowerCase()).filter(v => v && v !== 'identity');
   let delivered = body, decoded = false;
   if (encodings.length) {
-    if (encodings.length !== 1 || !['gzip', 'x-gzip'].includes(encodings[0])) error('headers', `Content-Encoding "${header('content-encoding').join(', ')}" não é suportado no mock: use gzip (com um corpo gzip de verdade, carregado de arquivo) ou nenhum.`);
-    else { try { delivered = gunzip(body); decoded = true; } catch (e) { error('body', `Content-Encoding: gzip, mas o corpo não é gzip válido (${e?.message ?? e}). Carregue um arquivo .gz ou remova o cabeçalho.`); } }
+    if (encodings.length !== 1 || !['gzip', 'x-gzip'].includes(encodings[0])) error('headers', `Content-Encoding "${header('content-encoding').join(', ')}" is not supported in the mock: use gzip (with a real gzip body, loaded from a file) or none.`);
+    else { try { delivered = gunzip(body); decoded = true; } catch (e) { error('body', `Content-Encoding: gzip, but the body is not valid gzip (${e?.message ?? e}). Load a .gz file or remove the header.`); } }
   }
   const lengths = header('content-length');
   if (lengths.length > 1) error('headers', 'Content-Length repetido.');
-  else if (lengths.length === 1 && (!/^\d+$/.test(lengths[0]) || Number(lengths[0]) !== body.length)) error('headers', `Content-Length (${lengths[0]}) difere do tamanho do corpo (${body.length} bytes). Remova o cabeçalho para que o lab o calcule.`);
+  else if (lengths.length === 1 && (!/^\d+$/.test(lengths[0]) || Number(lengths[0]) !== body.length)) error('headers', `Content-Length (${lengths[0]}) differs from the body size (${body.length} bytes). Remove the header so the lab computes it.`);
   const delayText = String(mock.delayMs ?? 0).trim(), delayMs = delayText === '' ? 0 : /^\d+$/.test(delayText) ? Number(delayText) : NaN;
-  if (!(delayMs >= 0 && delayMs <= MAX_DELAY_MS)) error('delayMs', `Atraso inválido: use de 0 a ${MAX_DELAY_MS} ms.`);
+  if (!(delayMs >= 0 && delayMs <= MAX_DELAY_MS)) error('delayMs', `Invalid delay: use 0 to ${MAX_DELAY_MS} ms.`);
   if (errors.length) return { errors, warnings, compiled: null, mock };
   // What the app receives: like the transport (src/network-transport.js), a body the transport decoded loses Content-Encoding and Content-Length; otherwise the lab states the length.
   let out = decoded ? headers.filter(([name]) => !['content-encoding', 'content-length'].includes(name.toLowerCase())) : headers.slice();
@@ -243,9 +243,9 @@ export function describeEndpointMocks(runtime) {
 export function endpointMockSummaryLines(runtime) {
   const active = runtime.platform?.endpointMocks; if (!active?.length) return null;
   const hits = active.reduce((sum, record) => sum + record.hits, 0);
-  const lines = [`Mocks de endpoint ATIVOS: ${active.length} (${hits} ${hits === 1 ? 'requisição respondida' : 'requisições respondidas'} pelo lab; essas requisições não foram à rede)`];
-  for (const record of active.slice(0, 8)) lines.push(`  ${record.label} -> ${record.status} (${record.hits} ${record.hits === 1 ? 'resposta' : 'respostas'})`);
-  if (active.length > 8) lines.push(`  … e mais ${active.length - 8}`);
+  const lines = [`Endpoint mocks ACTIVE: ${active.length} (${hits} ${hits === 1 ? 'request answered' : 'requests answered'} by the lab; those requests did not go to the network)`];
+  for (const record of active.slice(0, 8)) lines.push(`  ${record.label} -> ${record.status} (${record.hits} ${record.hits === 1 ? 'response' : 'responses'})`);
+  if (active.length > 8) lines.push(`  … and ${active.length - 8} more`);
   return lines;
 }
 
@@ -269,8 +269,8 @@ export function exportMocks(mocks, packageName = '') {
 }
 /** Parses an exported file (or a bare array of mocks). Returns { mocks, error? }; imported mocks get fresh ids so they never collide with the current list. */
 export function importMocks(text) {
-  let data; try { data = JSON.parse(String(text)); } catch (e) { return { mocks: [], error: `O arquivo não é JSON válido: ${String(e?.message ?? e).slice(0, 120)}` }; }
+  let data; try { data = JSON.parse(String(text)); } catch (e) { return { mocks: [], error: `The file is not valid JSON: ${String(e?.message ?? e).slice(0, 120)}` }; }
   const list = Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray(data.mocks) ? data.mocks : null;
-  if (!list) return { mocks: [], error: `O arquivo não tem uma lista de mocks (esperado {"format":"${EXPORT_FORMAT}","mocks":[...]}).` };
-  return { mocks: list.slice(0, MAX_MOCKS).map(item => ({ ...normalizeMock(item), id: newMockId() })), ...(list.length > MAX_MOCKS ? { error: `Só os primeiros ${MAX_MOCKS} mocks foram importados.` } : {}) };
+  if (!list) return { mocks: [], error: `The file has no list of mocks (expected {"format":"${EXPORT_FORMAT}","mocks":[...]}).` };
+  return { mocks: list.slice(0, MAX_MOCKS).map(item => ({ ...normalizeMock(item), id: newMockId() })), ...(list.length > MAX_MOCKS ? { error: `Only the first ${MAX_MOCKS} mocks were imported.` } : {}) };
 }

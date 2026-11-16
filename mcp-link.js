@@ -1,7 +1,7 @@
-// The page's side of the MCP bridge (scripts/lab-mcp.mjs, published as tools/lab-mcp.mjs): Controles › MCP › Conectar opens an event stream to the bridge on this machine
+// The page's side of the MCP bridge (scripts/lab-mcp.mjs, published as tools/lab-mcp.mjs): Controls › MCP › Connect opens an event stream to the bridge on this machine
 // (http://127.0.0.1:8790 by default), receives each tool call the MCP client makes and posts back what src/mcp-tools.js answers. Nothing runs while disconnected; the bridge
 // accepts only the lab's origins and the pairing token. The token is generated here (generateMcpToken) and handed to the bridge through the MCP client's configuration
-// (mcpClientConfig: the JSON shown in Controles › MCP, token in APK_WEB_LAB_MCP_TOKEN). No process.*.
+// (mcpClientConfig: the JSON shown in Controls › MCP, token in APK_WEB_LAB_MCP_TOKEN). No process.*.
 
 /** Kept equal to DEFAULT_ORIGINS / DEFAULT_PORT / TOKEN_ENV of scripts/lab-mcp.mjs (tests/lab-mcp.test.mjs checks it). */
 export const MCP_DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
@@ -9,11 +9,11 @@ export const MCP_DEFAULT_PORT = 8790;
 export const MCP_TOKEN_ENV = 'APK_WEB_LAB_MCP_TOKEN';
 export const MCP_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
 export const MCP_SERVER_NAME = 'apk-lab';
-export const MCP_SCRIPT_PLACEHOLDER = '/caminho/para/lab-mcp.mjs';
+export const MCP_SCRIPT_PLACEHOLDER = '/path/to/lab-mcp.mjs';
 
 /** A new pairing token: 192 random bits from crypto.getRandomValues, base64url (32 characters). */
 export function generateMcpToken(cryptoImpl = globalThis.crypto) {
-  if (typeof cryptoImpl?.getRandomValues !== 'function') throw new Error('Este navegador não tem crypto.getRandomValues.');
+  if (typeof cryptoImpl?.getRandomValues !== 'function') throw new Error('This browser has no crypto.getRandomValues.');
   const bytes = cryptoImpl.getRandomValues(new Uint8Array(24));
   let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
@@ -55,13 +55,13 @@ export const MCP_AGENTS = ['claude', 'codex', 'cursor'];
  */
 export function mcpAgentSetup(agent, options = {}) {
   const address = mcpHttpAddress(options);
-  if (agent === 'codex') return { where: 'Cole em ~/.codex/config.toml e reinicie o Codex', text: `[mcp_servers.${MCP_SERVER_NAME}]\nurl = "${address}"`, link: null };
+  if (agent === 'codex') return { where: 'Paste into ~/.codex/config.toml and restart Codex', text: `[mcp_servers.${MCP_SERVER_NAME}]\nurl = "${address}"`, link: null };
   if (agent === 'cursor') {
     const text = JSON.stringify({ mcpServers: { [MCP_SERVER_NAME]: { url: address } } }, null, 2);
     let link = null; try { link = `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(MCP_SERVER_NAME)}&config=${encodeURIComponent(btoa(JSON.stringify({ url: address })))}`; } catch { /* no btoa: the JSON is enough */ }
-    return { where: 'Cole em .cursor/mcp.json do projeto (ou ~/.cursor/mcp.json)', text, link };
+    return { where: "Paste into the project's .cursor/mcp.json (or ~/.cursor/mcp.json)", text, link };
   }
-  return { where: 'Rode no terminal do projeto (Claude Code)', text: mcpAgentCommand(options), link: null };
+  return { where: "Run in the project's terminal (Claude Code)", text: mcpAgentCommand(options), link: null };
 }
 
 /**
@@ -76,40 +76,40 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
     let result; try { result = await execute(call.tool, call.args ?? {}, { fetchFile: file => fetchFile(base, file), sendFile: (slot, blob, options) => sendFile(base, slot, blob, options) }); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
     S.calls++; S.lastTool = call.tool; if (S.state === 'conectado') emit('conectado', S.message);
     try { await fetchImpl(`${base}/result`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: call.id, ...result }) }); }
-    catch (error) { emit('erro', `a resposta não chegou à ponte: ${error?.message ?? error}`); }
+    catch (error) { emit('erro', `the response did not reach the bridge: ${error?.message ?? error}`); }
   }
   /** A file the bridge offers for the call in flight (install_apk: { id, name, size }), read from the bridge on this machine into a File. */
   async function fetchFile(base, { id, name, size } = {}) {
-    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('A ponte não entregou o arquivo desta chamada.');
+    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('The bridge did not deliver the file for this call.');
     const res = await fetchImpl(`${base}/file/${id}`, { cache: 'no-store' });
-    if (!res?.ok) throw new Error(`A ponte não entregou o arquivo (HTTP ${res?.status ?? '?'}).`);
+    if (!res?.ok) throw new Error(`The bridge did not deliver the file (HTTP ${res?.status ?? '?'}).`);
     const blob = await res.blob();
-    if (Number.isFinite(size) && blob.size !== size) throw new Error(`O arquivo chegou incompleto da ponte (${blob.size} de ${size} bytes).`);
+    if (Number.isFinite(size) && blob.size !== size) throw new Error(`The file arrived incomplete from the bridge (${blob.size} of ${size} bytes).`);
     return new File([blob], String(name ?? 'app.apk'), { type: 'application/vnd.android.package-archive' });
   }
   /** Bytes for a file the bridge will write on its machine for the call in flight (adb pull, `> file`: { id }). */
   async function sendFile(base, { id } = {}, blob, { ext = null } = {}) {   // ext: the extension of a file the bridge named without one (a screen recording: mp4 or webm)
-    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('A ponte não abriu um arquivo de saída para esta chamada.');
+    if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('The bridge did not open an output file for this call.');
     const res = await fetchImpl(`${base}/file/${id}${/^[a-z0-9]{1,8}$/.test(String(ext ?? '')) ? `?ext=${ext}` : ''}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: blob });
-    if (!res?.ok) { let reason = ''; try { reason = (await res.json())?.error ?? ''; } catch { /* no body */ } throw new Error(`A ponte não gravou o arquivo (HTTP ${res?.status ?? '?'}${reason ? `: ${reason}` : ''}).`); }
+    if (!res?.ok) { let reason = ''; try { reason = (await res.json())?.error ?? ''; } catch { /* no body */ } throw new Error(`The bridge did not write the file (HTTP ${res?.status ?? '?'}${reason ? `: ${reason}` : ''}).`); }
   }
   function connect({ url, token }) {
     disconnect(false);
     const clean = String(url ?? '').trim().replace(/\/+$/, ''), key = String(token ?? '').trim();
-    if (!/^https?:\/\//.test(clean)) { emit('erro', 'Endereço inválido (ex.: http://127.0.0.1:8790).'); return false; }
-    if (!key) { emit('erro', 'Sem token: clique em Gerar novo e rode de novo o comando do passo 1.'); return false; }
-    if (!MCP_TOKEN_PATTERN.test(key)) { emit('erro', 'Token inválido (16 ou mais letras, números, _ ou -): clique em Gerar novo e rode de novo o comando do passo 1.'); return false; }
-    if (typeof EventSourceImpl !== 'function') { emit('erro', 'Este navegador não tem EventSource.'); return false; }
+    if (!/^https?:\/\//.test(clean)) { emit('erro', 'Invalid address (e.g. http://127.0.0.1:8790).'); return false; }
+    if (!key) { emit('erro', 'No token: click Generate new and run the step 1 command again.'); return false; }
+    if (!MCP_TOKEN_PATTERN.test(key)) { emit('erro', 'Invalid token (16 or more letters, digits, _ or -): click Generate new and run the step 1 command again.'); return false; }
+    if (typeof EventSourceImpl !== 'function') { emit('erro', 'This browser has no EventSource.'); return false; }
     S.key = key; S.base = `${clean}/${encodeURIComponent(key)}`; S.calls = 0; S.server = null; emit('conectando', `${clean}…`);
     const source = new EventSourceImpl(`${S.base}/events`); S.source = source;
     source.addEventListener('hello', event => { if (S.source !== source) return; try { S.server = JSON.parse(event.data).server ?? null; } catch { S.server = null; } emit('conectado', `${clean}`); });
     source.addEventListener('call', event => { if (S.source !== source) return; let call; try { call = JSON.parse(event.data); } catch { return; } answer(call); });
-    source.addEventListener('replaced', () => { if (S.source !== source) return; disconnect(false); emit('desconectado', 'Outra aba conectou a esta ponte.'); });
+    source.addEventListener('replaced', () => { if (S.source !== source) return; disconnect(false); emit('desconectado', 'Another tab connected to this bridge.'); });
     source.onerror = () => {
       if (S.source !== source) return;
       // EventSource reconnects by itself (the bridge restarts with the MCP client); CLOSED means a refusal (wrong token or origin). EventSource does not say which, so ask the
       // bridge once (GET /<token>/hello answers 401 for another token, 403 for another origin) and say it plainly.
-      if (source.readyState !== 2) emit('conectando', `reconectando a ${clean}…`);
+      if (source.readyState !== 2) emit('conectando', `reconnecting to ${clean}…`);
       diagnose(source, clean);
     };
     return true;
@@ -121,15 +121,15 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
     catch { status = -1; }
     finally { if (S.checking === source) S.checking = null; }
     if (S.source !== source) return;
-    if (status === 401) { disconnect(false); emit('erro', `A ponte em ${clean} recusou o token desta página. O token mudou ou o cliente MCP ainda usa o antigo: pare a ponte e rode de novo o comando do passo 1 (e atualize o endereço no agente).`); }
-    else if (status === 403) { disconnect(false); emit('erro', `A ponte em ${clean} recusou esta origem (${body?.error ?? 'origem não permitida'}). Rode de novo o comando do passo 1: ele traz --origin para esta página.`); }
+    if (status === 401) { disconnect(false); emit('erro', `The bridge at ${clean} refused this page's token. The token changed or the MCP client still uses the old one: stop the bridge and run the step 1 command again (and update the address in the agent).`); }
+    else if (status === 403) { disconnect(false); emit('erro', `The bridge at ${clean} refused this origin (${body?.error ?? 'origin not allowed'}). Run the step 1 command again: it carries --origin for this page.`); }
     else if (status === -1) {
       // a bridge that refuses this origin answers without CORS headers, which looks like no bridge at all from here
-      const origin = globalThis.location?.origin, hint = origin && !MCP_DEFAULT_ORIGINS.includes(origin) ? ` Se a ponte está rodando, ela precisa aceitar esta origem (${origin}): o comando do passo 1 já traz --origin.` : '';
-      if (source.readyState === 2) { disconnect(false); emit('erro', `Sem ponte em ${clean}: o comando do passo 1 está rodando no terminal? Rode e clique em Conectar.${hint}`); }
-      else emit('conectando', `Sem ponte em ${clean} ainda: o comando do passo 1 está rodando no terminal? Tentando de novo…${hint}`);
+      const origin = globalThis.location?.origin, hint = origin && !MCP_DEFAULT_ORIGINS.includes(origin) ? ` If the bridge is running, it must accept this origin (${origin}): the step 1 command already carries --origin.` : '';
+      if (source.readyState === 2) { disconnect(false); emit('erro', `No bridge at ${clean}: is the step 1 command running in the terminal? Run it and click Connect.${hint}`); }
+      else emit('conectando', `No bridge at ${clean} yet: is the step 1 command running in the terminal? Trying again…${hint}`);
     }
-    else if (source.readyState === 2) { disconnect(false); emit('erro', `A ponte em ${clean} fechou a conexão${body?.error ? `: ${body.error}` : ''}.`); }
+    else if (source.readyState === 2) { disconnect(false); emit('erro', `The bridge at ${clean} closed the connection${body?.error ? `: ${body.error}` : ''}.`); }
   }
   function disconnect(notify = true) {
     if (S.source) { try { S.source.close(); } catch { /* already closed */ } }

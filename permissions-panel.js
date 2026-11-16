@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=ca92aaad0948';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=ca92aaad0948';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=d422379a2a38';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=d422379a2a38';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 export const PERMISSION_ICONS = {
@@ -24,25 +24,25 @@ function clearConfig(pkg) { try { globalThis.localStorage?.removeItem(storageKey
  */
 export function createPermissionsPanel({ $, vm, location }) {
   const S = { pkg: null, manifest: null, list: [], config: emptyConfig(), queue: [], open: null, revokedNote: '' };
-  const SELECT_LABELS = [['ask', 'Perguntar'], ['allow', 'Permitir'], ['deny', 'Negar']];
+  const SELECT_LABELS = [['ask', 'Ask'], ['allow', 'Allow'], ['deny', 'Deny']];
   const push = payload => { if (!vm.worker) return Promise.resolve(); return vm.setPermissions({ dialogs: true, ...payload }).catch(() => { /* the VM is busy or gone: the state is re-sent when the APK is opened again */ }); };
 
   function stateNote(entry) {
     const state = S.config.states[entry.name] ?? 'ask', denials = S.config.denials[entry.name] ?? 0, granted = computeGranted(S.config, S.manifest).has(entry.name);
     if (!entry.applicable) return entry.note;
-    if (S.config.once.includes(entry.name)) return 'concedida só desta vez (até o app encerrar)';
-    if (state === 'ask' && denials >= 2) return 'negada 2 vezes: o Android não mostra mais o diálogo (o pedido é negado na hora)';
-    if (state === 'ask' && denials === 1) return 'negada 1 vez: o app pode mostrar uma explicação antes de pedir de novo';
+    if (S.config.once.includes(entry.name)) return 'granted for this time only (until the app exits)';
+    if (state === 'ask' && denials >= 2) return 'denied twice: Android no longer shows the dialog (the request is denied at once)';
+    if (state === 'ask' && denials === 1) return 'denied once: the app may show an explanation before asking again';
     if (state === 'ask' && granted) return entry.note;
     return entry.note || '';
   }
   function render() {
     const list = $('perms-list'), empty = $('perms-empty'); list.replaceChildren();
     empty.hidden = S.list.length > 0; list.hidden = S.list.length === 0;
-    if (!S.pkg) empty.textContent = 'Abra um APK para ver as permissões de execução (perigosas) que o app pede no manifesto.';
-    else if (!S.list.length) empty.textContent = 'O manifesto deste app não pede permissões de execução (perigosas). As permissões normais são concedidas na instalação.';
+    if (!S.pkg) empty.textContent = 'Open an APK to see the runtime (dangerous) permissions the app requests in its manifest.';
+    else if (!S.list.length) empty.textContent = 'This app\'s manifest requests no runtime (dangerous) permissions. Normal permissions are granted at install time.';
     const granted = S.pkg ? computeGranted(S.config, S.manifest) : new Set();
-    $('perms-summary').textContent = !S.pkg ? 'sem app' : S.list.length ? `${S.list.filter(item => granted.has(item.name)).length} de ${S.list.length} concedidas` : 'nenhuma pedida';
+    $('perms-summary').textContent = !S.pkg ? 'no app' : S.list.length ? `${S.list.filter(item => granted.has(item.name)).length} of ${S.list.length} granted` : 'none requested';
     $('perms-reset').disabled = !S.pkg;
     let currentLabel = null, group = null;
     for (const entry of S.list) {
@@ -64,8 +64,8 @@ export function createPermissionsPanel({ $, vm, location }) {
     const before = computeGranted(S.config, S.manifest).has(entry.name);
     S.config = setState(S.config, entry.name, state);
     const after = computeGranted(S.config, S.manifest).has(entry.name);
-    if (before && !after) $('perms-note').textContent = `${shortName(entry.name)} revogada. No Android o processo do app seria encerrado agora; aqui a revogação vale na hora e o app continua rodando. Reabra o APK para vê-lo recomeçar sem a permissão.`;
-    else if (!before && after) $('perms-note').textContent = `${shortName(entry.name)} concedida: vale já na próxima verificação do app (checkSelfPermission).`;
+    if (before && !after) $('perms-note').textContent = `${shortName(entry.name)} revoked. On Android the app process would be killed now; here the revocation takes effect at once and the app keeps running. Reopen the APK to see it restart without the permission.`;
+    else if (!before && after) $('perms-note').textContent = `${shortName(entry.name)} granted: it applies from the app's next check (checkSelfPermission).`;
     commit();
   }
   function commit() { if (S.pkg) saveConfig(S.pkg, S.config); render(); push({ config: S.config }); }
@@ -86,7 +86,7 @@ export function createPermissionsPanel({ $, vm, location }) {
     $('perm-question').textContent = dialog.question.replace('%s', request.appLabel);
     $('perm-detail').textContent = dialog.permissions.map(shortName).join(', ');
     $('perm-icon').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PERMISSION_ICONS[dialog.group] ?? PERMISSION_ICONS.OTHER}"/></svg>`;
-    $('perm-allow').textContent = dialog.oneTime ? 'Enquanto o app está em uso' : 'Permitir'; $('perm-once').hidden = !dialog.oneTime;
+    $('perm-allow').textContent = dialog.oneTime ? 'While using the app' : 'Allow'; $('perm-once').hidden = !dialog.oneTime;
     const answer = choice => { const taken = S.open; closeDialog(); finish(taken.item, choice); };
     $('perm-allow').onclick = () => answer('allow'); $('perm-once').onclick = () => answer('once'); $('perm-deny').onclick = () => answer('deny');
     dialogEl.onkeydown = event => {
@@ -118,21 +118,21 @@ export function createPermissionsPanel({ $, vm, location }) {
     for (const [id, value] of [['loc-lat', block.latitude], ['loc-lon', block.longitude], ['loc-acc', block.accuracy]]) if (document.activeElement !== $(id)) { $(id).value = String(value); $(id).removeAttribute('aria-invalid'); }
   }
   function readLocation() {
-    const fields = [['loc-lat', -90, 90, 'Latitude'], ['loc-lon', -180, 180, 'Longitude'], ['loc-acc', 0, 100000, 'Precisão']], values = [];
+    const fields = [['loc-lat', -90, 90, 'Latitude'], ['loc-lon', -180, 180, 'Longitude'], ['loc-acc', 0, 100000, 'Accuracy']], values = [];
     for (const [id, lo, hi, label] of fields) {
       const text = $(id).value.trim().replace(',', '.'), n = Number(text), valid = text !== '' && Number.isFinite(n) && n >= lo && n <= hi;
-      if (valid) $(id).removeAttribute('aria-invalid'); else { $(id).setAttribute('aria-invalid', 'true'); $('loc-note').textContent = `${label}: informe um número entre ${lo} e ${hi}. O valor anterior continua valendo.`; return null; }
+      if (valid) $(id).removeAttribute('aria-invalid'); else { $(id).setAttribute('aria-invalid', 'true'); $('loc-note').textContent = `${label}: enter a number between ${lo} and ${hi}. The previous value still applies.`; return null; }
       values.push(n);
     }
     return { enabled: $('loc-enabled').checked, latitude: values[0], longitude: values[1], accuracy: values[2] };
   }
   function onLocationInput() {
     const block = readLocation(); if (!block) return;
-    $('loc-note').textContent = block.enabled ? 'Localização ligada: LocationManager entrega esta posição ao app (com a permissão concedida) e avisa os listeners quando ela muda.' : 'Localização desligada: isLocationEnabled e isProviderEnabled são falsos, sem posição para o app.';
+    $('loc-note').textContent = block.enabled ? 'Location on: LocationManager delivers this position to the app (with the permission granted) and notifies the listeners when it changes.' : 'Location off: isLocationEnabled and isProviderEnabled are false, with no position for the app.';
     location.set(block); push({ location: block });
   }
   for (const id of ['loc-enabled', 'loc-lat', 'loc-lon', 'loc-acc']) $(id).addEventListener('input', onLocationInput);
-  $('perms-reset').addEventListener('click', () => { if (!S.pkg) return; clearConfig(S.pkg); S.config = emptyConfig(); $('perms-note').textContent = 'Permissões deste app restauradas para "Perguntar".'; render(); push({ config: S.config }); });
+  $('perms-reset').addEventListener('click', () => { if (!S.pkg) return; clearConfig(S.pkg); S.config = emptyConfig(); $('perms-note').textContent = 'This app\'s permissions restored to "Ask".'; render(); push({ config: S.config }); });
 
   return {
     /** The APK was inspected: list its runtime permissions, load the saved state and give both (and the location) to the VM before the app runs. */
@@ -149,10 +149,10 @@ export function createPermissionsPanel({ $, vm, location }) {
     list() { const granted = computeGranted(S.config, S.manifest); return S.list.map(entry => ({ name: entry.name, state: S.config.states[entry.name] ?? 'ask', granted: granted.has(entry.name), applicable: !!entry.applicable })); },
     /** What a change of the panel's select does, by name (a short name such as CAMERA is android.permission.CAMERA). */
     set(name, state) {
-      if (!['ask', 'allow', 'deny'].includes(state)) throw new Error('state é ask, allow ou deny');
+      if (!['ask', 'allow', 'deny'].includes(state)) throw new Error('state is ask, allow or deny');
       const full = String(name).includes('.') ? String(name) : `android.permission.${name}`, entry = S.list.find(item => item.name === full);
-      if (!entry) throw new Error(`${full} não é uma permissão de execução declarada por este APK (há: ${S.list.map(item => item.name).join(', ') || 'nenhuma'})`);
-      if (!entry.applicable) throw new Error(`${full} não se aplica a este app (targetSdk / versão)`);
+      if (!entry) throw new Error(`${full} is not a runtime permission declared by this APK (there are: ${S.list.map(item => item.name).join(', ') || 'none'})`);
+      if (!entry.applicable) throw new Error(`${full} does not apply to this app (targetSdk / version)`);
       change(entry, state); return this.list();
     },
     get state() { return S; },

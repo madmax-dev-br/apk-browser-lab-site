@@ -1,7 +1,7 @@
 // The "Redirecionar hosts" section of the Controles panel (src/host-map.js): N from -> to rows kept in the device settings (network.hostMap) and applied live through the same path as the
 // other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). Each row shows the effective URL shape of its rule and, like the
 // "Mock de endpoints" rows, the live count of the requests it redirected (responses and failures), which come back with every snapshot (snapshot.hostMap).
-import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=ca92aaad0948';
+import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=d422379a2a38';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');
@@ -10,14 +10,14 @@ export function createHostMapPanel({ $, get, set }) {
 
   function meta(rule) {
     const parsed = parseRule(rule);
-    if (parsed.empty) return ['Digite a origem (o host que o app usa) e o destino.', ''];
+    if (parsed.empty) return ['Enter the source (the host the app uses) and the target.', ''];
     if (parsed.error) return [parsed.error, 'error'];
-    return [`${rule.enabled ? '' : 'desligada · '}${describeRule(parsed)}`, rule.enabled ? 'ok' : ''];
+    return [`${rule.enabled ? '' : 'off · '}${describeRule(parsed)}`, rule.enabled ? 'ok' : ''];
   }
   function hitsOf(rule) {
     const parsed = parseRule(rule); if (parsed.empty || parsed.error) return ['', ''];
     const record = counts.get(ruleKey(rule)) ?? null;
-    return [hitText(record), record?.failures ? 'warn' : '', record?.lastFailure ? `Última falha: ${record.lastFailure}` : ''];
+    return [hitText(record), record?.failures ? 'warn' : '', record?.lastFailure ? `Last failure: ${record.lastFailure}` : ''];
   }
   const activeRules = () => current.filter(rule => { const parsed = parseRule(rule); return rule.enabled && !parsed.error && !parsed.empty; });
   function updateMeta() {
@@ -29,10 +29,10 @@ export function createHostMapPanel({ $, get, set }) {
       li.querySelector('.hm-to').setAttribute('aria-invalid', String(state === 'error' && /^Destino|^Falta o destino/.test(text)));
     });
     const active = activeRules(), responses = active.reduce((sum, rule) => sum + (counts.get(ruleKey(rule))?.responses ?? 0), 0), failures = active.reduce((sum, rule) => sum + (counts.get(ruleKey(rule))?.failures ?? 0), 0);
-    $('hm-summary').textContent = `${active.length} ${active.length === 1 ? 'ativa' : 'ativas'}`;
+    $('hm-summary').textContent = `${active.length} active`;
     $('hm-status').textContent = active.length
-      ? `${active.length} ${active.length === 1 ? 'regra ativa' : 'regras ativas'}, ${responses} ${responses === 1 ? 'resposta' : 'respostas'}${failures ? `, ${failures} ${failures === 1 ? 'falha' : 'falhas'}` : ''}. O app continua vendo a URL original; o painel Rede marca cada requisição REDIRECIONADA e diz para onde ela foi.`
-      : current.length ? 'Nenhuma regra ativa.' : 'Nenhum host redirecionado.';
+      ? `${active.length} active ${active.length === 1 ? 'rule' : 'rules'}, ${responses} ${responses === 1 ? 'response' : 'responses'}${failures ? `, ${failures} ${failures === 1 ? 'failure' : 'failures'}` : ''}. The app still sees the original URL; the Network panel marks each request REDIRECTED and says where it went.`
+      : current.length ? 'No active rule.' : 'No redirected host.';
   }
   const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   function input(className, value, placeholder, label, describedBy) {
@@ -42,15 +42,15 @@ export function createHostMapPanel({ $, get, set }) {
   function render() {
     list().replaceChildren(...current.map((rule, index) => {
       const n = index + 1, metaId = `hm-meta-${n}`, li = el('li', 'hm-row');
-      const head = el('div', 'hm-head'), toggle = el('label', 'hm-toggle'), check = el('input'); check.type = 'checkbox'; check.checked = rule.enabled; check.setAttribute('aria-label', `Ativar o redirecionamento ${n}`);
-      toggle.append(check, el('span', null, `Regra ${n}`));
-      const remove = el('button', 'cp-button hm-remove', 'Remover'); remove.type = 'button'; remove.setAttribute('aria-label', `Remover o redirecionamento ${n}`);
+      const head = el('div', 'hm-head'), toggle = el('label', 'hm-toggle'), check = el('input'); check.type = 'checkbox'; check.checked = rule.enabled; check.setAttribute('aria-label', `Turn on redirect ${n}`);
+      toggle.append(check, el('span', null, `Rule ${n}`));
+      const remove = el('button', 'cp-button hm-remove', 'Remove'); remove.type = 'button'; remove.setAttribute('aria-label', `Remove redirect ${n}`);
       head.append(toggle, remove);
       const fields = el('div', 'hm-fields');
       const fromLabel = el('label', 'hm-field'), toLabel = el('label', 'hm-field');
-      const from = input('hm-from', rule.from, 'https://api.exemplo.com', `Origem do redirecionamento ${n}: o host que o app usa`, metaId);
-      const to = input('hm-to', rule.to, 'localhost:8080 ou https://staging.exemplo.com', `Destino do redirecionamento ${n}`, metaId);
-      fromLabel.append(el('span', 'hm-field-name', 'Origem (host do app)'), from); toLabel.append(el('span', 'hm-field-name', 'Destino'), to);
+      const from = input('hm-from', rule.from, 'https://api.example.com', `Source of redirect ${n}: the host the app uses`, metaId);
+      const to = input('hm-to', rule.to, 'localhost:8080 or https://staging.example.com', `Target of redirect ${n}`, metaId);
+      fromLabel.append(el('span', 'hm-field-name', 'Source (app host)'), from); toLabel.append(el('span', 'hm-field-name', 'Target'), to);
       const arrow = el('span', 'hm-arrow', '→'); arrow.setAttribute('aria-hidden', 'true');
       fields.append(fromLabel, arrow, toLabel);
       const info = el('span', 'hm-meta'); info.id = metaId;
@@ -65,14 +65,14 @@ export function createHostMapPanel({ $, get, set }) {
   }
   function changed(now = false) { updateMeta(); clearTimeout(timer); timer = setTimeout(() => set(current.map(rule => ({ ...rule }))), now ? 0 : 400); }
   $('hm-add').addEventListener('click', () => {
-    if (current.length >= 50) { $('hm-status').textContent = 'No máximo 50 redirecionamentos.'; return; }
+    if (current.length >= 50) { $('hm-status').textContent = 'At most 50 redirects.'; return; }
     current.push({ from: '', to: '', enabled: true }); render(); list().querySelectorAll('.hm-from')[current.length - 1]?.focus();
   });
   render();
   return {
     /** "Redirecionar" from a request of the Rede panel: a new rule with that origin; the destination field gets the focus (nothing applies until it is typed). */
     addRule(from) {
-      if (current.length >= 50) { $('hm-status').textContent = 'No máximo 50 redirecionamentos.'; return false; }
+      if (current.length >= 50) { $('hm-status').textContent = 'At most 50 redirects.'; return false; }
       const existing = current.findIndex(rule => rule.from.trim() === String(from).trim());
       const index = existing >= 0 ? existing : current.push({ from: String(from), to: '', enabled: true }) - 1;
       render(); const target = list().querySelectorAll('.hm-to')[index]; target?.scrollIntoView?.({ block: 'center' }); target?.focus?.(); return true;

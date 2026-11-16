@@ -47,34 +47,34 @@ export function smaliTypeToJava(type) {
  */
 export function parseMethodSpec(input) {
   const text = String(input ?? '').trim();
-  if (!text) return { ok: false, error: 'Informe o método.' };
+  if (!text) return { ok: false, error: 'Enter the method.' };
   if (text.startsWith('L') && text.includes('->')) {
     const arrow = text.indexOf('->'), owner = text.slice(0, arrow);
-    if (!/^L[^;\s]+;$/.test(owner) || !CLASS_PATH.test(owner.slice(1, -1))) return { ok: false, error: 'Classe inválida: use Lpacote/Classe; antes de "->".' };
+    if (!/^L[^;\s]+;$/.test(owner) || !CLASS_PATH.test(owner.slice(1, -1))) return { ok: false, error: 'Invalid class: use Lpackage/Class; before "->".' };
     const open = text.indexOf('(', arrow), close = text.indexOf(')', open);
-    if (open < 0 || close < 0) return { ok: false, error: 'Faltam os parênteses dos parâmetros: Lpkg/Classe;->nome(Params)Retorno.' };
-    const name = text.slice(arrow + 2, open); if (!SIMPLE_NAME.test(name)) return { ok: false, error: `Nome de método inválido: "${name}".` };
-    const parameters = smaliParameters(text.slice(open + 1, close)); if (!parameters) return { ok: false, error: 'Parâmetros inválidos: use tipos smali (I, Z, Ljava/lang/String;, [B...).' };
+    if (open < 0 || close < 0) return { ok: false, error: 'The parameter parentheses are missing: Lpkg/Class;->name(Params)Return.' };
+    const name = text.slice(arrow + 2, open); if (!SIMPLE_NAME.test(name)) return { ok: false, error: `Invalid method name: "${name}".` };
+    const parameters = smaliParameters(text.slice(open + 1, close)); if (!parameters) return { ok: false, error: 'Invalid parameters: use smali types (I, Z, Ljava/lang/String;, [B...).' };
     const result = text.slice(close + 1), read = result === 'V' ? { type: 'V', end: 1 } : readSmaliType(result, 0);
-    if (!read || read.end !== result.length) return { ok: false, error: 'Tipo de retorno inválido: use um tipo smali (V, Z, I, Ljava/lang/String;...).' };
+    if (!read || read.end !== result.length) return { ok: false, error: 'Invalid return type: use a smali type (V, Z, I, Ljava/lang/String;...).' };
     return finish(owner, name, parameters, result);
   }
   let rest = text, result = null;
   const prefix = /^([\w$.]+(?:\[\])*)\s+(?=[\w$.]+\s*\()/.exec(rest);
   if (prefix) { result = prefix[1]; rest = rest.slice(prefix[0].length); }
   const suffix = /\)\s*:\s*([\w$.]+(?:\[\])*)\s*$/.exec(rest);
-  if (suffix) { if (result !== null) return { ok: false, error: 'Tipo de retorno informado duas vezes.' }; result = suffix[1]; rest = rest.slice(0, suffix.index + 1); }
+  if (suffix) { if (result !== null) return { ok: false, error: 'Return type given twice.' }; result = suffix[1]; rest = rest.slice(0, suffix.index + 1); }
   const match = /^([\w$.]+)\.([\w$<>]+)\s*\(([^)]*)\)$/.exec(rest.trim());
-  if (!match) return { ok: false, error: 'Formato não reconhecido: use Lpkg/Classe;->nome(Params)Ret ou pacote.Classe.nome(tipos).' };
-  const [, className, name, list] = match; if (!JAVA_CLASS.test(className) || !SIMPLE_NAME.test(name)) return { ok: false, error: 'Nome de classe ou método inválido.' };
+  if (!match) return { ok: false, error: 'Format not recognized: use Lpkg/Class;->name(Params)Ret or package.Class.name(types).' };
+  const [, className, name, list] = match; if (!JAVA_CLASS.test(className) || !SIMPLE_NAME.test(name)) return { ok: false, error: 'Invalid class or method name.' };
   const parameters = [];
   for (const piece of list.split(',')) {
-    const trimmed = piece.trim(); if (!trimmed) { if (list.trim()) return { ok: false, error: 'Parâmetro vazio na lista.' }; continue; }
-    const smali = javaTypeToSmali(trimmed); if (!smali || smali === 'V') return { ok: false, error: `Tipo de parâmetro inválido: "${trimmed}".` };
+    const trimmed = piece.trim(); if (!trimmed) { if (list.trim()) return { ok: false, error: 'Empty parameter in the list.' }; continue; }
+    const smali = javaTypeToSmali(trimmed); if (!smali || smali === 'V') return { ok: false, error: `Invalid parameter type: "${trimmed}".` };
     parameters.push(smali);
   }
   let smaliResult = null;
-  if (result !== null) { smaliResult = javaTypeToSmali(result); if (!smaliResult) return { ok: false, error: `Tipo de retorno inválido: "${result}".` }; }
+  if (result !== null) { smaliResult = javaTypeToSmali(result); if (!smaliResult) return { ok: false, error: `Invalid return type: "${result}".` }; }
   return finish('L' + className.replaceAll('.', '/') + ';', name, parameters, smaliResult);
 }
 function finish(owner, name, parameters, result) {
@@ -90,23 +90,23 @@ const BITS = new ArrayBuffer(8), F32 = new Float32Array(BITS), I32 = new Int32Ar
 export function parseReturnValue(result, input) {
   const text = String(input ?? '');
   if (result === 'V') return { ok: true, value: undefined, display: '(void)' };
-  if (result === 'Z') { const t = text.trim(); if (t === 'true') return { ok: true, value: 1, display: 'true' }; if (t === 'false') return { ok: true, value: 0, display: 'false' }; return { ok: false, error: 'boolean: use true ou false.' }; }
+  if (result === 'Z') { const t = text.trim(); if (t === 'true') return { ok: true, value: 1, display: 'true' }; if (t === 'false') return { ok: true, value: 0, display: 'false' }; return { ok: false, error: 'boolean: use true or false.' }; }
   if (result in INT_RANGES) {
     const t = text.trim(), [lo, hi] = INT_RANGES[result], name = PRIMITIVES[result];
     if (result === 'C' && /^'.'$/u.test(t) && t.length === 3) return { ok: true, value: t.charCodeAt(1), display: t };
-    if (!/^[+-]?\d+$/.test(t)) return { ok: false, error: `${name}: use um inteiro entre ${lo} e ${hi}.` };
-    const n = Number(t); if (!Number.isSafeInteger(n) || n < lo || n > hi) return { ok: false, error: `${name}: ${t} fora do intervalo ${lo} a ${hi}.` };
+    if (!/^[+-]?\d+$/.test(t)) return { ok: false, error: `${name}: use an integer between ${lo} and ${hi}.` };
+    const n = Number(t); if (!Number.isSafeInteger(n) || n < lo || n > hi) return { ok: false, error: `${name}: ${t} is out of range ${lo} to ${hi}.` };
     return { ok: true, value: n, display: String(n) };
   }
   if (result === 'J') {
-    const t = text.trim(); if (!/^[+-]?\d+$/.test(t)) return { ok: false, error: 'long: use um inteiro entre -9223372036854775808 e 9223372036854775807.' };
-    const n = BigInt(t); if (n < -(2n ** 63n) || n > 2n ** 63n - 1n) return { ok: false, error: `long: ${t} fora do intervalo de 64 bits.` };
+    const t = text.trim(); if (!/^[+-]?\d+$/.test(t)) return { ok: false, error: 'long: use an integer between -9223372036854775808 and 9223372036854775807.' };
+    const n = BigInt(t); if (n < -(2n ** 63n) || n > 2n ** 63n - 1n) return { ok: false, error: `long: ${t} is out of the 64-bit range.` };
     return { ok: true, value: n, display: String(n) };
   }
   if (result === 'F' || result === 'D') {
     const t = text.trim(), name = PRIMITIVES[result], special = { NaN: NaN, Infinity: Infinity, '+Infinity': Infinity, '-Infinity': -Infinity };
-    let n; if (t in special) n = special[t]; else if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fFdD]?$/.test(t)) n = Number(t.replace(/[fFdD]$/, '')); else return { ok: false, error: `${name}: use um número (1.5, -2e3, NaN, Infinity).` };
-    if (result === 'F') { F32[0] = n; if (Number.isFinite(n) && !Number.isFinite(F32[0])) return { ok: false, error: 'float: valor fora do intervalo de float.' }; return { ok: true, value: n !== n ? 0x7fc00000 : I32[0], display: t }; }
+    let n; if (t in special) n = special[t]; else if (/^[+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?[fFdD]?$/.test(t)) n = Number(t.replace(/[fFdD]$/, '')); else return { ok: false, error: `${name}: use a number (1.5, -2e3, NaN, Infinity).` };
+    if (result === 'F') { F32[0] = n; if (Number.isFinite(n) && !Number.isFinite(F32[0])) return { ok: false, error: 'float: value out of the float range.' }; return { ok: true, value: n !== n ? 0x7fc00000 : I32[0], display: t }; }
     if (n !== n) return { ok: true, value: 0x7ff8000000000000n, display: t };
     F64[0] = n; return { ok: true, value: B64[0], display: t };
   }
@@ -117,9 +117,9 @@ export function parseReturnValue(result, input) {
   }
   if (typeof result === 'string' && (result[0] === 'L' || result[0] === '[')) {
     if (text.trim() === 'null') return { ok: true, value: null, display: 'null' };
-    return { ok: false, error: `${smaliTypeToJava(result)}: só "null" é aceito para este tipo de referência.` };
+    return { ok: false, error: `${smaliTypeToJava(result)}: only "null" is accepted for this reference type.` };
   }
-  return { ok: false, error: 'Tipo de retorno desconhecido.' };
+  return { ok: false, error: 'Unknown return type.' };
 }
 
 /**
@@ -133,18 +133,18 @@ export function applyMethodOverrides(rt, specs) {
   for (const spec of Array.isArray(specs) ? specs : []) {
     const parsed = parseMethodSpec(spec?.method);
     if (!parsed.ok) { statuses.push({ key: String(spec?.method ?? ''), state: 'invalid', error: parsed.error, hits: 0 }); continue; }
-    if (parsed.result === null || parsed.key === null) { statuses.push({ key: String(spec?.method ?? ''), state: 'invalid', error: 'Informe o tipo de retorno (ex.: pacote.Classe.nome(int): boolean).', hits: 0 }); continue; }
-    if (parsed.name === '<clinit>') { statuses.push({ key: parsed.key, state: 'invalid', error: 'O inicializador estático (<clinit>) não pode ser substituído.', hits: 0 }); continue; }
+    if (parsed.result === null || parsed.key === null) { statuses.push({ key: String(spec?.method ?? ''), state: 'invalid', error: 'Enter the return type (e.g. package.Class.name(int): boolean).', hits: 0 }); continue; }
+    if (parsed.name === '<clinit>') { statuses.push({ key: parsed.key, state: 'invalid', error: 'The static initializer (<clinit>) cannot be replaced.', hits: 0 }); continue; }
     const value = parseReturnValue(parsed.result, spec.value);
     if (!value.ok) { statuses.push({ key: parsed.key, state: 'invalid', error: value.error, hits: 0 }); continue; }
     const definition = rt.classes.get(parsed.owner)?.methods.get(parsed.name + parsed.key.slice(parsed.key.indexOf('(')));
-    const known = nextAll.get(parsed.key); if (known) { statuses.push({ key: parsed.key, state: 'invalid', error: 'Método repetido na lista.', hits: known.hits }); continue; }
+    const known = nextAll.get(parsed.key); if (known) { statuses.push({ key: parsed.key, state: 'invalid', error: 'Method repeated in the list.', hits: known.hits }); continue; }
     const old = previousAll.get(parsed.key), same = old && old.display === value.display && Object.is(old.value, value.value);
     const entry = { key: parsed.key, result: parsed.result, value: value.value, display: value.display, enabled: spec.enabled !== false, hits: same ? old.hits : 0, refusedNative: !!(definition && (definition.flags & 0x100)) };
     nextAll.set(parsed.key, entry);
     const state = entry.refusedNative ? 'refused' : !definition ? 'missing' : !entry.enabled ? 'disabled' : 'active';
     if (entry.enabled && !entry.refusedNative) next.set(parsed.key, entry);
-    statuses.push({ key: parsed.key, state, hits: entry.hits, ...(state === 'refused' ? { error: 'Métodos native não são substituídos: o corpo é código nativo do app.' } : state === 'missing' ? { error: 'Nenhuma classe carregada define este método; nada será substituído até que exista.' } : {}) });
+    statuses.push({ key: parsed.key, state, hits: entry.hits, ...(state === 'refused' ? { error: 'Native methods are not replaced: the body is the app\'s native code.' } : state === 'missing' ? { error: 'No loaded class defines this method; nothing will be replaced until it exists.' } : {}) });
   }
   const changed = new Set();
   for (const [key, entry] of previous) { const now = next.get(key); if (!now || now.display !== entry.display || !Object.is(now.value, entry.value)) changed.add(key); }
@@ -192,7 +192,7 @@ function resetCachedSites(rt, keys) {
 export function overrideHit(rt, entry, definition, mode) {
   if (mode === 'static') rt.initialize(definition.method.owner);   // class initialization semantics stay exact: a static call initializes its class before returning
   const hits = ++entry.hits;
-  if (hits === 1 || hits % 100 === 0) rt.record(`LOG W APKWebLab: retorno substituído: ${entry.key} = ${entry.display} (${hits} chamadas)`);
+  if (hits === 1 || hits % 100 === 0) rt.record(`LOG W APKWebLab: return replaced: ${entry.key} = ${entry.display} (${hits} calls)`);
   return entry.value;
 }
 
@@ -204,9 +204,9 @@ export function describeMethodOverrides(rt) {
 export function overrideSummaryLines(rt) {
   const active = [...(rt.methodOverrides?.values() ?? [])]; if (!active.length) return null;
   const calls = active.reduce((sum, entry) => sum + entry.hits, 0);
-  const lines = [`Retornos substituídos: ${active.length} métodos, ${calls} chamadas (ferramenta de depuração; os corpos desses métodos não executam)`];
-  for (const entry of active.slice(0, 6)) lines.push(`  ${entry.key} = ${entry.display} (${entry.hits} chamadas)`);
-  if (active.length > 6) lines.push(`  … e mais ${active.length - 6}`);
+  const lines = [`Method returns REPLACED: ${active.length} methods, ${calls} calls (debugging tool; the bodies of these methods do not run)`];
+  for (const entry of active.slice(0, 6)) lines.push(`  ${entry.key} = ${entry.display} (${entry.hits} calls)`);
+  if (active.length > 6) lines.push(`  … and ${active.length - 6} more`);
   return lines;
 }
 

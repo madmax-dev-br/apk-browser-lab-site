@@ -41,13 +41,13 @@ const arenaStartMiB = memory => Math.ceil((memory.metaMiB + THREAD_SPAN_MIB) / H
 const firstMiB = memory => { const start = arenaStartMiB(memory); return start + Math.ceil((CORE_MEMORY_LIMITS.totalMiB - start) / 20) + CORE_FIRST_HEAP_MIB; };
 /**
  * { value (sanitized), totalMiB, firstMiB, areaMiB, error }: `areaMiB` is what heap and threads share in dynamic mode (0 in fixed); `totalMiB` is the size of the memory (dynamic: the 2 GiB), `firstMiB` how much of it is laid out at the start (fixed: all of it);
- * `error` (Portuguese) when the three sizes of the fixed mode do not fit the 2 GiB.
+ * `error` when the three sizes of the fixed mode do not fit the 2 GiB.
  */
 export function checkCoreMemory(input) {
   const value = sanitizeCoreMemory(input);
   if (value.mode === 'dynamic') return { value, totalMiB: CORE_MEMORY_LIMITS.totalMiB, firstMiB: firstMiB(value), areaMiB: CORE_MEMORY_LIMITS.totalMiB - arenaStartMiB(value), error: null };
   const totalMiB = heapStartMiB(value) + value.heapMiB, over = totalMiB - CORE_MEMORY_LIMITS.totalMiB;
-  return { value, totalMiB, firstMiB: totalMiB, areaMiB: 0, error: over > 0 ? `heap ${value.heapMiB} MiB + metaspace ${value.metaMiB} MiB + ${value.threads} threads somam ${totalMiB} MiB; o núcleo Wasm tem no máximo ${CORE_MEMORY_LIMITS.totalMiB} MiB: reduza ${over} MiB` : null };
+  return { value, totalMiB, firstMiB: totalMiB, areaMiB: 0, error: over > 0 ? `heap ${value.heapMiB} MiB + metaspace ${value.metaMiB} MiB + ${value.threads} threads add up to ${totalMiB} MiB; the Wasm core has at most ${CORE_MEMORY_LIMITS.totalMiB} MiB: reduce by ${over} MiB` : null };
 }
 /** The settings form: the values when they fit, else the defaults (a stored combination that does not fit is never sent to the VM). */
 export const coreMemorySetting = input => { const checked = checkCoreMemory(input); return checked.error ? { ...CORE_MEMORY_DEFAULT } : checked.value; };
@@ -69,6 +69,6 @@ export function coreLayout(input = CORE_MEMORY_DEFAULT) {
 
 /** The message of a load that failed because the core could not start: what happened, and how to open the APK on the JavaScript VM instead (`?engine=js`, player `engine: 'js'`). */
 export function coreStartMessage(error) {
-  const reason = String(error?.message ?? error).slice(0, 400), hint = "Para abrir com a VM JavaScript: ?engine=js na página (no player, engine: 'js').";
-  return reason.includes('?engine=js') ? reason : `O núcleo WebAssembly não iniciou: ${reason}. ${hint}`;
+  const reason = String(error?.message ?? error).slice(0, 400), hint = "To open with the JavaScript VM: ?engine=js on the page (in the player, engine: 'js').";
+  return reason.includes('?engine=js') ? reason : `The WebAssembly core did not start: ${reason}. ${hint}`;
 }

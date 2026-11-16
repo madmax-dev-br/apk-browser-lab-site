@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=ca92aaad0948';
-import { cellBytes } from './java-arrays.js?v=ca92aaad0948';
-import { storedFieldCount } from './object-shapes.js?v=ca92aaad0948';
+import { BUCKET } from './time-breakdown.js?v=d422379a2a38';
+import { cellBytes } from './java-arrays.js?v=d422379a2a38';
+import { storedFieldCount } from './object-shapes.js?v=d422379a2a38';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -258,7 +258,7 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
   let sincePulse = 0;
   const drain = (cap = Infinity) => {
   while (worklist.length && count < cap) {
-    if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`coleta de lixo (marcando ${count} objetos)`); }
+    if (++sincePulse >= 2048) { sincePulse = 0; runtime.monitor?.pulse(`garbage collection (marking ${count} objects)`); }
     const record = heap.get(worklist.pop()), kind = refKind(record.type), weak = kind !== REF_NONE && (kind !== REF_SOFT || clearSoft);   // `weak`: this reference does not keep its referent alive in this mark
     if (kind === REF_WEAK) weakIds.push(record.id); else if (kind === REF_SOFT) { if (clearSoft) softIds.push(record.id); } else if (kind === REF_PHANTOM) phantomIds.push(record.id);
     let host = false;   // host state of the record's own (a property outside the field and element storage that holds or may come to hold a reference): rescanned by every minor collection
@@ -346,13 +346,13 @@ function markRoots(runtime, marker, { safepoint, emergency, extraRoots, report }
   // Owner categories: roots are scanned and closed in a fixed order and every object keeps the category of the first group that reaches it (a dominator-lite attribution: where is the mass).
   const categories = new Map(); let counted = 0;
   const closeCategory = (id, name) => { drain(); const now = count(); if (now > counted) { const entry = categories.get(id) ?? categories.set(id, { id, name, n: 0 }).get(id); entry.n += now - counted; counted = now; } };
-  if (marker.bound > 0) { setCategory(6); for (const id of runtime.gcRemList) marker.rescan(id); for (const id of runtime.gcTouchList) marker.rescan(id); for (const id of runtime.gcHostful) marker.rescan(id); closeCategory(6, 'objetos antigos relidos (conjunto lembrado, estado de host)'); }
-  setCategory(1); if (runtime.staticFields && typeof runtime.staticFields === 'object') scanRoot(runtime.staticFields, 'staticFields', 0); closeCategory(1, 'campos estáticos das classes');
+  if (marker.bound > 0) { setCategory(6); for (const id of runtime.gcRemList) marker.rescan(id); for (const id of runtime.gcTouchList) marker.rescan(id); for (const id of runtime.gcHostful) marker.rescan(id); closeCategory(6, 'old objects rescanned (remembered set, host state)'); }
+  setCategory(1); if (runtime.staticFields && typeof runtime.staticFields === 'object') scanRoot(runtime.staticFields, 'staticFields', 0); closeCategory(1, 'static fields of the classes');
   { const threads = runtime.scheduler?.threads ?? [];
     threads.forEach((thread, index) => { const id = 10 + Math.min(index, 200); setCategory(id); const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(id, `thread ${thread.name ?? index}`); });
-    for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !threads.includes(extra)) { setCategory(5); const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(5, 'thread em execução aninhada'); }
+    for (const extra of [runtime.thread]) if (extra && Array.isArray(extra.frames) && runtime.scheduler && !threads.includes(extra)) { setCategory(5); const view = Object.create(runtime.scheduler); view.threads = [extra]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); closeCategory(5, 'thread running nested'); }
   }
-  setCategory(2); for (const queue of [runtime.platform?.looperHost?.pendingEvents?.()]) if (queue) scan([...queue]); closeCategory(2, 'filas de Handler / eventos do host');
+  setCategory(2); for (const queue of [runtime.platform?.looperHost?.pendingEvents?.()]) if (queue) scan([...queue]); closeCategory(2, 'Handler queues / host events');
   // Host code up the JavaScript stack (a native that called back into Java, a class initializer, a nested wait) may hold values no Java frame references: what host code allocated and every result
   // handed back to it since the last fully quiescent collection stay alive. Outside a safepoint nothing is in flight and the set is dropped.
   setCategory(3);
@@ -363,14 +363,14 @@ function markRoots(runtime, marker, { safepoint, emergency, extraRoots, report }
   graceRoots(runtime, markId);   // the last host allocations of finished calls (see APKRuntime.releaseHostAllocs)
   for (const weak of tracked) { const container = weak.deref(); if (container === undefined) tracked.delete(weak); else scan(container); }
   if (extraRoots) { const values = typeof extraRoots === 'function' ? extraRoots() : extraRoots; for (const item of values ?? []) scan(item); }
-  closeCategory(3, 'raízes do host (alocações do host, contêineres, tarefas)');
+  closeCategory(3, 'host roots (host allocations, containers, tasks)');
   setCategory(4);
   for (const key of Object.keys(runtime)) {
     if (SKIP_PROPS.has(key) || key === 'staticFields') continue;
     const item = runtime[key];
     if (item !== null && typeof item === 'object') scanRoot(item, key, 0); else if (typeof item === 'number' && idLike(key, item)) markId(item);
   }
-  closeCategory(4, 'tabelas da plataforma e do runtime');
+  closeCategory(4, 'platform and runtime tables');
   for (const row of rows) if (row.ms > worstRoot.ms) worstRoot = row;
   const topBy = field => [...rows].sort((a, b) => b[field] - a[field]).slice(0, 5).map(row => ({ key: row.key, ms: Math.round(row.ms), nodes: row.nodes, kind: row.kind, size: row.size }));
   if (report) runtime.gcTopRoots = { byNodes: topBy('nodes'), byMs: topBy('ms') };
@@ -395,7 +395,7 @@ function collectCore(runtime, options) {
   return { collected: true, reason: options.reason ?? 'host', before, after, freed: Math.max(0, before - after), ms, markMs: ms };
 }
 function collectGarbageTimed(runtime, options) {
-  const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'coleta de lixo';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
+  const saved = runtime.hostCall, started = performance.now(); runtime.hostCall = 'garbage collection';   // the page must see "garbage collection" (with progress pulses), never a stale host call, while the VM is busy here
   try { return collectGarbageNow(runtime, options); } finally {
     runtime.hostCall = saved ?? null;
     const spent = performance.now() - started, major = runtime.gcPhases?.[0] && runtime.gcPhases[0].at >= started - 1, minor = (runtime.gcMinorStats?.recent.at(-1)?.at ?? -Infinity) >= started - 1;
@@ -803,10 +803,10 @@ function arrayCensus(runtime, heap, markedHas, candidates) {
   const row = c => ({ type: typeLabel(c.type), length: c.length, cells: c.cells, root: c.root ?? null });
   const liveTop = candidates.filter(c => c.root !== undefined).slice(0, 10).map(row), garbageTop = candidates.filter(c => c.root === undefined).slice(0, 5).map(c => ({ ...row(c), root: null }));
   const summary = { cellsInUse: runtime.arrayCells ?? 0, maxCells: runtime.maxArrayCells ?? 0, liveCells, garbageCells, liveOver1M: { arrays: liveBig, cells: liveBigCells }, garbageOver1M: { arrays: garbageBig, cells: garbageBigCells }, liveTop, garbageTop };
-  const fmt = c => `${c.type} length ${c.length} elements (${c.cells} weighted cells) via ${c.root ?? 'nenhuma raiz (inalcançável)'}`;
-  const lines = [`Células de array (ponderadas pela largura do elemento: byte 1/8, char 1/4, int 1/2, long e referência 1): ${summary.cellsInUse} contadas de ${summary.maxCells}; vivas ${liveCells}, inalcançáveis ainda não coletadas ${garbageCells}; arrays acima de 1 M de células: ${liveBig} vivos com ${liveBigCells} células, ${garbageBig} inalcançáveis com ${garbageBigCells}.`];
-  if (liveTop.length) lines.push('Maiores arrays vivos (por células; primeira raiz que alcança):', ...liveTop.map(c => `  ${fmt(c)}`));
-  if (garbageTop.length) lines.push('Maiores arrays inalcançáveis ainda não coletados:', ...garbageTop.map(c => `  ${fmt(c)}`));
+  const fmt = c => `${c.type} length ${c.length} elements (${c.cells} weighted cells) via ${c.root ?? 'no root (unreachable)'}`;
+  const lines = [`Array cells (weighted by element width: byte 1/8, char 1/4, int 1/2, long and reference 1): ${summary.cellsInUse} counted of ${summary.maxCells}; live ${liveCells}, unreachable and not yet collected ${garbageCells}; arrays above 1 M cells: ${liveBig} live with ${liveBigCells} cells, ${garbageBig} unreachable with ${garbageBigCells}.`];
+  if (liveTop.length) lines.push('Largest live arrays (by cells; first root that reaches):', ...liveTop.map(c => `  ${fmt(c)}`));
+  if (garbageTop.length) lines.push('Largest unreachable arrays not yet collected:', ...garbageTop.map(c => `  ${fmt(c)}`));
   return { summary, lines };
 }
 const familyOf = key => { const text = String(key), owner = text.slice(1, text.indexOf('->')), parts = owner.split('/'); return parts.length > 3 ? parts.slice(0, 3).join('.') : parts.join('.').replace(/;$/, ''); };
@@ -854,13 +854,13 @@ export function staticRetention(runtime, { topFields = 12, topClasses = 12, budg
   const classes = [...classCounts].sort((a, b) => b[1].n - a[1].n).slice(0, topClasses).map(([type, v]) => ({ type: typeLabel(type), n: v.n, bytes: v.bytes }));
   return { total: own.order.length, bytes, staticFields: entries.length, fields: top, classes, ms: Math.round(performance.now() - started), truncated };
 }
-/** The report lines of a staticRetention result (Portuguese, like the rest of the report): fields first, then classes. */
+/** The report lines of a staticRetention result (like the rest of the report): fields first, then classes. */
 export function staticRetentionLines(retention, { indent = '' } = {}) {
   if (!retention?.fields?.length) return [];
   const mib = bytes => (bytes / 1048576).toFixed(1), kib = bytes => bytes >= 1048576 ? `${mib(bytes)} MiB` : `${Math.round(bytes / 1024)} KiB`;
-  return [`${indent}retidos por campo estático (${retention.total} objetos, ~${kib(retention.bytes)}, ${retention.staticFields} campos com objeto${retention.truncated ? '; alcance medido parcialmente' : ''}):`,
-    ...retention.fields.map(f => `${indent}  ${f.objects} objetos (~${kib(f.bytes)}) via ${f.owner}${f.field ? '.' + f.field : ''}: ${f.classes.map(c => `${c.n} ${c.type}`).join(', ')}`),
-    `${indent}classes mais numerosas entre os retidos por campos estáticos: ${retention.classes.map(c => `${c.n} ${c.type}`).join(', ')}`];
+  return [`${indent}retained by static fields (${retention.total} objects, ~${kib(retention.bytes)}, ${retention.staticFields} fields holding an object${retention.truncated ? '; reach measured partially' : ''}):`,
+    ...retention.fields.map(f => `${indent}  ${f.objects} objects (~${kib(f.bytes)}) via ${f.owner}${f.field ? '.' + f.field : ''}: ${f.classes.map(c => `${c.n} ${c.type}`).join(', ')}`),
+    `${indent}most numerous classes among those retained by static fields: ${retention.classes.map(c => `${c.n} ${c.type}`).join(', ')}`];
 }
 
 /**
@@ -871,10 +871,10 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   const heap = runtime.heap, marker = createMarker(runtime, { privateMarks: true }), { markedHas, scan, drain, markId, idLike } = marker, groups = [], REACH_CAP = 25000;   // private marks: the per-group markers below zero the shared ones
   // Root groups: thread stacks, static fields by class family, the runtime's own tables, every host of the platform, registered host containers.
   const defs = [], scheduler = runtime.scheduler;
-  if (scheduler?.threads) scheduler.threads.forEach((thread, index) => defs.push({ name: `pilha da thread ${index}${thread.name ? ` (${thread.name})` : ''}`, visit: sc => { const view = Object.create(scheduler); view.threads = [thread]; scheduler.enumerateRoots.call(view, item => sc(item)); } }));
+  if (scheduler?.threads) scheduler.threads.forEach((thread, index) => defs.push({ name: `stack of thread ${index}${thread.name ? ` (${thread.name})` : ''}`, visit: sc => { const view = Object.create(scheduler); view.threads = [thread]; scheduler.enumerateRoots.call(view, item => sc(item)); } }));
   const families = new Map();
   for (const [key, value] of runtime.staticFields ?? []) { const family = familyOf(key); (families.get(family) ?? families.set(family, []).get(family)).push(value); }
-  for (const [family, values] of families) defs.push({ name: `campos estáticos de ${family}`, visit: sc => { for (const value of values) if (value !== null && typeof value === 'object') sc(value); } });
+  for (const [family, values] of families) defs.push({ name: `static fields of ${family}`, visit: sc => { for (const value of values) if (value !== null && typeof value === 'object') sc(value); } });
   const ids = [];   // id-named integers of the runtime / platform objects (e.g. activity ids)
   for (const key of Object.keys(runtime)) {
     if (SKIP_PROPS.has(key) || key === 'staticFields' || key === 'scheduler') continue;
@@ -885,16 +885,16 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
     }
     if (item !== null && typeof item === 'object') defs.push({ name: `runtime.${key}`, visit: sc => sc(item) }); else if (typeof item === 'number' && idLike(key, item)) ids.push(item);
   }
-  let trackedCount = 0; defs.push({ name: 'contêineres de hosts (gcRoot)', visit: sc => { for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) { trackedCount++; sc(container); } } } });
+  let trackedCount = 0; defs.push({ name: 'host containers (gcRoot)', visit: sc => { for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) { trackedCount++; sc(container); } } } });
   // Pass 1: how far each group reaches on its own (capped), so that structures shared by many groups are attributed to the group that reaches the most, not to whichever came first.
   for (const def of defs) { const own = createMarker(runtime); def.visit(own.scan); own.drain(REACH_CAP); def.reach = own.count(); }
   for (const id of ids) markId(id);
   const bigArrays = candidateArrays(heap); const attribute = name => { for (const c of bigArrays) if (c.root === undefined && markedHas(c.id)) c.root = name; };
-  attribute('ids de objetos do runtime/plataforma');
+  attribute('object ids of the runtime/platform');
   // Pass 2: exclusive attribution, smallest reach first.
   for (const def of [...defs].sort((x, y) => x.reach - y.reach)) { const before = marker.count(); def.visit(scan); drain(); attribute(def.name); const gained = marker.count() - before; if (gained > 0) groups.push({ name: def.name, objects: gained, reachAlone: def.reach >= REACH_CAP ? `${REACH_CAP}+` : def.reach }); }
   drain(); marker.ephemerons();
-  drain(); attribute('(demais raízes)');
+  drain(); attribute('(other roots)');
   const arrays = arrayCensus(runtime, heap, markedHas, bigArrays);
   const counts = new Map(), garbageCounts = new Map(); let live = 0, garbage = 0, estimatedBytes = 0, arrayBytes = 0;
   for (const ci of heap.usedChunks()) for (let slot = 0; slot < 4096; slot++) {
@@ -910,15 +910,15 @@ export function heapCensus(runtime, { topClasses = 20, topRoots = 10 } = {}) {
   let retention = null; try { retention = staticRetention(runtime); } catch (error) { retention = { error: String(error?.message ?? error), fields: [], classes: [] }; }
   runtime.gcStaticRetention = retention;   // the report prints it (report-summary.js)
   const mib = bytes => (bytes / 1048576).toFixed(1);
-  const lines = [`Censo do heap da VM: ${live} objetos vivos (~${mib(estimatedBytes)} MiB estimados) de um limite de ${runtime.maxHeapObjects}; ${garbage} inalcançáveis ainda não coletados; ${runtime.fieldSlots ?? 0} campos, ${runtime.arrayCells ?? 0} células de array ponderadas (${mib(arrayBytes)} MiB de armazenamento exato: tipado para arrays primitivos), ${runtime.collectionCells ?? 0} células de coleção.`,
-    `Coletor: ${gc.enabled ? 'ligado' : 'DESLIGADO'}; ${gc.collections ?? 0} coletas, ${gc.freed ?? 0} liberados no total, última coleta (${gc.lastReason ?? 'nenhuma'}) deixou ${gc.lastLive ?? '?'} vivos${Object.keys(gc.skips).length ? `; coletas recusadas: ${Object.entries(gc.skips).map(([why, n]) => `${why} x${n}`).join(', ')}` : ''}.`,
-    'Classes com mais objetos vivos:', ...classes.map(c => `  ${c.count} x ${typeLabel(c.type)} (~${mib(c.bytes)} MiB)`),
-    'Raízes que mantêm os objetos vivos (objetos exclusivos de cada grupo, do menor alcance ao maior):', ...roots.map(g => `  ${g.objects} objetos via ${g.name} (sozinha alcança ${g.reachAlone})`)];
+  const lines = [`VM heap census: ${live} live objects (~${mib(estimatedBytes)} MiB estimated) of a limit of ${runtime.maxHeapObjects}; ${garbage} unreachable and not yet collected; ${runtime.fieldSlots ?? 0} fields, ${runtime.arrayCells ?? 0} weighted array cells (${mib(arrayBytes)} MiB of exact storage: typed for primitive arrays), ${runtime.collectionCells ?? 0} collection cells.`,
+    `Collector: ${gc.enabled ? 'on' : 'OFF'}; ${gc.collections ?? 0} collections, ${gc.freed ?? 0} freed in total, the last collection (${gc.lastReason ?? 'none'}) left ${gc.lastLive ?? '?'} live${Object.keys(gc.skips).length ? `; refused collections: ${Object.entries(gc.skips).map(([why, n]) => `${why} x${n}`).join(', ')}` : ''}.`,
+    'Classes with the most live objects:', ...classes.map(c => `  ${c.count} x ${typeLabel(c.type)} (~${mib(c.bytes)} MiB)`),
+    'Roots that keep the objects alive (objects exclusive to each group, from the smallest reach to the largest):', ...roots.map(g => `  ${g.objects} objects via ${g.name} (alone it reaches ${g.reachAlone})`)];
   lines.push(...arrays.lines);
   lines.push(...staticRetentionLines(retention));
-  if (gc.softCleared || runtime.gcSoftLast) lines.push(`Referências suaves: ${gc.softCleared ?? 0} limpas em ${gc.softCollections ?? 0} coletas sob pressão${runtime.gcSoftLast ? `; a última (política ${runtime.gcSoftLast.policy}) limpou ${runtime.gcSoftLast.cleared} de ${runtime.gcSoftLast.softReferences} e liberou ${runtime.gcSoftLast.freed} objetos` : ''}.`);
-  if (garbageClasses.length) lines.push('Inalcançáveis ainda não coletados:', ...garbageClasses.map(c => `  ${c.count} x ${typeLabel(c.type)}`));
-  if (allocationSites.length) lines.push('Métodos que mais alocaram desde a última coleta (amostra):', ...allocationSites.map(s => `  ${s.samples} amostras em ${s.site}`));
+  if (gc.softCleared || runtime.gcSoftLast) lines.push(`Soft references: ${gc.softCleared ?? 0} cleared in ${gc.softCollections ?? 0} collections under pressure${runtime.gcSoftLast ? `; the last (policy ${runtime.gcSoftLast.policy}) cleared ${runtime.gcSoftLast.cleared} of ${runtime.gcSoftLast.softReferences} and freed ${runtime.gcSoftLast.freed} objects` : ''}.`);
+  if (garbageClasses.length) lines.push('Unreachable and not yet collected:', ...garbageClasses.map(c => `  ${c.count} x ${typeLabel(c.type)}`));
+  if (allocationSites.length) lines.push('Methods that allocated the most since the last collection (sample):', ...allocationSites.map(s => `  ${s.samples} samples in ${s.site}`));
   return { live, garbage, estimatedBytes, arrays: arrays.summary, limit: runtime.maxHeapObjects, topClasses: classes, roots, staticRetention: retention, garbageClasses, allocationSites, gc, trackedContainers: trackedCount, text: lines.join('\n') };
 }
 
@@ -959,11 +959,11 @@ export function retentionPaths(runtime, { type = null, samples = 3, budgetMs = 1
     edge(null, thread.javaObject, `${label} (objeto)`); edge(null, thread.target, `${label} (target)`); edge(null, thread.lastOutcome, `${label} (resultado)`); edge(null, thread.blocked?.roots, `${label} (bloqueada)`);
     (thread.frames ?? []).forEach((frame, index) => {
       const m = frame.method, where = `${label} frame ${index} ${m ? short(m.owner) + '.' + m.name : '?'}`;
-      if (frame.cont) { edge(null, frame.cont.args, where + ' (continuação)'); edge(null, frame.cont.roots, where + ' (continuação)'); return; }
-      if (Array.isArray(frame.regs)) frame.regs.forEach((value, r) => edge(null, value, `${where} v${r}`)); edge(null, frame.result, where + ' (resultado)'); edge(null, frame.pendingException, where + ' (exceção)');
+      if (frame.cont) { edge(null, frame.cont.args, where + ' (continuation)'); edge(null, frame.cont.roots, where + ' (continuation)'); return; }
+      if (Array.isArray(frame.regs)) frame.regs.forEach((value, r) => edge(null, value, `${where} v${r}`)); edge(null, frame.result, where + ' (result)'); edge(null, frame.pendingException, where + ' (exception)');
     });
   }
-  for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) edge(null, container, 'raiz de host'); }
+  for (const weak of tracked) { const container = weak.deref(); if (container !== undefined) edge(null, container, 'host root'); }
   let visited = 0;
   for (let head = 0; head < queue.length && found.length < samples; head++) {
     if ((++visited & 4095) === 0 && (performance.now() - started > budgetMs || visited > maxNodes)) break;

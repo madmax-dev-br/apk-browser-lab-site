@@ -12,8 +12,8 @@
 //   - ACCESS_BACKGROUND_LOCATION is only grantable while a foreground location permission is held, and (targetSdk >= 30) cannot be requested in the same call as the foreground ones;
 //   - READ_EXTERNAL_STORAGE has no effect for targetSdk >= 33 (use READ_MEDIA_*): never granted;
 //   - requests that need a dialog are asked per permission group; the dialog's answer ("Permitir", "Só desta vez", "Não permitir") updates the config.
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ca92aaad0948';
-import { PERMISSION_GROUPS } from './permission-groups-data.js?v=ca92aaad0948';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=d422379a2a38';
+import { PERMISSION_GROUPS } from './permission-groups-data.js?v=d422379a2a38';
 
 export const DEVICE_SDK = 33;
 const P = 'android.permission.';
@@ -22,23 +22,23 @@ const FOREGROUND_LOCATION = [FINE_LOCATION, COARSE_LOCATION];
 
 /** Settings-style sections: platform permission group -> the label the page shows and the dialog's question ("%s" is the app label). */
 export const SECTIONS = Object.freeze({
-  LOCATION: { id: 'location', label: 'Localização', question: 'Permitir que %s acesse o local deste dispositivo?', order: 0 },
-  CAMERA: { id: 'camera', label: 'Câmera', question: 'Permitir que %s tire fotos e grave vídeos?', order: 1 },
-  MICROPHONE: { id: 'microphone', label: 'Microfone', question: 'Permitir que %s grave áudio?', order: 2 },
-  CONTACTS: { id: 'contacts', label: 'Contatos', question: 'Permitir que %s acesse seus contatos?', order: 3 },
-  NOTIFICATIONS: { id: 'notifications', label: 'Notificações', question: 'Permitir que %s envie notificações?', order: 4 },
-  STORAGE: { id: 'files', label: 'Arquivos e mídia', question: 'Permitir que %s acesse fotos, mídia e arquivos no seu dispositivo?', order: 5 },
-  READ_MEDIA_AURAL: { id: 'files', label: 'Arquivos e mídia', question: 'Permitir que %s acesse músicas e outros arquivos de áudio no seu dispositivo?', order: 5 },
-  READ_MEDIA_VISUAL: { id: 'files', label: 'Arquivos e mídia', question: 'Permitir que %s acesse fotos e vídeos no seu dispositivo?', order: 5 },
-  PHONE: { id: 'phone', label: 'Telefone', question: 'Permitir que %s faça e gerencie ligações telefônicas?', order: 6 },
-  CALL_LOG: { id: 'calllog', label: 'Registro de chamadas', question: 'Permitir que %s leia e grave o registro de chamadas do telefone?', order: 7 },
-  SMS: { id: 'sms', label: 'SMS', question: 'Permitir que %s envie e veja mensagens SMS?', order: 8 },
-  CALENDAR: { id: 'calendar', label: 'Agenda', question: 'Permitir que %s acesse sua agenda?', order: 9 },
-  SENSORS: { id: 'sensors', label: 'Sensores', question: 'Permitir que %s acesse os dados de sensor sobre seus sinais vitais?', order: 10 },
-  NEARBY_DEVICES: { id: 'nearby', label: 'Dispositivos próximos', question: 'Permitir que %s encontre, conecte-se e determine a posição relativa de dispositivos por perto?', order: 11 },
-  ACTIVITY_RECOGNITION: { id: 'activity', label: 'Atividade física', question: 'Permitir que %s acesse sua atividade física?', order: 12 },
+  LOCATION: { id: 'location', label: 'Location', question: 'Allow %s to access this device\'s location?', order: 0 },
+  CAMERA: { id: 'camera', label: 'Camera', question: 'Allow %s to take pictures and record video?', order: 1 },
+  MICROPHONE: { id: 'microphone', label: 'Microphone', question: 'Allow %s to record audio?', order: 2 },
+  CONTACTS: { id: 'contacts', label: 'Contacts', question: 'Allow %s to access your contacts?', order: 3 },
+  NOTIFICATIONS: { id: 'notifications', label: 'Notifications', question: 'Allow %s to send you notifications?', order: 4 },
+  STORAGE: { id: 'files', label: 'Files and media', question: 'Allow %s to access photos, media, and files on your device?', order: 5 },
+  READ_MEDIA_AURAL: { id: 'files', label: 'Files and media', question: 'Allow %s to access music and other audio on your device?', order: 5 },
+  READ_MEDIA_VISUAL: { id: 'files', label: 'Files and media', question: 'Allow %s to access photos and videos on your device?', order: 5 },
+  PHONE: { id: 'phone', label: 'Phone', question: 'Allow %s to make and manage phone calls?', order: 6 },
+  CALL_LOG: { id: 'calllog', label: 'Call logs', question: 'Allow %s to read and write phone call log?', order: 7 },
+  SMS: { id: 'sms', label: 'SMS', question: 'Allow %s to send and view SMS messages?', order: 8 },
+  CALENDAR: { id: 'calendar', label: 'Calendar', question: 'Allow %s to access your calendar?', order: 9 },
+  SENSORS: { id: 'sensors', label: 'Body sensors', question: 'Allow %s to access sensor data about your vital signs?', order: 10 },
+  NEARBY_DEVICES: { id: 'nearby', label: 'Nearby devices', question: 'Allow %s to find, connect to, and determine the relative position of nearby devices?', order: 11 },
+  ACTIVITY_RECOGNITION: { id: 'activity', label: 'Physical activity', question: 'Allow %s to access your physical activity?', order: 12 },
 });
-export const OTHER_SECTION = Object.freeze({ id: 'other', label: 'Outras', question: 'Permitir que %s use esta permissão?', order: 99 });
+export const OTHER_SECTION = Object.freeze({ id: 'other', label: 'Other', question: 'Allow %s to use this permission?', order: 99 });
 export const sectionOf = group => SECTIONS[group] ?? OTHER_SECTION;
 /** Platform group of a runtime permission (UNDEFINED / unknown / app-defined: null). */
 export const groupOf = permission => { const group = PERMISSION_GROUPS[permission]; return group && SECTIONS[group] ? group : null; };
@@ -61,11 +61,11 @@ export function listRuntimePermissions(manifest) {
     seen.add(name);
     const group = groupOf(name), section = sectionOf(group);
     let applicable = true, note = '';
-    if (!(entry.maxSdkVersion === null || entry.maxSdkVersion === undefined || Number(entry.maxSdkVersion) >= DEVICE_SDK)) { applicable = false; note = `maxSdkVersion ${entry.maxSdkVersion}: não vale no Android ${DEVICE_SDK}`; }
-    else if (name === P + 'READ_EXTERNAL_STORAGE' && targetSdk >= 33) { applicable = false; note = 'sem efeito com targetSdk 33 ou maior: use READ_MEDIA_*'; }
-    else if (name === P + 'WRITE_EXTERNAL_STORAGE' && targetSdk >= 30) note = 'sem acesso extra com armazenamento com escopo (targetSdk 30 ou maior)';
-    else if (name === BACKGROUND_LOCATION) note = 'só pode ser concedida depois da localização em primeiro plano';
-    else if (targetSdk < 23) note = 'app antigo (targetSdk menor que 23): concedida na instalação, sem diálogo';
+    if (!(entry.maxSdkVersion === null || entry.maxSdkVersion === undefined || Number(entry.maxSdkVersion) >= DEVICE_SDK)) { applicable = false; note = `maxSdkVersion ${entry.maxSdkVersion}: does not apply on Android ${DEVICE_SDK}`; }
+    else if (name === P + 'READ_EXTERNAL_STORAGE' && targetSdk >= 33) { applicable = false; note = 'no effect with targetSdk 33 or higher: use READ_MEDIA_*'; }
+    else if (name === P + 'WRITE_EXTERNAL_STORAGE' && targetSdk >= 30) note = 'no extra access with scoped storage (targetSdk 30 or higher)';
+    else if (name === BACKGROUND_LOCATION) note = 'can only be granted after foreground location';
+    else if (targetSdk < 23) note = 'old app (targetSdk below 23): granted at install, without a dialog';
     out.push({ name, group, section: section.id, label: section.label, applicable, note, order: section.order });
   }
   return out.sort((a, b) => a.order - b.order || a.name.localeCompare(b.name));

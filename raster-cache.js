@@ -47,7 +47,7 @@ export function createRasterSender() {
     rasterObjects(snapshot, value => {
       if (value.kind === 'rgba-raster') {   // raw RGBA8 pixels, named by the VM's rasterization id (a cache hit keeps the id): first sight travels as a transferred copy, repeats as the id only
         const id = value.rasterId, bytes = value.pixels?.byteLength ?? value.rasterSize;
-        if (typeof id !== 'string' || !(bytes > 0)) throw new Error('Raster RGBA sem identificador ou pixels.');
+        if (typeof id !== 'string' || !(bytes > 0)) throw new Error('RGBA raster without an identifier or pixels.');
         value.rasterSize = bytes;
         if (lru.has(id)) { lru.touch(id); delete value.pixels; stats.pixelsDeduped++; stats.bytesSaved += bytes; }
         else { lru.touch(id, null, bytes); const copy = value.pixels.slice().buffer; value.pixels = copy; transfers.push(copy); stats.pixelsSent++; stats.bytesSent += bytes; }
@@ -55,11 +55,11 @@ export function createRasterSender() {
       }
       if (value.kind === 'bitmap-raster') {   // a GPU frame (src/gpu-raster.js): the ImageBitmap travels once, transferred (no copy); repeats as the id only
         const id = value.rasterId, bytes = value.width * value.height * 4;
-        if (typeof id !== 'string' || !(bytes > 0)) throw new Error('Raster GPU sem identificador ou dimensões.');
+        if (typeof id !== 'string' || !(bytes > 0)) throw new Error('GPU raster without an identifier or dimensions.');
         value.rasterSize = bytes;
         if (lru.has(id)) { lru.touch(id); delete value.bitmap; stats.bitmapsDeduped = (stats.bitmapsDeduped ?? 0) + 1; stats.bytesSaved += bytes; }
         else if (value.bitmap && value.bitmap.width > 0) { lru.touch(id, null, bytes); transfers.push(value.bitmap); stats.bitmapsSent = (stats.bitmapsSent ?? 0) + 1; }
-        else throw new Error('Raster GPU já transferido e não mais em cache na página.');
+        else throw new Error('GPU raster already transferred and no longer cached in the page.');
         return;
       }
       if (typeof value.dataURL !== 'string') return;
@@ -81,36 +81,36 @@ export function createRasterReceiver({ toURL = defaultToURL, toImage = defaultTo
       const id = value.rasterId;
       if (value.kind === 'rgba-raster') {   // `image` is an ImageData the page puts on a canvas; built once per distinct rasterization
         const { width, height } = value;
-        if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('Raster RGBA com dimensões inválidas recebido da VM.');
-        if (typeof id !== 'string') throw new Error('Raster RGBA sem identificador recebido da VM.');
+        if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('RGBA raster with invalid dimensions received from the VM.');
+        if (typeof id !== 'string') throw new Error('RGBA raster without an identifier received from the VM.');
         if (value.pixels !== undefined) {
-          if (!(value.pixels instanceof ArrayBuffer) || value.pixels.byteLength !== width * height * 4) throw new Error('Raster RGBA com pixels inválidos recebido da VM.');
+          if (!(value.pixels instanceof ArrayBuffer) || value.pixels.byteLength !== width * height * 4) throw new Error('RGBA raster with invalid pixels received from the VM.');
           if (!lru.has(id)) { lru.touch(id, toImage(value.pixels, width, height), value.pixels.byteLength); stats.decoded++; } else { lru.touch(id); stats.reused++; }
-        } else if (!lru.has(id)) throw new Error('Cache de rasters dessincronizado com a VM; reabra o APK.');
+        } else if (!lru.has(id)) throw new Error('Raster cache out of sync with the VM; reopen the APK.');
         else { lru.touch(id); stats.reused++; }
         delete value.pixels; value.image = lru.get(id).value; return;
       }
       if (value.kind === 'bitmap-raster') {   // `image` is the ImageBitmap the Worker transferred (GPU renderer); the page draws it on the content layer's canvas
         const { width, height } = value;
-        if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('Raster GPU com dimensões inválidas recebido da VM.');
-        if (typeof id !== 'string') throw new Error('Raster GPU sem identificador recebido da VM.');
+        if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('GPU raster with invalid dimensions received from the VM.');
+        if (typeof id !== 'string') throw new Error('GPU raster without an identifier received from the VM.');
         if (value.bitmap !== undefined) {
-          if (!isBitmap(value.bitmap) || value.bitmap.width !== width || value.bitmap.height !== height) throw new Error('Raster GPU com bitmap inválido recebido da VM.');
+          if (!isBitmap(value.bitmap) || value.bitmap.width !== width || value.bitmap.height !== height) throw new Error('GPU raster with an invalid bitmap received from the VM.');
           if (!lru.has(id)) { lru.touch(id, value.bitmap, width * height * 4); stats.decoded++; } else { lru.touch(id); stats.reused++; try { value.bitmap.close?.(); } catch { /* closed */ } }
-        } else if (!lru.has(id)) throw new Error('Cache de rasters dessincronizado com a VM; reabra o APK.');
+        } else if (!lru.has(id)) throw new Error('Raster cache out of sync with the VM; reopen the APK.');
         else { lru.touch(id); stats.reused++; }
         delete value.bitmap; value.image = lru.get(id).value; return;
       }
       if (typeof value.dataURL === 'string') {
         const text = value.dataURL;
         if (text.startsWith('blob:') && trusted.has(text)) return;
-        if (text.length > MAX_RASTER || !DATA_PNG.test(text)) throw new Error('Raster PNG inválido ou excessivo recebido da VM.');
-        const actual = hashRaster(text); if (id !== undefined && id !== actual) throw new Error('Raster PNG com identificador divergente recebido da VM.');
+        if (text.length > MAX_RASTER || !DATA_PNG.test(text)) throw new Error('Invalid or oversized PNG raster received from the VM.');
+        const actual = hashRaster(text); if (id !== undefined && id !== actual) throw new Error('PNG raster with a mismatching identifier received from the VM.');
         let entry = lru.has(actual) ? lru.touch(actual) : null;
         if (!entry) { const url = toURL(text.slice(PNG_PREFIX.length)); trusted.add(url); entry = lru.touch(actual, url, text.length); stats.decoded++; } else stats.reused++;
         value.rasterId = actual; value.dataURL = entry.value; return;
       }
-      if (typeof id !== 'string' || !lru.has(id)) throw new Error('Cache de rasters dessincronizado com a VM; reabra o APK.');
+      if (typeof id !== 'string' || !lru.has(id)) throw new Error('Raster cache out of sync with the VM; reopen the APK.');
       value.dataURL = lru.touch(id).value; stats.reused++;
     });
     return snapshot;

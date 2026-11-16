@@ -7,7 +7,7 @@
 // asked for it (Layout Inspector's inspection tables, ComposerImpl.collectParameterInformation). The root composition's slot table is read through its public tooling API
 // (CompositionData / CompositionGroup.getSourceInfo / getNode); when it carries "C(Name)" markers the LayoutNode gets that name (source 'composable'). Otherwise the name is
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=ca92aaad0948';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=d422379a2a38';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
 const COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
@@ -40,9 +40,9 @@ export function elementName({ calls = [], semantics = null, measurePolicy = null
   const suffix = [label ? quote(label) : '', tag].filter(Boolean).join(' '), named = calls.filter(call => !PRIMITIVES.has(call)), join = kind => suffix ? `${kind} ${suffix}` : kind;
   if (named.length) return { name: join(named.at(-1)), source: 'composable', kind: named.at(-1) };
   if (semantics?.role) return { name: join(semantics.role), source: 'semantics', kind: semantics.role };
-  if (actions.includes('SetText')) return { name: join('Campo de texto'), source: 'semantics', kind: 'Campo de texto' };
-  if (semantics?.texts?.length) return { name: join('Texto'), source: 'semantics', kind: 'Texto' };
-  if (interactive) return { name: join('Clicável'), source: 'semantics', kind: 'Clicável' };
+  if (actions.includes('SetText')) return { name: join('Text field'), source: 'semantics', kind: 'Text field' };
+  if (semantics?.texts?.length) return { name: join('Text'), source: 'semantics', kind: 'Text' };
+  if (interactive) return { name: join('Clickable'), source: 'semantics', kind: 'Clickable' };
   const policy = measurePolicy ? simpleName(measurePolicy) : null, mods = modifiers.slice(0, 3).map(modifier => modifier.label).join(', ');
   return { name: join(['Layout', policy, mods].filter(Boolean).join(' · ')), source: 'layout', kind: 'Layout' };
 }
@@ -107,7 +107,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     let last = null;
     if (!childReadsMissing) for (const name of CHILD_READS) { try { const value = list(call(ref, NODE, name, '()Ljava/util/List;'), 4096); childRead = name; return value; } catch (error) { last = error; } }
     childReadsMissing = true;
-    const discovery = discoverChildren(ref), found = discovery?.best ?? null; if (found) { childRead = found.name; if (!failedReads.has('filhos')) failedReads.set('filhos', `nomes conhecidos ausentes; filhos lidos por ${found.name}()`); return found.items; }
+    const discovery = discoverChildren(ref), found = discovery?.best ?? null; if (found) { childRead = found.name; if (!failedReads.has('filhos')) failedReads.set('filhos', `known names missing; children read through ${found.name}()`); return found.items; }
     if (discovery && discovery.callable > 0) return [];   // methods answered, none with LayoutNodes: a node without children
     throw last ?? new Error('LayoutNode children unavailable');
   };
@@ -116,7 +116,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     try {
       const tree = driver.snapshot({ roots: all.slice(floor).map(value => value.root), merged: false, maxNodes: 4096 });
       for (const owner of tree.owners) { semanticsByOwner.set(owner.ownerViewId, owner.nodes); for (const node of owner.nodes) semanticsById.set(`${owner.ownerViewId}:${node.nodeId}`, node); }
-    } catch (error) { notes.push(`semântica indisponível: ${String(error?.message ?? error).slice(0, 160)}`); }
+    } catch (error) { notes.push(`semantics unavailable: ${String(error?.message ?? error).slice(0, 160)}`); }
     finally { runtime.gcExtraRoots?.delete(driver); }
   }
 
@@ -128,7 +128,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     catch (error) {
       totalNodes = counted;   // the LayoutNode walk is not readable in this build: the public semantics tree of the same owner (what the layout bounds use) still describes the screen
       const fallback = semanticsOwnerTree(view, ownerWindow);
-      notes.push(`árvore de LayoutNode ilegível (${String(error?.message ?? error).slice(0, 140)}): ${fallback ? `mostrando a árvore de semântica do Compose (${fallback.nodes.length} nós, sem modificadores nem política de medida)` : 'sem árvore de semântica também'}`);
+      notes.push(`LayoutNode tree unreadable (${String(error?.message ?? error).slice(0, 140)}): ${fallback ? `showing the Compose semantics tree (${fallback.nodes.length} nodes, no modifiers or measure policy)` : 'no semantics tree either'}`);
       if (fallback) { owners.push(fallback); totalNodes += fallback.nodes.length; }
     }
   }
@@ -151,7 +151,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     for (const node of nodes) { const { name, source } = elementName({ semantics: semanticsById.get(node.id), innerText: innerText.get(node.id) }); node.name = name; node.nameSource = source; }
     if (list.length > maxNodes) truncated = true;
     return { ownerViewId: view.ref, window: ownerWindow, width: optional('View.getWidth', () => call(view, VIEW, 'getWidth', '()I'), 0), height: optional('View.getHeight', () => call(view, VIEW, 'getHeight', '()I'), 0), attached: true, locationInWindow,
-      names: { source: 'semantics', groups: 0, named: 0, note: 'árvore de semântica: só os nós com semântica (texto, papel, ação, testTag) e seus contêineres' }, source: 'semantics', nodes };
+      names: { source: 'semantics', groups: 0, named: 0, note: 'semantics tree: only the nodes with semantics (text, role, action, testTag) and their containers' }, source: 'semantics', nodes };
   }
   function inspectOwner(view, window, ownerWindow) {
     const root = call(view, OWNER_VIEW, 'getRoot', `()${NODE}`); if (!root) return;
@@ -182,10 +182,10 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
         };
         walk(table, [], 0);
         names.source = names.named ? 'slot-table' : 'none';
-        if (names.groups >= maxGroups) names.note = `limite de ${maxGroups} grupos do slot table atingido`;
-        else if (!names.named) names.note = 'a composição não registrou informação de fonte (o Compose só a grava com ferramentas de inspeção ativas): nomes derivados da semântica e do layout';
-      } else names.note = 'composição do AndroidComposeView não encontrada';
-    } catch (error) { names.note = `slot table ilegível: ${String(error?.message ?? error).slice(0, 160)}`; callsByNode.clear(); }
+        if (names.groups >= maxGroups) names.note = `limit of ${maxGroups} slot table groups reached`;
+        else if (!names.named) names.note = 'the composition recorded no source information (Compose only records it while inspection tools are active): names derived from the semantics and the layout';
+      } else names.note = 'composition of the AndroidComposeView not found';
+    } catch (error) { names.note = `slot table unreadable: ${String(error?.message ?? error).slice(0, 160)}`; callsByNode.clear(); }
 
     const nodes = [], raw = new Map();
     const visit = (ref, parentId, depth, index) => {
@@ -231,7 +231,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     owners.push({ ownerViewId: view.ref, window: ownerWindow,
       width: call(view, VIEW, 'getWidth', '()I'), height: call(view, VIEW, 'getHeight', '()I'), attached: !!call(view, VIEW, 'isAttachedToWindow', '()Z'), locationInWindow, names, source: 'layout-nodes', nodes });
   }
-  if (failedReads.size) notes.push(`leituras indisponíveis neste build (o minificador pode ter renomeado membros internos do Compose): ${[...failedReads.keys()].join(', ')}`);
-  if (truncated) notes.push(`limite de ${maxNodes} elementos (ou profundidade ${maxDepth}) atingido: a lista está incompleta`);
+  if (failedReads.size) notes.push(`reads unavailable in this build (the minifier may have renamed internal Compose members): ${[...failedReads.keys()].join(', ')}`);
+  if (truncated) notes.push(`limit of ${maxNodes} elements (or depth ${maxDepth}) reached: the list is incomplete`);
   return { schemaVersion: 1, source: 'original-Compose-DEX/LayoutNode', density, owners, totalNodes, truncated, notes };
 }

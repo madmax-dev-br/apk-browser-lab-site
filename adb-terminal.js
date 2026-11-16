@@ -27,7 +27,7 @@ export function resultLines(result) {
   if (result && result.code !== 0) lines.push({ kind: 'hint', text: `status ${result.code}` });
   return lines;
 }
-const baseName = path => String(path ?? '').replace(/^pull:/, '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'arquivo';
+const baseName = path => String(path ?? '').replace(/^pull:/, '').replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'file';
 
 /**
  * root: the terminal's <details> (index.html #adb-terminal: .adb-screen, the scrolling screen, holding .adb-output and .adb-form with .adb-input; .adb-file, .adb-clear, .adb-count).
@@ -38,13 +38,13 @@ export function createAdbTerminal({ root, run, doc = globalThis.document, histor
   const screen = root.querySelector('.adb-screen') ?? output, toEnd = () => { screen.scrollTop = screen.scrollHeight; };
   let busy = false, commands = 0;
   const print = (kind, text) => { const line = doc.createElement('div'); line.className = `adb-line adb-${kind}`; line.textContent = text; output.append(line); toEnd(); return line; };
-  const picture = blob => { const image = doc.createElement('img'); image.className = 'adb-image'; image.alt = 'Imagem devolvida pelo comando'; image.src = URL.createObjectURL(blob); image.addEventListener('load', toEnd); output.append(image); };
+  const picture = blob => { const image = doc.createElement('img'); image.className = 'adb-image'; image.alt = 'Image returned by the command'; image.src = URL.createObjectURL(blob); image.addEventListener('load', toEnd); output.append(image); };
   /** A file of the person's computer for `adb install` / `adb push`: the browser's file picker (a page cannot read a path). */
   const chooseFile = path => new Promise((resolve, reject) => {
-    print('hint', `${path}: uma página não lê caminhos do computador. Escolha o arquivo na janela do navegador.`);
-    const button = doc.createElement('button'); button.type = 'button'; button.className = 'cp-button adb-pick'; button.textContent = `Escolher ${baseName(path)}…`; output.append(button); toEnd();
+    print('hint', `${path}: a page cannot read paths on the computer. Choose the file in the browser's window.`);
+    const button = doc.createElement('button'); button.type = 'button'; button.className = 'cp-button adb-pick'; button.textContent = `Choose ${baseName(path)}…`; output.append(button); toEnd();
     const finish = (file, error) => { picker.removeEventListener('change', chosen); picker.removeEventListener('cancel', cancelled); button.remove(); picker.value = ''; if (file) resolve(file); else reject(Object.assign(new Error(error), { name: 'AdbError', exitCode: 1 })); };
-    const chosen = () => finish(picker.files?.[0] ?? null, `adb: ${path}: nenhum arquivo escolhido`), cancelled = () => finish(null, `adb: ${path}: a escolha do arquivo foi cancelada`);
+    const chosen = () => finish(picker.files?.[0] ?? null, `adb: ${path}: no file chosen`), cancelled = () => finish(null, `adb: ${path}: file selection was cancelled`);
     picker.addEventListener('change', chosen); picker.addEventListener('cancel', cancelled);
     picker.accept = /\.apk$/i.test(path) ? '.apk,application/vnd.android.package-archive' : '';
     button.addEventListener('click', () => picker.click());
@@ -56,7 +56,7 @@ export function createAdbTerminal({ root, run, doc = globalThis.document, histor
     const text = String(command ?? '').trim(); if (!text || busy) return null;
     history.add(text); print('command', text);
     if (text === 'clear' || text === 'cls') { clear(); return null; }
-    busy = true; form.dataset.busy = 'true'; if (screen.dataset) screen.dataset.busy = 'true'; input.disabled = true; commands++; if (counter) counter.textContent = `${commands} ${commands === 1 ? 'comando' : 'comandos'}`;
+    busy = true; form.dataset.busy = 'true'; if (screen.dataset) screen.dataset.busy = 'true'; input.disabled = true; commands++; if (counter) counter.textContent = `${commands} ${commands === 1 ? 'command' : 'commands'}`;
     try {
       onCommand(text);
       const result = await run(text, { localFile: chooseFile, writeLocal: download });
@@ -75,6 +75,6 @@ export function createAdbTerminal({ root, run, doc = globalThis.document, histor
   root.querySelector('.adb-clear')?.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); clear(); });
   // as in a terminal, a click on the screen goes to the prompt (not one that ends a text selection, nor one on a button or an image of the output)
   screen.addEventListener?.('click', event => { if (event.target?.closest?.('button, a, img, input')) return; if (String(globalThis.getSelection?.() ?? '')) return; input.focus(); });
-  root.addEventListener('toggle', () => { if (root.open) { if (!output.childElementCount) print('hint', 'adb help lista os comandos · clear limpa a tela · ↑ ↓ histórico'); input.focus(); } });
+  root.addEventListener('toggle', () => { if (root.open) { if (!output.childElementCount) print('hint', 'adb help lists the commands · clear clears the screen · ↑ ↓ history'); input.focus(); } });
   return { execute, clear, focus: () => input.focus() };
 }

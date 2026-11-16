@@ -29,19 +29,19 @@ export function drawTestPattern(ctx, width, height, timeMs, frame) {
   const big = Math.round(width * 0.105), small = Math.round(width * 0.055);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fillRect(width * 0.06, height * 0.5, width * 0.88, big * 2.5);
   ctx.fillStyle = '#fff'; ctx.font = `700 ${big}px ui-monospace, Menlo, monospace`; ctx.fillText(clock, width / 2, height * 0.5 + big * 0.75);
-  ctx.font = `600 ${small}px ui-monospace, Menlo, monospace`; ctx.fillStyle = '#ffd54a'; ctx.fillText(`quadro ${frame}`, width / 2, height * 0.5 + big * 1.85);
-  ctx.font = `600 ${Math.round(small * 0.8)}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.textBaseline = 'bottom'; ctx.fillText('↑ CÂMERA DE TESTE', width / 2, height * 0.975);
+  ctx.font = `600 ${small}px ui-monospace, Menlo, monospace`; ctx.fillStyle = '#ffd54a'; ctx.fillText(`frame ${frame}`, width / 2, height * 0.5 + big * 1.85);
+  ctx.font = `600 ${Math.round(small * 0.8)}px system-ui, sans-serif`; ctx.fillStyle = 'rgba(255,255,255,.9)'; ctx.textBaseline = 'bottom'; ctx.fillText('↑ TEST CAMERA', width / 2, height * 0.975);
 }
 
 export function createCameraSource({ onChange = () => {}, documentRef = globalThis.document, mediaDevices = globalThis.navigator?.mediaDevices } = {}) {
-  const S = { kind: 'pattern', label: 'Padrão de teste gerado', error: '', stream: null, video: null, image: null, objectURL: null, frame: 0, started: performance.now() };
+  const S = { kind: 'pattern', label: 'Generated test pattern', error: '', stream: null, video: null, image: null, objectURL: null, frame: 0, started: performance.now() };
   const release = () => {
     if (S.stream) for (const track of S.stream.getTracks()) track.stop();
     if (S.video) { S.video.pause(); S.video.srcObject = null; S.video.removeAttribute('src'); S.video.load?.(); }
     if (S.objectURL) URL.revokeObjectURL(S.objectURL);
     S.stream = null; S.video = null; S.image = null; S.objectURL = null;
   };
-  const usePattern = (error = '') => { release(); S.kind = 'pattern'; S.label = 'Padrão de teste gerado'; S.error = error; onChange(); };
+  const usePattern = (error = '') => { release(); S.kind = 'pattern'; S.label = 'Generated test pattern'; S.error = error; onChange(); };
   const videoElement = () => { const video = documentRef.createElement('video'); video.muted = true; video.playsInline = true; video.loop = true; return video; };
   /** The picture element and its intrinsic size, or null while it has nothing to show (the generated feed stands in). */
   const picture = () => {
@@ -63,26 +63,26 @@ export function createCameraSource({ onChange = () => {}, documentRef = globalTh
       if (kind === 'pattern') { usePattern(); return S.kind; }
       try {
         if (kind === 'webcam') {
-          if (!mediaDevices?.getUserMedia) throw new Error('este navegador não oferece getUserMedia nesta página (é preciso HTTPS ou localhost)');
+          if (!mediaDevices?.getUserMedia) throw new Error('this browser does not offer getUserMedia on this page (HTTPS or localhost is required)');
           const stream = await mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
           release(); S.stream = stream; S.video = videoElement(); S.video.srcObject = stream; await S.video.play();
-          for (const track of stream.getVideoTracks()) track.addEventListener('ended', () => { if (S.stream === stream) usePattern('a webcam foi desligada; a câmera voltou ao padrão de teste'); });
+          for (const track of stream.getVideoTracks()) track.addEventListener('ended', () => { if (S.stream === stream) usePattern('the webcam was turned off; the camera went back to the test pattern'); });
           S.kind = 'webcam'; S.label = stream.getVideoTracks()[0]?.label || 'Webcam'; S.error = '';
         } else if (kind === 'image') {
-          if (!file) throw new Error('nenhum arquivo de imagem escolhido');
+          if (!file) throw new Error('no image file chosen');
           const url = URL.createObjectURL(file), image = new Image(); image.src = url;
-          try { await image.decode(); } catch { URL.revokeObjectURL(url); throw new Error(`o navegador não conseguiu abrir "${file.name}" como imagem`); }
+          try { await image.decode(); } catch { URL.revokeObjectURL(url); throw new Error(`the browser could not open "${file.name}" as an image`); }
           release(); S.objectURL = url; S.image = image; S.kind = 'image'; S.label = file.name; S.error = '';
         } else if (kind === 'video') {
-          if (!file) throw new Error('nenhum arquivo de vídeo escolhido');
+          if (!file) throw new Error('no video file chosen');
           const url = URL.createObjectURL(file), video = videoElement(); video.src = url;
-          try { await video.play(); } catch { URL.revokeObjectURL(url); throw new Error(`o navegador não conseguiu reproduzir "${file.name}" como vídeo`); }
+          try { await video.play(); } catch { URL.revokeObjectURL(url); throw new Error(`the browser could not play "${file.name}" as a video`); }
           release(); S.objectURL = url; S.video = video; S.kind = 'video'; S.label = file.name; S.error = '';
-        } else throw new Error(`fonte desconhecida: ${kind}`);
+        } else throw new Error(`unknown source: ${kind}`);
         onChange(); return S.kind;
       } catch (error) {
-        const reason = error?.name === 'NotAllowedError' ? 'a permissão da câmera foi negada no navegador' : error?.name === 'NotFoundError' ? 'nenhuma webcam foi encontrada neste computador' : error?.name === 'NotReadableError' ? 'a webcam está em uso por outro programa' : String(error?.message ?? error);
-        usePattern(`${reason}; a câmera continua no padrão de teste`); return S.kind;
+        const reason = error?.name === 'NotAllowedError' ? 'camera permission was denied in the browser' : error?.name === 'NotFoundError' ? 'no webcam was found on this computer' : error?.name === 'NotReadableError' ? 'the webcam is in use by another program' : String(error?.message ?? error);
+        usePattern(`${reason}; the camera stays on the test pattern`); return S.kind;
       }
     },
     /** The upright scene into (x, y, width, height) of `ctx`. `mirror`: flipped left to right (how a front camera's preview is shown). */

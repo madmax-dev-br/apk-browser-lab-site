@@ -6,7 +6,7 @@ export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
 const text = value => {
   const body = typeof value === 'string' ? value : JSON.stringify(value);
-  return { type: 'text', text: body.length > MAX_TEXT_CHARS ? body.slice(0, MAX_TEXT_CHARS) + `\n… (cortado: ${body.length - MAX_TEXT_CHARS} caracteres a mais; peça menos, por exemplo max_nodes ou limit)` : body };
+  return { type: 'text', text: body.length > MAX_TEXT_CHARS ? body.slice(0, MAX_TEXT_CHARS) + `\n… (truncated: ${body.length - MAX_TEXT_CHARS} more characters; ask for less, for example max_nodes or limit)` : body };
 };
 /** A Blob -> base64 (chunked, so a large image does not overflow the call stack). */
 export async function blobToBase64(blob) {
@@ -22,7 +22,7 @@ const scrollTargetOf = args => args.element_key || args.test_tag || args.text ||
 
 export const NETWORK_WAIT_MS = 5000;
 /**
- * Waits for "Tela pronta" without letting an endpoint hold the caller: the screen is not ready while a network exchange is in flight, so a slow or hanging request (a long poll,
+ * Waits for "Screen ready" without letting an endpoint hold the caller: the screen is not ready while a network exchange is in flight, so a slow or hanging request (a long poll,
  * a stream, a server that does not answer) would keep every wait until its timeout. Once the screen is drawn and still and only the network is pending (screen.ready.onlyNetwork),
  * the wait gives the requests `networkMs` more and then returns, saying which requests are still open. -> { ready, screen, networkPending: [{ method, url, seconds }] | undefined }
  * screen(): the page's screen (src/plugin-host.js screenFromSnapshot); requests(): the network log's entries; sleep(ms); now().
@@ -43,7 +43,7 @@ export async function waitScreenReady({ screen, requests = () => [], sleep = ms 
 export function readyReport(result) {
   const report = { ready: result.ready, activity: result.screen?.activity ?? null };
   if (!result.ready) report.waitingFor = result.screen?.ready?.waitingFor ?? [];
-  if (result.networkPending) { report.networkPending = result.networkPending; report.note = 'A tela está desenhada e parada; só há rede em andamento, então a espera não seguiu até o fim. Se o conteúdo depende dessa resposta, chame wait_ready com network_ms maior.'; }
+  if (result.networkPending) { report.networkPending = result.networkPending; report.note = 'The screen is drawn and still; only network requests are in flight, so the wait did not run to the end. If the content depends on that response, call wait_ready with a larger network_ms.'; }
   return report;
 }
 
@@ -70,7 +70,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
     if (args.test_tag || args.text) {
       const elements = await query('layoutBounds', { names: false }), tag = args.test_tag ? String(args.test_tag) : null, wanted = args.text ? String(args.text).toLowerCase() : null;
       const element = elements.find(item => (tag ? item.testTag === tag : true) && (wanted ? [...(item.texts ?? []), item.editableText ?? '', ...(item.contentDescriptions ?? [])].some(value => String(value).toLowerCase().includes(wanted)) : true));
-      if (!element) throw fail(`Nenhum componente na tela com ${tag ? `testTag "${tag}"` : ''}${tag && wanted ? ' e ' : ''}${wanted ? `texto "${args.text}"` : ''} (veja layout_bounds).`);
+      if (!element) throw fail(`No component on screen with ${tag ? `testTag "${tag}"` : ''}${tag && wanted ? ' and ' : ''}${wanted ? `text "${args.text}"` : ''} (see layout_bounds).`);
       return { key: element.key };
     }
     return {};
@@ -80,7 +80,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
   function windowOf(args) {
     const since = Number.isFinite(Number(args.since)) ? Number(args.since) : null;
     const fromTime = args.from_time !== undefined ? (Number.isFinite(Number(args.from_time)) ? Number(args.from_time) : Date.parse(String(args.from_time))) : Number.isFinite(Number(args.last_seconds)) ? Date.now() - Number(args.last_seconds) * 1000 : null;
-    if (args.from_time !== undefined && !Number.isFinite(fromTime)) throw fail(`from_time inválido: ${args.from_time} (use ISO 8601 ou milissegundos desde 1970).`);
+    if (args.from_time !== undefined && !Number.isFinite(fromTime)) throw fail(`invalid from_time: ${args.from_time} (use ISO 8601 or milliseconds since 1970).`);
     return entry => (since === null || !(entry.seq <= since)) && (fromTime === null || !Number.isFinite(entry.wall) || entry.wall >= fromTime);
   }
   /** After an input: wait for the screen to settle (up to wait_ms), then the screen and, when asked, its image. */
@@ -93,7 +93,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
   }
   /** Which installed app a call names: its id (apps, install_apk), its package, or its label / file name. */
   const appSelector = args => ({ id: args.id === undefined ? null : String(args.id), packageName: args.package === undefined ? null : String(args.package), name: args.name === undefined ? null : String(args.name) });
-  /** After an app was opened: "Tela pronta" (up to wait_ms) and the Activity on screen. */
+  /** After an app was opened: "Screen ready" (up to wait_ms) and the Activity on screen. */
   async function settled(waitMs, networkMs) { return readyReport(await waitReady(waitMs ?? 15000, networkMs)); }
   const tools = {
     async lab_status() {
@@ -107,7 +107,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
     },
     async layout_bounds(args) { return [text(await query('layoutBounds', { names: args.names !== false }))]; },
     async compose_tree(args) { return [text(await query('composeTree', { maxNodes: bounded(args.max_nodes, 600, 1, 4000), ...(Array.isArray(args.locals) && args.locals.length ? { locals: args.locals.map(String) } : {}) }))]; },
-    async composition_locals(args) { if (!args.handle) throw fail('handle é obrigatório (de compose_tree).'); return [text(await query('compositionLocals', { handle: String(args.handle), only: Array.isArray(args.only) ? args.only.map(String) : null, options: { depth: 1 } }))]; },
+    async composition_locals(args) { if (!args.handle) throw fail('handle is required (from compose_tree).'); return [text(await query('compositionLocals', { handle: String(args.handle), only: Array.isArray(args.only) ? args.only.map(String) : null, options: { depth: 1 } }))]; },
     async find_composition_local(args) { return [text(await query('findCompositionLocal', { match: String(args.match ?? ''), options: { depth: 1 } }))]; },
     async view_models() { return [text(await query('viewModels', {}))]; },
     async inspect(args) { return [text(await query('inspect', { handle: String(args.handle ?? ''), options: { depth: bounded(args.depth, 2, 0, 6) } }))]; },
@@ -137,18 +137,18 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
           ...(plugin.buttons?.length ? { buttons: plugin.buttons.map(button => ({ id: button.id, label: button.label, icon: button.icon || undefined, title: button.title || undefined, placement: button.placement, disabled: button.disabled || undefined, busy: button.busy || undefined })) } : {}),
           errors: (plugin.errors ?? []).slice(-5).map(error => `${error.phase}: ${error.message}`), console: (plugin.console ?? []).slice(-20).map(line => `${line.level}: ${line.text}`) });
       }
-      if (wanted && !out.length) throw fail(`Plugin "${wanted}" não encontrado (lab_status lista os plugins).`);
+      if (wanted && !out.length) throw fail(`Plugin "${wanted}" not found (lab_status lists the plugins).`);
       const content = [text(out)];
-      for (const { plugin, block } of images.slice(0, 8)) { content.push(await image({ blob: block.blob, type: block.blob.type })); content.push(text(`↑ imagem do plugin ${plugin}${block.caption ? `: ${block.caption}` : ''}`)); }
+      for (const { plugin, block } of images.slice(0, 8)) { content.push(await image({ blob: block.blob, type: block.blob.type })); content.push(text(`↑ image from plugin ${plugin}${block.caption ? `: ${block.caption}` : ''}`)); }
       return content;
     },
     /** A click on a plugin's button (lab.button), as the user's: the plugin's handler runs; the answer comes when it finished, with what it wrote (blocks, errors). */
     async click_plugin_button(args) {
-      if (typeof clickButton !== 'function') throw fail('Botões de plugin não estão disponíveis nesta página.');
+      if (typeof clickButton !== 'function') throw fail('Plugin buttons are not available on this page.');
       const wanted = String(args.plugin ?? ''), plugin = plugins().find(item => item.id === wanted) ?? plugins().find(item => item.name === wanted);
-      if (!plugin) throw fail(`Plugin "${wanted}" não encontrado (lab_status lista os plugins).`);
+      if (!plugin) throw fail(`Plugin "${wanted}" not found (lab_status lists the plugins).`);
       const key = String(args.button ?? ''), button = (plugin.buttons ?? []).find(item => item.id === key) ?? (plugin.buttons ?? []).find(item => item.label === key);
-      if (!button) throw fail(`O plugin ${plugin.name} não tem o botão "${key}" (plugins lista os botões: ${(plugin.buttons ?? []).map(item => item.id).join(', ') || 'nenhum'}).`);
+      if (!button) throw fail(`Plugin ${plugin.name} has no button "${key}" (plugins lists the buttons: ${(plugin.buttons ?? []).map(item => item.id).join(', ') || 'none'}).`);
       const errorsBefore = plugin.errorCount ?? 0, wait = bounded(args.wait_ms, 10000, 0, 60000);
       const result = await Promise.race([clickButton(plugin.id, button.id), sleep(wait).then(() => ({ ok: null, reason: 'still-running' }))]);
       const after = plugins().find(item => item.id === plugin.id) ?? plugin, fresh = Math.min(5, Math.max(0, (after.errorCount ?? 0) - errorsBefore));
@@ -158,126 +158,126 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
       // a cursor to follow the Logcat: `since` (the `next` of the previous answer) returns only newer lines; `wait_ms` waits up to that long for one to arrive
       const min = LEVEL_ORDER.indexOf(String(args.level ?? 'V').toUpperCase()), needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 200, 1, 5000);
       const wait = bounded(args.wait_ms, 0, 0, 30000), inWindow = windowOf(args), since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1;
-      if (args.start === 'now') { const all = logcat(); return [text('Acompanhando a partir de agora: passe since com o next abaixo nas próximas chamadas.'), text({ next: all.length ? all.at(-1).seq : -1, count: 0 })]; }
+      if (args.start === 'now') { const all = logcat(); return [text('Following from now on: pass since with the next below in the following calls.'), text({ next: all.length ? all.at(-1).seq : -1, count: 0 })]; }
       const pick = () => logcat().filter(entry => inWindow(entry) && LEVEL_ORDER.indexOf(entry.level) >= Math.max(0, min) && (!needle || `${entry.tag} ${entry.message}`.toLowerCase().includes(needle)));
       let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
       rows = rows.slice(-limit);
       const all = logcat(), next = all.length ? all.at(-1).seq : since;
       const lines = rows.map(entry => `${(entry.uptime / 1000).toFixed(3)} ${entry.level}/${entry.tag} (${entry.thread}): ${entry.message}`);
-      return [text(lines.length ? lines.join('\n') : `Sem linhas novas${needle || min > 0 ? ' com esse filtro' : ''}. O Logcat é coletado enquanto o MCP está conectado.`), text({ next, count: rows.length })];
+      return [text(lines.length ? lines.join('\n') : `No new lines${needle || min > 0 ? ' with that filter' : ''}. Logcat is collected while MCP is connected.`), text({ next, count: rows.length })];
     },
     async network(args) {
       const needle = args.contains ? String(args.contains).toLowerCase() : null, limit = bounded(args.limit, 50, 1, 1000), withBody = args.include_body === true;
       const wait = bounded(args.wait_ms, 0, 0, 30000), inWindow = windowOf(args), since = Number.isFinite(Number(args.since)) ? Number(args.since) : -1;
-      if (args.start === 'now') { const all = network(); return [text({ requests: [], next: all.length ? all.at(-1).seq : -1, note: 'Acompanhando a partir de agora: passe since com este next nas próximas chamadas.' })]; }
+      if (args.start === 'now') { const all = network(); return [text({ requests: [], next: all.length ? all.at(-1).seq : -1, note: 'Following from now on: pass since with this next in the following calls.' })]; }
       const pick = () => network().filter(entry => inWindow(entry) && (!needle || `${entry.method} ${entry.url}`.toLowerCase().includes(needle)));
       let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
       const all = network(), next = all.length ? all.at(-1).seq : since;
       const out = rows.slice(-limit).map(entry => ({ seq: entry.seq, method: entry.method, url: entry.url, status: entry.status, outcome: entry.outcome, complete: entry.complete, durationMs: entry.durationMs, contentType: entry.contentType, responseBytes: entry.responseBytes,
-        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}),
+        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.proxiedVia ? { proxiedVia: entry.proxiedVia } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}),
         ...(withBody && typeof entry.responseBody === 'string' ? { responseBody: entry.responseBody.length > 20000 ? entry.responseBody.slice(0, 20000) + '…' : entry.responseBody, responseHeaders: entry.responseHeaders } : {}) }));
       return [text({ requests: out, next })];
     },
-    // ---- acting on the lab: the page's own controls (they show in Controles like the user's) ----
+    // ---- acting on the lab: the page's own controls (they show in Controls like the user's) ----
     async set_mock(args) {
-      if (!actions?.mock) throw fail('Mocks não estão disponíveis nesta página.');
+      if (!actions?.mock) throw fail('Mocks are not available on this page.');
       const headers = args.headers && typeof args.headers === 'object' ? args.headers : undefined, body = args.body === undefined ? '' : typeof args.body === 'string' ? args.body : JSON.stringify(args.body);
       const result = await actions.mock({ id: args.id, name: args.name ?? `MCP ${args.method ?? 'ANY'} ${args.url ?? ''}`.slice(0, 120), method: args.method ?? 'ANY', url: args.url, status: args.status ?? 200, headers: headers ?? (typeof args.body === 'object' && args.body !== null ? { 'Content-Type': 'application/json' } : undefined), body, delayMs: args.delay_ms ?? 0, query: args.query });
-      return [text({ id: result.id, note: 'Ativo em Controles › Mock de endpoints: a próxima requisição que casar recebe esta resposta sem ir à rede. Use reload para o app buscar de novo.' })];
+      return [text({ id: result.id, note: 'Active in Controls › Endpoint mocks: the next request that matches gets this response without going to the network. Use reload so the app fetches again.' })];
     },
-    async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
-    async list_mocks() { if (!actions?.mocks) throw fail('Mocks não estão disponíveis nesta página.'); return [text(await actions.mocks())]; },
+    async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks are not available on this page.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
+    async list_mocks() { if (!actions?.mocks) throw fail('Mocks are not available on this page.'); return [text(await actions.mocks())]; },
     // ---- input: the page's own input paths (a real touch on Compose, a click on a View, SetText, ScrollBy) ----
-    async tap(args) { if (!input?.tap) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.tap(args), args); },
-    async type(args) { if (!input?.type) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.type(args), args); },
-    async scroll(args) { if (!input?.scroll) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.scroll(args), args); },
+    async tap(args) { if (!input?.tap) throw fail('Input is not available on this page.'); return afterInput(await input.tap(args), args); },
+    async type(args) { if (!input?.type) throw fail('Input is not available on this page.'); return afterInput(await input.type(args), args); },
+    async scroll(args) { if (!input?.scroll) throw fail('Input is not available on this page.'); return afterInput(await input.scroll(args), args); },
     // to a position (px = dp) or a percentage of the scroll range, as lab.scrollTo / lab.scrollToPercent of the plugins (src/lab-scroll.js): the app's own scroll, steered until it gets there
     async scroll_to(args) {
-      if (!input?.scrollTo) throw fail('Entrada não disponível nesta página.');
+      if (!input?.scrollTo) throw fail('Input is not available on this page.');
       return afterInput(await input.scrollTo({ target: scrollTargetOf(args), x: args.to_x, y: args.to_y, percentX: args.percent_x, percentY: args.percent_y }), args);
     },
-    async scroll_info(args) { if (!input?.scrollInfo) throw fail('Entrada não disponível nesta página.'); return [text(await input.scrollInfo({ target: scrollTargetOf(args) }))]; },
-    async back(args) { if (!input?.back) throw fail('Entrada não disponível nesta página.'); return afterInput(await input.back(args), args); },
-    async reload(args) { if (!actions?.reload) throw fail('Recarregar não está disponível nesta página.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
-    // ---- the Controles panel (controls: src/app.js mcpControls) ----
+    async scroll_info(args) { if (!input?.scrollInfo) throw fail('Input is not available on this page.'); return [text(await input.scrollInfo({ target: scrollTargetOf(args) }))]; },
+    async back(args) { if (!input?.back) throw fail('Input is not available on this page.'); return afterInput(await input.back(args), args); },
+    async reload(args) { if (!actions?.reload) throw fail('Reload is not available on this page.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
+    // ---- the Controls panel (controls: src/app.js mcpControls) ----
     async app_data(args) {
-      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
+      if (!controls?.appData) throw fail('App data is not available on this page.');
       if (args.prefs) return [text(await controls.appData({ op: 'prefs', name: String(args.prefs) }))];
       if (args.db && args.table) return [text(await controls.appData({ op: 'rows', db: String(args.db), table: String(args.table), offset: bounded(args.offset, 0, 0, 1e9), limit: bounded(args.limit, 100, 1, 500) }))];
       return [text(await controls.appData({ op: 'overview' }))];
     },
     async set_preferences(args) {
-      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
-      if (!args.name || !Array.isArray(args.changes) || !args.changes.length) throw fail('name e changes ([{ key, type, value } ou { key, remove: true }]) são obrigatórios.');
+      if (!controls?.appData) throw fail('App data is not available on this page.');
+      if (!args.name || !Array.isArray(args.changes) || !args.changes.length) throw fail('name and changes ([{ key, type, value } or { key, remove: true }]) are required.');
       return [text(await controls.appData({ op: 'edit-prefs', name: String(args.name), changes: args.changes }))];
     },
     async edit_row(args) {
-      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
-      if (!args.db || !args.table) throw fail('db e table são obrigatórios.');
+      if (!controls?.appData) throw fail('App data is not available on this page.');
+      if (!args.db || !args.table) throw fail('db and table are required.');
       const change = { rowid: args.rowid ?? null, key: args.key ?? null, set: args.set ?? null, insert: args.insert ?? null, remove: args.remove === true };
       return [text(await controls.appData({ op: 'edit-row', db: String(args.db), table: String(args.table), change }))];
     },
     async sql(args) {
-      if (!controls?.appData) throw fail('Dados do app não estão disponíveis nesta página.');
-      if (!args.db || !args.sql) throw fail('db e sql são obrigatórios.');
+      if (!controls?.appData) throw fail('App data is not available on this page.');
+      if (!args.db || !args.sql) throw fail('db and sql are required.');
       return [text(await controls.appData({ op: 'sql', db: String(args.db), sql: String(args.sql), params: Array.isArray(args.params) ? args.params : [], limit: bounded(args.limit, 200, 1, 500) }))];
     },
-    async device(args) { if (!controls?.device) throw fail('Ajustes do dispositivo não estão disponíveis nesta página.'); return [text(controls.device(args.set ?? null))]; },
-    async apps(args) { if (!controls?.apps) throw fail('Apps salvos não estão disponíveis nesta página.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list' || !result.running) return [text(result)]; return [text({ ...result, ...(await settled(args.wait_ms)) })]; },
+    async device(args) { if (!controls?.device) throw fail('Device settings are not available on this page.'); return [text(controls.device(args.set ?? null))]; },
+    async apps(args) { if (!controls?.apps) throw fail('Saved apps are not available on this page.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list' || !result.running) return [text(result)]; return [text({ ...result, ...(await settled(args.wait_ms)) })]; },
     // ---- the device's apps (src/app.js mcpControls: the same paths as dropping a file on the page, the launcher icon and throwing the app off the recents) ----
     async install_apk(args, context) {
-      if (!controls?.installApk) throw fail('Instalar um APK não está disponível nesta página.');
-      if (!args.file?.id || typeof context?.fetchFile !== 'function') throw fail('install_apk precisa do arquivo entregue pela ponte: passe path (um .apk na máquina onde a ponte roda) e use a ponte lab-mcp.mjs atual.');
+      if (!controls?.installApk) throw fail('Installing an APK is not available on this page.');
+      if (!args.file?.id || typeof context?.fetchFile !== 'function') throw fail('install_apk needs the file delivered by the bridge: pass path (an .apk on the machine where the bridge runs) and use the current lab-mcp.mjs bridge.');
       const result = await controls.installApk(await context.fetchFile(args.file), { open: args.open === true });
       return [text(args.open === true && result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
     },
     async open_app(args) {
-      if (!controls?.openApp) throw fail('Abrir um app instalado não está disponível nesta página.');
+      if (!controls?.openApp) throw fail('Opening an installed app is not available on this page.');
       const result = await controls.openApp(appSelector(args));
       return [text(result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
     },
-    async close_app(args) { if (!controls?.closeApp) throw fail('Fechar um app não está disponível nesta página.'); return [text(await controls.closeApp(appSelector(args)))]; },
+    async close_app(args) { if (!controls?.closeApp) throw fail('Closing an app is not available on this page.'); return [text(await controls.closeApp(appSelector(args)))]; },
     /** A video of the screen (src/screen-recorder.js): start, then the other tools act on the app, then stop writes the file on the bridge's machine (`args.local.outputs.recording`). */
     async record_screen(args, context) {
-      const recorder = controls?.recordScreen; if (!recorder) throw fail('A gravação da tela não está disponível nesta página.');
+      const recorder = controls?.recordScreen; if (!recorder) throw fail('Screen recording is not available on this page.');
       const action = String(args.action ?? '');
-      if (action === 'start') return [text({ ...recorder.start({ fps: args.fps, maxWidth: args.max_width, maxSeconds: args.max_seconds, format: args.format ?? null }), note: 'Gravando. Use as outras ferramentas e depois record_screen com action "stop" (e path) para gravar o arquivo.' })];
+      if (action === 'start') return [text({ ...recorder.start({ fps: args.fps, maxWidth: args.max_width, maxSeconds: args.max_seconds, format: args.format ?? null }), note: 'Recording. Use the other tools, then record_screen with action "stop" (and path) to write the file.' })];
       if (action === 'status') return [text(recorder.status())];
       if (action === 'discard') return [text({ discarded: recorder.discard() })];
-      if (action !== 'stop') throw fail('action é start, stop, status ou discard.');
+      if (action !== 'stop') throw fail('action is start, stop, status or discard.');
       const { blob, ...video } = await recorder.stop(), slot = args.local?.outputs?.recording;
-      const kept = 'O vídeo continua guardado na página: chame stop de novo com um path válido, ou discard.';
-      if (!slot?.id || typeof context?.sendFile !== 'function') throw fail(`${args.local?.missing?.recording ?? 'a ponte não abriu o arquivo de saída (use a ponte lab-mcp.mjs atual)'}. ${kept}`);
-      if (slot.ext && slot.ext !== video.container) throw fail(`A gravação é ${video.container} (${video.type}): use um path terminado em .${video.container}. ${kept}`);
+      const kept = 'The video is still kept on the page: call stop again with a valid path, or discard.';
+      if (!slot?.id || typeof context?.sendFile !== 'function') throw fail(`${args.local?.missing?.recording ?? 'the bridge did not open the output file (use the current lab-mcp.mjs bridge)'}. ${kept}`);
+      if (slot.ext && slot.ext !== video.container) throw fail(`The recording is ${video.container} (${video.type}): use a path ending in .${video.container}. ${kept}`);
       await context.sendFile(slot, blob, { ext: video.container }); recorder.discard();
       return [text({ saved: true, ...video })];
     },
     /** An adb command line run by the page's interpreter (src/adb-commands.js). `args.local`, put there by the bridge: the local files the command names ({ files: { path: { id, name, size } }, missing: { path: reason }, outputs: { path: { id } } }). */
     async adb(args, context) {
-      if (!controls?.adb) throw fail('O interpretador de comandos adb não está disponível nesta página.');
+      if (!controls?.adb) throw fail('The adb command interpreter is not available on this page.');
       const command = typeof args.command === 'string' && args.command.trim() ? args.command : null, words = Array.isArray(args.args) && args.args.length ? args.args.map(String) : null;
-      if (!command && !words) throw fail('Passe command (a linha, ex. "adb shell input tap 200 400") ou args (as palavras de um comando adb). "adb help" lista o que há.');
+      if (!command && !words) throw fail('Pass command (the line, e.g. "adb shell input tap 200 400") or args (the words of an adb command). "adb help" lists what there is.');
       const local = args.local ?? {}, io = {
-        localFile: async path => { const file = local.files?.[path]; if (file && typeof context?.fetchFile === 'function') return context.fetchFile(file); throw Object.assign(new Error(`adb: ${path}: ${local.missing?.[path] ?? 'a ponte não ofereceu este arquivo (use a ponte lab-mcp.mjs atual)'}`), { name: 'AdbError', exitCode: 1 }); },
-        writeLocal: async (path, blob) => { const slot = local.outputs?.[path]; if (slot?.id && typeof context?.sendFile === 'function') return context.sendFile(slot, blob); throw Object.assign(new Error(`adb: gravar ${path.replace(/^pull:/, '')}: ${local.missing?.[path] ?? 'a ponte não abriu este arquivo de saída (use a ponte lab-mcp.mjs atual)'}`), { name: 'AdbError', exitCode: 1 }); },
+        localFile: async path => { const file = local.files?.[path]; if (file && typeof context?.fetchFile === 'function') return context.fetchFile(file); throw Object.assign(new Error(`adb: ${path}: ${local.missing?.[path] ?? 'the bridge did not offer this file (use the current lab-mcp.mjs bridge)'}`), { name: 'AdbError', exitCode: 1 }); },
+        writeLocal: async (path, blob) => { const slot = local.outputs?.[path]; if (slot?.id && typeof context?.sendFile === 'function') return context.sendFile(slot, blob); throw Object.assign(new Error(`adb: write ${path.replace(/^pull:/, '')}: ${local.missing?.[path] ?? 'the bridge did not open this output file (use the current lab-mcp.mjs bridge)'}`), { name: 'AdbError', exitCode: 1 }); },
       };
       const result = await controls.adb(command ? { command } : { args: words }, io), content = [];
       for (const picture of result.images ?? []) content.push(await image({ blob: picture.blob, type: picture.type }));
       const output = `${result.stdout ?? ''}${result.stderr ?? ''}`;
-      content.push(text(output || (result.images?.length ? '(imagem)' : '(sem saída)')));
+      content.push(text(output || (result.images?.length ? '(image)' : '(no output)')));
       if (result.code !== 0 || result.notes?.length) content.push(text({ exit: result.code, ...(result.notes?.length ? { lab: result.notes } : {}) }));
       return Object.assign(content, { isError: result.code !== 0 });
     },
-    async open_link(args) { if (!controls?.openLink) throw fail('Deep links não estão disponíveis nesta página.'); if (!args.link && !args.component) throw fail('link (ou component) é obrigatório.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
-    async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirecionar hosts não está disponível nesta página.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
-    async permissions(args) { if (!controls?.permissions) throw fail('Permissões não estão disponíveis nesta página.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
+    async open_link(args) { if (!controls?.openLink) throw fail('Deep links are not available on this page.'); if (!args.link && !args.component) throw fail('link (or component) is required.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
+    async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirect hosts is not available on this page.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
+    async permissions(args) { if (!controls?.permissions) throw fail('Permissions are not available on this page.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
     async wait_ready(args) { const report = readyReport(await waitReady(args.timeout_ms, args.network_ms)); return [text({ ...report, waitingFor: report.waitingFor ?? [] })]; },
   };
   return {
     names: Object.keys(tools),
     /** One MCP tool call -> { content, isError }. Errors are tool errors (the client sees the message), never thrown. `context.fetchFile(file)`: a file the bridge offers with the call. */
     async execute(name, args = {}, context = {}) {
-      const tool = tools[name]; if (!tool) return { isError: true, content: [text(`Ferramenta desconhecida nesta página: ${name}. Atualize a página do lab (a ponte é mais nova).`)] };
+      const tool = tools[name]; if (!tool) return { isError: true, content: [text(`Unknown tool on this page: ${name}. Refresh the lab page (the bridge is newer).`)] };
       try { const content = await tool(args && typeof args === 'object' ? args : {}, context ?? {}); return content.isError ? { content: [...content], isError: true } : { content }; }
       catch (error) { return { isError: true, content: [text(`${error?.code ? `[${error.code}] ` : ''}${error?.message ?? error}`)] }; }
     },

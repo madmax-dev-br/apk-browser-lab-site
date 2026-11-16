@@ -16,9 +16,9 @@
 export const MOTION_RASTER_SCALE = 0.5;   // replay at half the linear resolution (a quarter of the pixels); chosen by measurement, see docs/INTERACTION-PERFORMANCE.md
 export const REFINE_QUIET_MS = 100;       // quiet period after the last change of the reduced content before the full-density replay (about 6 frames)
 export const STILL_SNAPSHOTS = 2;         // snapshots in a row with the same reduced rasters while frames are pending: the screen is still
-export const SETTLED_SCALE_STEPS = Object.freeze([1, 0.9, 0.8]);   // "Resolução com a tela parada" (Controles): the density of the frame the screen settles on (1 = full)
-export const MOTION_SCALE_STEPS = Object.freeze([1, 0.75, 0.5, 0.35, 0.25]);   // "Resolução no movimento" (Controles): 1 = always full density
-export const NAVIGATION_REDUCED_MS = 400;   // "Tela nova em baixa resolução": a new Activity or window is drawn reduced this long after it appears, then refined once still
+export const SETTLED_SCALE_STEPS = Object.freeze([1, 0.9, 0.8]);   // "Resolution when the screen is still" (Controls): the density of the frame the screen settles on (1 = full)
+export const MOTION_SCALE_STEPS = Object.freeze([1, 0.75, 0.5, 0.35, 0.25]);   // "Resolution in motion" (Controls): 1 = always full density
+export const NAVIGATION_REDUCED_MS = 400;   // "New screen in low resolution": a new Activity or window is drawn reduced this long after it appears, then refined once still
 export const MOTION_CADENCE_MS = 250;     // content that changed less than this before the previous change is moving (an animation draws every 16-60 ms; a cursor blinks every 500 ms)
 export const GESTURE_STALE_MS = 1500;     // a gesture whose last sample is older than this no longer counts as motion (a lost UP must not keep the screen reduced)
 
@@ -35,7 +35,7 @@ export class MotionRasterPolicy {
     this.stats = { reducedSnapshots: 0, fullSnapshots: 0, refinements: 0 };   // snapshots with a reduced raster / without / full snapshots posted by the settle rule
   }
   /** Whether the screen is moving for the snapshot about to be taken. */
-  /** "Resolução no movimento" and "Tela nova em baixa resolução" (Controles), applied live: scale 1 turns the reduced replay off; a disabled policy (`load { motionRaster: false }`, ?raster=full) stays off. */
+  /** "Resolução no movimento" and "New screen in low resolution" (Controles), applied live: scale 1 turns the reduced replay off; a disabled policy (`load { motionRaster: false }`, ?raster=full) stays off. */
   configure({ scale = this.scale, navigation = this.navigation, settled = this.settled } = {}) {
     if (!MOTION_SCALE_STEPS.includes(scale)) throw new RangeError(`Motion raster scale must be one of ${MOTION_SCALE_STEPS.join(', ')}`);
     if (!SETTLED_SCALE_STEPS.includes(settled)) throw new RangeError(`Settled raster scale must be one of ${SETTLED_SCALE_STEPS.join(', ')}`);

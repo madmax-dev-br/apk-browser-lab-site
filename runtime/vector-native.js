@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { getSolidPaint } from './paint-host.js?v=ca92aaad0948';
-import { getMatrixValues } from './matrix-native.js?v=ca92aaad0948';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=ca92aaad0948';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { getSolidPaint } from './paint-host.js?v=d422379a2a38';
+import { getMatrixValues } from './matrix-native.js?v=d422379a2a38';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=d422379a2a38';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -33,10 +33,17 @@ const FULL_DEFAULTS={strokeWidth:0,strokeColor:0,strokeAlpha:1,fillColor:0,fillA
 const GROUP_DEFAULTS={rotation:0,pivotX:0,pivotY:0,scaleX:1,scaleY:1,translateX:0,translateY:0};
 const groupKeys=Object.keys(GROUP_DEFAULTS), propertyKeys=Object.keys(FULL_DEFAULTS);
 const states=new WeakMap();
+/** Graphics handles (Canvas, vector trees and nodes, path data) created since the last collection before they ask for one (VectorGraphics.create). */
+export const VECTOR_PACE_MIN=4096;
 
 export class VectorGraphics {
- constructor(runtime){this.runtime=runtime;this.handles=new Map();this.next=0x200000000n;this.commandCount=0;this.pathChars=0;this.accountedBytes=0n;}
- create(kind,props={}){if(this.handles.size>=20000)problem('Vector handle limit exceeded');const handle=this.next++;this.handles.set(handle,{kind,refs:0,...props});return handle;}
+ // No ceiling on the handles (Android has none on Canvas, VectorDrawable trees and path data): they are freed by their owners' finalizers, i.e. by collections. So, as ART paces
+ // collections by native growth (NativeAllocationRegistry), handles that doubled since the last collection (at least VECTOR_PACE_MIN more) ask for one, once per collection.
+ constructor(runtime){this.runtime=runtime;this.handles=new Map();this.next=0x200000000n;this.commandCount=0;this.pathChars=0;this.accountedBytes=0n;this.atCollection=0;this.collectionAsked=false;
+  (runtime.nativeCollectionHooks??=new Set()).add(()=>{this.atCollection=this.handles.size;this.collectionAsked=false;});}
+ create(kind,props={}){const handle=this.next++;this.handles.set(handle,{kind,refs:0,...props});
+  if(!this.collectionAsked&&this.handles.size-this.atCollection>Math.max(VECTOR_PACE_MIN,this.atCollection)){this.collectionAsked=true;this.runtime.requestNativeCollection?.('vector');}
+  return handle;}
  release(handle){this.get(handle);const pending=[handle],seen=new Set();while(pending.length){const h=pending.pop();if(seen.has(h)||!this.handles.has(h))continue;seen.add(h);const object=this.get(h);if(object.kind==='tree')pending.push(object.root);else if(object.kind==='group')pending.push(...object.children);this.pathChars-=(object.path||'').length;this.handles.delete(h);}}
  get(handle,kind=null){const value=this.handles.get(handle);if(!value||kind&&value.kind!==kind)problem(`Invalid ${kind||'graphics'} VM handle ${handle}`,'invalid-vector-handle');return value;}
  copy(handle,kind){const value=clone(this.get(handle,kind));value.refs=0;return this.create(kind,value);}

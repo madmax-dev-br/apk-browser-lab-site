@@ -11,7 +11,7 @@
  *   entries { seq, uptime, wall, pid, tid, thread, level, tag, message }. 'network': a batch of network log entries (src/netlog.js), new or updated. Batches come at most
  *   every 250 ms, and Logcat lines reach the page only while some plugin listens to 'log' (or the Logcat panel is open). 'refresh': the user clicked Atualizar on the plugin's card.
  * @property {(name: string, fn?: Function) => void} off
- * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work. `screen.ready` is "Tela pronta" (src/screen-ready.js):
+ * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work. `screen.ready` is "Screen ready" (src/screen-ready.js):
  *   { ready, activity, readySince, waitingFor: [motivos], fragments: [{ className, state, hidden, ready }] } — the Activity and its fragments loaded and the screen is still.
  *   lab.on('ready', fn) calls fn(screen) each time it turns ready (a new Activity, a reload, a navigation that settles).
  * @property {(options?: { timeoutMs?: number }) => Promise<object>} waitReady   Resolves with the screen once it is ready (rejects with code 'timeout', 15 s by default).
@@ -122,7 +122,7 @@ export function pluginWorkerMain(scope) {
     clear: () => pushUi({ op: 'clear' }),
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
-  const wrapError = error => Object.assign(new Error(error?.message ?? 'Falha na consulta.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {});
+  const wrapError = error => Object.assign(new Error(error?.message ?? 'Query failed.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {});
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const tabs = new Map(); let tabSubscribed = false;
   const overlays = new Map(); let overlaySubscribed = false;   // lab.overlay: id -> { message: Set, close: Set, state }
@@ -144,7 +144,7 @@ export function pluginWorkerMain(scope) {
   function buttonHandle(id) {
     let entry = buttons.get(id); if (entry) return entry;
     entry = { handlers: new Set(), state: null, handle: null };
-    const listen = fn => { if (typeof fn !== 'function') throw new TypeError('button.onClick(função)'); entry.handlers.add(fn); return () => entry.handlers.delete(fn); };
+    const listen = fn => { if (typeof fn !== 'function') throw new TypeError('button.onClick(function)'); entry.handlers.add(fn); return () => entry.handlers.delete(fn); };
     entry.handle = Object.freeze({ id, get state() { return entry.state; },
       update: async (changes = {}) => { entry.state = await call('button', { op: 'update', id, config: buttonConfig(changes) }); return entry.state; },
       remove: async () => { buttons.delete(id); return call('button', { op: 'remove', id }); },
@@ -173,14 +173,14 @@ export function pluginWorkerMain(scope) {
   }
   const lab = {
     on(name, fn) {
-      name = String(name); if (typeof fn !== 'function') throw new TypeError('lab.on(nome, função)');
-      if (name === 'ready') {   // "Tela pronta": derived from 'screen' (screen.ready.ready turning true: the Activity and its fragments loaded and the screen is still)
+      name = String(name); if (typeof fn !== 'function') throw new TypeError('lab.on(name, function)');
+      if (name === 'ready') {   // "Screen ready": derived from 'screen' (screen.ready.ready turning true: the Activity and its fragments loaded and the screen is still)
         let was = false; const wrapped = screen => { const now = !!screen?.ready?.ready; if (now && !was) fn(screen); was = now; };
         readyWrappers.set(fn, wrapped); const off = lab.on('screen', wrapped);
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track'].includes(name)) throw new TypeError(`Evento desconhecido: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh' ou 'frame')`);
+      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track'].includes(name)) throw new TypeError(`Unknown event: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh' or 'frame')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -234,7 +234,7 @@ export function pluginWorkerMain(scope) {
         const reply = await call('tab', { op: 'open', config: tabConfig(options), html: String(options?.html ?? '') }), id = reply.id;
         let entry = tabs.get(id); if (!entry) { entry = { open: false, message: new Set(), toggle: new Set(), close: new Set(), drag: new Set(), drop: new Set() }; tabs.set(id, entry); }
         entry.open = !!reply.open;
-        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Passe uma função.'); set.add(fn); return () => set.delete(fn); };
+        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Pass a function.'); set.add(fn); return () => set.delete(fn); };
         const setOpen = async open => { const answer = await call('tab', { op: 'setOpen', id, open: open !== false }); entry.open = !!answer.open; return entry.open; };
         return Object.freeze({ id, get isOpen() { return entry.open; },
           update: (changes = {}) => call('tab', { op: 'update', id, ...(Object.keys(tabConfig(changes)).length ? { config: tabConfig(changes) } : {}), ...(changes?.html !== undefined ? { html: String(changes.html) } : {}) }),
@@ -252,9 +252,9 @@ export function pluginWorkerMain(scope) {
     scrollTo: (options = {}) => { const o = typeof options === 'number' ? { y: options } : options ?? {}; return call('scrollTo', { target: scrollTarget(o.target), x: o.x, y: o.y }); },
     /** Scrolls to a percentage (0 to 100) of the scroll range: scrollToPercent(50), scrollToPercent({ y: 50 }), scrollToPercent({ x: 100, target: 'carrossel' }). */
     scrollToPercent: (options = {}) => { const o = typeof options === 'number' ? { y: options } : options ?? {}; return call('scrollTo', { target: scrollTarget(o.target), percentX: o.x, percentY: o.y }); },
-    async waitReady(options = {}) {   // resolves with the screen once "Tela pronta" holds; rejects with code 'timeout' (default 15 s)
+    async waitReady(options = {}) {   // resolves with the screen once "Screen ready" holds; rejects with code 'timeout' (default 15 s)
       const until = Date.now() + Math.max(100, Number(options?.timeoutMs) || 15000);
-      for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`A tela não ficou pronta: ${(screen?.ready?.waitingFor ?? ['sem informação']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
+      for (;;) { const screen = await lab.screen(); if (screen?.ready?.ready) return screen; if (Date.now() >= until) throw Object.assign(new Error(`The screen did not become ready: ${(screen?.ready?.waitingFor ?? ['no information']).join('; ')}`), { code: 'timeout', screen }); await new Promise(resolve => setTimeout(resolve, 100)); }
     },
     composeTree: (options = {}) => call('composeTree', { maxNodes: options?.maxNodes, locals: Array.isArray(options?.locals) ? options.locals.map(String) : options?.locals ? [String(options.locals)] : undefined }),
     layoutBounds: (options = {}) => call('layoutBounds', { names: options?.names !== false }),
@@ -285,7 +285,7 @@ export function pluginWorkerMain(scope) {
      * each time one moved, resized, appeared or left the screen (and when the device moved on the page). -> the stop function (with .id).
      */
     async track(target, fn, options = {}) {
-      if (typeof fn !== 'function') throw new TypeError('lab.track(alvo, função)');
+      if (typeof fn !== 'function') throw new TypeError('lab.track(target, function)');
       if (!trackSubscribed) { trackSubscribed = true; lab.on('track', event => { const handler = tracks.get(event?.id); if (handler) handler(event); }); }
       const { id } = await call('track', { op: 'start', target: targetArg(target), id: options?.id ?? null, all: options?.all === true });
       tracks.set(id, value => { try { const result = fn(value); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, 'track')); } catch (error) { reportError(error, 'track'); } });
@@ -311,7 +311,7 @@ export function pluginWorkerMain(scope) {
         const reply = await call('overlay', { op: 'open', id: options?.id ?? null, config: overlayConfig({ ...options, anchor }), target, html: String(options?.html ?? ''), required: options?.required === true });
         const id = reply.id; let entry = overlays.get(id); if (!entry) { entry = { message: new Set(), close: new Set(), state: null }; overlays.set(id, entry); }
         entry.state = reply.state;
-        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Passe uma função.'); set.add(fn); return () => set.delete(fn); };
+        const listen = set => fn => { if (typeof fn !== 'function') throw new TypeError('Pass a function.'); set.add(fn); return () => set.delete(fn); };
         return Object.freeze({ id, get state() { return entry.state; },
           /** Changes the anchor, placement, size or HTML: update({ html, anchor, placement, ... }). */
           update: async (changes = {}) => {
@@ -355,7 +355,7 @@ export function pluginWorkerMain(scope) {
     compositionLocals: (handle, options = {}) => call('compositionLocals', { handle: String(handle ?? ''), only: Array.isArray(options?.only) ? options.only.map(String) : options?.only ? [String(options.only)] : null, options: viewOptions(options) }),
     findCompositionLocal: (match, options = {}) => call('findCompositionLocal', { match: Array.isArray(match) ? match.map(String) : String(match ?? ''), limit: options?.limit, budgetMs: options?.budgetMs, options: viewOptions(options) }),
     watch(handle, path, fn, options = {}) {   // handle: a handle, or { static: 'pacote.Classe' } to follow a static field
-      if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, caminho, função)');
+      if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, path, function)');
       const interval = Math.max(250, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false;
       const tick = async () => {
         if (busy || stopped) return; busy = true;
@@ -366,7 +366,7 @@ export function pluginWorkerMain(scope) {
         } catch (error) {
           if (error?.code === 'collected' || error?.code === 'bad-handle') { stop(); }
           if (typeof options?.onError === 'function') { try { options.onError(error); } catch (inner) { reportError(inner, 'watch'); } }
-          else if (error?.code === 'collected') consoleOut.warn(`watch parado: ${error.message}`);
+          else if (error?.code === 'collected') consoleOut.warn(`watch stopped: ${error.message}`);
           else if (error?.code !== 'busy' && error?.code !== 'no-apk') reportError(error, 'watch');
         } finally { busy = false; }
       };
@@ -376,7 +376,7 @@ export function pluginWorkerMain(scope) {
     /** A button of the plugin rendered by the lab: lab.button({ label, icon, title, id, variant, disabled, placement }, onClick) -> { id, state, update, remove, onClick }. */
     async button(options = {}, onClick) {
       if (typeof options === 'string') options = { label: options };
-      if (onClick !== undefined && typeof onClick !== 'function') throw new TypeError('lab.button(opções, função)');
+      if (onClick !== undefined && typeof onClick !== 'function') throw new TypeError('lab.button(options, function)');
       const reply = await call('button', { op: 'add', config: buttonConfig(options) }), entry = buttonHandle(reply.id);
       if (onClick) { if (reply.replaced) entry.handlers.clear(); entry.handlers.add(onClick); }
       entry.state = reply.button; return entry.handle;

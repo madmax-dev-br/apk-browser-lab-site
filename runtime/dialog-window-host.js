@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=ca92aaad0948';
-import { getVectorGraphics } from './vector-native.js?v=ca92aaad0948';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ca92aaad0948';
-const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
+import { APKError } from './apk-runtime.js?v=d422379a2a38';
+import { getVectorGraphics } from './vector-native.js?v=d422379a2a38';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d422379a2a38';
+const VIEW='Landroid/view/View;',KEYEVENT='Landroid/view/KeyEvent;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
 const floatBuffer=new DataView(new ArrayBuffer(4)),bits=value=>{floatBuffer.setFloat32(0,value,true);return floatBuffer.getInt32(0,true);},number=value=>{floatBuffer.setInt32(0,value,true);return floatBuffer.getFloat32(0,true);};
 const keys=new Set(),add=(owner,methods)=>methods.forEach(method=>keys.add(owner+'->'+method));
 add(WMI,['<init>(Landroid/content/Context;)V','getDefaultDisplay()Landroid/view/Display;','addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V','updateViewLayout(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V','removeView(Landroid/view/View;)V','removeViewImmediate(Landroid/view/View;)V','getCurrentWindowMetrics()Landroid/view/WindowMetrics;','getMaximumWindowMetrics()Landroid/view/WindowMetrics;']);
@@ -82,7 +82,13 @@ export function createDialogWindowHost(platform){
   /** WindowManagerGlobal.closeAll(token): windows an Activity still owns are removed after its onDestroy (a leaked Dialog is not dismissed or notified). */
   activityDestroyed(r,activity){for(const record of [...records.values()])if(same(record.ownerActivity,activity)){remove(r,record.root);r.record(`WINDOW leaked ${record.kind} root removed with destroyed Activity`);}},
   visibilityChanged(r,ref){if(records.has(ref.ref))updateFocus(r);},
-  back(r){const record=[...records.values()].reverse().find(record=>visible(r,record)&&!(field(r,record.params,'flags')&8));if(!record)return false;if(record.window){if(platform.backDispatcher.dispatchBack(r,record.window))return true;const callback=windowData(r,record.window).callback;if(callback&&r.isSubtype(r.object(callback).type,DIALOG)){call(r,callback,DIALOG,'onBackPressed','()V');return true;}}fail('Popup back requires original KeyEvent dispatch');},
+  back(r){const record=[...records.values()].reverse().find(record=>visible(r,record)&&!(field(r,record.params,'flags')&8));if(!record)return false;if(record.window){if(platform.backDispatcher.dispatchBack(r,record.window))return true;const callback=windowData(r,record.window).callback;if(callback&&r.isSubtype(r.object(callback).type,DIALOG)){call(r,callback,DIALOG,'onBackPressed','()V');return true;}}
+   // A window that is not a Dialog (a PopupWindow, a Compose Popup, any view added to the WindowManager) gets BACK as ViewRootImpl delivers it: a KeyEvent down and up dispatched
+   // to the focused window's root, whose own dispatchKeyEvent decides (PopupDecorView and Compose's PopupLayout track the down in getKeyDispatcherState() and dismiss on the up).
+   // The key stays with that window, handled or not: it does not fall through to the Activity, as on a device.
+   const time=BigInt(Math.max(0,Math.floor(platform.clock?.now?.()??0))),key=action=>{const event=r.allocate(KEYEVENT),parameters=['J','J','I','I','I','I','I','I','I'];r.dispatch({owner:KEYEVENT,name:'<init>',parameters,result:'V',signature:'(JJIIIIIII)V'},r.argumentWords(parameters,[time,time,action,4,0,0,-1,0,8],{receiver:event}),'direct');return event;};   // KEYCODE_BACK, no repeat, no meta, virtual device, FLAG_FROM_SYSTEM
+   for(const action of [0,1])call(r,record.root,VIEW,'dispatchKeyEvent',`(${KEYEVENT})Z`,[key(action)]);
+   r.record(`WINDOW back to ${record.kind} root (KeyEvent down/up)`);return true;},
   invoke(r,method,args){
    const owner=method.owner,name=method.name,ref=args[0];
    if(owner==='Landroid/app/Dialog;'&&name==='getOnBackInvokedDispatcher'){const window=r.dispatch({owner:'Landroid/app/Dialog;',name:'getWindow',parameters:[],result:WINDOW,signature:'()'+WINDOW},[ref],'virtual');return platform.backDispatcher.forOwner(r,window);}   // Dialog.getOnBackInvokedDispatcher() = mWindow.getOnBackInvokedDispatcher()

@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { JavaException } from './apk-runtime.js?v=ca92aaad0948';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=ca92aaad0948';
-import { buildElfDescriptor } from './native-descriptor.js?v=ca92aaad0948';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=ca92aaad0948';
-import { NativeLinker, LinkError } from './native-linker.js?v=ca92aaad0948';
-import { hostFunction } from './wasm-host-function.js?v=ca92aaad0948';
-import { parseWasm } from './wasm-dylink.js?v=ca92aaad0948';
-import { formatVersion } from './rn-version.js?v=ca92aaad0948';
-import { registerWasmMemory } from './unsafe-native.js?v=ca92aaad0948';
-import { writeSkPath } from './skia-path-layout.js?v=ca92aaad0948';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=ca92aaad0948';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=ca92aaad0948';
-import { withVariants } from './native-provider-variants.js?v=ca92aaad0948';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { JavaException } from './apk-runtime.js?v=d422379a2a38';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=d422379a2a38';
+import { buildElfDescriptor } from './native-descriptor.js?v=d422379a2a38';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=d422379a2a38';
+import { NativeLinker, LinkError } from './native-linker.js?v=d422379a2a38';
+import { hostFunction } from './wasm-host-function.js?v=d422379a2a38';
+import { parseWasm } from './wasm-dylink.js?v=d422379a2a38';
+import { formatVersion } from './rn-version.js?v=d422379a2a38';
+import { registerWasmMemory } from './unsafe-native.js?v=d422379a2a38';
+import { writeSkPath } from './skia-path-layout.js?v=d422379a2a38';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=d422379a2a38';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=d422379a2a38';
+import { withVariants } from './native-provider-variants.js?v=d422379a2a38';
 
 // JNI -> WebAssembly bridge.
 //
@@ -133,7 +133,7 @@ export class JniBridge {
       const have = this.runtime.androidxVersions?.[ax.artifact] ?? null;
       if (!have || !ax.versions.includes(have)) {
         const known = ax.versions.join(', ');
-        fail(`${ax.artifact} ${known}, ${have ? `but this app ships ${ax.artifact} ${have}` : `but the lab could not read this app's ${ax.artifact} version (no ${ax.versionFile})`}. To serve it, check that the native sources of that release are the ones in scripts/wasm/androidx-libs.json, add the version there and build it (scripts/build-native-libs.sh androidx)`, { neededAndroidx: `${ax.artifact} ${have ?? '(versão não identificada)'}`, labAndroidx: `${ax.artifact} ${known}` });
+        fail(`${ax.artifact} ${known}, ${have ? `but this app ships ${ax.artifact} ${have}` : `but the lab could not read this app's ${ax.artifact} version (no ${ax.versionFile})`}. To serve it, check that the native sources of that release are the ones in scripts/wasm/androidx-libs.json, add the version there and build it (scripts/build-native-libs.sh androidx)`, { neededAndroidx: `${ax.artifact} ${have ?? '(version not identified)'}`, labAndroidx: `${ax.artifact} ${known}` });
       }
     }
     const fresco = need?.fresco;
@@ -144,10 +144,10 @@ export class JniBridge {
       const serve = `To serve it, check that the native sources of that release are the ones in scripts/wasm/fresco-libs.json, add the release and the build-ids of its official binaries there and build it (scripts/build-native-libs.sh fresco)`;
       if (packaged.length) {
         const unknown = packaged.find(copy => !copy.buildId || !fresco.buildIds[copy.buildId]);
-        if (unknown) fail(`${fresco.artifact} ${known}, but the ${soname} this app packages (lib/${unknown.abi}) ${unknown.buildId ? `has GNU build-id ${unknown.buildId}, which is not the official binary of any of those releases` : 'has no GNU build-id, so its release cannot be identified'}. ${serve}`, { neededFresco: `${fresco.artifact} (${unknown.buildId ? `build-id ${unknown.buildId}` : 'versão não identificada'})`, labFresco: `${fresco.artifact} ${known}` });
+        if (unknown) fail(`${fresco.artifact} ${known}, but the ${soname} this app packages (lib/${unknown.abi}) ${unknown.buildId ? `has GNU build-id ${unknown.buildId}, which is not the official binary of any of those releases` : 'has no GNU build-id, so its release cannot be identified'}. ${serve}`, { neededFresco: `${fresco.artifact} (${unknown.buildId ? `build-id ${unknown.buildId}` : 'version not identified'})`, labFresco: `${fresco.artifact} ${known}` });
       } else {
         const release = appText ? fresco.reactNative?.[appText] ?? null : null;
-        if (!release || !fresco.versions.includes(release)) fail(`${fresco.artifact} ${known}, but this APK packages no ${soname} to identify its release by, and ${appText ? `no Fresco release is recorded for React Native ${appText}` : 'it has no React Native version that would pin one'}. ${serve}`, { neededFresco: `${fresco.artifact} (${appText ? `a do React Native ${appText}` : 'versão não identificada'})`, labFresco: `${fresco.artifact} ${known}` });
+        if (!release || !fresco.versions.includes(release)) fail(`${fresco.artifact} ${known}, but this APK packages no ${soname} to identify its release by, and ${appText ? `no Fresco release is recorded for React Native ${appText}` : 'it has no React Native version that would pin one'}. ${serve}`, { neededFresco: `${fresco.artifact} (${appText ? `the one of React Native ${appText}` : 'version not identified'})`, labFresco: `${fresco.artifact} ${known}` });
       }
     }
     for (const dep of entry.needed ?? []) this.#requireVersions(dep, seen, probe);
@@ -161,7 +161,7 @@ export class JniBridge {
     try { this.#requireVersions(soname, new Set(), true); }
     catch (error) {
       if (!error?.probe) throw error;
-      const d = error.details; return { status: 'version-gated', needs: d.neededAndroidx ? d.neededAndroidx : d.neededFresco ? d.neededFresco : d.neededReactNative ? `React Native ${d.neededReactNative}` : d.neededHermesBytecodeVersion ? `Hermes bytecode ${d.neededHermesBytecodeVersion}` : `React Native ${d.labReactNative} (versão do app não identificada)` };
+      const d = error.details; return { status: 'version-gated', needs: d.neededAndroidx ? d.neededAndroidx : d.neededFresco ? d.neededFresco : d.neededReactNative ? `React Native ${d.neededReactNative}` : d.neededHermesBytecodeVersion ? `Hermes bytecode ${d.neededHermesBytecodeVersion}` : `React Native ${d.labReactNative} (app version not identified)` };
     }
     return { status: 'available' };
   }

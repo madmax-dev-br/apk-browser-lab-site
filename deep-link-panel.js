@@ -12,9 +12,9 @@ const implicitByAction = (act, type) => !!text(type) || (!!act && act !== DEFAUL
  */
 export function buildDeepLinkRequest({ link = '', action = DEFAULT_ACTION, component = '', type = '' } = {}) {
   const data = text(link), cmp = text(component), act = text(action);
-  if (!data && !cmp && !implicitByAction(act, type)) throw new Error('Informe um link (meuapp://caminho ou https://host/caminho), um componente ou uma ação diferente de VIEW (Intent implícito, como SEND com um tipo).');
-  if (data && !/^[A-Za-z][A-Za-z0-9+.-]*:\S*$/.test(data)) throw new Error(`"${data}" não é um URI com esquema. Exemplo: meuapp://caminho?id=1 ou https://exemplo.com/p/1.`);
-  if (cmp && !/^(?:[\w.$]+\/)?[\w.$]+$/.test(cmp)) throw new Error(`Componente inválido: "${cmp}". Use pacote/.Activity ou pacote/pacote.Activity.`);
+  if (!data && !cmp && !implicitByAction(act, type)) throw new Error('Enter a link (myapp://path or https://host/path), a component or an action other than VIEW (implicit Intent, such as SEND with a type).');
+  if (data && !/^[A-Za-z][A-Za-z0-9+.-]*:\S*$/.test(data)) throw new Error(`"${data}" is not a URI with a scheme. Example: myapp://path?id=1 or https://example.com/p/1.`);
+  if (cmp && !/^(?:[\w.$]+\/)?[\w.$]+$/.test(cmp)) throw new Error(`Invalid component: "${cmp}". Use package/.Activity or package/package.Activity.`);
   const request = {};
   if (act) request.action = act;
   if (data) request.data = data;
@@ -25,9 +25,9 @@ export function buildDeepLinkRequest({ link = '', action = DEFAULT_ACTION, compo
 const shortName = name => String(name ?? '').split('.').pop();
 /** The inline result for a Worker `deepLink` outcome: { state: 'ok' | 'error', message, detail }. */
 export function describeDeepLink(outcome) {
-  if (!outcome) return { state: 'error', message: 'O Worker não respondeu ao link.', detail: '' };
-  if (!outcome.ok) return { state: 'error', message: outcome.error || 'Nenhuma Activity resolve este link.', detail: '' };
-  const lead = outcome.launched ? 'App iniciado com este Intent' : 'Activity iniciada';
-  const alternatives = outcome.alternatives?.length ? `Também combinam: ${outcome.alternatives.map(entry => shortName(entry.activity)).join(', ')} (usada a primeira).` : '';
-  return { state: 'ok', message: `${lead}: ${shortName(outcome.activity)}`, detail: [outcome.filter ? `Filtro: ${outcome.filter}` : 'Componente explícito', alternatives].filter(Boolean).join('\n') };
+  if (!outcome) return { state: 'error', message: 'The Worker did not answer the link.', detail: '' };
+  if (!outcome.ok) return { state: 'error', message: outcome.error || 'No Activity resolves this link.', detail: '' };
+  const lead = outcome.launched ? 'App started with this Intent' : 'Activity started';
+  const alternatives = outcome.alternatives?.length ? `Also matching: ${outcome.alternatives.map(entry => shortName(entry.activity)).join(', ')} (the first one is used).` : '';
+  return { state: 'ok', message: `${lead}: ${shortName(outcome.activity)}`, detail: [outcome.filter ? `Filter: ${outcome.filter}` : 'Explicit component', alternatives].filter(Boolean).join('\n') };
 }

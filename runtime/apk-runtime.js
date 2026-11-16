@@ -1,32 +1,32 @@
-import { VMClock } from './vm-clock.js?v=ca92aaad0948';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=ca92aaad0948';
-import { OperationMonitor } from './operation-monitor.js?v=ca92aaad0948';
-import { ExecutionProfile } from './execution-profile.js?v=ca92aaad0948';
-import { SamplingProfiler } from './sampling-profiler.js?v=ca92aaad0948';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ca92aaad0948';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ca92aaad0948';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ca92aaad0948';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ca92aaad0948';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ca92aaad0948';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=ca92aaad0948';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ca92aaad0948';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ca92aaad0948';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ca92aaad0948';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ca92aaad0948';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ca92aaad0948';
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ca92aaad0948';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ca92aaad0948';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=ca92aaad0948';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ca92aaad0948';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ca92aaad0948';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ca92aaad0948';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ca92aaad0948';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=ca92aaad0948';
+import { VMClock } from './vm-clock.js?v=d422379a2a38';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=d422379a2a38';
+import { OperationMonitor } from './operation-monitor.js?v=d422379a2a38';
+import { ExecutionProfile } from './execution-profile.js?v=d422379a2a38';
+import { SamplingProfiler } from './sampling-profiler.js?v=d422379a2a38';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d422379a2a38';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d422379a2a38';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d422379a2a38';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d422379a2a38';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d422379a2a38';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=d422379a2a38';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d422379a2a38';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d422379a2a38';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d422379a2a38';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d422379a2a38';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d422379a2a38';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=d422379a2a38';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=d422379a2a38';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=d422379a2a38';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=d422379a2a38';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=d422379a2a38';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=d422379a2a38';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=d422379a2a38';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=d422379a2a38';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=ca92aaad0948';
-import { bootClassLacksMember } from './boot-class-members.js?v=ca92aaad0948';
-export { APKError } from './apk-error.js?v=ca92aaad0948';
+import { Scheduler, Blocked } from './scheduler.js?v=d422379a2a38';
+import { bootClassLacksMember } from './boot-class-members.js?v=d422379a2a38';
+export { APKError } from './apk-error.js?v=d422379a2a38';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1152,7 +1152,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
-  'lastPointerTime', 'sliceLog',
+  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks',
 ]);
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
@@ -1529,7 +1529,7 @@ export class APKRuntime {
     if(this.isSubtype(object.type,'Ljava/util/AbstractList;'))this.storeField(object.fields,'Ljava/util/AbstractList;->modCount:I',object.modCount);
   }
   storeField(storage, key, value) {
-    if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('fields'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
     const record = storage.record;   // a FieldMap (an object's fields; staticFields are roots)
     if (record !== undefined && record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
@@ -1539,7 +1539,7 @@ export class APKRuntime {
   storeSlot(record, slot, key, value) {
     const slots = record.slots;
     if (!(slot < slots.length)) { this.storeField(record.fields, key, value); return; }
-    if (slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('campos'), slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    if (slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('fields'), slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     slots[slot] = value;
     if (record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
   }
@@ -1693,7 +1693,7 @@ export class APKRuntime {
   typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.vmObject(value).type; }
   /** The object-limit check (after an emergency collection when the limit is reached), the next id and the allocation-driven collection trigger shared by every heap allocation. */
   allocateId(type) {
-    if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objetos') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
+    if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objects') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
     if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
     if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null) { this.q = 0; this.dlimit = 0; } }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
@@ -1727,7 +1727,7 @@ export class APKRuntime {
     const frames = this.thread?.frames, samples = this.allocationSamples ??= new Map();
     const name = method => (method ? `${method.owner.replace(/^L|;$/g, '').replaceAll('/', '.')}.${method.name}` : null);
     const top = frames?.length ? name(frames[frames.length - 1].method) : null, caller = frames?.length > 1 ? name(frames[frames.length - 2].method) : null;
-    const site = top ? (caller ? `${top} <- ${caller}` : top) : 'código do host (sem método Java em execução)';
+    const site = top ? (caller ? `${top} <- ${caller}` : top) : 'host code (no Java method running)';
     if (samples.size < 2000 || samples.has(site)) samples.set(site, (samples.get(site) ?? 0) + 1);
   }
   newArray(type, length, cells = null) {
@@ -1735,7 +1735,7 @@ export class APKRuntime {
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
     if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
     const weighted = cellsOf(type, length);   // weighted by element width (heap-gc.js cellsOf): the one place that charges; the collector's recount uses it too
-    if (length <= 16777216 && this.arrayCells + weighted > this.maxArrayCells) this.emergencyCollect('células de arrays');   // the collection recounts the cell counters
+    if (length <= 16777216 && this.arrayCells + weighted > this.maxArrayCells) this.emergencyCollect('array cells');   // the collection recounts the cell counters
     if (length > 16777216 || this.arrayCells + weighted > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} elements (${weighted} cells) requested with ${this.arrayCells} in use`);
     const id = this.allocateId(type); this.arrayCells += weighted;   // after allocateId: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
     this.heap.set(id, new ArrayRecord(id, type, cells ?? newCells(type, length)));
@@ -1986,7 +1986,7 @@ export class APKRuntime {
     const profile = this.profile.report(), summary = this.profile.summary();
     throw new APKError(message + summary, { kind: 'instruction-budget', ...details, profile });
   }
-  /** An exception reached a catch block of app/framework code: counted by class and message (the first distinct ones are kept) for "Estado da tela", since libraries often swallow them. */
+  /** An exception reached a catch block of app/framework code: counted by class and message (the first distinct ones are kept) for "Screen state", since libraries often swallow them. */
   /** An exception reached Thread.dispatchUncaughtException (whether the thread's handler swallows it or not): the last one per thread, with class, message, cause and the top of its stack. */
   /** Class, message, cause and the top frames of a throwable, as plain text for the reports. */
   describeThrowable(value) {
@@ -2036,15 +2036,15 @@ export class APKRuntime {
   }
   threadFailureText() {
     const table = this.threadFailures; if (!table?.length) return '';
-    return ['Threads interrompidas por erro do laboratório (uma API não modelada ou um limite da VM atingido fora da thread principal):', ...table.slice(-8).map(entry => `  thread "${entry.thread}" em ${entry.atMs} ms [${entry.kind}]: ${entry.message}`)].join('\n');
+    return ['Threads stopped by a lab error (an API that is not modelled or a VM limit reached outside the main thread):', ...table.slice(-8).map(entry => `  thread "${entry.thread}" at ${entry.atMs} ms [${entry.kind}]: ${entry.message}`)].join('\n');
   }
   uncaughtText() {
     const table = this.uncaughtExceptions; if (!table?.size) return '';
-    const lines = ['Exceções não tratadas (a última de cada thread; chegaram a Thread.dispatchUncaughtException, mesmo que o handler do app as descarte):'];
+    const lines = ['Uncaught exceptions (the last of each thread; they reached Thread.dispatchUncaughtException, even if the app handler discards them):'];
     for (const entry of [...table.values()].reverse().slice(0, 12)) {
-      lines.push(`  thread "${entry.thread}" (${entry.count}x): exceção original ${entry.type}${entry.message ? ': ' + entry.message : ''}${entry.cause ? ' [causa: ' + entry.cause + ']' : ''}`);
+      lines.push(`  thread "${entry.thread}" (${entry.count}x): original exception ${entry.type}${entry.message ? ': ' + entry.message : ''}${entry.cause ? ' [cause: ' + entry.cause + ']' : ''}`);
       for (const frame of entry.stack) lines.push(`      at ${frame}`);
-      if (entry.handlerFailure) { const h = entry.handlerFailure; lines.push(`    o tratador também falhou: ${h.type}${h.message ? ': ' + h.message : ''}${h.cause ? ' [causa: ' + h.cause + ']' : ''}`); for (const frame of h.stack) lines.push(`      at ${frame}`); }
+      if (entry.handlerFailure) { const h = entry.handlerFailure; lines.push(`    the handler also failed: ${h.type}${h.message ? ': ' + h.message : ''}${h.cause ? ' [cause: ' + h.cause + ']' : ''}`); for (const frame of h.stack) lines.push(`      at ${frame}`); }
     }
     return lines.join('\n');
   }
@@ -2094,14 +2094,16 @@ export class APKRuntime {
   nativeBytesRegistered(delta) {
     const before = this.nativeBytes ?? 0, after = Math.max(0, before + delta); this.nativeBytes = after;
     const base = this.nativeBytesAtCollection ?? 0;
-    if (delta > 0 && after - base > Math.max(NATIVE_PACE_MIN, base)) {
-      if (this.engine === 'wasm') this.wasm?.requestCollection('native');
-      else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
-    }
+    if (delta > 0 && after - base > Math.max(NATIVE_PACE_MIN, base)) this.requestNativeCollection('native');
     return after - before;
   }
-  /** A collection finished: native growth is measured from here (registerNativeAllocation). */
-  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; }
+  /** Asks for a collection at the next safepoint because native resources that only a collection frees have grown (`reason` names them in the core's stats). */
+  requestNativeCollection(reason = 'native') {
+    if (this.engine === 'wasm') this.wasm?.requestCollection(reason);
+    else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
+  }
+  /** A collection finished: native growth is measured from here (registerNativeAllocation), and every native table that paces itself by collections hears it (nativeCollectionHooks). */
+  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; for (const hook of this.nativeCollectionHooks ?? []) hook(); }
   collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
@@ -2411,7 +2413,7 @@ export class APKRuntime {
   noteOom(reason) {
     const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
     for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
-    const kind = /^Object limit|^Reflected multi-array allocation exceeds VM heap limits: object/.test(reason) ? 'limite de objetos' : /field storage/.test(reason) ? 'limite de campos' : /^Array of|^Reflected multi-array allocation exceeds VM heap limits: dimension/.test(reason) ? 'tamanho de um array' : /^Array storage|^Reflected multi-array allocation exceeds VM heap limits: array cell/.test(reason) ? 'orçamento de células de arrays' : /^Collection storage/.test(reason) ? 'orçamento de coleções' : 'outro';
+    const kind = /^Object limit|^Reflected multi-array allocation exceeds VM heap limits: object/.test(reason) ? 'object limit' : /field storage/.test(reason) ? 'field limit' : /^Array of|^Reflected multi-array allocation exceeds VM heap limits: dimension/.test(reason) ? 'array size' : /^Array storage|^Reflected multi-array allocation exceeds VM heap limits: array cell/.test(reason) ? 'array cell budget' : /^Collection storage/.test(reason) ? 'collection budget' : 'other';
     log.push({ kind, reason: String(reason).slice(0, 220), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)), gcEmergency: this.gcEmergency ? { ...this.gcEmergency, blocked: { ...this.gcEmergency.blocked }, budgets: { ...this.gcEmergency.budgets } } : null, soft: this.gcSoftLast ? { ...this.gcSoftLast, collections: this.gcStats?.softCollections ?? 0, totalCleared: this.gcStats?.softCleared ?? 0 } : null });   // soft: the last collection that cleared SoftReferences (heap-gc.js softPolicy): policy and how many referents it cleared
     if (log.length > 12) log.shift();
   }
@@ -2437,14 +2439,14 @@ export class APKRuntime {
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
     // The first few exhaustions get a heap census (src/heap-gc.js heapCensus): what is alive, who keeps it alive, who allocated it. Later ones reuse it (a census is a full mark).
-    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit, arrays: census.arrays }; const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry) entry.arrays = census.arrays; } catch (error) { this.lastOom.census = { text: `Censo do heap indisponível: ${error.message}` }; } }
+    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit, arrays: census.arrays }; const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry) entry.arrays = census.arrays; } catch (error) { this.lastOom.census = { text: `Heap census unavailable: ${error.message}` }; } }
     else this.lastOom.census = this.prevCensus;
     this.prevCensus = this.lastOom.census;
     { const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry && !entry.arrays && this.lastOom.census?.arrays) entry.arrays = this.lastOom.census.arrays; }
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
-    const em = this.gcEmergency, emergencyNote = !em?.attempts ? '' : em.lastFreed === null ? `; coleta de emergência tentada ${em.attempts}x e bloqueada (${Object.entries(em.blocked).map(([k, n]) => `${k} ${n}x`).join(', ') || '?'})` : em.lastFreed === 0 ? '; a coleta de emergência não liberou nada (heap cheio de objetos vivos)' : `; a coleta de emergência liberou ${em.lastFreed} objetos, insuficiente`;
-    const sl = this.gcSoftLast, softNote = sl ? `; referências suaves: a última coleta sob pressão (política ${sl.policy}) limpou ${sl.cleared} de ${sl.softReferences}, ${this.gcStats?.softCleared ?? 0} no total` : '; nenhuma referência suave foi limpa';
-    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; coleta antes do OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; nenhuma coleta antes do OOM'}${emergencyNote}${softNote}`, { kind: 'java-heap-exhausted', softCleared: sl?.cleared ?? 0, softPolicy: sl?.policy ?? null, limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
+    const em = this.gcEmergency, emergencyNote = !em?.attempts ? '' : em.lastFreed === null ? `; emergency collection tried ${em.attempts}x and blocked (${Object.entries(em.blocked).map(([k, n]) => `${k} ${n}x`).join(', ') || '?'})` : em.lastFreed === 0 ? '; the emergency collection freed nothing (heap full of live objects)' : `; the emergency collection freed ${em.lastFreed} objects, not enough`;
+    const sl = this.gcSoftLast, softNote = sl ? `; soft references: the last collection under pressure (policy ${sl.policy}) cleared ${sl.cleared} of ${sl.softReferences}, ${this.gcStats?.softCleared ?? 0} in total` : '; no soft reference was cleared';
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; collection before the OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; no collection before the OOM'}${emergencyNote}${softNote}`, { kind: 'java-heap-exhausted', softCleared: sl?.cleared ?? 0, softPolicy: sl?.policy ?? null, limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
   }
   throwJava(type, message, details = null) {
@@ -2593,7 +2595,7 @@ export class APKRuntime {
     if (obj.tailSerial === entry.serial) { obj.tailSerial = null; for (const serial of obj.map.keys()) obj.tailSerial = serial; }
   }
   reserveCollection(delta) {
-    if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.emergencyCollect('células de coleções');
+    if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.emergencyCollect('collection cells');
     if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.outOfMemory(`Collection storage limit (${this.maxCollectionCells} cells) exceeded`);
     this.collectionCells = Math.max(0, this.collectionCells + delta);
   }
@@ -2964,7 +2966,7 @@ export class APKRuntime {
       if(method.parameters[1]==='[I'&&this.typeOf(args[1])!=='[I')this.throwJava('Ljava/lang/ClassCastException;','Array dimensions require int[]');
       if(!dimensions.length||component.match(/^\[*/)[0].length+dimensions.length>255)this.throwJava('Ljava/lang/IllegalArgumentException;','Array dimensions must total1..255');
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
-      let nodes=1,totalArrays=0,totalCells=0;for(let d=0;d<dimensions.length;d++){const length=dimensions[d];if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*cellsOf('['.repeat(dimensions.length-d)+component,length);if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.emergencyCollect('células de arrays');if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} weighted cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.emergencyCollect('objetos');if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
+      let nodes=1,totalArrays=0,totalCells=0;for(let d=0;d<dimensions.length;d++){const length=dimensions[d];if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*cellsOf('['.repeat(dimensions.length-d)+component,length);if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.emergencyCollect('array cells');if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} weighted cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.emergencyCollect('objects');if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){

@@ -15,21 +15,21 @@ export function buildDiagnosticReport({ error, product = 'APK Browser Lab', pack
   const trace = error?.trace ?? [], list = stubs ?? stubsOf(error);
   const libStubs = list.filter(line => /^STUB-LIB /.test(line)).length;
   const consequence = libStubs && !/UnsatisfiedLink|native|JNI|\.so\b/i.test(cause)
-    ? `Atenção: o modo tolerante substituiu ${libStubs} biblioteca${libStubs > 1 ? 's' : ''} nativa${libStubs > 1 ? 's' : ''} (STUB-LIB) e este erro não menciona nativos: a falha pode ser consequência das bibliotecas substituídas listadas abaixo (os resultados delas são vazios).` : '';
+    ? `Warning: tolerant mode replaced ${libStubs} native librar${libStubs > 1 ? 'ies' : 'y'} (STUB-LIB) and this error does not mention native code: the failure may be a consequence of the replaced libraries listed below (their results are empty).` : '';
   const text = [
-    `${product}${build ? ' ' + build : ''} · ${packageName} · modo tolerante: ${tolerateMissing}${methodOverrides > 0 ? ` · RETORNOS SUBSTITUÍDOS ATIVOS (${methodOverrides} métodos: o código original deles não executou)` : ''}${ignoredActivities > 0 ? ` · ACTIVITIES IGNORADAS ATIVAS (${ignoredActivities}: as aberturas delas não aconteceram)` : ''}${endpointMocks > 0 ? ` · MOCKS DE ENDPOINT ATIVOS (${endpointMocks}: as requisições que casam são respondidas pelo lab, sem rede)` : ''}${hostRedirects?.length ? ` · HOSTS REDIRECIONADOS (${hostRedirects.length}: ${hostRedirects.slice(0, 4).join('; ')}${hostRedirects.length > 4 ? '; …' : ''})` : ''}`,
-    error?.details?.jsStack ? `Erro interno: ${String(error.details.jsStack).split('\n')[0]}` : '',
-    `Erro: ${cause}`,
+    `${product}${build ? ' ' + build : ''} · ${packageName} · tolerant mode: ${tolerateMissing}${methodOverrides > 0 ? ` · METHOD RETURNS REPLACED (${methodOverrides} methods: their original code did not run)` : ''}${ignoredActivities > 0 ? ` · IGNORED ACTIVITIES ACTIVE (${ignoredActivities}: their launches did not happen)` : ''}${endpointMocks > 0 ? ` · ENDPOINT MOCKS ACTIVE (${endpointMocks}: the matching requests are answered by the lab, with no network)` : ''}${hostRedirects?.length ? ` · HOSTS REDIRECTED (${hostRedirects.length}: ${hostRedirects.slice(0, 4).join('; ')}${hostRedirects.length > 4 ? '; …' : ''})` : ''}`,
+    error?.details?.jsStack ? `Internal error: ${String(error.details.jsStack).split('\n')[0]}` : '',
+    `Error: ${cause}`,
     error?.summary ? error.summary : '',
     error?.details?.heartbeatText ? error.details.heartbeatText : '',
-    error?.details?.jsStack ? `Erro interno da VM (JavaScript) -- local:\n${error.details.jsStack}${error.details.vmContext ? `\nContexto: operação ${error.details.vmContext.operation ?? '?'}, thread ${error.details.vmContext.thread ?? '?'}, chamada do host: ${error.details.vmContext.hostCall ?? 'nenhuma'}, pilha Java: ${(error.details.vmContext.stack ?? []).join(' < ') || 'vazia'}` : ''}` : '',
+    error?.details?.jsStack ? `Internal VM error (JavaScript) -- location:\n${error.details.jsStack}${error.details.vmContext ? `\nContext: operation ${error.details.vmContext.operation ?? '?'}, thread ${error.details.vmContext.thread ?? '?'}, host call: ${error.details.vmContext.hostCall ?? 'none'}, Java stack: ${(error.details.vmContext.stack ?? []).join(' < ') || 'empty'}` : ''}` : '',
     error?.uncaught ? error.uncaught : '',
     error?.details?.heap?.text ? error.details.heap.text : '',
-    frames.length ? `Pilha (mais interna por último):\n${frames.slice(-12).join('\n')}` : '',
+    frames.length ? `Stack (innermost last):\n${frames.slice(-12).join('\n')}` : '',
     error?.details?.profile?.text ? error.details.profile.text : '',
     consequence,
-    list.length ? `APIs com stub (${list.length}):\n${list.slice(0, 60).join('\n')}` : '',
-    trace.length ? `Últimas linhas do log:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
+    list.length ? `Stubbed APIs (${list.length}):\n${list.slice(0, 60).join('\n')}` : '',
+    trace.length ? `Last log lines:\n${trace.filter(line => !/^STUB-/.test(line)).slice(-15).join('\n')}` : '',
     apiGaps || '',
   ].filter(Boolean).join('\n\n');
   return { cause, text };

@@ -5,7 +5,7 @@
 // Cost: nothing without overlays, tracks or frame listeners (no animation-frame loop, no listener). With them, one animation-frame loop reads the screen's rectangle (one
 // getBoundingClientRect) and does the rest only when the rectangle changed or a new frame was drawn; tracks and 'frame' reach the plugin only when their value changed.
 // No process.*.
-import { matchTargets } from './lab-target.js?v=ca92aaad0948';
+import { matchTargets } from './lab-target.js?v=d422379a2a38';
 
 export const OVERLAY_PLACEMENTS = ['over', 'top', 'bottom', 'left', 'right', 'center'];
 export const OVERLAY_ALIGNS = ['start', 'center', 'end'];
@@ -181,7 +181,7 @@ export function createOverlayHost({ doc = globalThis.document, win = globalThis.
   const owned = owner => [...overlays.values()].filter(overlay => overlay.owner === String(owner));
 
   function setHtml(overlay, html) {
-    const source = String(html ?? ''); if (source.length > OVERLAY_LIMITS.html) throw fail('bad-args', `HTML grande demais (máximo ${OVERLAY_LIMITS.html} caracteres).`);
+    const source = String(html ?? ''); if (source.length > OVERLAY_LIMITS.html) throw fail('bad-args', `HTML too large (at most ${OVERLAY_LIMITS.html} characters).`);
     const frame = doc.createElement('iframe'); frame.className = 'lab-overlay-frame'; frame.title = overlay.config.title;
     frame.setAttribute('sandbox', 'allow-scripts allow-forms');   // opaque origin: no same-origin, no top navigation, no popups
     frame.setAttribute('referrerpolicy', 'no-referrer');
@@ -194,7 +194,7 @@ export function createOverlayHost({ doc = globalThis.document, win = globalThis.
     const c = overlay.config;
     overlay.node.style.pointerEvents = c.interactive ? 'auto' : 'none'; overlay.node.dataset.interactive = String(c.interactive);
     if (overlay.frame) { overlay.frame.title = c.title; overlay.frame.tabIndex = c.interactive ? 0 : -1; }
-    overlay.node.setAttribute('aria-label', `Sobreposição do plugin: ${c.title}`);
+    overlay.node.setAttribute('aria-label', `Plugin overlay: ${c.title}`);
   }
   const onMessage = event => {
     const message = event.data; if (!message || typeof message !== 'object' || typeof message.__labOverlay !== 'string') return;
@@ -218,18 +218,18 @@ export function createOverlayHost({ doc = globalThis.document, win = globalThis.
       owner = String(owner); listen();
       const wanted = id === null || id === undefined || id === '' ? null : clip(id, 80), existing = wanted ? overlays.get(`${owner}\n${wanted}`) : null;
       if (existing) { existing.update({ config, selector, keys, html }); return existing; }
-      if (owned(owner).length >= OVERLAY_LIMITS.perOwner) throw fail('limit', `No máximo ${OVERLAY_LIMITS.perOwner} sobreposições por plugin: feche alguma.`);
-      if (overlays.size >= OVERLAY_LIMITS.total) throw fail('limit', `No máximo ${OVERLAY_LIMITS.total} sobreposições na página.`);
+      if (owned(owner).length >= OVERLAY_LIMITS.perOwner) throw fail('limit', `At most ${OVERLAY_LIMITS.perOwner} overlays per plugin: close one.`);
+      if (overlays.size >= OVERLAY_LIMITS.total) throw fail('limit', `At most ${OVERLAY_LIMITS.total} overlays on the page.`);
       let local = wanted; while (!local || overlays.has(`${owner}\n${local}`)) local = `o${++serial}`;
       const node = doc.createElement('div'); node.className = 'lab-overlay'; node.hidden = true; node.dataset.owner = owner; node.dataset.overlay = local;
       const overlay = { id: `${owner}\n${local}`, localId: local, owner, node, frame: null, token: `ov${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`, config: sanitizeOverlayConfig({ title: config?.title ?? ownerName, ...(config ?? {}) }),
         selector, keys, all: false, measured: null, loaded: false, queue: [], sentKey: null, state: { visible: false, rect: null, placement: null, anchor: null, element: null }, closed: false, callbacks: { onMessage: messageFn, onClose } };
-      if (overlay.config.anchor === 'target' && !selector) throw fail('bad-args', 'Uma sobreposição ancorada num componente precisa de um alvo (anchor: testTag, texto, { viewId }, ...).');
+      if (overlay.config.anchor === 'target' && !selector) throw fail('bad-args', 'An overlay anchored to a component needs a target (anchor: testTag, text, { viewId }, ...).');
       overlay.send = message => { if (!overlay.loaded) { if (overlay.queue.length < 100) overlay.queue.push(message); return; } try { overlay.frame?.contentWindow?.postMessage(Object.assign({ __labOverlay: overlay.token }, message), '*'); } catch { /* the frame is gone */ } };
-      overlay.post = data => { let copy = null; try { copy = JSON.parse(JSON.stringify(data ?? null)); } catch { throw fail('bad-args', 'post(dados): só dados JSON.'); } overlay.send({ data: copy }); };
+      overlay.post = data => { let copy = null; try { copy = JSON.parse(JSON.stringify(data ?? null)); } catch { throw fail('bad-args', 'post(data): JSON data only.'); } overlay.send({ data: copy }); };
       overlay.postAnchor = anchor => overlay.send({ anchor });
       overlay.update = ({ config: changes = null, selector: nextSelector = undefined, keys: nextKeys = undefined, html = undefined } = {}) => {
-        if (changes) { const maxBefore = overlay.config.maxWidth; overlay.config = sanitizeOverlayConfig(changes, overlay.config); if (overlay.config.anchor === 'target' && !(nextSelector ?? overlay.selector)) throw fail('bad-args', 'anchor de componente sem alvo.'); if (html === undefined && overlay.config.maxWidth !== maxBefore && overlay.frame) setHtml(overlay, overlay.html); }
+        if (changes) { const maxBefore = overlay.config.maxWidth; overlay.config = sanitizeOverlayConfig(changes, overlay.config); if (overlay.config.anchor === 'target' && !(nextSelector ?? overlay.selector)) throw fail('bad-args', 'a component anchor needs a target.'); if (html === undefined && overlay.config.maxWidth !== maxBefore && overlay.frame) setHtml(overlay, overlay.html); }
         if (nextSelector !== undefined && nextSelector !== null) { overlay.selector = nextSelector; overlay.keys = nextKeys ?? null; }
         if (html !== undefined && html !== null) { overlay.html = String(html); setHtml(overlay, overlay.html); }
         applyConfig(overlay); overlay.sentKey = null; dirty = true; wake(); return overlay;
@@ -245,7 +245,7 @@ export function createOverlayHost({ doc = globalThis.document, win = globalThis.
     /** Follows the components a target names: onChange({ id, visible, matches, elements: [{ key, kind, name, testTag, viewId, texts, bounds (window dp), rect (page px) }] }) when it changed. */
     track({ owner, id = null, selector, keys = null, all = false, onChange }) {
       owner = String(owner); if (!selector) throw fail('bad-args', 'lab.track precisa de um alvo.');
-      if ([...tracks.values()].filter(track => track.owner === owner).length >= OVERLAY_LIMITS.tracksPerOwner && !(id && tracks.has(`${owner}\n${id}`))) throw fail('limit', `No máximo ${OVERLAY_LIMITS.tracksPerOwner} acompanhamentos por plugin.`);
+      if ([...tracks.values()].filter(track => track.owner === owner).length >= OVERLAY_LIMITS.tracksPerOwner && !(id && tracks.has(`${owner}\n${id}`))) throw fail('limit', `At most ${OVERLAY_LIMITS.tracksPerOwner} trackers per plugin.`);
       let local = id === null || id === undefined || id === '' ? null : clip(id, 80); while (!local || (tracks.has(`${owner}\n${local}`) && id === null)) local = `t${++serial}`;
       const track = { id: local, owner, selector, keys, all: !!all, onChange, sentKey: null }; tracks.set(`${owner}\n${local}`, track);
       dirty = true; wake(); return local;
@@ -278,18 +278,18 @@ export function createOverlayAction({ host, emit }) {
       return out(opened);
     }
     if (op === 'list') return host.list(plugin.id).map(out);
-    const item = host.get(plugin.id, args.id); if (!item) throw fail('not-found', 'Sobreposição fechada ou desconhecida.');
+    const item = host.get(plugin.id, args.id); if (!item) throw fail('not-found', 'Overlay closed or unknown.');
     if (op === 'update') item.update({ config: args.config ?? null, selector: args.selector, keys: args.keys, html: args.html });
     else if (op === 'post') item.post(args.data);
     else if (op === 'close') { item.close('code'); return { id: item.localId, closed: true }; }
-    else if (op !== 'state') throw fail('bad-args', `Operação de sobreposição desconhecida: ${op.slice(0, 20)}`);
+    else if (op !== 'state') throw fail('bad-args', `Unknown overlay operation: ${op.slice(0, 20)}`);
     return out(item);
   };
   const track = (plugin, args = {}) => {
     const op = String(args.op ?? 'start');
     if (op === 'start') return { id: host.track({ owner: plugin.id, id: args.id ?? null, selector: args.selector, keys: args.keys ?? null, all: args.all === true, onChange: value => emit(plugin.id, 'track', value) }) };
     if (op === 'stop') return { removed: host.untrack(plugin.id, args.id) };
-    throw fail('bad-args', `Operação de acompanhamento desconhecida: ${op.slice(0, 20)}`);
+    throw fail('bad-args', `Unknown tracker operation: ${op.slice(0, 20)}`);
   };
   return { overlay, track, frame: () => host.frame() };
 }

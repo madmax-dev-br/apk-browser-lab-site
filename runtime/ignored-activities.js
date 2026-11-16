@@ -29,11 +29,11 @@ export function applyIgnoredActivities(runtime, entries) {
   const packageName = platform.packageName ?? '';
   for (const entry of (Array.isArray(entries) ? entries : []).slice(0, MAX_ENTRIES)) {
     const name = String(entry?.name ?? '').trim(), descriptor = activityDescriptor(name, packageName);
-    if (!descriptor) { statuses.push({ name, descriptor: null, state: 'invalid', hits: 0, error: 'Nome de Activity inválido: use pacote.Classe, .Classe ou Lpacote/Classe;.' }); continue; }
+    if (!descriptor) { statuses.push({ name, descriptor: null, state: 'invalid', hits: 0, error: 'Invalid Activity name: use package.Class, .Class or Lpackage/Class;.' }); continue; }
     const record = previous.get(descriptor) ?? all.get(descriptor) ?? { descriptor, name: dotted(descriptor), hits: 0 };
     all.set(descriptor, record);
     let known = false; try { known = runtime.dex.classes.has(descriptor) && runtime.isSubtype(descriptor, ACTIVITY); } catch { known = false; }
-    if (!known) { statuses.push({ name, descriptor, state: 'missing', hits: record.hits, error: `${dotted(descriptor)} não é uma Activity deste APK.` }); continue; }
+    if (!known) { statuses.push({ name, descriptor, state: 'missing', hits: record.hits, error: `${dotted(descriptor)} is not an Activity of this APK.` }); continue; }
     if (entry?.enabled === false) { statuses.push({ name, descriptor, state: 'disabled', hits: record.hits }); continue; }
     active.set(descriptor, record); statuses.push({ name, descriptor, state: 'active', hits: record.hits });
   }
@@ -48,7 +48,7 @@ export function ignoreActivityStart(runtime, descriptor, kind) {
   if (!record) return false;
   const hits = ++record.hits;
   runtime.record(`ACTIVITY start ignored ${record.name} (${kind})`);
-  if (hits === 1 || hits % 100 === 0) runtime.record(`LOG W APKWebLab: Activity ignorada: ${record.name} não foi aberta (${kind}; ${hits} ${hits === 1 ? 'vez' : 'vezes'})`);
+  if (hits === 1 || hits % 100 === 0) runtime.record(`LOG W APKWebLab: Activity ignored: ${record.name} was not opened (${kind}; ${hits} ${hits === 1 ? 'time' : 'times'})`);
   return true;
 }
 
@@ -62,5 +62,5 @@ export function ignoredActivitiesLine(runtime) {
   const active = runtime.platform?.ignoredActivities;
   if (!active?.size) return null;
   const list = [...active.values()], starts = list.reduce((sum, record) => sum + record.hits, 0);
-  return `Activities ignoradas ATIVAS: ${list.length} (${starts} ${starts === 1 ? 'abertura descartada' : 'aberturas descartadas'}): ${list.map(record => `${record.name} ×${record.hits}`).join(', ')}`;
+  return `Ignored activities ACTIVE: ${list.length} (${starts} ${starts === 1 ? 'launch discarded' : 'launches discarded'}): ${list.map(record => `${record.name} ×${record.hits}`).join(', ')}`;
 }

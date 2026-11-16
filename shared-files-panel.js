@@ -1,10 +1,10 @@
 // "Arquivos do dispositivo" in the Controles panel and the system file picker shown over the phone screen. The tester attaches files from the computer (button or drag and drop); they
 // become the virtual device's shared storage (src/shared-storage.js, src/shared-storage-host.js): what the pickers offer and what MediaStore lists. The bytes never leave the browser:
 // the page keeps them (IndexedDB when available, so they survive a reload; this page session otherwise) and hands copies to the VM's Worker.
-import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=ca92aaad0948';
+import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=d422379a2a38';
 
 const DB_NAME = 'apkweb-shared-storage', STORE = 'files', FIRST_ID = 1001;
-const KIND_LABEL = { image: 'imagem', video: 'vídeo', audio: 'áudio', document: 'documento' };
+const KIND_LABEL = { image: 'image', video: 'video', audio: 'audio', document: 'document' };
 const KIND_ICON = {
   image: 'M21 19V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2zM8.5 13.5l2.5 3 3.5-4.5 4.5 6H5l3.5-4.5z',
   video: 'M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11l-4 4z',
@@ -21,7 +21,7 @@ export function openFileStore({ indexedDB = globalThis.indexedDB } = {}) {
   const database = () => opening ??= new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
     request.onupgradeneeded = () => { if (!request.result.objectStoreNames.contains(STORE)) request.result.createObjectStore(STORE, { keyPath: 'id' }); };
-    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('IndexedDB bloqueado'));
+    request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); request.onblocked = () => reject(new Error('IndexedDB blocked'));
   });
   const run = async (mode, body) => { const db = await database(); return new Promise((resolve, reject) => { const tx = db.transaction(STORE, mode), result = body(tx.objectStore(STORE)); tx.oncomplete = () => resolve(result?.result); tx.onerror = tx.onabort = () => reject(tx.error); }); };
   return { all: () => run('readonly', store => store.getAll()), put: record => run('readwrite', store => store.put(record)), remove: id => run('readwrite', store => store.delete(id)), clear: () => run('readwrite', store => store.clear()) };
@@ -66,7 +66,7 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
     const url = thumb(file); if (!url) return icon(file.kind, className);
     const image = document.createElement('img'); image.className = className; image.alt = ''; image.loading = 'lazy'; image.src = url; return image;
   };
-  const details = file => [file.mime || 'tipo pelo nome', formatBytes(file.size), file.width && file.height ? `${file.width}×${file.height}` : '', file.duration ? formatDuration(file.duration) : ''].filter(Boolean).join(' · ');
+  const details = file => [file.mime || 'type from the name', formatBytes(file.size), file.width && file.height ? `${file.width}×${file.height}` : '', file.duration ? formatDuration(file.duration) : ''].filter(Boolean).join(' · ');
 
   function render() {
     const list = $('files-list'); list.replaceChildren();
@@ -76,22 +76,22 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
       const name = document.createElement('span'); name.className = 'files-name'; name.textContent = file.name; name.title = file.name;
       const info = document.createElement('small'); info.textContent = details(file);
       text.append(name, info);
-      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'files-remove'; remove.textContent = 'Remover'; remove.setAttribute('aria-label', `Remover ${file.name}`);
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'files-remove'; remove.textContent = 'Remove'; remove.setAttribute('aria-label', `Remove ${file.name}`);
       remove.addEventListener('click', () => removeFile(file.id));
       item.append(picture(file, 'files-thumb'), text, remove); list.append(item);
     }
     list.hidden = S.files.length === 0;
-    $('files-summary').textContent = S.files.length ? `${S.files.length} · ${formatBytes(total())}` : 'nenhum';
+    $('files-summary').textContent = S.files.length ? `${S.files.length} · ${formatBytes(total())}` : 'none';
     $('files-clear').disabled = S.files.length === 0;
-    const where = S.persisted ? 'Ficam guardados só neste navegador (IndexedDB) e voltam depois de recarregar a página.' : 'Este navegador não oferece armazenamento agora: os arquivos valem só até a página ser recarregada.';
-    $('files-note').textContent = S.note || `Nada é enviado para fora do navegador. ${where} São o armazenamento compartilhado do dispositivo: os seletores de arquivo do Android os oferecem, e o MediaStore lista fotos, vídeos e áudios para o app que tiver a permissão de mídia.`;
+    const where = S.persisted ? 'They are kept only in this browser (IndexedDB) and come back after the page is reloaded.' : 'This browser offers no storage right now: the files last only until the page is reloaded.';
+    $('files-note').textContent = S.note || `Nothing leaves the browser. ${where} They are the device's shared storage: Android file pickers offer them, and MediaStore lists photos, videos and audio to an app that holds the media permission.`;
   }
   const say = text => { S.note = text; render(); };
   /** Sends a change to the running VM; without one the files go with the next APK (attach). */
   async function push(payload) {
     if (!vm.worker) return;
     try { const reply = await vm.setSharedFiles({ dialogs: true, ...payload }); adopt(reply.files ?? []); }
-    catch (error) { say(`A VM não recebeu a mudança dos arquivos (${error.message}). Reabra o APK para o dispositivo virtual ficar igual a esta lista.`); }
+    catch (error) { say(`The VM did not receive the file change (${error.message}). Reopen the APK so the virtual device matches this list.`); }
   }
   /** The device's view of the files: the type Android resolved for a file the browser gave none for. */
   function adopt(deviceFiles) {
@@ -105,16 +105,16 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
     const incoming = [...fileList].filter(file => file && typeof file.size === 'number'); if (!incoming.length) return;
     const added = [], refused = []; let bytes = total();
     for (const source of incoming) {
-      if (source.size > MAX_FILE_BYTES) { refused.push(`${source.name}: maior que ${MAX_FILE_BYTES / 1048576} MiB`); continue; }
-      if (S.files.length + added.length >= MAX_FILES) { refused.push(`${source.name}: limite de ${MAX_FILES} arquivos`); continue; }
-      if (bytes + source.size > MAX_TOTAL_BYTES) { refused.push(`${source.name}: limite total de ${MAX_TOTAL_BYTES / 1048576} MiB`); continue; }
+      if (source.size > MAX_FILE_BYTES) { refused.push(`${source.name}: larger than ${MAX_FILE_BYTES / 1048576} MiB`); continue; }
+      if (S.files.length + added.length >= MAX_FILES) { refused.push(`${source.name}: limit of ${MAX_FILES} files`); continue; }
+      if (bytes + source.size > MAX_TOTAL_BYTES) { refused.push(`${source.name}: total limit of ${MAX_TOTAL_BYTES / 1048576} MiB`); continue; }
       const mime = typeof source.type === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(source.type) ? source.type.toLowerCase() : '', kind = kindOf(mime);
       const name = uniqueName(safeName(source.name), new Set([...S.files, ...added].map(file => file.name)));
       const file = { id: nextId(), name, mime, kind, size: source.size, modified: Number(source.lastModified) || Date.now(), added: Date.now(), blob: source, thumb: null, ...(await probe(source, kind)) };
       added.push(file); S.files.push(file); bytes += source.size;
     }
     if (store) { try { for (const file of added) await store.put({ ...meta(file), blob: file.blob }); } catch { S.persisted = false; } }
-    S.note = refused.length ? `Não anexado: ${refused.join('; ')}.` : added.length ? `${added.length} arquivo(s) anexado(s) ao dispositivo virtual.` : '';
+    S.note = refused.length ? `Not attached: ${refused.join('; ')}.` : added.length ? `${added.length} file(s) attached to the virtual device.` : '';
     render();
     if (added.length) await push({ files: await withBytes(added) });
   }
@@ -122,13 +122,13 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
     const index = S.files.findIndex(file => file.id === id); if (index < 0) return;
     const [file] = S.files.splice(index, 1); dropThumb(file);
     if (store) { try { await store.remove(id); } catch { S.persisted = false; } }
-    S.note = `${file.name} removido do dispositivo virtual.`; render();
+    S.note = `${file.name} removed from the virtual device.`; render();
     await push({ remove: [id] });
   }
   async function clearFiles() {
     for (const file of S.files) dropThumb(file); S.files = [];
     if (store) { try { await store.clear(); } catch { S.persisted = false; } }
-    S.note = 'Todos os arquivos foram removidos do dispositivo virtual.'; render();
+    S.note = 'All files were removed from the virtual device.'; render();
     await push({ replace: true, files: [] });
   }
   const loading = (async () => {
@@ -150,7 +150,7 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
 
   // ---- the system picker over the phone ----
   const scrim = () => $('system-picker');
-  const FILTER_TEXT = filters => filters.includes('*/*') ? 'qualquer arquivo' : filters.join(', ');
+  const FILTER_TEXT = filters => filters.includes('*/*') ? 'any file' : filters.join(', ');
   function closeDialog() {
     const dialog = scrim(); dialog.hidden = true; dialog.onkeydown = null; dialog.replaceChildren();
     const content = $('android-content'), layer = $('android-window-layer'); if (S.open?.inertBefore) { content.inert = S.open.inertBefore.content; layer.inert = S.open.inertBefore.layer; }
@@ -165,10 +165,10 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
     const card = document.createElement('div'); card.className = 'sp-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', 'sp-title'); card.tabIndex = -1;
     const title = document.createElement('h2'); title.id = 'sp-title'; title.className = 'sp-title'; title.textContent = request.title;
     const hint = document.createElement('p'); hint.className = 'sp-hint';
-    hint.textContent = `${request.multiple ? (request.max > 1 ? `Escolha até ${request.max} itens` : 'Escolha um ou mais itens') : 'Escolha um item'} · ${FILTER_TEXT(request.filters)}`;
-    const list = document.createElement('ul'); list.className = 'sp-list'; list.setAttribute('aria-label', 'Arquivos do dispositivo');
+    hint.textContent = `${request.multiple ? (request.max > 1 ? `Choose up to ${request.max} items` : 'Choose one or more items') : 'Choose one item'} · ${FILTER_TEXT(request.filters)}`;
+    const list = document.createElement('ul'); list.className = 'sp-list'; list.setAttribute('aria-label', 'Device files');
     const confirm = document.createElement('button'); confirm.type = 'button'; confirm.id = 'sp-confirm'; confirm.className = 'sp-button sp-primary'; confirm.hidden = !request.multiple;
-    const refresh = () => { confirm.textContent = chosen.length ? `Selecionar (${chosen.length})` : 'Selecionar'; confirm.disabled = chosen.length === 0; };
+    const refresh = () => { confirm.textContent = chosen.length ? `Select (${chosen.length})` : 'Select'; confirm.disabled = chosen.length === 0; };
     for (const offered of request.files) {
       const file = S.files.find(item => item.id === offered.id) ?? { ...offered, kind: kindOf(offered.mime), blob: null, thumb: null };
       const item = document.createElement('li'), button = document.createElement('button'); button.type = 'button'; button.className = 'sp-item'; button.dataset.fileId = String(offered.id);
@@ -186,11 +186,11 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
       item.append(button); list.append(item);
     }
     const empty = document.createElement('p'); empty.className = 'sp-empty'; empty.hidden = request.files.length > 0;
-    empty.textContent = request.total === 0 ? 'O dispositivo não tem arquivos. Anexe arquivos em Controles › Arquivos do dispositivo e peça de novo no app.' : 'Nenhum arquivo do dispositivo corresponde ao tipo que o app pediu.';
+    empty.textContent = request.total === 0 ? 'The device has no files. Attach files in Controls › Device files and ask again in the app.' : 'No device file matches the type the app asked for.';
     const others = document.createElement('p'); others.className = 'sp-others'; others.hidden = !(request.others > 0 && request.files.length > 0);
-    others.textContent = `${request.others} arquivo(s) do dispositivo não aparecem: o tipo não corresponde ao pedido do app.`;
+    others.textContent = `${request.others} device file(s) are not shown: the type does not match the app's request.`;
     const actions = document.createElement('div'); actions.className = 'sp-actions';
-    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.id = 'sp-cancel'; cancel.className = 'sp-button'; cancel.textContent = 'Cancelar';
+    const cancel = document.createElement('button'); cancel.type = 'button'; cancel.id = 'sp-cancel'; cancel.className = 'sp-button'; cancel.textContent = 'Cancel';
     cancel.addEventListener('click', () => answer(null)); confirm.addEventListener('click', () => answer([...chosen]));
     actions.append(cancel, confirm); refresh();
     card.append(title, hint, list, empty, others, actions); dialog.replaceChildren(card);
@@ -211,7 +211,7 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
       if (S.open) closeDialog(); S.queue.length = 0; await loading;
       if (!vm.worker) return;
       try { const reply = await vm.setSharedFiles({ dialogs: true, replace: true, files: await withBytes(S.files) }); adopt(reply.files ?? []); }
-      catch (error) { say(`A VM não recebeu os arquivos do dispositivo (${error.message}).`); }
+      catch (error) { say(`The VM did not receive the device files (${error.message}).`); }
     },
     /** The VM went away (reopen, stop): a picker that waited for it has nothing to answer. */
     detach() { if (S.open) closeDialog(); S.queue.length = 0; },

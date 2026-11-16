@@ -56,7 +56,7 @@ export function surfaceBridgeMain(win, token) {
   const add = name => fn => { if (typeof fn === 'function') handlers[name].push(fn); return () => { const at = handlers[name].indexOf(fn); if (at >= 0) handlers[name].splice(at, 1); }; };
   let cancelActive = null, resetActive = null;
   function draggable(element, data, options) {
-    if (!element || typeof element.addEventListener !== 'function') throw new TypeError('lab.draggable(elemento, dados)');
+    if (!element || typeof element.addEventListener !== 'function') throw new TypeError('lab.draggable(element, data)');
     const settings = options || {}; let state = null, suppressClick = false;
     if (element.style) { element.style.touchAction = 'none'; element.style.userSelect = 'none'; element.style.webkitUserSelect = 'none'; if (!element.style.cursor) element.style.cursor = 'grab'; }
     const payload = () => { const value = typeof data === 'function' ? data(element) : data; try { return JSON.parse(JSON.stringify(value === undefined ? null : value)); } catch (error) { return null; } };
@@ -127,7 +127,7 @@ export function createSideTabHost({ doc = globalThis.document, win = globalThis.
   function sideOf(name) {
     let side = sides.get(name); if (side) return side;
     const root = el('div', 'lab-tabs'), rail = el('div', 'lab-tabs-rail'), panels = el('div', 'lab-tabs-panels');
-    root.dataset.side = name; rail.setAttribute('role', 'group'); rail.setAttribute('aria-label', name === 'left' ? 'Abas de plugins à esquerda' : 'Abas de plugins à direita');
+    root.dataset.side = name; rail.setAttribute('role', 'group'); rail.setAttribute('aria-label', name === 'left' ? 'Plugin tabs on the left' : 'Plugin tabs on the right');
     root.append(rail, panels); doc.body.append(root);
     side = { name, root, rail, panels, hoverTimer: null };
     root.addEventListener('keydown', event => { if (event.key !== 'Escape') return; const tab = openOn(name); if (!tab) return; event.preventDefault(); event.stopPropagation(); setOpen(tab, false, 'user'); tab.button.focus?.(); });
@@ -165,7 +165,7 @@ export function createSideTabHost({ doc = globalThis.document, win = globalThis.
     call(tab.callbacks.onToggle, tab, open, by);
   }
   function setHtml(tab, html) {
-    const source = String(html ?? ''); if (source.length > TAB_LIMITS.html) throw fail('bad-args', `HTML grande demais (máximo ${TAB_LIMITS.html} caracteres).`);
+    const source = String(html ?? ''); if (source.length > TAB_LIMITS.html) throw fail('bad-args', `HTML too large (at most ${TAB_LIMITS.html} characters).`);
     const frame = el('iframe', 'lab-tab-frame'); frame.title = tab.config.title;
     frame.setAttribute('sandbox', 'allow-scripts allow-forms');   // opaque origin: no same-origin, no top navigation, no popups
     frame.setAttribute('referrerpolicy', 'no-referrer');
@@ -181,8 +181,8 @@ export function createSideTabHost({ doc = globalThis.document, win = globalThis.
     const side = sideOf(config.side);
     if (!previous || previous.side !== config.side) { side.rail.append(tab.button); side.panels.append(tab.panel); }
     tab.icon.textContent = config.icon; tab.name.textContent = config.title; tab.heading.textContent = config.title;
-    tab.button.title = config.title; tab.button.dataset.trigger = config.trigger; tab.panel.dataset.mode = config.mode; tab.panel.setAttribute('aria-label', `Aba do plugin: ${config.title}`);
-    tab.closeButton.setAttribute('aria-label', `Recolher a aba ${config.title}`); if (tab.frame) tab.frame.title = config.title;
+    tab.button.title = config.title; tab.button.dataset.trigger = config.trigger; tab.panel.dataset.mode = config.mode; tab.panel.setAttribute('aria-label', `Plugin tab: ${config.title}`);
+    tab.closeButton.setAttribute('aria-label', `Collapse the tab ${config.title}`); if (tab.frame) tab.frame.title = config.title;
     if (previous && previous.side !== config.side) layout(previous.side);
     layout(config.side);
   }
@@ -257,9 +257,9 @@ export function createSideTabHost({ doc = globalThis.document, win = globalThis.
   function open({ owner = '', ownerName = 'Plugin', config: rawConfig = {}, html = '', onMessage: receive = null, onToggle = null, onClose = null, onDrag = null } = {}) {
     const config = sanitizeTabConfig(rawConfig, { name: ownerName }), existing = [...tabs.values()].find(tab => tab.owner === owner && tab.config.key === config.key);
     if (existing) { existing.callbacks = { onMessage: receive, onToggle, onClose, onDrag }; applyConfig(existing, config); setHtml(existing, html); return existing; }
-    if ([...tabs.values()].filter(tab => tab.owner === owner).length >= TAB_LIMITS.perOwner) throw fail('bad-args', `No máximo ${TAB_LIMITS.perOwner} abas por plugin.`);
-    if (tabs.size >= TAB_LIMITS.total) throw fail('busy', `No máximo ${TAB_LIMITS.total} abas de plugins na página.`);
-    if (String(html ?? '').length > TAB_LIMITS.html) throw fail('bad-args', `HTML grande demais (máximo ${TAB_LIMITS.html} caracteres).`);
+    if ([...tabs.values()].filter(tab => tab.owner === owner).length >= TAB_LIMITS.perOwner) throw fail('bad-args', `At most ${TAB_LIMITS.perOwner} tabs per plugin.`);
+    if (tabs.size >= TAB_LIMITS.total) throw fail('busy', `At most ${TAB_LIMITS.total} plugin tabs on the page.`);
+    if (String(html ?? '').length > TAB_LIMITS.html) throw fail('bad-args', `HTML too large (at most ${TAB_LIMITS.html} characters).`);
     const id = `lab-tab-${++counter}`, button = el('button', 'lab-tab'), icon = el('span', 'lab-tab-icon'), name = el('span', 'lab-tab-name');
     const panel = el('section', 'lab-tab-panel'), head = el('div', 'lab-tab-head'), heading = el('h2', 'lab-tab-title'), close = el('button', 'lab-tab-close', '×'), body = el('div', 'lab-tab-body');
     button.type = 'button'; button.id = `${id}-button`; button.setAttribute('aria-expanded', 'false'); button.setAttribute('aria-controls', id); icon.setAttribute('aria-hidden', 'true'); button.append(icon, name);
@@ -306,12 +306,12 @@ export function createTabAction({ tabs, emit }) {
     const op = String(args.op ?? '');
     if (op === 'open') { const tab = tabs.open({ owner: plugin.id, ownerName: plugin.name, config: args.config ?? {}, html: args.html ?? '', ...callbacks(plugin) }); return { id: tab.id, open: tab.open, config: tab.config }; }
     const tab = args.id ? tabs.get(String(args.id)) : null;
-    if (!tab || tab.owner !== plugin.id) throw fail('not-found', 'Aba fechada ou desconhecida.');
+    if (!tab || tab.owner !== plugin.id) throw fail('not-found', 'Tab closed or unknown.');
     if (op === 'update') tab.update({ ...(args.config !== undefined ? { config: { ...tab.config, open: tab.config.startOpen, ...args.config } } : {}), ...(args.html !== undefined ? { html: args.html } : {}) });
     else if (op === 'post') tab.post(args.data);
     else if (op === 'setOpen') tab.setOpen(args.open !== false, 'code');
     else if (op === 'close') tab.close('code');
-    else throw fail('bad-args', `Operação de aba desconhecida: ${op.slice(0, 20)}`);
+    else throw fail('bad-args', `Unknown tab operation: ${op.slice(0, 20)}`);
     return { id: tab.id, open: tab.open, config: tab.config };
   };
 }

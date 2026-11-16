@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=ca92aaad0948';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=ca92aaad0948';
-import { parseReturnValue } from './method-overrides.js?v=ca92aaad0948';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=d422379a2a38';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=d422379a2a38';
+import { parseReturnValue } from './method-overrides.js?v=d422379a2a38';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');
@@ -115,7 +115,7 @@ export function enableMicrog(runtime, { version }) {
   };
   const microg = platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings: { ...MICROG_LOCKED_SETTINGS }, mocks: new Map(), entries: new Map() };
   installMicrogEntryPoints(runtime, microg, registry);
-  runtime.record(`DEVICE microG ${version}: ${names.join(', ')} preinstalled (option "com microG"); signatures from their fake-signature meta-data; locked off: check-in, GCM, SafetyNet/Play Integrity, DroidGuard, licensing, billing (${MICROG_SETTINGS_PATH}); refused permission: ${MICROG_REFUSED_PERMISSIONS.join(', ')}; default grants to ${MICROG_GMS}: location`);
+  runtime.record(`DEVICE microG ${version}: ${names.join(', ')} preinstalled (option "With microG"); signatures from their fake-signature meta-data; locked off: check-in, GCM, SafetyNet/Play Integrity, DroidGuard, licensing, billing (${MICROG_SETTINGS_PATH}); refused permission: ${MICROG_REFUSED_PERMISSIONS.join(', ')}; default grants to ${MICROG_GMS}: location`);
   return platform.microg;
 }
 
@@ -160,12 +160,12 @@ function intercept(runtime, microg, state, definition, args) {
     let failure = microg.failures.find(item => item.kind === 'microg-not-implemented' && item.entryPoint === def.id);
     if (!failure) { failure = { kind: 'microg-not-implemented', entryPoint: def.id, api: def.label, method: microgEntryMethodSmali(def), hits: 0 }; microg.failures.push(failure); }
     failure.hits = state.hits;
-    if (state.hits === 1 || state.hits % 100 === 0) runtime.record(`LOG W APKWebLab: microG ${def.id} (${def.label}): não implementado, sem mock; ponto de entrada ${microgEntryMethodSmali(def)} (${state.hits} chamadas)`);
+    if (state.hits === 1 || state.hits % 100 === 0) runtime.record(`LOG W APKWebLab: microG ${def.id} (${def.label}): not implemented, no mock; entry point ${microgEntryMethodSmali(def)} (${state.hits} calls)`);
     if (state.hits === 1) runtime.record(`DEVICE microG NOT IMPLEMENTED ${def.id}: ${def.label}; entry point ${dealias(definition.method.owner).slice(1, -1).replaceAll('/', '.')}.${def.method.name}; no mock registered`);
     return RUN_BODY;   // microG's own locked body runs: the app gets that API's ordinary failure
   }
   state.mockHits++;
-  if (state.mockHits === 1 || state.mockHits % 100 === 0) runtime.record(`LOG W APKWebLab: microG MOCK ${def.id} (${def.label}): valor fornecido substitui ${microgEntryMethodSmali(def)} (${state.mockHits} chamadas)`);
+  if (state.mockHits === 1 || state.mockHits % 100 === 0) runtime.record(`LOG W APKWebLab: microG MOCK ${def.id} (${def.label}): the provided value replaces ${microgEntryMethodSmali(def)} (${state.mockHits} calls)`);
   if (state.mockHits === 1) runtime.record(`DEVICE microG MOCK ${def.id}: ${def.label}; entry point ${microgEntryMethodSmali(def)}`);
   const receiver = (definition.flags & 8) ? null : args[0];   // ACC_STATIC
   let value;
@@ -201,7 +201,7 @@ export function applyMicrogMocks(runtime, specs) {
     const spec = wanted.get(def.id);
     if (spec === undefined) { microg.unmock(def.id); continue; }
     const state = microg.entries.get(def.id), result = state?.result ?? null;
-    if (result === null) { errors.set(def.id, 'O ponto de entrada ainda não foi resolvido (abra o app e alcance o microG uma vez).'); continue; }
+    if (result === null) { errors.set(def.id, 'The entry point has not been resolved yet (open the app and reach microG once).'); continue; }
     const parsed = parseReturnValue(dealias(result), spec.value);   // the return type without the loader alias, so a reference is "null"/"string" and a primitive its literal
     if (!parsed.ok) { errors.set(def.id, parsed.error); microg.unmock(def.id); continue; }
     microg.mock(def.id, ({ runtime: r }) => typeof parsed.value === 'string' ? r.javaString(parsed.value) : parsed.value);

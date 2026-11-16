@@ -23,15 +23,15 @@ export function createModalHost({ doc = globalThis.document, win = globalThis.wi
     const id = `lab-modal-${++counter}`, opener = doc.activeElement;
     const scrim = doc.createElement('div'), card = doc.createElement('div'), head = doc.createElement('div'), heading = doc.createElement('h2'), close = doc.createElement('button'), body = doc.createElement('div');
     scrim.className = 'lab-modal-scrim'; card.className = 'lab-modal'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-modal', 'true'); card.setAttribute('aria-labelledby', `${id}-title`); card.id = id;
-    head.className = 'lab-modal-head'; heading.id = `${id}-title`; close.type = 'button'; close.className = 'lab-modal-close'; close.textContent = '×'; close.setAttribute('aria-label', 'Fechar');
+    head.className = 'lab-modal-head'; heading.id = `${id}-title`; close.type = 'button'; close.className = 'lab-modal-close'; close.textContent = '×'; close.setAttribute('aria-label', 'Close');
     body.className = 'lab-modal-body'; head.append(heading); if (label) { const tag = doc.createElement('span'); tag.className = 'lab-modal-label'; tag.textContent = label; head.append(tag); } head.append(close); card.append(head, body); scrim.append(card);
     const modal = { id, element: scrim, body, token: `${id}-${Math.random().toString(36).slice(2)}`, frame: null, onMessage: receive, closed: false };
     modal.setTitle = text => { heading.textContent = String(text ?? '').slice(0, 200); };
     modal.setSize = value => { card.dataset.size = MODAL_SIZES.includes(value) ? value : 'medium'; };
     modal.setContent = node => { modal.frame = null; body.replaceChildren(...(node ? [node] : [])); };
     modal.setHtml = text => {
-      const source = String(text ?? ''); if (source.length > MAX_MODAL_HTML) throw Object.assign(new Error(`HTML grande demais (máximo ${MAX_MODAL_HTML} caracteres).`), { code: 'bad-args' });
-      const frame = doc.createElement('iframe'); frame.className = 'lab-modal-frame'; frame.title = heading.textContent || 'Conteúdo do plugin';
+      const source = String(text ?? ''); if (source.length > MAX_MODAL_HTML) throw Object.assign(new Error(`HTML too large (at most ${MAX_MODAL_HTML} characters).`), { code: 'bad-args' });
+      const frame = doc.createElement('iframe'); frame.className = 'lab-modal-frame'; frame.title = heading.textContent || 'Plugin content';
       frame.setAttribute('sandbox', 'allow-scripts allow-forms');   // opaque origin: no same-origin, no top navigation, no popups
       frame.setAttribute('referrerpolicy', 'no-referrer');
       frame.srcdoc = `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">${bridgeScript(modal.token)}${source}`;

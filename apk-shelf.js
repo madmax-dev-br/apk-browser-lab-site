@@ -21,14 +21,14 @@ export function printableShelfId(id) { return String(id ?? '').replace('\u0000',
  */
 export function resolveShelfApp(items, { id = null, packageName = null, name = null } = {}) {
   const list = Array.isArray(items) ? items : [], lower = value => String(value ?? '').trim().toLowerCase(), error = (code, message) => Object.assign(new Error(message), { code });
-  const show = item => `${printableShelfId(item.id)}${item.label ? ` (${item.label})` : ''}`, installed = list.length ? `Instalados: ${list.map(show).join(', ')}.` : 'Nenhum app instalado: use install_apk.';
+  const show = item => `${printableShelfId(item.id)}${item.label ? ` (${item.label})` : ''}`, installed = list.length ? `Installed: ${list.map(show).join(', ')}.` : 'No app is installed: use install_apk.';
   let found, what;
   if (id) { found = list.filter(item => item.id === id || printableShelfId(item.id) === id); what = `id "${printableShelfId(id)}"`; }
-  else if (packageName) { found = list.filter(item => item.packageName === packageName); what = `pacote "${packageName}"`; }
-  else if (name) { const wanted = lower(name); found = list.filter(item => lower(item.label) === wanted || lower(item.name) === wanted || lower(item.name) === `${wanted}.apk`); what = `nome "${name}"`; }
-  else throw error('bad-args', 'Diga qual app: id, package ou name.');
-  if (!found.length) throw error('not-found', `Nenhum app instalado com ${what}. ${installed}`);
-  if (found.length > 1) throw error('ambiguous', `Mais de um app instalado com ${what}: passe o id (${found.map(show).join(', ')}).`);
+  else if (packageName) { found = list.filter(item => item.packageName === packageName); what = `package "${packageName}"`; }
+  else if (name) { const wanted = lower(name); found = list.filter(item => lower(item.label) === wanted || lower(item.name) === wanted || lower(item.name) === `${wanted}.apk`); what = `name "${name}"`; }
+  else throw error('bad-args', 'Say which app: id, package or name.');
+  if (!found.length) throw error('not-found', `No installed app with ${what}. ${installed}`);
+  if (found.length > 1) throw error('ambiguous', `More than one installed app with ${what}: pass the id (${found.map(show).join(', ')}).`);
   return found[0];
 }
 

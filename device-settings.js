@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=ca92aaad0948';
-import { isMemoryStep } from './memory-budget.js?v=ca92aaad0948';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ca92aaad0948';
-import { sanitizeHostMap } from './host-map.js?v=ca92aaad0948';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=ca92aaad0948';
-import { sanitizeLocation } from './runtime-permissions.js?v=ca92aaad0948';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=ca92aaad0948';
+import { coreMemorySetting } from './core-memory.js?v=d422379a2a38';
+import { isMemoryStep } from './memory-budget.js?v=d422379a2a38';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d422379a2a38';
+import { sanitizeHostMap } from './host-map.js?v=d422379a2a38';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=d422379a2a38';
+import { sanitizeLocation } from './runtime-permissions.js?v=d422379a2a38';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=d422379a2a38';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -21,6 +21,14 @@ export function sanitizeProxyUrl(value) {
   try { const url = new URL(value.trim().replace('{url}', 'TARGET')); const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname); if (url.protocol === 'https:' || (url.protocol === 'http:' && loopback)) return value.trim(); } catch { /* not a URL */ }
   return '';
 }
+/** What the "Proxy" field of Device says about a typed value (pure): { state: 'off' | 'on' | 'refused', text }. A refused value is not kept: without this
+ *  line the app would go on without a proxy and nothing on the page would say why. */
+export function proxyState(raw) {
+  const typed = String(raw ?? '').trim(); if (!typed) return { state: 'off', text: 'No proxy: the browser fetches each URL straight from the server (subject to CORS).' };
+  const kept = sanitizeProxyUrl(typed); let host = null; try { host = new URL(kept.replace('{url}', 'x')).host; } catch { host = null; }
+  if (kept && host) return { state: 'on', text: `Proxy on: the app's requests go through ${host}${kept.includes('{url}') ? '' : ' (the target URL is appended at the end)'}. In Network they show the PROXY badge.` };
+  return { state: 'refused', text: 'Proxy refused and turned off: use https://… (or http:// only on localhost / 127.0.0.1), for example https://relay.example.com/?url={url}.' };
+}
 // The engine a load uses when nothing names one: the WebAssembly core. `?engine=js` (the page) and `engine: 'js'` (the player) select the JavaScript VM;
 // scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
 export const DEFAULT_ENGINE = 'wasm';
@@ -36,12 +44,12 @@ export function sanitizeSettings(input = {}) {
   if (EVENT_SECONDS_STEPS.includes(Number(input.eventSeconds)) && input.eventSeconds !== null && input.eventSeconds !== '' && input.eventSeconds !== true) out.eventSeconds = Number(input.eventSeconds);   // src/time-limits.js; 0 = the defaults
   if (typeof input.darkTheme === 'boolean') out.darkTheme = input.darkTheme;
   if (typeof input.hour24 === 'boolean') out.hour24 = input.hour24;
-  out.location = sanitizeLocation(input.location);   // simulated device location ("Permissões" section): page-only, sent to the VM through the permission channel, never as part of the device model
-  out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 1, navigation: input.raster?.navigation === true, stillScale: [1, 0.9, 0.8].includes(Number(input.raster?.stillScale)) ? Number(input.raster.stillScale) : 1 };   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js MOTION_SCALE_STEPS)
-  out.renderer = sanitizeRendererSetting(input.renderer);   // "Renderização": 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live, never part of the device model the app sees
+  out.location = sanitizeLocation(input.location);   // simulated device location ("Permissions" section): page-only, sent to the VM through the permission channel, never as part of the device model
+  out.raster = { motionScale: [1, 0.75, 0.5, 0.35, 0.25].includes(Number(input.raster?.motionScale)) ? Number(input.raster.motionScale) : 1, navigation: input.raster?.navigation === true, stillScale: [1, 0.9, 0.8].includes(Number(input.raster?.stillScale)) ? Number(input.raster.stillScale) : 1 };   // "Resolution in motion" / "New screen in low resolution" (src/motion-raster.js MOTION_SCALE_STEPS)
+  out.renderer = sanitizeRendererSetting(input.renderer);   // "Rendering": 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live, never part of the device model the app sees
   out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
-  out.coreMemory = coreMemorySetting(input.coreMemory);   // "Memória do núcleo Wasm" { mode, heapMiB, metaMiB, threads } (src/core-memory.js): the mode (dynamic by default, or fixed) and the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
-  out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Mostrar limites de layout"); the VM never sees it
+  out.coreMemory = coreMemorySetting(input.coreMemory);   // "Wasm core memory" { mode, heapMiB, metaMiB, threads } (src/core-memory.js): the mode (dynamic by default, or fixed) and the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
+  out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Show layout bounds"); the VM never sees it
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }

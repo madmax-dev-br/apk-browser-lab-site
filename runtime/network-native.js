@@ -1,16 +1,16 @@
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { throwNew } from './java-throw.js?v=ca92aaad0948';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=ca92aaad0948';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=ca92aaad0948';
-import { Blocked } from './scheduler.js?v=ca92aaad0948';
-import { captureBody } from './network-capture.js?v=ca92aaad0948';
-import { OS_CONSTANTS } from './os-constants-data.js?v=ca92aaad0948';
-import { openExchange, describeFailure } from './network-transport.js?v=ca92aaad0948';
-import { WorkerExecutor } from './network-worker-executor.js?v=ca92aaad0948';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=ca92aaad0948';
-import { TransportAuthority } from './transport-ca.js?v=ca92aaad0948';
-import { openWebSocketSession } from './websocket-bridge.js?v=ca92aaad0948';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=ca92aaad0948';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { throwNew } from './java-throw.js?v=d422379a2a38';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=d422379a2a38';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=d422379a2a38';
+import { Blocked } from './scheduler.js?v=d422379a2a38';
+import { captureBody } from './network-capture.js?v=d422379a2a38';
+import { OS_CONSTANTS } from './os-constants-data.js?v=d422379a2a38';
+import { openExchange, describeFailure } from './network-transport.js?v=d422379a2a38';
+import { WorkerExecutor } from './network-worker-executor.js?v=d422379a2a38';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=d422379a2a38';
+import { TransportAuthority } from './transport-ca.js?v=d422379a2a38';
+import { openWebSocketSession } from './websocket-bridge.js?v=d422379a2a38';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=d422379a2a38';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -33,6 +33,8 @@ const C = OS_CONSTANTS, BOUNDARY = 'network-boundary';
 const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024;
 
 /** True for "a.b.c.d" and for IPv6 literals. */
+/** The host of the proxy a request goes through (Dispositivo › Proxy: a relay URL with {url}, or a prefix), for the network log; null without one. */
+const proxyHost = proxyUrl => { if (!proxyUrl) return null; try { return new URL(String(proxyUrl).replace('{url}', 'x')).host; } catch { return null; } };
 export const isIpLiteral = host => /^\d{1,3}(\.\d{1,3}){3}$/.test(host) || (host.includes(':') && /^[0-9a-f:.]+$/i.test(host));
 const loopbackHost = host => host === 'localhost' || /^127\.\d+\.\d+\.\d+$/.test(host) || host === '::1';
 
@@ -151,7 +153,7 @@ export class NetworkBridge {
     if (this.requestObserver) this.requestObserver(request, mock);   // a background render lists the requests made while it runs (src/render-variant.js)
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped }) ?? null;
+    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl) }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
     if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });

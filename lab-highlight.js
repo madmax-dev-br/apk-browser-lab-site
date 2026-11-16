@@ -2,7 +2,7 @@
 // (the same place as "Mostrar limites de layout"): the app never sees it and nothing is asked of the VM. Each highlight keeps its selector and is matched again against the
 // elements of every drawn frame, so the outline follows the component while it moves or scrolls, hides while it is not on screen and comes back with it.
 // Costs nothing without highlights: refresh() returns at once. No process.*.
-import { matchTargets } from './lab-target.js?v=ca92aaad0948';
+import { matchTargets } from './lab-target.js?v=d422379a2a38';
 
 export const HIGHLIGHT_LIMITS = Object.freeze({ perOwner: 32, boxes: 64, label: 60, minDurationMs: 100, maxDurationMs: 600000, maxWidth: 8, maxPadding: 32 });
 export const HIGHLIGHT_COLOR = '#ff3d7f';
@@ -59,7 +59,7 @@ export function createHighlightLayer({ doc = globalThis.document, root = () => n
   function drop(entry) { if (entry.timer !== null) clearTimer(entry.timer); entry.timer = null; for (const box of entry.boxes.splice(0)) box.remove(); entries.delete(keyOf(entry.owner, entry.id)); }
   function arm(entry) { if (entry.timer !== null) clearTimer(entry.timer); entry.timer = entry.style.durationMs ? setTimer(() => { entry.timer = null; drop(entry); }, entry.style.durationMs) : null; }
   const owned = owner => [...entries.values()].filter(entry => entry.owner === String(owner));
-  const find = (owner, id) => { const entry = entries.get(keyOf(String(owner), String(id ?? ''))); if (!entry) throw fail('not-found', 'Destaque removido ou desconhecido.'); return entry; };
+  const find = (owner, id) => { const entry = entries.get(keyOf(String(owner), String(id ?? ''))); if (!entry) throw fail('not-found', 'Highlight removed or unknown.'); return entry; };
   return {
     /**
      * Draws (or replaces, with the same id) a highlight. selector: a resolved selector (src/lab-target.js); list: the elements it was matched against now (they may carry
@@ -69,7 +69,7 @@ export function createHighlightLayer({ doc = globalThis.document, root = () => n
       owner = String(owner); id = id === null || id === undefined || id === '' ? null : String(id).slice(0, 80);
       let entry = id ? entries.get(keyOf(owner, id)) : null;
       if (!entry) {
-        if (owned(owner).length >= HIGHLIGHT_LIMITS.perOwner) throw fail('limit', `No máximo ${HIGHLIGHT_LIMITS.perOwner} destaques por plugin: remova algum (lab.highlights.clear()).`);
+        if (owned(owner).length >= HIGHLIGHT_LIMITS.perOwner) throw fail('limit', `At most ${HIGHLIGHT_LIMITS.perOwner} highlights per plugin: remove one (lab.highlights.clear()).`);
         while (!id || entries.has(keyOf(owner, id))) id = `h${++serial}`;
         entry = { owner, id, selector: null, keys: null, style: sanitizeHighlightStyle(options), boxes: [], matched: [], found: 0, timer: null }; entries.set(keyOf(owner, id), entry);
       } else entry.style = sanitizeHighlightStyle(options, entry.style);
@@ -98,7 +98,7 @@ export function createHighlightAction(layer) {
       case 'remove': return layer.remove(plugin.id, args.id);
       case 'clear': return layer.clear(plugin.id);
       case 'list': return layer.list(plugin.id);
-      default: throw fail('bad-args', `op desconhecida: ${String(args.op).slice(0, 20)}`);
+      default: throw fail('bad-args', `unknown op: ${String(args.op).slice(0, 20)}`);
     }
   };
 }

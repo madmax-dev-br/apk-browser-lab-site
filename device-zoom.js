@@ -15,9 +15,9 @@ export function writeZoom(value, storage = globalThis.localStorage) { try { if (
 /** The control. `deviceState.zoom` is what fitDevice reads; `refit()` applies it; `shownScale()` is the scale on screen now. */
 export function createDeviceZoom({ stage, deviceState, refit, shownScale, doc = globalThis.document }) {
   if (!stage || typeof doc?.createElement !== 'function' || typeof stage.parentElement?.insertBefore !== 'function') return { sync() {} };   // no full DOM (a test sandbox): no control
-  const box = doc.createElement('div'); box.className = 'stage-zoom'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Zoom do dispositivo');
+  const box = doc.createElement('div'); box.className = 'stage-zoom'; box.setAttribute('role', 'group'); box.setAttribute('aria-label', 'Device zoom');
   const button = (text, label) => { const b = doc.createElement('button'); b.type = 'button'; b.textContent = text; b.setAttribute('aria-label', label); b.title = label; box.append(b); return b; };
-  const out = button('−', 'Diminuir o dispositivo'), value = button('Ajustar', 'Ajustar ao espaço'), into = button('+', 'Aumentar o dispositivo');
+  const out = button('−', 'Shrink the device'), value = button('Fit', 'Fit to the space'), into = button('+', 'Enlarge the device');
   stage.parentElement?.insertBefore(box, stage);
   deviceState.zoom = readZoom();
   // Keeps the point at the centre of what is visible where it was when the zoom changes (the device grows or shrinks around what you were looking at).
@@ -45,7 +45,7 @@ export function createDeviceZoom({ stage, deviceState, refit, shownScale, doc = 
   value.addEventListener('click', () => apply(null));
   function sync() {
     const scale = shownScale(), fitted = deviceState.zoom === null || deviceState.zoom === undefined;
-    value.textContent = `${Math.round(scale * 100)}%`; value.title = fitted ? 'Ajustado ao espaço' : 'Voltar a ajustar ao espaço'; value.setAttribute('aria-pressed', String(fitted));
+    value.textContent = `${Math.round(scale * 100)}%`; value.title = fitted ? 'Fitted to the space' : 'Fit to the space again'; value.setAttribute('aria-pressed', String(fitted));
     out.disabled = scale <= ZOOM_STEPS[0] + 0.001; into.disabled = scale >= ZOOM_STEPS.at(-1) - 0.001;
     if (fitted) delete stage.dataset.zoomed; else stage.dataset.zoomed = 'true';
     box.style.top = `${stage.offsetTop + 12}px`;   // over the stage's top right corner, outside its scrolling content

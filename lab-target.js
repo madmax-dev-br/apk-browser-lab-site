@@ -17,9 +17,9 @@ const LAYOUT_KEY = /^[cv]:\d/;
  * Also the MCP spelling (element_key, test_tag, view_id, node_id, content_description). Throws bad-args.
  */
 export function targetSelector(raw) {
-  if (!given(raw)) throw fail('bad-args', 'Diga qual componente: um id (testTag, android:id ou chave de layoutBounds) ou { testTag }, { viewId }, { nodeId }, { key }, { text }, { contentDescription }, { name }, { role }.');
+  if (!given(raw)) throw fail('bad-args', 'Say which component: an id (testTag, android:id or layoutBounds key) or { testTag }, { viewId }, { nodeId }, { key }, { text }, { contentDescription }, { name }, { role }.');
   if (typeof raw === 'string' || typeof raw === 'number') return blank({ id: typeof raw === 'number' ? raw : text(raw) });
-  if (typeof raw !== 'object') throw fail('bad-args', 'O alvo é um id ou um objeto como { testTag: "…" }.');
+  if (typeof raw !== 'object') throw fail('bad-args', 'The target is an id or an object such as { testTag: "…" }.');
   const pick = (...names) => { for (const name of names) if (given(raw[name])) return raw[name]; return null; };
   const key = pick('key', 'element_key');
   if (key !== null && raw.bounds && typeof raw.bounds === 'object') return blank({ key: text(key) });   // an element of lab.layoutBounds() / lab.find(): the same element again
@@ -28,10 +28,10 @@ export function targetSelector(raw) {
   for (const name of ['key', 'testTag', 'text', 'contentDescription', 'name', 'role', 'kind']) if (out[name] !== null) out[name] = text(out[name]);
   if (out.id !== null && typeof out.id !== 'number') out.id = text(out.id);
   if (out.viewId !== null && typeof out.viewId !== 'number') out.viewId = text(out.viewId);
-  if (out.nodeId !== null) { const n = integer(out.nodeId); if (n === null) throw fail('bad-args', 'nodeId é o número do nó de semântica do Compose (o `id` de um elemento de lab.layoutBounds()).'); out.nodeId = n; }
-  if (out.kind !== null && out.kind !== 'compose' && out.kind !== 'view') throw fail('bad-args', "kind é 'compose' ou 'view'.");
-  if (out.index !== null) { const n = Number(out.index); if (!(Number.isInteger(n) && n >= 0)) throw fail('bad-args', 'index precisa ser um inteiro >= 0.'); out.index = n; }
-  if (!TARGET_KEYS.some(name => name !== 'kind' && out[name] !== null)) throw fail('bad-args', `O alvo precisa de ao menos um de: ${TARGET_KEYS.filter(name => name !== 'kind').join(', ')}.`);
+  if (out.nodeId !== null) { const n = integer(out.nodeId); if (n === null) throw fail('bad-args', 'nodeId is the number of the Compose semantics node (the `id` of an element of lab.layoutBounds()).'); out.nodeId = n; }
+  if (out.kind !== null && out.kind !== 'compose' && out.kind !== 'view') throw fail('bad-args', "kind is 'compose' or 'view'.");
+  if (out.index !== null) { const n = Number(out.index); if (!(Number.isInteger(n) && n >= 0)) throw fail('bad-args', 'index must be an integer >= 0.'); out.index = n; }
+  if (!TARGET_KEYS.some(name => name !== 'kind' && out[name] !== null)) throw fail('bad-args', `The target needs at least one of: ${TARGET_KEYS.filter(name => name !== 'kind').join(', ')}.`);
   return out;
 }
 const blank = values => ({ id: null, key: null, testTag: null, viewId: null, nodeId: null, text: null, contentDescription: null, name: null, role: null, kind: null, index: null, ...values });
@@ -91,19 +91,19 @@ export const chooseTarget = (matches, selector) => matches[selector?.index ?? 0]
 export function describeSelector(selector) {
   const parts = [];
   if (selector.id !== null) parts.push(`id ${JSON.stringify(selector.id)}`);
-  if (selector.key !== null) parts.push(`a chave ${selector.key}`);
+  if (selector.key !== null) parts.push(`key ${selector.key}`);
   if (selector.testTag !== null) parts.push(`testTag "${selector.testTag}"`);
   if (selector.viewId !== null) parts.push(`android:id ${selector.viewId}`);
-  if (selector.nodeId !== null) parts.push(`nó ${selector.nodeId}`);
-  if (selector.text !== null) parts.push(`texto "${selector.text}"`);
+  if (selector.nodeId !== null) parts.push(`node ${selector.nodeId}`);
+  if (selector.text !== null) parts.push(`text "${selector.text}"`);
   if (selector.contentDescription !== null) parts.push(`contentDescription "${selector.contentDescription}"`);
-  if (selector.name !== null) parts.push(`nome ${selector.name}`);
-  if (selector.role !== null) parts.push(`papel ${selector.role}`);
+  if (selector.name !== null) parts.push(`name ${selector.name}`);
+  if (selector.role !== null) parts.push(`role ${selector.role}`);
   if (selector.kind !== null) parts.push(selector.kind === 'view' ? 'View' : 'Compose');
   return parts.join(', ').slice(0, 240);
 }
 /** The not-found error for a selector (says when the APK has no such resource id). */
 export function targetNotFound(selector) {
-  const unknown = selector.unknownViewId ? ` O APK não tem o id de recurso ${String(selector.unknownViewId).slice(0, 80)}.` : '';
-  return fail('not-found', `Nenhum componente na tela com ${describeSelector(selector)}.${unknown} Veja lab.layoutBounds() para os ids e chaves atuais.`);
+  const unknown = selector.unknownViewId ? ` The APK has no resource id ${String(selector.unknownViewId).slice(0, 80)}.` : '';
+  return fail('not-found', `No component on the screen with ${describeSelector(selector)}.${unknown} See lab.layoutBounds() for the current ids and keys.`);
 }

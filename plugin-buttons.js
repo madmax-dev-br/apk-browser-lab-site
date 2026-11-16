@@ -33,7 +33,7 @@ export function sanitizeButtonConfig(raw = {}, previous = null) {
     disabled: has('disabled') ? item.disabled === true : base.disabled,
     placement: has('placement') ? (BUTTON_PLACEMENTS.includes(item.placement) ? item.placement : 'plugin') : base.placement,
   };
-  if (!out.label && !out.icon) out.label = 'Botão';
+  if (!out.label && !out.icon) out.label = 'Button';
   return out;
 }
 /** The public view of a button (lab.buttons.list, the MCP plugins tool). */

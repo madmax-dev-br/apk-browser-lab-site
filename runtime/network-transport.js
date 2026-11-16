@@ -1,6 +1,6 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=ca92aaad0948';
+import { mapUrl } from './host-map.js?v=d422379a2a38';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -81,7 +81,7 @@ export function describeFailure(error, request, timedOut = false) {
   const url = redirect?.target ? new URL(redirect.target) : request?.url ? new URL(request.url) : null, port = url ? (url.port || (url.protocol === 'https:' ? '443' : '80')) : '0', host = url?.hostname ?? '';
   if (redirect && name === 'TypeError') {
     const from = (() => { try { const original = new URL(redirect.from); return `${original.hostname}:${original.port || (original.protocol === 'https:' ? '443' : '80')}`; } catch { return redirect.from; } })();
-    const why = redirect.reachable === true ? `the server at ${url.origin} answered, but not with CORS for this page: it must send Access-Control-Allow-Origin (and answer the OPTIONS preflight), or run the CORS relay with --allow-private and set it as the Proxy`
+    const why = redirect.reachable === true ? `the server at ${url.origin} answered, but not with CORS for this page: it must send Access-Control-Allow-Origin (and answer the OPTIONS preflight), or set the CORS relay as the Proxy (it reaches this machine and the local network too)`
       : redirect.reachable === false ? `nothing answered at ${url.origin}: check that the server is running there and speaks ${url.protocol === 'https:' ? 'HTTPS' : 'plain HTTP'}`
       : 'the browser reports unreachable hosts, CORS rejections and blocked requests identically ("Failed to fetch")';
     return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}) (host redirect of ${from}): ${why}` };
@@ -95,7 +95,7 @@ export function describeFailure(error, request, timedOut = false) {
   if (/^(CERT_|DEPTH_ZERO|SELF_SIGNED|UNABLE_TO_|ERR_TLS|ERR_SSL|ERR_CERT|HANDSHAKE)/.test(code) || /certificate|tls|ssl/i.test(message)) return { type: 'Ljavax/net/ssl/SSLHandshakeException;', message: `Chain validation failed: ${message}` };
   if (code === 'UND_ERR_ABORTED' || code === 'ERR_STREAM_PREMATURE_CLOSE') return { type: 'Ljava/io/IOException;', message: 'unexpected end of stream' };
   if (code === 'APKWEB_OPAQUE_REDIRECT') return { type: 'Ljava/io/IOException;', message };
-  if (code === 'APKWEB_RELAY_PRIVATE') return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}) from /:: (port 0): the CORS relay refused the target (${message})` };
+  if (code === 'APKWEB_RELAY_PRIVATE') return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}) from /:: (port 0): the CORS relay refused the target (${message})` };   // only relays from before 2026-11-16 refuse private destinations; the code stays mapped for them
   if (name === 'TypeError' && /fetch/i.test(message)) return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}): the browser reports unreachable hosts, CORS rejections and blocked requests identically ("${message}")` };
   return { type: 'Ljava/io/IOException;', message: `${name || 'Error'}: ${message}` };
 }

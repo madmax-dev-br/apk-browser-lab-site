@@ -34,10 +34,10 @@ function messageOf(r, error) {
 
 export function createAppStorage(runtime) {
   const r = runtime, platform = r.platform;
-  const pkg = () => platform.packageName ?? fail('Nenhum app carregado');
+  const pkg = () => platform.packageName ?? fail('No app loaded');
   const fs = () => platform.javaIo.fs();
   const dataDir = () => `/data/user/0/${pkg()}`;
-  const app = () => platform.application ?? fail('O app ainda não foi iniciado: abra o app para ver os dados dele');
+  const app = () => platform.application ?? fail('The app has not started yet: open the app to see its data');
   const guarded = fn => { try { return fn(); } catch (error) { if (error?.kind === 'app-data') throw error; fail(messageOf(r, error)); } };
 
   // ---- SharedPreferences
@@ -46,7 +46,7 @@ export function createAppStorage(runtime) {
   const entryOut = (key, entry) => ({ key, type: CODES[entry.t], value: entry.t === 'j' ? String(entry.v) : entry.t === 'set' ? [...entry.v] : entry.v });
   function readPrefs(name) {
     const ref = prefsOf(name), state = r.object(ref).prefs;   // the SharedPreferencesImpl of src/app-services-host.js: its in-memory map is what getAll() answers
-    if (!state) fail(`SharedPreferences ${name}: implementação inesperada`);
+    if (!state) fail(`SharedPreferences ${name}: unexpected implementation`);
     return [...state.map].map(([key, entry]) => entryOut(key, entry)).sort((a, b) => a.key.localeCompare(b.key));
   }
   function javaSet(values) {
@@ -57,23 +57,23 @@ export function createAppStorage(runtime) {
   /** The value of `type` for the Editor's putX: checked and converted like the page typed it. */
   function prefValue(type, value) {
     if (type === 'string') return String(value ?? '');
-    if (type === 'boolean') { if (value === true || value === 'true') return 1; if (value === false || value === 'false') return 0; fail('Um boolean é true ou false'); }
-    if (type === 'int') { const n = Number(value); if (!Number.isInteger(n) || n < -2147483648 || n > 2147483647) fail('Um int é um inteiro de 32 bits'); return n; }
-    if (type === 'long') { let n; try { n = BigInt(String(value).trim()); } catch { fail('Um long é um inteiro de 64 bits'); } if (n < -(2n ** 63n) || n >= 2n ** 63n) fail('Um long é um inteiro de 64 bits'); return n; }
-    if (type === 'float') { const n = Number(value); if (!Number.isFinite(n) && !['NaN', 'Infinity', '-Infinity'].includes(String(value))) fail('Um float é um número'); const bits = new DataView(new ArrayBuffer(4)); bits.setFloat32(0, n); return bits.getInt32(0); }
+    if (type === 'boolean') { if (value === true || value === 'true') return 1; if (value === false || value === 'false') return 0; fail('A boolean is true or false'); }
+    if (type === 'int') { const n = Number(value); if (!Number.isInteger(n) || n < -2147483648 || n > 2147483647) fail('An int is a 32-bit integer'); return n; }
+    if (type === 'long') { let n; try { n = BigInt(String(value).trim()); } catch { fail('A long is a 64-bit integer'); } if (n < -(2n ** 63n) || n >= 2n ** 63n) fail('A long is a 64-bit integer'); return n; }
+    if (type === 'float') { const n = Number(value); if (!Number.isFinite(n) && !['NaN', 'Infinity', '-Infinity'].includes(String(value))) fail('A float is a number'); const bits = new DataView(new ArrayBuffer(4)); bits.setFloat32(0, n); return bits.getInt32(0); }
     if (type === 'set') { const list = Array.isArray(value) ? value : String(value ?? '').split('\n').filter(line => line !== ''); return javaSet(list.map(String)); }
-    fail(`Tipo de preferência desconhecido: ${type} (use ${PREF_TYPES.join(', ')})`);
+    fail(`Unknown preference type: ${type} (use ${PREF_TYPES.join(', ')})`);
   }
   const PUT = { string: ['putString', STRING], int: ['putInt', 'I'], long: ['putLong', 'J'], float: ['putFloat', 'F'], boolean: ['putBoolean', 'Z'], set: ['putStringSet', 'Ljava/util/Set;'] };
   /** One Editor, the changes in order, commit(): { committed }. changes: [{ key, type, value } | { key, remove: true }] or { clear: true }. */
   function editPrefs(name, changes) {
-    if (!/^[^/\0]{1,200}$/.test(String(name))) fail('Nome de SharedPreferences inválido');
+    if (!/^[^/\0]{1,200}$/.test(String(name))) fail('Invalid SharedPreferences name');
     const editor = call(r, prefsOf(name), PREFS, 'edit', [], EDITOR);
     for (const change of changes) {
       if (change.clear) { call(r, editor, EDITOR, 'clear', [], EDITOR); continue; }
-      const key = String(change.key ?? ''); if (!key) fail('A chave não pode ser vazia');
+      const key = String(change.key ?? ''); if (!key) fail('The key cannot be empty');
       if (change.remove) { call(r, editor, EDITOR, 'remove', [STRING], EDITOR, [key]); continue; }
-      const [method, kind] = PUT[change.type] ?? fail(`Tipo de preferência desconhecido: ${change.type} (use ${PREF_TYPES.join(', ')})`);
+      const [method, kind] = PUT[change.type] ?? fail(`Unknown preference type: ${change.type} (use ${PREF_TYPES.join(', ')})`);
       call(r, editor, EDITOR, method, [STRING, kind], EDITOR, [key, prefValue(change.type, change.value)]);
     }
     return { committed: !!call(r, editor, EDITOR, 'commit', [], 'Z') };
@@ -82,7 +82,7 @@ export function createAppStorage(runtime) {
   // ---- SQLite
   const DB_SUFFIXES = ['-journal', '-wal', '-shm', '-mj'];
   const dbNames = () => (fs().list(`${dataDir()}/databases`) ?? []).filter(name => !DB_SUFFIXES.some(suffix => name.endsWith(suffix)) && fs().stat(`${dataDir()}/databases/${name}`)?.type !== 'dir').sort();
-  const dbPath = name => { if (!dbNames().includes(String(name))) fail(`Banco ${name} não existe em databases/ (há: ${dbNames().join(', ') || 'nenhum'})`); return `${dataDir()}/databases/${name}`; };
+  const dbPath = name => { if (!dbNames().includes(String(name))) fail(`Database ${name} does not exist in databases/ (available: ${dbNames().join(', ') || 'none'})`); return `${dataDir()}/databases/${name}`; };
   function withDb(name, readOnly, use) {
     const db = callStatic(r, DB, 'openDatabase', [STRING, FACTORY, 'I'], DB, [dbPath(name), null, readOnly ? OPEN_READONLY : OPEN_READWRITE]);
     try { return use(db); } finally { try { call(r, db, DB, 'close', [], 'V'); } catch { /* already closed */ } }
@@ -101,7 +101,7 @@ export function createAppStorage(runtime) {
     if (typeof value === 'boolean') return call(r, compiled, PROGRAM, 'bindLong', ['I', 'J'], 'V', [index, value ? 1n : 0n]);
     if (typeof value === 'bigint' || (typeof value === 'object' && value.long !== undefined)) return call(r, compiled, PROGRAM, 'bindLong', ['I', 'J'], 'V', [index, BigInt.asIntN(64, BigInt(typeof value === 'bigint' ? value : value.long))]);
     if (typeof value === 'number') return Number.isInteger(value) ? call(r, compiled, PROGRAM, 'bindLong', ['I', 'J'], 'V', [index, BigInt(value)]) : call(r, compiled, PROGRAM, 'bindDouble', ['I', 'D'], 'V', [index, (() => { const v = new DataView(new ArrayBuffer(8)); v.setFloat64(0, value); return v.getBigInt64(0); })()]);
-    if (typeof value === 'object' && typeof value.hex === 'string') { const hex = value.hex.replace(/\s+/g, ''); if (!/^([0-9a-f]{2})*$/i.test(hex)) fail('Um blob é escrito em hexadecimal'); const bytes = r.newArray('[B', hex.length / 2); r.array(bytes).elements = Array.from({ length: hex.length / 2 }, (_, k) => (parseInt(hex.slice(2 * k, 2 * k + 2), 16) << 24) >> 24); return call(r, compiled, PROGRAM, 'bindBlob', ['I', '[B'], 'V', [index, bytes]); }
+    if (typeof value === 'object' && typeof value.hex === 'string') { const hex = value.hex.replace(/\s+/g, ''); if (!/^([0-9a-f]{2})*$/i.test(hex)) fail('A blob is written in hexadecimal'); const bytes = r.newArray('[B', hex.length / 2); r.array(bytes).elements = Array.from({ length: hex.length / 2 }, (_, k) => (parseInt(hex.slice(2 * k, 2 * k + 2), 16) << 24) >> 24); return call(r, compiled, PROGRAM, 'bindBlob', ['I', '[B'], 'V', [index, bytes]); }
     return call(r, compiled, PROGRAM, 'bindString', ['I', STRING], 'V', [index, String(value)]);
   }
   function objectArray(values) { const array = r.newArray(`[${OBJECT}`, values.length); r.array(array).elements = values.map(boxed); return array; }
@@ -126,7 +126,7 @@ export function createAppStorage(runtime) {
   const READS = /^\s*(select|pragma|with|explain|values)\b/i;
   /** One SQL statement with `?` parameters: rows for a query (at most `limit`), the changed row count otherwise. */
   function runSql(name, sql, params = [], { limit = 200 } = {}) {
-    const statement = String(sql ?? '').trim(); if (!statement) fail('Escreva um comando SQL');
+    const statement = String(sql ?? '').trim(); if (!statement) fail('Write an SQL statement');
     limit = Math.max(1, Math.min(MAX_ROWS, Number(limit) || 200));
     return withDb(name, false, db => {
       if (READS.test(statement)) return { kind: 'rows', ...readCursor(call(r, db, DB, 'rawQuery', [STRING, `[${STRING}`], CURSOR, [statement, stringArray(params)]), limit) };
@@ -154,23 +154,23 @@ export function createAppStorage(runtime) {
   }
   /** A page of a table: rowid (when it has one) and every column. */
   function tableRows(name, table, { offset = 0, limit = 100 } = {}) {
-    const info = describeDb(name).find(t => t.name === table) ?? fail(`Tabela ${table} não existe em ${name}`);
+    const info = describeDb(name).find(t => t.name === table) ?? fail(`Table ${table} does not exist in ${name}`);
     const select = `SELECT ${info.rowid ? 'rowid AS "rowid", ' : ''}* FROM ${quote(table)} LIMIT ${Math.max(1, Math.min(MAX_ROWS, Number(limit) || 100))} OFFSET ${Math.max(0, Number(offset) || 0)}`;
     return { table: info, ...runSql(name, select, [], { limit }) };
   }
   /** One cell, one row added or one row removed, by rowid (or by primary key for a WITHOUT ROWID table): parameters, never values pasted into the SQL. */
   function editRow(name, table, { rowid = null, key = null, set = null, insert = null, remove = false }) {
-    const info = describeDb(name).find(t => t.name === table && t.type === 'table') ?? fail(`Tabela ${table} não existe em ${name}`);
-    const columns = new Set(info.columns.map(c => c.name)), checkColumns = object => { for (const column of Object.keys(object)) if (!columns.has(column)) fail(`A tabela ${table} não tem a coluna ${column}`); };
+    const info = describeDb(name).find(t => t.name === table && t.type === 'table') ?? fail(`Table ${table} does not exist in ${name}`);
+    const columns = new Set(info.columns.map(c => c.name)), checkColumns = object => { for (const column of Object.keys(object)) if (!columns.has(column)) fail(`Table ${table} has no column ${column}`); };
     const where = () => {
       if (info.rowid && rowid !== null && rowid !== undefined) return [' WHERE rowid = ?', [typeof rowid === 'object' ? BigInt(rowid.long) : rowid]];
-      const keys = info.columns.filter(c => c.primaryKey); if (!keys.length || !key) fail('Diga qual linha: rowid, ou a chave primária em key');
+      const keys = info.columns.filter(c => c.primaryKey); if (!keys.length || !key) fail('Say which row: rowid, or the primary key in key');
       checkColumns(key); return [` WHERE ${keys.map(c => `${quote(c.name)} = ?`).join(' AND ')}`, keys.map(c => key[c.name])];
     };
     if (insert) { checkColumns(insert); const names = Object.keys(insert); return runSql(name, names.length ? `INSERT INTO ${quote(table)} (${names.map(quote).join(', ')}) VALUES (${names.map(() => '?').join(', ')})` : `INSERT INTO ${quote(table)} DEFAULT VALUES`, names.map(n => insert[n])); }
     if (remove) { const [clause, args] = where(); return runSql(name, `DELETE FROM ${quote(table)}${clause}`, args); }
-    if (set) { checkColumns(set); const names = Object.keys(set); if (!names.length) fail('Nada para mudar'); const [clause, args] = where(); return runSql(name, `UPDATE ${quote(table)} SET ${names.map(n => `${quote(n)} = ?`).join(', ')}${clause}`, [...names.map(n => set[n]), ...args]); }
-    fail('Diga o que fazer: set, insert ou remove');
+    if (set) { checkColumns(set); const names = Object.keys(set); if (!names.length) fail('Nothing to change'); const [clause, args] = where(); return runSql(name, `UPDATE ${quote(table)} SET ${names.map(n => `${quote(n)} = ?`).join(', ')}${clause}`, [...names.map(n => set[n]), ...args]); }
+    fail('Say what to do: set, insert or remove');
   }
 
   return {

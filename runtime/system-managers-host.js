@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=ca92aaad0948';
-import { gcRoot } from './heap-gc.js?v=ca92aaad0948';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=ca92aaad0948';
+import { floatBits } from './host-contract.js?v=d422379a2a38';
+import { gcRoot } from './heap-gc.js?v=d422379a2a38';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=d422379a2a38';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -479,11 +479,17 @@ export function createSystemManagersHost(platform) {
     const wanted = r.array(ids).elements; if (wanted.some(id => id !== uid())) enforce(r, 'android.permission.BATTERY_STATS');
     return array(r, HEALTH_STATS, wanted.map(() => snapshot(r)));
   });
-  def(HEALTH_STATS, 'getDataType', '()I', () => 1);
-  def(HEALTH_STATS, 'getStatsKeyCount', '()I', () => 0);
-  for (const name of ['hasMeasurement', 'hasMeasurements', 'hasTimer', 'hasTimers', 'hasStats', 'hasKey']) def(HEALTH_STATS, name, '(I)Z', () => 0);
-  for (const [name, count] of [['getMeasurementKeyCount', 0], ['getTimerKeyCount', 0], ['getStatsKeyCount', 0]]) def(HEALTH_STATS, name, '()I', () => count);
-  def(HEALTH_STATS, 'getMeasurement', '(I)J', (r, _m, [, key]) => r.throwJava('Ljava/lang/IndexOutOfBoundsException;', `Bad key: ${key}`));
+  // The snapshot records no measurement, so every key family is empty and each accessor behaves as android.os.health.HealthStats (AOSP android-13.0.0_r1) does for an
+  // absent key: has* false, *KeyCount 0, get* by key throws IndexOutOfBoundsException "Bad <kind> key dataType=<type> key=<key>", *KeyAt indexes an empty array.
+  // The data type is HealthKeys.Constants' clazz.getSimpleName() of the uid snapshot's constants.
+  const HEALTH_DATA_TYPE = 'UidHealthStats';
+  def(HEALTH_STATS, 'getDataType', '()Ljava/lang/String;', r => r.javaString(HEALTH_DATA_TYPE));
+  for (const name of ['hasMeasurement', 'hasMeasurements', 'hasTimer', 'hasTimers', 'hasStats']) def(HEALTH_STATS, name, '(I)Z', () => 0);
+  for (const name of ['getMeasurementKeyCount', 'getTimerKeyCount', 'getStatsKeyCount', 'getTimersKeyCount', 'getMeasurementsKeyCount']) def(HEALTH_STATS, name, '()I', () => 0);
+  for (const name of ['getMeasurementKeyAt', 'getTimerKeyAt', 'getStatsKeyAt', 'getTimersKeyAt', 'getMeasurementsKeyAt']) def(HEALTH_STATS, name, '(I)I', (r, _m, [, index]) => r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=0; index=${index}`));
+  const badKey = (kind, key) => r => r.throwJava('Ljava/lang/IndexOutOfBoundsException;', `Bad ${kind} key dataType=${HEALTH_DATA_TYPE} key=${key}`);
+  for (const [name, signature, kind] of [['getMeasurement', '(I)J', 'measurement'], ['getTimer', '(I)Landroid/os/health/TimerStat;', 'timer'], ['getTimerCount', '(I)I', 'timer'], ['getTimerTime', '(I)J', 'timer'],
+    ['getStats', '(I)Ljava/util/Map;', 'stats'], ['getTimers', '(I)Ljava/util/Map;', 'timers'], ['getMeasurements', '(I)Ljava/util/Map;', 'measurements']]) def(HEALTH_STATS, name, signature, (r, _m, [, key]) => badKey(kind, key)(r));
 
   // ---- StatusBarManager: the panel can only be opened by holders of EXPAND_STATUS_BAR, and the lab has no shade to expand
   const STATUS_BAR = service('statusbar', 'Landroid/app/StatusBarManager;');

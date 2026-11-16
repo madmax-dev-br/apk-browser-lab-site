@@ -4,7 +4,7 @@
 //   contains : substrings of exported/imported symbol names (C++ mangled namespaces)
 //   banners  : ASCII strings a build of that project embeds
 // A library that only IMPORTS a project's symbols is reported as "usa", not as "parece".
-import { inspectELF } from './native-inspector.js?v=ca92aaad0948';
+import { inspectELF } from './native-inspector.js?v=d422379a2a38';
 export const LIBRARY_HINTS = [
   { id: 'mcrypt', label: 'libmcrypt', provides: ['mcrypt_', 'mdecrypt_'], banners: ['libmcrypt'] },
   { id: 'sqlite', label: 'SQLite', provides: ['sqlite3_'], banners: ['SQLite format 3', 'SQLite version '] },
@@ -79,7 +79,7 @@ const ELF_ANALYSIS_LIMIT = 32 * 1024 * 1024;
  */
 export function describeNativeLibrary(bytes) {
   const out = { size: bytes.length };
-  if (bytes.length > ELF_ANALYSIS_LIMIT) return { ...out, error: 'grande demais para análise' };
+  if (bytes.length > ELF_ANALYSIS_LIMIT) return { ...out, error: 'too large to analyze' };
   let elf;
   try { elf = inspectELF(bytes, { maxNames: 4000, maxSymbols: 20000 }); }
   catch (error) { return { ...out, error: String(error.message ?? error).replace(/^ELF inspection: /, '').slice(0, 80) }; }

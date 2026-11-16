@@ -5,8 +5,8 @@
 // parameter type. A Java exception the method throws is answered as { exception } (the snapshot after the call still goes to the page). Framework classes the lab implements
 // itself (android.app.Activity, java.lang.Integer, android.widget.TextView, ...) have no DEX to read: they are not listed, and a call of one of their methods names it by its
 // JVM signature, which the runtime then dispatches like any call site of the app would. No process.*.
-import { PluginQueryError, parseHandle, handleOf, typeName, dotted, createHeapReader, classDescriptor } from './plugin-queries.js?v=ca92aaad0948';
-import { parseSignature, floatBits, doubleBits } from './host-contract.js?v=ca92aaad0948';
+import { PluginQueryError, parseHandle, handleOf, typeName, dotted, createHeapReader, classDescriptor } from './plugin-queries.js?v=d422379a2a38';
+import { parseSignature, floatBits, doubleBits } from './host-contract.js?v=d422379a2a38';
 
 export const INVOKE_LIMITS = Object.freeze({ methods: 200, maxMethods: 2000, args: 32, string: 100_000 });
 const ACC = { PUBLIC: 0x1, PRIVATE: 0x2, PROTECTED: 0x4, STATIC: 0x8, BRIDGE: 0x40, ABSTRACT: 0x400, SYNTHETIC: 0x1000, CONSTRUCTOR: 0x10000 };
@@ -20,7 +20,7 @@ const isBoot = (runtime, type) => { try { return !!runtime.dex?.bootClasses?.has
 /** The object a handle names: { ref, type }. */
 function receiverOf(runtime, handle) {
   const id = parseHandle(runtime, handle), rec = runtime.heap?.get?.(id);
-  if (!rec) throw fail('collected', `objeto coletado: ${handle} foi liberado pelo coletor de lixo da VM (o app não o referencia mais)`);
+  if (!rec) throw fail('collected', `object collected: ${handle} was freed by the VM garbage collector (the app no longer references it)`);
   return { ref: { ref: rec.id ?? id }, type: rec.type };
 }
 /** The classes from `type` up its superclasses: [{ type, cls }] (classes the DEX of the app or of the framework define); `out.hosted`: the first one the lab implements itself. */
@@ -43,17 +43,17 @@ function describeMethod(entry, declaredIn) {
 const matcher = match => {
   if (match === undefined || match === null || match === '') return () => true;
   const text = String(match).slice(0, 200), regex = /^\/(.+)\/([a-z]*)$/.exec(text);
-  if (regex) { let re; try { re = new RegExp(regex[1], regex[2].replace(/[^imsu]/g, '')); } catch { throw fail('bad-args', `Expressão regular inválida: ${text}`); } return name => re.test(name); }
+  if (regex) { let re; try { re = new RegExp(regex[1], regex[2].replace(/[^imsu]/g, '')); } catch { throw fail('bad-args', `Invalid regular expression: ${text}`); } return name => re.test(name); }
   const lower = text.toLowerCase(); return name => name.toLowerCase().includes(lower);
 };
 /** Where a listing or a call starts: a live object (handle) or a class (className; one the lab implements itself only for a call by signature). -> { type, receiver | null }. */
 function startOf(runtime, { handle, className, signature = null }, { call = false } = {}) {
   if (className !== undefined && className !== null && className !== '') {
     const type = classDescriptor(className);
-    if (!classOf(runtime, type) && !(call && signature)) throw fail('no-class', `Classe não encontrada nos DEX: ${dotted(type)}${call ? ' (uma classe do framework que o lab implementa é chamada com { signature })' : ''}`);
+    if (!classOf(runtime, type) && !(call && signature)) throw fail('no-class', `Class not found in the DEX files: ${dotted(type)}${call ? ' (a framework class that the lab implements is called with { signature })' : ''}`);
     return { type, receiver: null };
   }
-  if (!handle) throw fail('bad-args', 'Passe um handle (de lab.viewModels(), lab.instances(), ...) ou { static: "pacote.Classe" }.');
+  if (!handle) throw fail('bad-args', 'Pass a handle (from lab.viewModels(), lab.instances(), ...) or { static: "package.Class" }.');
   const receiver = receiverOf(runtime, handle); return { type: receiver.type, receiver };
 }
 
@@ -63,7 +63,7 @@ function startOf(runtime, { handle, className, signature = null }, { call = fals
  * synthetic (compiler-made methods, off by default), limit.
  */
 export function listMethods(runtime, args = {}) {
-  if (!runtime) throw fail('no-apk', 'Nenhum APK em execução.');
+  if (!runtime) throw fail('no-apk', 'No APK is running.');
   const { type } = startOf(runtime, args), named = matcher(args.match), limit = Math.max(1, Math.min(INVOKE_LIMITS.maxMethods, Math.floor(Number(args.limit) || INVOKE_LIMITS.methods)));
   const seen = new Set(), methods = []; let more = 0;
   const classes = chain(runtime, type, { inherited: args.inherited === false ? false : true });
@@ -97,20 +97,20 @@ function resolveMethod(runtime, type, name, signature, count, receiver) {
     if (found) return found;
     // a method of a class the lab implements itself (the receiver's superclass, or a framework class with no DEX): dispatched by its signature, as an app call site would
     if (classes.hosted && !candidates.length && SIGNATURE.test(wanted)) { const { parameters, result } = parseSignature(wanted); return { entry: { method: { owner: type, name, parameters, result }, flags: receiver ? 0 : ACC.STATIC, code: null }, owner: type, sig: wanted, hosted: true }; }
-    if (!SIGNATURE.test(wanted)) throw fail('bad-args', `Assinatura JVM inválida: ${wanted.slice(0, 120)} (exemplo: (ILjava/lang/String;)V)`);
-    throw fail('no-method', `${label} não tem a assinatura ${wanted}${candidates.length ? `; há: ${candidates.map(item => item.sig).join(', ')}` : ''}`);
+    if (!SIGNATURE.test(wanted)) throw fail('bad-args', `Invalid JVM signature: ${wanted.slice(0, 120)} (example: (ILjava/lang/String;)V)`);
+    throw fail('no-method', `${label} does not have the signature ${wanted}${candidates.length ? `; available: ${candidates.map(item => item.sig).join(', ')}` : ''}`);
   }
-  if (!candidates.length) throw fail('no-method', `Método não encontrado: ${label} (use lab.methods para ver os que existem${classes.hosted ? `; um método de ${dotted(classes.hosted)}, que o lab implementa, é chamado com { signature }` : ''}).`);
+  if (!candidates.length) throw fail('no-method', `Method not found: ${label} (use lab.methods to see which exist${classes.hosted ? `; a method of ${dotted(classes.hosted)}, which the lab implements, is called with { signature }` : ''}).`);
   const byCount = candidates.filter(item => item.entry.method.parameters.length === count);
   if (byCount.length === 1) return byCount[0];
-  if (!byCount.length) throw fail('bad-args', `${label} espera ${[...new Set(candidates.map(item => item.entry.method.parameters.length))].join(' ou ')} argumento(s), não ${count}: ${candidates.map(item => item.sig).join(', ')}`);
-  throw fail('ambiguous', `${label} tem ${byCount.length} versões com ${count} argumento(s): passe { signature } (${byCount.map(item => item.sig).join(', ')}).`);
+  if (!byCount.length) throw fail('bad-args', `${label} expects ${[...new Set(candidates.map(item => item.entry.method.parameters.length))].join(' or ')} argument(s), not ${count}: ${candidates.map(item => item.sig).join(', ')}`);
+  throw fail('ambiguous', `${label} has ${byCount.length} versions with ${count} argument(s): pass { signature } (${byCount.map(item => item.sig).join(', ')}).`);
 }
 
 /** One JSON argument as the VM value of a parameter `type`. */
 function argument(runtime, type, value, index) {
   const where = `argumento ${index + 1} (${typeName(type)})`, bad = what => fail('bad-args', `${where}: ${what}`);
-  const integer = (min, max) => { const n = typeof value === 'boolean' ? Number(value) : Number(value); if (!Number.isInteger(n) || n < min || n > max) throw bad(`esperado um inteiro entre ${min} e ${max}`); return n; };
+  const integer = (min, max) => { const n = typeof value === 'boolean' ? Number(value) : Number(value); if (!Number.isInteger(n) || n < min || n > max) throw bad(`expected an integer between ${min} and ${max}`); return n; };
   switch (type) {
     case 'Z': if (typeof value !== 'boolean' && value !== 0 && value !== 1) throw bad('esperado true ou false'); return value ? 1 : 0;
     case 'B': return integer(-128, 127);
@@ -119,22 +119,22 @@ function argument(runtime, type, value, index) {
     case 'C': if (typeof value === 'string' && value.length === 1) return value.charCodeAt(0); return integer(0, 65535);
     case 'J': {
       const raw = value && typeof value === 'object' && value.long !== undefined ? value.long : value;
-      if (typeof raw === 'number' && !Number.isSafeInteger(raw)) throw bad('um long além de 2^53 vai como texto ou { long: "…" }');
-      try { const big = BigInt(raw); if (big < -(2n ** 63n) || big >= 2n ** 63n) throw new RangeError(); return big; } catch { throw bad('esperado um inteiro (long)'); }
+      if (typeof raw === 'number' && !Number.isSafeInteger(raw)) throw bad('a long beyond 2^53 goes as text or { long: "…" }');
+      try { const big = BigInt(raw); if (big < -(2n ** 63n) || big >= 2n ** 63n) throw new RangeError(); return big; } catch { throw bad('expected an integer (long)'); }
     }
-    case 'F': if (typeof value !== 'number') throw bad('esperado um número'); return floatBits(value);
-    case 'D': if (typeof value !== 'number') throw bad('esperado um número'); return doubleBits(value);
+    case 'F': if (typeof value !== 'number') throw bad('expected a number'); return floatBits(value);
+    case 'D': if (typeof value !== 'number') throw bad('expected a number'); return doubleBits(value);
   }
   if (value === null || value === undefined) return null;
   if (type === 'Ljava/lang/String;' || type === 'Ljava/lang/CharSequence;' || (type === 'Ljava/lang/Object;' && typeof value === 'string')) {
-    if (typeof value !== 'string') throw bad('esperado um texto'); if (value.length > INVOKE_LIMITS.string) throw bad(`texto com mais de ${INVOKE_LIMITS.string} caracteres`); return value;
+    if (typeof value !== 'string') throw bad('expected a string'); if (value.length > INVOKE_LIMITS.string) throw bad(`string longer than ${INVOKE_LIMITS.string} characters`); return value;
   }
   const box = BOXES[type] ?? (type === 'Ljava/lang/Object;' || type === 'Ljava/lang/Number;' ? (typeof value === 'boolean' ? 'Z' : typeof value === 'number' ? (Number.isInteger(value) && value >= -2147483648 && value <= 2147483647 ? 'I' : 'D') : null) : null);
   if (box && (typeof value === 'number' || typeof value === 'boolean' || (box === 'J' && typeof value === 'object' && value.long !== undefined) || (box === 'C' && typeof value === 'string'))) return runtime.boxPrimitive(box, argument(runtime, box, value, index));
   const handle = typeof value === 'string' ? value : value && typeof value === 'object' && typeof value.handle === 'string' ? value.handle : null;
-  if (!handle) throw bad(type.startsWith('[') ? 'arrays não são aceitos aqui' : 'esperado um handle (de lab.viewModels(), lab.instances(), lab.field(...).$handle) ou null');
+  if (!handle) throw bad(type.startsWith('[') ? 'arrays are not accepted here' : 'expected a handle (from lab.viewModels(), lab.instances(), lab.field(...).$handle) or null');
   const object = receiverOf(runtime, handle);
-  if (!runtime.isSubtype(object.type, type)) throw bad(`o objeto ${handle} é ${typeName(object.type)}`);
+  if (!runtime.isSubtype(object.type, type)) throw bad(`object ${handle} is a ${typeName(object.type)}`);
   return object.ref;
 }
 
@@ -143,15 +143,15 @@ function argument(runtime, type, value, index) {
  * { exception: { type, message, stack, cause }, method, ms } when the method threw. Runs on the VM's main thread (the caller is the Worker's operation, between events).
  */
 export function invokeAppMethod(runtime, args = {}, { now = () => performance.now() } = {}) {
-  if (!runtime) throw fail('no-apk', 'Nenhum APK em execução.');
-  const name = String(args.method ?? '').trim(); if (!name || name.length > 300) throw fail('bad-args', 'Passe o nome do método.');
-  if (name === '<init>' || name === '<clinit>') throw fail('bad-args', 'Construtores e inicializadores de classe não são chamados por aqui.');
-  const values = Array.isArray(args.args) ? args.args : []; if (values.length > INVOKE_LIMITS.args) throw fail('bad-args', `No máximo ${INVOKE_LIMITS.args} argumentos.`);
+  if (!runtime) throw fail('no-apk', 'No APK is running.');
+  const name = String(args.method ?? '').trim(); if (!name || name.length > 300) throw fail('bad-args', 'Pass the method name.');
+  if (name === '<init>' || name === '<clinit>') throw fail('bad-args', 'Constructors and class initializers cannot be called from here.');
+  const values = Array.isArray(args.args) ? args.args : []; if (values.length > INVOKE_LIMITS.args) throw fail('bad-args', `At most ${INVOKE_LIMITS.args} arguments.`);
   const start = startOf(runtime, args, { call: true }), { entry, owner } = resolveMethod(runtime, start.type, name, args.signature ?? null, values.length, start.receiver);
   const m = entry.method, isStatic = !!(entry.flags & ACC.STATIC), label = `${dotted(owner)}.${m.name}(${m.parameters.map(typeName).join(', ')})`;
-  if (!isStatic && !start.receiver) throw fail('bad-args', `${label} é de instância: passe o handle de um objeto, não a classe.`);
-  if (m.parameters.at(-1) === CONTINUATION) throw fail('unsupported', `${label} é uma função suspend do Kotlin: chame a função que a inicia (por exemplo a do ViewModel que faz o launch).`);
-  if (m.parameters.length !== values.length) throw fail('bad-args', `${label} espera ${m.parameters.length} argumento(s).`);
+  if (!isStatic && !start.receiver) throw fail('bad-args', `${label} is an instance method: pass the handle of an object, not the class.`);
+  if (m.parameters.at(-1) === CONTINUATION) throw fail('unsupported', `${label} is a Kotlin suspend function: call the function that starts it (for example the ViewModel one that does the launch).`);
+  if (m.parameters.length !== values.length) throw fail('bad-args', `${label} expects ${m.parameters.length} argument(s).`);
   const converted = m.parameters.map((type, index) => argument(runtime, type, values[index], index));
   const method = { owner, name: m.name, parameters: m.parameters, result: m.result, signature: `(${m.parameters.join('')})${m.result}` };
   const mode = isStatic ? 'static' : entry.flags & ACC.PRIVATE ? 'direct' : 'virtual';

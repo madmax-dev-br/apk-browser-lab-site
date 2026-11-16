@@ -29,10 +29,10 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=ca92aaad0948';
+import { Blocked } from '../../runtime/scheduler.js?v=d422379a2a38';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ca92aaad0948';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=ca92aaad0948';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d422379a2a38';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=d422379a2a38';
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
@@ -97,7 +97,7 @@ export class CoreThreads {
     if (t === undefined) {
       // One record per thread the layout was sized for (src/core-memory.js `threads`, at most the core's thread ids: threads.h THREAD_MAX_TID); past them the start fails by name.
       const limit = Math.min(MAX_LIVE_THREADS, this.records.guestCount);
-      if (this.nextGuest >= limit) throw new APKError(`vmcore: ${this.nextGuest} threads are alive or parked in the core; ${limit < MAX_LIVE_THREADS ? `it was sized for ${limit} (raise "threads" in Controles › Execução › Memória do núcleo Wasm, up to ${MAX_LIVE_THREADS})` : 'no thread id is left for another'}`, { kind: 'vmcore-threads' });
+      if (this.nextGuest >= limit) throw new APKError(`vmcore: ${this.nextGuest} threads are alive or parked in the core; ${limit < MAX_LIVE_THREADS ? `it was sized for ${limit} (raise "threads" in Controls › Execution › Wasm core memory, up to ${MAX_LIVE_THREADS})` : 'no thread id is left for another'}`, { kind: 'vmcore-threads' });
       if (this.records.take) {   // a dynamic memory: the record comes from the area the heap also grows in
         t = this.records.take();
         if (!t) throw new APKError(`vmcore: ${this.nextGuest} threads are alive or parked in the core and its memory has no room for another thread's record (in the dynamic mode the heap and the threads share what is above the metaspace, up to 2 GiB)`, { kind: 'vmcore-threads' });

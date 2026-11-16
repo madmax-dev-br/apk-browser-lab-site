@@ -1,9 +1,9 @@
-import { createHostRegistry } from './host-contract.js?v=ca92aaad0948';
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ca92aaad0948';
-import { allocateFd } from './libcore-io-native.js?v=ca92aaad0948';
+import { createHostRegistry } from './host-contract.js?v=d422379a2a38';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d422379a2a38';
+import { allocateFd } from './libcore-io-native.js?v=d422379a2a38';
 import { ACTION, EXTRA, AUTHORITY, SYSTEM_PICKERS, PICK_IMAGES_MAX_LIMIT, MAX_FILES, MAX_TOTAL_BYTES, QuerySyntaxError, compileSelection, directoryOf, extensionOf, fileRecord, kindOf, parseSortOrder, parseStorageUri,
-  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=ca92aaad0948';
+  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=d422379a2a38';
 
 // The VM side of the virtual device's shared storage (src/shared-storage.js): the files the page attached, the system providers an app reads them through and the system pickers.
 //
@@ -107,8 +107,8 @@ export function createSharedStorageHost(platform) {
       return { record: fileRecord({ ...input, size: bytes.length }), bytes };
     });
     const kept = payload.replace ? [...files.values()].filter(entry => entry.owned) : [...files.values()].filter(entry => entry.owned || !(payload.remove ?? []).includes(entry.id) && !incoming.some(item => item.record.id === entry.id));
-    if (kept.length + incoming.length > MAX_FILES) throw new RangeError(`O armazenamento do dispositivo aceita até ${MAX_FILES} arquivos.`);
-    if (kept.reduce((sum, entry) => sum + entry.size, 0) + incoming.reduce((sum, item) => sum + item.bytes.length, 0) > MAX_TOTAL_BYTES) throw new RangeError(`O armazenamento do dispositivo aceita até ${MAX_TOTAL_BYTES / 1048576} MiB no total.`);
+    if (kept.length + incoming.length > MAX_FILES) throw new RangeError(`The device storage accepts up to ${MAX_FILES} files.`);
+    if (kept.reduce((sum, entry) => sum + entry.size, 0) + incoming.reduce((sum, item) => sum + item.bytes.length, 0) > MAX_TOTAL_BYTES) throw new RangeError(`The device storage accepts up to ${MAX_TOTAL_BYTES / 1048576} MiB in total.`);
     for (const entry of [...files.values()]) if (!kept.includes(entry)) { files.delete(entry.id); dropGrantsOf(entry); }
     const now = platform.clock?.wall?.() ?? Date.now();
     for (const { record, bytes } of incoming) {

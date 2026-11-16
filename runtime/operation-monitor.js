@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=ca92aaad0948';
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { gcBlockReason } from './heap-gc.js?v=ca92aaad0948';
+import { TimeBreakdown } from './time-breakdown.js?v=d422379a2a38';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { gcBlockReason } from './heap-gc.js?v=d422379a2a38';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -41,7 +41,7 @@ export class OperationMonitor {
     if (busyMs >= this.mainBusyReportMs && now - event.capturedAt >= 2000) this.captureMainBusy(event, now);
     if (busyMs >= this.mainEventCapMs && this.rt.thread === this.rt.scheduler.main) {
       this.captureMainBusy(event, now); this.mainBusy.ended = true; this.mainBusy.endedAfterMs = Math.round(busyMs); this.mainBusy.capped = true; this.mainEvent = event.parent ?? null;
-      throw new APKError(`A thread principal ficou ${Math.round(busyMs / 1000)} s dentro de um único evento (${event.what}) sem voltar ao looper; limite ${Math.round(this.mainEventCapMs / 1000)} s. ${this.mainBusyText()}`, { kind: 'main-event-hard-cap', busyMs: Math.round(busyMs), event: event.what, mainBusy: this.mainBusy });
+      throw new APKError(`The main thread stayed ${Math.round(busyMs / 1000)} s inside a single event (${event.what}) without returning to the looper; limit ${Math.round(this.mainEventCapMs / 1000)} s. ${this.mainBusyText()}`, { kind: 'main-event-hard-cap', busyMs: Math.round(busyMs), event: event.what, mainBusy: this.mainBusy });
     }
   }
   captureMainBusy(event, now) {
@@ -53,7 +53,7 @@ export class OperationMonitor {
     this.mainBusy = { event: event.what, busyMs: Math.round(now - event.start), frames, hot, hostCall: rt.hostCall ? short(rt.hostCall) : null, resourceCall: typeof rt.lastResourceCall === 'function' ? rt.lastResourceCall() : rt.lastResourceCall ?? null, thread: rt.thread?.name ?? null, nested: !!inside, ended: false, overdue: this.overdueMessages() };
   }
   overdueMessages() { const platform = this.rt.platform, queue = platform?.eventQueue ?? [], clock = platform?.clock?.now?.() ?? 0, late = queue.filter(event => !event.front && Number.isFinite(event.when) && event.when < clock - 50); return { count: late.length, oldestMs: late.length ? Math.round(Math.max(...late.map(event => clock - event.when))) : 0 }; }
-  mainBusyText() { const b = this.mainBusy; return b ? `Laço da thread principal: ${b.hot.join(', ') || '(sem amostras)'}; frames: ${b.frames.join(' <- ') || '(nenhum)'}${b.hostCall ? `; dentro da chamada do host ${b.hostCall}` : ''}${b.resourceCall ? ` [${b.resourceCall}]` : ''}.` : ''; }
+  mainBusyText() { const b = this.mainBusy; return b ? `Main thread loop: ${b.hot.join(', ') || '(no samples)'}; frames: ${b.frames.join(' <- ') || '(none)'}${b.hostCall ? `; inside the host call ${b.hostCall}` : ''}${b.resourceCall ? ` [${b.resourceCall}]` : ''}.` : ''; }
   tick() {
     if (this.mainEvent) this.watchMain(performance.now());
     if (!this.active) return;
@@ -129,7 +129,7 @@ export class OperationMonitor {
     op.events++;
     const rt = this.rt; let key;
     try {
-      if (event.platformTask) key = `tarefa do host ${event.platformTask.name || '(anônima)'}`;
+      if (event.platformTask) key = `host task ${event.platformTask.name || '(anonymous)'}`;
       else {
         const handler = typeName(rt.typeOf(event.handler)), host = rt.platform.looperHost, callback = host.callbackOf(rt, event.message), what = callback ? 0 : host.whatOf(rt, event.message);
         key = `Handler ${handler} → ${callback ? typeName(rt.typeOf(callback)) : 'what=' + what}`;
@@ -159,18 +159,18 @@ export class OperationMonitor {
   /** Where execution stands: which thread runs, the main thread's state, how many runs are nested on the JavaScript stack and whether slices can be preempted right now. */
   executionLine() {
     const rt = this.rt, main = rt.scheduler.main, thread = rt.thread;
-    return `${this.gcLine()}\n${this.schedulerLine()}\nExecução: thread atual ${thread?.name ?? 'nenhuma'}${thread === main ? ' [main]' : ''}; thread principal ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'espera'})` : ''}` : '?'}; execuções aninhadas na pilha do JavaScript: ${rt.nestedRuns}; profundidade de dispatch: ${rt.depth}; fatia de segundo plano com limite de tempo: ${rt.sliceDeadline !== 0 ? 'sim' : 'não (evento principal ou espera aninhada: não pode ser interrompida)'}${rt.hostCall ? `; chamada do host: ${short(rt.hostCall)}` : ''}`;
+    return `${this.gcLine()}\n${this.schedulerLine()}\nExecution: current thread ${thread?.name ?? 'none'}${thread === main ? ' [main]' : ''}; main thread ${main ? `${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'waiting'})` : ''}` : '?'}; nested runs on the JavaScript stack: ${rt.nestedRuns}; dispatch depth: ${rt.depth}; time-limited background slice: ${rt.sliceDeadline !== 0 ? 'yes' : 'no (main event or nested wait: it cannot be interrupted)'}${rt.hostCall ? `; host call: ${short(rt.hostCall)}` : ''}`;
   }
   wakeRows(op, limit) {
-    const CAUSES = ['interrupção', 'sinal', 'tempo esgotado'];
+    const CAUSES = ['interrupt', 'signal', 'timed out'];
     return [...op.wakes].map(([thread, row]) => ({ thread, total: row.counts[0] + row.counts[1] + row.counts[2], row })).sort((a, b) => b.total - a.total).slice(0, limit)
-      .map(({ thread, total, row }) => ({ count: total, key: `${thread.name} · ${row.reason ?? 'espera'} · ${row.counts.map((n, i) => n ? `${n} ${CAUSES[i]}` : '').filter(Boolean).join(', ')}` }));
+      .map(({ thread, total, row }) => ({ count: total, key: `${thread.name} · ${row.reason ?? 'waiting'} · ${row.counts.map((n, i) => n ? `${n} ${CAUSES[i]}` : '').filter(Boolean).join(', ')}` }));
   }
   unparkRows(op, limit) {
     const rows = [];
     for (const [unparker, targets] of op.unparks) {
-      const frames = unparker?.frames, top = frames?.length ? short(frames.at(-1).method?.key) : 'código do host';
-      for (const [target, count] of targets) rows.push({ count, key: `${unparker?.name ?? 'host'} (${top}) acordou ${target.name ?? target.threadName ?? 'uma thread'}` });
+      const frames = unparker?.frames, top = frames?.length ? short(frames.at(-1).method?.key) : 'host code';
+      for (const [target, count] of targets) rows.push({ count, key: `${unparker?.name ?? 'host'} (${top}) woke ${target.name ?? target.threadName ?? 'a thread'}` });
     }
     return rows.sort((a, b) => b.count - a.count).slice(0, limit);
   }
@@ -178,47 +178,47 @@ export class OperationMonitor {
   /** GC attribution: collections and time in this operation, the share of the operation's wall time, and the phases of the last collections. */
   gcLine() {
     const rt = this.rt, op = this.op, phases = rt.gcPhases ?? [];
-    const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% do tempo da operação)` : '';
-    const tries = rt.gcSafepointTries ?? { calls: 0, notDue: 0, disabled: 0 }, skips = Object.entries(rt.gcSkips ?? {}).map(([why, n]) => `${why} ${n}x`).join(', ') || 'nenhuma';
+    const share = op && op.gcMs ? ` (${Math.round(100 * op.gcMs / Math.max(1, op.gcMs + performance.now() - op.start))}% of the operation time)` : '';
+    const tries = rt.gcSafepointTries ?? { calls: 0, notDue: 0, disabled: 0 }, skips = Object.entries(rt.gcSkips ?? {}).map(([why, n]) => `${why} ${n}x`).join(', ') || 'none';
     let blocked = null; try { blocked = gcBlockReason(rt); } catch { blocked = '?'; }
-    const gate = `\n  coletor: ${rt.gcEnabled ? 'ligado' : 'DESLIGADO'}; safepoints que pediram coleta ${tries.calls} (não devida ${tries.notDue}, adiada por movimento ${tries.deferred ?? 0}, coletor desligado ${tries.disabled}); coletas puladas: ${skips}; agora ${blocked ? `bloqueado por "${blocked}"` : 'livre'}; alocados desde a última ${Math.max(0, (rt.nextId ?? 0) - (rt.gcLastNextId ?? 0))}, espera mínima ${rt.gcMinAlloc ?? 0}, próxima a partir de ${rt.gcNextAt ?? '?'} vivos, piso ${rt.gcSafepointFloor ?? '?'}, pressão ${rt.gcPressure ? 'sim' : 'não'}, última levou ${Math.round(rt.gcLastMs ?? 0)} ms`;
+    const gate = `\n  collector: ${rt.gcEnabled ? 'on' : 'OFF'}; safepoints that asked for a collection ${tries.calls} (not due ${tries.notDue}, deferred by motion ${tries.deferred ?? 0}, collector off ${tries.disabled}); skipped collections: ${skips}; now ${blocked ? `blocked by "${blocked}"` : 'free'}; allocated since the last ${Math.max(0, (rt.nextId ?? 0) - (rt.gcLastNextId ?? 0))}, minimum wait ${rt.gcMinAlloc ?? 0}, next from ${rt.gcNextAt ?? '?'} live, floor ${rt.gcSafepointFloor ?? '?'}, pressure ${rt.gcPressure ? 'yes' : 'no'}, the last took ${Math.round(rt.gcLastMs ?? 0)} ms`;
     // Collections deferred while the screen was in motion (heap-gc.js deferral): episodes closed at an idle moment or forced by a ceiling, and the one still open.
     const d = rt.gcDeferralStats, open = rt.gcDeferral, motion = (() => { try { return rt.platform?.mainThreadMotion?.() ?? null; } catch { return '?'; } })();
-    const deferrals = `\n  adiamentos durante movimento: ${d ? `${d.episodes} (${d.idle} coletadas em repouso, ${d.forced} forçadas pelo teto${d.forced ? ': ' + Object.entries(d.forcedBy).map(([why, n]) => `${why} ${n}x`).join(', ') : ''}${d.absorbed ? `, ${d.absorbed} absorvidas por outra coleta` : ''}; espera máxima ${d.maxMs} ms, ${d.maxAllocated} objetos)` : 'nenhum'}; agora ${open ? `adiada há ${Math.round(performance.now() - open.since)} ms (${open.held} verificações: ${Object.entries(open.reasons).map(([why, n]) => `${why} ${n}x`).join(', ')}; teto ${open.ceiling} vivos ou ${Math.max(0, Math.round(open.until - performance.now()))} ms)` : `nenhuma adiada; thread principal ${motion ? `em movimento (${motion})` : 'ociosa'}`}`;
+    const deferrals = `\n  deferrals during motion: ${d ? `${d.episodes} (${d.idle} collected at rest, ${d.forced} forced by the ceiling${d.forced ? ': ' + Object.entries(d.forcedBy).map(([why, n]) => `${why} ${n}x`).join(', ') : ''}${d.absorbed ? `, ${d.absorbed} absorbed by another collection` : ''}; longest wait ${d.maxMs} ms, ${d.maxAllocated} objects)` : 'none'}; now ${open ? `deferred for ${Math.round(performance.now() - open.since)} ms (${open.held} checks: ${Object.entries(open.reasons).map(([why, n]) => `${why} ${n}x`).join(', ')}; ceiling ${open.ceiling} live or ${Math.max(0, Math.round(open.until - performance.now()))} ms)` : `none deferred; main thread ${motion ? `in motion (${motion})` : 'idle'}`}`;
     // Generations (heap-gc.js, "Young generation"): how many collections were minor ones, their pauses and what they rescan.
-    const m = rt.gcMinorStats, gen = rt.gcGenerational === false ? '\n  gerações: desligadas (toda coleta marca o heap inteiro)' : m ? `\n  gerações: ${m.collections} coletas menores (${Math.round(m.totalMs)} ms, pausa máxima ${Math.round(m.maxMs)} ms; última ${m.recent.at(-1)?.ms ?? 0} ms ${m.recent.at(-1)?.motion ? 'em movimento' : 'em repouso'}), ${m.freed} liberados, geração jovem ${Math.round(rt.gcNurseryNow ?? 0) || '-'} objetos; antigos relidos: lembrados ${rt.gcRemList?.length ?? 0}, tocados pelo host ${rt.gcTouchList?.length ?? 0}, com estado de host ${rt.gcHostful?.length ?? 0}` : '';
-    const head = `Coleta de lixo: ${op?.gcCount ?? 0} coletas / ${Math.round(op?.gcMs ?? 0)} ms nesta operação${share}; no total ${rt.gcStats?.collections ?? 0} coletas, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}${deferrals}${gen}`;
+    const m = rt.gcMinorStats, gen = rt.gcGenerational === false ? '\n  generations: off (every collection marks the whole heap)' : m ? `\n  generations: ${m.collections} minor collections (${Math.round(m.totalMs)} ms, longest pause ${Math.round(m.maxMs)} ms; the last ${m.recent.at(-1)?.ms ?? 0} ms ${m.recent.at(-1)?.motion ? 'in motion' : 'at rest'}), ${m.freed} freed, young generation ${Math.round(rt.gcNurseryNow ?? 0) || '-'} objects; old objects rescanned: remembered ${rt.gcRemList?.length ?? 0}, touched by the host ${rt.gcTouchList?.length ?? 0}, with host state ${rt.gcHostful?.length ?? 0}` : '';
+    const head = `Garbage collection: ${op?.gcCount ?? 0} collections / ${Math.round(op?.gcMs ?? 0)} ms in this operation${share}; in total ${rt.gcStats?.collections ?? 0} collections, ${Math.round(rt.gcTotalMs ?? 0)} ms${gate}${deferrals}${gen}`;
     const last = phases[0], census = last ? [
-      last.survivorsByCount?.length ? `\n  sobreviventes (por quantidade): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
-      last.survivorsByBytes?.length ? `\n  sobreviventes (por bytes estimados): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',
-      last.allocated ? `\n  alocados desde a última coleta: ${last.allocated.count}${last.allocated.sites?.length ? ', principais: ' + last.allocated.sites.join(' | ') : ''}` : '',
-      rt.gcRetention?.paths?.length ? `\n  exemplo de retenção (${String(rt.gcRetention.type).replace(/^L|;$/g, '').replaceAll('/', '.')}):${rt.gcRetention.paths.map(path => '\n    ' + path).join('')}` : '',
+      last.survivorsByCount?.length ? `\n  survivors (by count): ${last.survivorsByCount.slice(0, 12).map(c => `${c.n} ${c.type}`).join(', ')}` : '',
+      last.survivorsByBytes?.length ? `\n  survivors (by estimated bytes): ${last.survivorsByBytes.slice(0, 12).map(c => `${Math.round(c.bytes / 1024)} KiB ${c.type}`).join(', ')}` : '',
+      last.allocated ? `\n  allocated since the last collection: ${last.allocated.count}${last.allocated.sites?.length ? ', main ones: ' + last.allocated.sites.join(' | ') : ''}` : '',
+      rt.gcRetention?.paths?.length ? `\n  retention example (${String(rt.gcRetention.type).replace(/^L|;$/g, '').replaceAll('/', '.')}):${rt.gcRetention.paths.map(path => '\n    ' + path).join('')}` : '',
     ].join('') : '';
-    return phases.length ? `${head}${census}\n  últimas: ${phases.map(p => `${p.reason}${p.motion ? ` em movimento (${p.motion})` : ' em repouso'}${p.deferral ? ` após adiar ${p.deferral.ms} ms / ${p.deferral.allocated} objetos` : ''}: ${p.before}→${p.after} vivos [raízes ${p.rootsMs} ms (${p.nodes} nós JS; maior: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; podados ${p.pruned ?? 0}; por nós: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; por tempo: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marcação ${p.markMs} ms, varredura ${p.sweepMs} ms, recontagem ${p.rebuildMs} ms, ids ${p.idRange} em ${p.blocksInUse} blocos]`).join(' | ')}` : head;
+    return phases.length ? `${head}${census}\n  latest: ${phases.map(p => `${p.reason}${p.motion ? ` in motion (${p.motion})` : ' at rest'}${p.deferral ? ` after deferring ${p.deferral.ms} ms / ${p.deferral.allocated} objects` : ''}: ${p.before}→${p.after} live [roots ${p.rootsMs} ms (${p.nodes} JS nodes; largest: ${p.worstRoot.key} ${p.worstRoot.ms} ms/${p.worstRoot.nodes}; pruned ${p.pruned ?? 0}; by nodes: ${(p.topByNodes ?? []).map(r => `${r.key} ${r.nodes}${r.kind ? ' ' + r.kind : ''}${r.size !== undefined ? '[' + r.size + ']' : ''}`).join(', ') || '-'}; by time: ${(p.topByMs ?? []).map(r => `${r.key} ${r.ms} ms`).join(', ') || '-'}), marking ${p.markMs} ms, sweep ${p.sweepMs} ms, recount ${p.rebuildMs} ms, ids ${p.idRange} in ${p.blocksInUse} blocks]`).join(' | ')}` : head;
   }
   schedulerLine() {
     const stats = this.rt.scheduler.stats, op = this.op, seconds = op ? Math.max(0.001, (performance.now() - op.start) / 1000) : 0;
-    return `Escalonador: ${stats.rounds} rodadas, ${stats.wakeups} despertares${op ? ` (${Math.round(stats.wakeups / seconds)}/s, ${Math.round(stats.rounds / seconds)} rodadas/s nesta operação)` : ''}, ${this.rt.scheduler.threads.length} threads`;
+    return `Scheduler: ${stats.rounds} rounds, ${stats.wakeups} wakeups${op ? ` (${Math.round(stats.wakeups / seconds)}/s, ${Math.round(stats.rounds / seconds)} rounds/s in this operation)` : ''}, ${this.rt.scheduler.threads.length} threads`;
   }
   pumpReport(limit = 5) {
     const op = this.op; if (op === null) return { text: '', recurring: [], threads: [] };
     const wakes = this.wakeRows(op, limit);
     const recurring = [...op.pump].sort((a, b) => b[1].count - a[1].count).slice(0, limit).map(([key, e]) => ({ target: key, count: e.count, periodMs: e.count > 1 ? Math.round((e.last - e.first) / (e.count - 1)) : null }));
     const threads = [...op.slices].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, slices: count }));
-    const lines = [this.executionLine(), `O que a VM continuou agendando nesta operação (${op.events} eventos):`,
-      ...(op.overrun ? [`Aviso: o tempo da operação passou do orçamento enquanto ${op.overrun.mainWaiting ? 'a thread principal esperava outras threads' : 'uma thread em segundo plano'} executava (${op.overrun.thread ?? 'sem thread'}, aos ${op.overrun.atMs} ms)${op.backgroundOverruns ? `; ${op.backgroundOverruns} fatias foram interrompidas` : ''}`] : []),
-      ...recurring.map(row => `  ${row.count}×${row.periodMs === null ? '' : ` a cada ~${row.periodMs} ms (tempo virtual)`}  ${row.target}`),
-      ...(recurring.length ? [] : ['  (nenhum evento da fila)']),
-      'Despertares de threads (thread · primitiva · causa):', ...this.wakeRows(op, limit).map(row => `  ${row.count}× ${row.key}`), ...(op.wakes.size ? [] : ['  (nenhum)']),
-      ...(op.unparks?.size ? ['Quem acordou quem (LockSupport.unpark):', ...this.unparkRows(op, limit).map(row => `  ${row.count}× ${row.key}`)] : []),
-      'Threads que receberam tempo de processador:', ...threads.map(row => `  ${row.slices}× ${row.name}`), ...(threads.length ? [] : ['  (nenhuma)'])];
+    const lines = [this.executionLine(), `What the VM kept scheduling in this operation (${op.events} events):`,
+      ...(op.overrun ? [`Warning: the operation time went over budget while ${op.overrun.mainWaiting ? 'the main thread was waiting for other threads' : 'a background thread'} was running (${op.overrun.thread ?? 'no thread'}, at ${op.overrun.atMs} ms)${op.backgroundOverruns ? `; ${op.backgroundOverruns} slices were interrupted` : ''}`] : []),
+      ...recurring.map(row => `  ${row.count}×${row.periodMs === null ? '' : ` every ~${row.periodMs} ms (virtual time)`}  ${row.target}`),
+      ...(recurring.length ? [] : ['  (no queued event)']),
+      'Thread wakeups (thread · primitive · cause):', ...this.wakeRows(op, limit).map(row => `  ${row.count}× ${row.key}`), ...(op.wakes.size ? [] : ['  (none)']),
+      ...(op.unparks?.size ? ['Who woke whom (LockSupport.unpark):', ...this.unparkRows(op, limit).map(row => `  ${row.count}× ${row.key}`)] : []),
+      'Threads that received processor time:', ...threads.map(row => `  ${row.slices}× ${row.name}`), ...(threads.length ? [] : ['  (none)'])];
     return { text: lines.join('\n'), recurring, threads, wakes, events: op.events };
   }
   expire(now) {
     const op = this.op; op.expired = true;
     const rt = this.rt, profile = rt.profile.report(), pump = this.pumpReport(), ms = Math.round(now - op.start);
     this.beat(now, 'expired'); const breakdown = rt.tb.snapshot();
-    throw new APKError(`A operação ${op.name} usou ${ms} ms de tempo do host (limite ${this.budgetMs} ms${op.soft ? `, estendido enquanto havia progresso até ${this.hardCapMs} ms` : ''}) sem chegar ao fim; ${op.events} eventos e ${this.instructions() - op.startInstructions} instruções nesta operação${rt.hostCall ? `; chamada do host em andamento: ${short(rt.hostCall)}` : ''}.${rt.profile.summary()}`,
+    throw new APKError(`The ${op.name} operation used ${ms} ms of host time (limit ${this.budgetMs} ms${op.soft ? `, extended while there was progress up to ${this.hardCapMs} ms` : ''}) without finishing; ${op.events} events and ${this.instructions() - op.startInstructions} instructions in this operation${rt.hostCall ? `; host call in progress: ${short(rt.hostCall)}` : ''}.${rt.profile.summary()}`,
       { kind: 'operation-wall-budget', operation: op.name, wallMs: ms, limitMs: this.budgetMs, events: op.events, pump, timeBreakdown: breakdown, profile: { ...profile, text: `${profile.text}\n${pump.text}\n${TimeBreakdown.text(breakdown)}` } });
   }
 }

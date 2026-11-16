@@ -1,73 +1,73 @@
-import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=ca92aaad0948';
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=ca92aaad0948';
-import { launcherInfo } from './launcher-info.js?v=ca92aaad0948';
-import { buildScreenState } from './screen-state.js?v=ca92aaad0948';
-import { createLogcat } from './logcat.js?v=ca92aaad0948';
-import { createNetlog } from './netlog.js?v=ca92aaad0948';
-import { reportSummary } from './report-summary.js?v=ca92aaad0948';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=ca92aaad0948';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=ca92aaad0948';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=ca92aaad0948';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=ca92aaad0948';
-import { applyMicrogMocks } from './microg-device.js?v=ca92aaad0948';
-import { describeRedirects } from './host-map.js?v=ca92aaad0948';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=ca92aaad0948';
-import { InflatePool } from './zip-inflate-pool.js?v=ca92aaad0948';
-import { warmCrc32 } from './zip-entry.js?v=ca92aaad0948';
-import { createAppStorage } from './app-storage.js?v=ca92aaad0948';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=ca92aaad0948';
-import { createMessageSink } from './audio-native.js?v=ca92aaad0948';
-import { loadAPK } from './apk-loader.js?v=ca92aaad0948';
-import { AndroidPlatform } from './android-platform.js?v=ca92aaad0948';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=ca92aaad0948';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=ca92aaad0948';
-import { createWebViewBackend } from './webview-backend.js?v=ca92aaad0948';
-import { FrameworkProvider } from './framework-provider.js?v=ca92aaad0948';
-import { createRasterSender } from './raster-cache.js?v=ca92aaad0948';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=ca92aaad0948';
-import { dispatchPointer, pressView } from './pointer-input-host.js?v=ca92aaad0948';
-import { resolveDevice } from './device-profile.js?v=ca92aaad0948';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=ca92aaad0948';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=ca92aaad0948';
-import { SkiaProvider } from './skia-provider.js?v=ca92aaad0948';
-import { inspectCompose } from './compose-inspector.js?v=ca92aaad0948';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=ca92aaad0948';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=ca92aaad0948';
-import { readScrollInfo } from './scroll-info.js?v=ca92aaad0948';
-import { SemanticsPacer } from './semantics-pacing.js?v=ca92aaad0948';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=ca92aaad0948';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=ca92aaad0948';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=ca92aaad0948';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=ca92aaad0948';
-import { WorkerTaskLog } from './worker-task-log.js?v=ca92aaad0948';
-import { holdDelay } from './frame-flow.js?v=ca92aaad0948';
-import { disposeTextLayout } from './text-layout-native.js?v=ca92aaad0948';
-import { IcuBreakProvider } from './icu-break-provider.js?v=ca92aaad0948';
-import { SqliteProvider } from './sqlite-native.js?v=ca92aaad0948';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=ca92aaad0948';
-import { TzdataProvider } from './java-time-native.js?v=ca92aaad0948';
-import { ZlibProvider } from './zip-native.js?v=ca92aaad0948';
-import { IcuConverterProvider } from './icu-converter-native.js?v=ca92aaad0948';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=ca92aaad0948';
-import { JavacryptoProvider } from './javacrypto-native.js?v=ca92aaad0948';
-import { disposeColorFilters } from './color-filter-native.js?v=ca92aaad0948';
-import { disposeRegex } from './regex-native.js?v=ca92aaad0948';
-import { disposeRenderNodes } from './rendernode-native.js?v=ca92aaad0948';
-import { startDeepLink } from './deep-link-host.js?v=ca92aaad0948';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=ca92aaad0948';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=ca92aaad0948';
-import { probeWebCodecs } from './media-codec-backend.js?v=ca92aaad0948';
-import { APKError } from './apk-error.js?v=ca92aaad0948';
-import { MICROG_VERSION, microgFiles } from './microg-device.js?v=ca92aaad0948';
+import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=d422379a2a38';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=d422379a2a38';
+import { launcherInfo } from './launcher-info.js?v=d422379a2a38';
+import { buildScreenState } from './screen-state.js?v=d422379a2a38';
+import { createLogcat } from './logcat.js?v=d422379a2a38';
+import { createNetlog } from './netlog.js?v=d422379a2a38';
+import { reportSummary } from './report-summary.js?v=d422379a2a38';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=d422379a2a38';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=d422379a2a38';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=d422379a2a38';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=d422379a2a38';
+import { applyMicrogMocks } from './microg-device.js?v=d422379a2a38';
+import { describeRedirects } from './host-map.js?v=d422379a2a38';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=d422379a2a38';
+import { InflatePool } from './zip-inflate-pool.js?v=d422379a2a38';
+import { warmCrc32 } from './zip-entry.js?v=d422379a2a38';
+import { createAppStorage } from './app-storage.js?v=d422379a2a38';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=d422379a2a38';
+import { createMessageSink } from './audio-native.js?v=d422379a2a38';
+import { loadAPK } from './apk-loader.js?v=d422379a2a38';
+import { AndroidPlatform } from './android-platform.js?v=d422379a2a38';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=d422379a2a38';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=d422379a2a38';
+import { createWebViewBackend } from './webview-backend.js?v=d422379a2a38';
+import { FrameworkProvider } from './framework-provider.js?v=d422379a2a38';
+import { createRasterSender } from './raster-cache.js?v=d422379a2a38';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=d422379a2a38';
+import { dispatchPointer, pressView } from './pointer-input-host.js?v=d422379a2a38';
+import { resolveDevice } from './device-profile.js?v=d422379a2a38';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=d422379a2a38';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=d422379a2a38';
+import { SkiaProvider } from './skia-provider.js?v=d422379a2a38';
+import { inspectCompose } from './compose-inspector.js?v=d422379a2a38';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=d422379a2a38';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=d422379a2a38';
+import { readScrollInfo } from './scroll-info.js?v=d422379a2a38';
+import { SemanticsPacer } from './semantics-pacing.js?v=d422379a2a38';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=d422379a2a38';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=d422379a2a38';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=d422379a2a38';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=d422379a2a38';
+import { WorkerTaskLog } from './worker-task-log.js?v=d422379a2a38';
+import { holdDelay } from './frame-flow.js?v=d422379a2a38';
+import { disposeTextLayout } from './text-layout-native.js?v=d422379a2a38';
+import { IcuBreakProvider } from './icu-break-provider.js?v=d422379a2a38';
+import { SqliteProvider } from './sqlite-native.js?v=d422379a2a38';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=d422379a2a38';
+import { TzdataProvider } from './java-time-native.js?v=d422379a2a38';
+import { ZlibProvider } from './zip-native.js?v=d422379a2a38';
+import { IcuConverterProvider } from './icu-converter-native.js?v=d422379a2a38';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=d422379a2a38';
+import { JavacryptoProvider } from './javacrypto-native.js?v=d422379a2a38';
+import { disposeColorFilters } from './color-filter-native.js?v=d422379a2a38';
+import { disposeRegex } from './regex-native.js?v=d422379a2a38';
+import { disposeRenderNodes } from './rendernode-native.js?v=d422379a2a38';
+import { startDeepLink } from './deep-link-host.js?v=d422379a2a38';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=d422379a2a38';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=d422379a2a38';
+import { probeWebCodecs } from './media-codec-backend.js?v=d422379a2a38';
+import { APKError } from './apk-error.js?v=d422379a2a38';
+import { MICROG_VERSION, microgFiles } from './microg-device.js?v=d422379a2a38';
 installWasmMemoryMeter();   // before anything is instantiated: every WebAssembly memory of this Worker is counted for the page's memory line (src/wasm-memory-meter.js)
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=ca92aaad0948';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=ca92aaad0948';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=d422379a2a38';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=d422379a2a38';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=ca92aaad0948';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=ca92aaad0948';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=ca92aaad0948';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'ca92aaad0948';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=d422379a2a38';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=d422379a2a38';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=d422379a2a38';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'd422379a2a38';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -110,9 +110,9 @@ function selectRenderer(mode) {
   if (!runtime || (wanted === 'cpu' && !runtime.gpuRaster)) return rendererStatus();
   const CanvasKit = runtime.skia?.CanvasKit;
   if (!runtime.gpuRaster) {
-    if (!CanvasKit) { rendererNote = { requested: wanted, active: 'cpu', reason: 'o Skia não foi carregado para este app (nada para a GPU desenhar)' }; try { runtime.record(`LOG W ApkLabRender: GPU indisponível: ${rendererNote.reason} — usando CPU`); } catch { /* logcat detached */ } return rendererNote; }
+    if (!CanvasKit) { rendererNote = { requested: wanted, active: 'cpu', reason: 'Skia was not loaded for this app (nothing for the GPU to draw)' }; try { runtime.record(`LOG W ApkLabRender: GPU unavailable: ${rendererNote.reason} — using CPU`); } catch { /* logcat detached */ } return rendererNote; }
     const target = runtime;
-    runtime.gpuRaster = new GpuRasterController({ CanvasKit, onFallback: reason => { try { target.record(`LOG W ApkLabRender: GPU indisponível: ${reason} — usando CPU`); } catch { /* logcat detached */ } } });
+    runtime.gpuRaster = new GpuRasterController({ CanvasKit, onFallback: reason => { try { target.record(`LOG W ApkLabRender: GPU unavailable: ${reason} — using CPU`); } catch { /* logcat detached */ } } });
     runtime.displayRasterHeld = id => rasterSender.holds(id);   // a GPU raster whose ImageBitmap left the Worker is drawable while the page holds its id
   }
   return runtime.gpuRaster.select(wanted, runtime);
@@ -126,7 +126,7 @@ function currentSnapshot({ paced = false, pacedSemantics = paced, request = null
   appData?.touch(); const snapshotStarted = performance.now();
   if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
-  try { motionRaster.noteScreen(`${runtime.activity?.ref ?? 0}:${runtime.platform.viewRoots?.(runtime)?.length ?? 0}`); } catch { /* no screen yet */ }   // "tela nova": a new Activity instance or window
+  try { motionRaster.noteScreen(`${runtime.activity?.ref ?? 0}:${runtime.platform.viewRoots?.(runtime)?.length ?? 0}`); } catch { /* no screen yet */ }   // "new screen": a new Activity instance or window
   const signal = motionSignal(request); runtime.displayRasterScale = motionRaster.scaleFor(signal); runtime.displayRasterSettledScale = motionRaster.settledScale(); runtime.displayRasterReducedServed = [];
   const rasterizedBefore = runtime.rasterStats?.rasterized ?? 0;
   let snapshot; try { snapshot = runtime.snapshot(); } finally { runtime.displayRasterScale = 1; }   // only the page's snapshot is ever replayed reduced
@@ -144,8 +144,8 @@ function currentSnapshot({ paced = false, pacedSemantics = paced, request = null
   try { snapshot.warmup = warmTracker.observe(firstTimeWork(runtime), performance.now()); } catch { snapshot.warmup = null; }   // read-only: field reads, no bytecode
   if (runtime.methodOverridesAll?.size) snapshot.methodOverrides = describeMethodOverrides(runtime);
   if (runtime.platform?.endpointMocksAll?.size) snapshot.endpointMocks = describeEndpointMocks(runtime);
-  if (runtime.network?.redirectTable?.size) snapshot.hostMap = describeRedirects(runtime.network.redirectTable);   // live counts for the "Redirecionar hosts" rows (src/host-map.js)   // live hit counts for the "Mock de endpoints" section (src/endpoint-mocks.js)
-  if (runtime.platform?.ignoredActivitiesAll?.size) snapshot.ignoredActivities = describeIgnoredActivities(runtime);   // live counts for the "Activities ignoradas" section (src/ignored-activities.js)   // live hit counts for the "Retornos de métodos" section (src/method-overrides.js)
+  if (runtime.network?.redirectTable?.size) snapshot.hostMap = describeRedirects(runtime.network.redirectTable);   // live counts for the "Redirect hosts" rows (src/host-map.js)   // live hit counts for the "Mock de endpoints" section (src/endpoint-mocks.js)
+  if (runtime.platform?.ignoredActivitiesAll?.size) snapshot.ignoredActivities = describeIgnoredActivities(runtime);   // live counts for the "Ignored activities" section (src/ignored-activities.js)   // live hit counts for the "Method returns" section (src/method-overrides.js)
   // VM health the page can show: live Java objects, collections, and any OutOfMemoryError the VM raised (even if the app caught it).
   snapshot.pendingEventDelay = runtime.platform.nextEventDelay?.() ?? null;   // ms until the VM's next scheduled event (frame, timer); null when nothing is scheduled
   if (rasterReduced) snapshot.pendingEventDelay = Math.min(snapshot.pendingEventDelay ?? Infinity, motionRaster.quietMs);   // the refinement is due within the quiet period
@@ -184,14 +184,14 @@ function drainReadyEvents(maxMs = SETTLE_WINDOW_MS, { framePaced = false } = {})
 const IME_MAX_OPS = 64, IME_FRAME_WAIT_MS = 20, IME_KEY_SETTLE_MS = 60;
 async function typeWithIme(data) {
   const ops = data.ops;
-  if (!Array.isArray(ops) || !ops.length || ops.length > IME_MAX_OPS) throw new TypeError(`A digitação requer de 1 a ${IME_MAX_OPS} teclas por pedido.`);
+  if (!Array.isArray(ops) || !ops.length || ops.length > IME_MAX_OPS) throw new TypeError(`Typing requires 1 to ${IME_MAX_OPS} keys per request.`);
   const ims = runtime.platform.inputMethodService, view = { ref: data.ownerViewId };
   let fallback = null;
   for (const op of ops) {
     runtime.steps = 0;
     const outcome = ims ? ims.imeEdit(runtime, view, op) : { handled: false, reason: 'the platform has no InputMethodManager' };
     if (!outcome.handled) {
-      const via = typeof op.fallbackText === 'string' && Number.isInteger(data.nodeId) ? 'SetText' : 'nenhum';
+      const via = typeof op.fallbackText === 'string' && Number.isInteger(data.nodeId) ? 'SetText' : 'none';
       runtime.record(`WEB InputMethod: no InputConnection for ${op.kind} (${outcome.reason}); ${via === 'SetText' ? 'semantics SetText of the browser control text instead' : 'key dropped'}`);
       if (via === 'SetText') {
         try { composeSemantics.performAction({ ownerViewId: data.ownerViewId, nodeId: data.nodeId, action: 'SetText', args: [op.fallbackText] }); }
@@ -284,7 +284,7 @@ function scheduleEvents() {
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
       taskLog.begin('events', runtime);
-      const started = performance.now(), drained = monitored('evento agendado', () => drainReadyEvents(SETTLE_WINDOW_MS, { framePaced: true })); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
+      const started = performance.now(), drained = monitored('scheduled event', () => drainReadyEvents(SETTLE_WINDOW_MS, { framePaced: true })); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
       logcat.flush(); netlog.flush();
       const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
       const readyFlip = !drained.processed && readyTracker.flipDue(performance.now());   // nothing ran and the quiet period passed: a fresh snapshot carries screenReady.ready = true
@@ -317,7 +317,7 @@ function startApiGapScan() {
   }, 0);
 }
 // A Worker running VM code cannot answer a "screen-state" request until the operation ends. While an operation runs, a heartbeat at most every 4 s also carries a text snapshot of the screen
-// state (no Java code is run for it: no Compose semantics), which the page keeps so that "Copiar estado da tela" still has something when the VM is stuck.
+// state (no Java code is run for it: no Compose semantics), which the page keeps so that "Copy screen state" still has something when the VM is stuck.
 let lastScreenSnapshotAt = 0;
 function snapshotScreenDuringOperation(message) {
   if (message?.type !== 'heartbeat' || !runtime) return;
@@ -333,30 +333,30 @@ const pluginJobs = []; let pluginTimer = null, pluginWindowAt = 0, pluginWindowM
 const pluginStats = { served: 0, ms: 0, deferred: 0, rejected: 0, maxMs: 0 };
 const pluginError = (requestId, code, message) => self.postMessage({ requestId, type: 'error', error: { name: 'PluginQueryError', code, message } });
 function queuePluginQuery(requestId, data) {
-  if (pluginJobs.length >= PLUGIN_QUEUE_MAX) { pluginStats.rejected++; pluginError(requestId, 'busy', 'Fila de consultas de plugins cheia; tente de novo.'); return; }
+  if (pluginJobs.length >= PLUGIN_QUEUE_MAX) { pluginStats.rejected++; pluginError(requestId, 'busy', 'The plugin query queue is full; try again.'); return; }
   pluginJobs.push({ requestId, data, at: performance.now() }); armPluginTimer(0);
 }
 function armPluginTimer(delay) { if (pluginTimer === null) pluginTimer = setTimeout(servePluginQuery, delay); }
 function servePluginQuery() {
   pluginTimer = null; if (!pluginJobs.length) return;
   const now = performance.now(), job = pluginJobs[0];
-  if (now - job.at > PLUGIN_WAIT_MS) { pluginJobs.shift(); pluginStats.rejected++; pluginError(job.requestId, 'busy', 'A VM ficou ocupada; a consulta do plugin não foi atendida a tempo.'); armPluginTimer(0); return; }
+  if (now - job.at > PLUGIN_WAIT_MS) { pluginJobs.shift(); pluginStats.rejected++; pluginError(job.requestId, 'busy', 'The VM was busy; the plugin query was not served in time.'); armPluginTimer(0); return; }
   if (now - pluginWindowAt >= 1000) { pluginWindowAt = now; pluginWindowMs = 0; }
   const quietLeft = PLUGIN_INPUT_QUIET_MS - (now - Math.max(lastOperationAt, lastPointerAt)), spent = pluginWindowMs >= PLUGIN_MS_PER_SECOND;
   if (busy || quietLeft > 0 || spent) { pluginStats.deferred++; armPluginTimer(busy ? PLUGIN_RETRY_MS : Math.max(PLUGIN_RETRY_MS, quietLeft, spent ? pluginWindowAt + 1000 - now : 0)); return; }
   pluginJobs.shift();
   const { requestId, data } = job, started = performance.now(); taskLog.begin('plugin-query', runtime);
   try {
-    if (!runtime) throw new PluginQueryError('no-apk', 'Nenhum APK em execução.');
+    if (!runtime) throw new PluginQueryError('no-apk', 'No APK is running.');
     const args = data.args && typeof data.args === 'object' ? data.args : {};
     let value, failure = null;
     if (data.query === 'composeTree') {
       const notes = [], maxNodes = Math.min(4000, Math.max(1, Number(args.maxNodes) || 2000));
-      const inspection = runtime.runDiagnostic(() => inspectCompose(runtime, { maxNodes }), null, error => notes.push(`inspeção do Compose indisponível: ${String(error?.message ?? error).slice(0, 240)}`));
+      const inspection = runtime.runDiagnostic(() => inspectCompose(runtime, { maxNodes }), null, error => notes.push(`Compose inspection unavailable: ${String(error?.message ?? error).slice(0, 240)}`));
       value = compactComposeTree(inspection, { maxNodes, handle: id => handleOf(runtime, id) }); value.notes = [...value.notes, ...notes];
       value.activityName = runtime.activityType ? runtime.activityType.slice(1, -1).replaceAll('/', '.') : null;
       const locals = Array.isArray(args.locals) ? args.locals.map(String).filter(Boolean).slice(0, 32) : [];
-      if (locals.length) runtime.runDiagnostic(() => attachCompositionLocals(runtime, value, locals), null, error => value.notes.push(`CompositionLocals indisponíveis: ${String(error?.message ?? error).slice(0, 200)}`));
+      if (locals.length) runtime.runDiagnostic(() => attachCompositionLocals(runtime, value, locals), null, error => value.notes.push(`CompositionLocals unavailable: ${String(error?.message ?? error).slice(0, 200)}`));
     } else if (data.query === 'scrollState') {   // where a scrollable is and how far it goes (src/scroll-info.js): what lab.scrollTo / scroll_to steer by
       value = runtime.runDiagnostic(() => readScrollInfo(runtime, composeSemantics, args), null, error => { failure = error; });
       if (failure) throw failure;
@@ -395,14 +395,14 @@ const sharedInflatePool = () => inflatePool === undefined ? (inflatePool = (() =
 let microgPackagesPromise = null;
 function microgCompanions() {
   return microgPackagesPromise ??= (async () => {
-    const files = microgFiles(), at = file => new URL(`../${file}`, import.meta.url), absent = file => new APKError(`A opção "com microG" está ligada, mas ${file} não está disponível neste site (uma cópia do laboratório sem os arquivos do microG). Desligue a opção em Dispositivo ou sirva o laboratório a partir do dist completo.`, { kind: 'microg-files-missing', file });
+    const files = microgFiles(), at = file => new URL(`../${file}`, import.meta.url), absent = file => new APKError(`The "With microG" option is on, but ${file} is not available on this site (a copy of the lab without the microG files). Turn the option off in Device or serve the lab from the complete dist.`, { kind: 'microg-files-missing', file });
     const get = async file => { let response; try { response = await fetch(at(file)); } catch (cause) { throw absent(file); } if (!response.ok) throw absent(`${file} (HTTP ${response.status})`); return response; };
     const provenance = await (await get(files.provenance)).json();
     const packages = [];
     for (const file of files.packages) {
       const bytes = await (await get(file)).arrayBuffer(), name = file.split('/').pop(), expected = provenance.outputs?.find(output => output.file === name)?.sha256;
       const actual = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
-      if (!expected || actual !== expected) throw new APKError(`O pacote do microG ${name} não confere com ${files.provenance} (SHA-256 ${actual}); o dispositivo não o instala.`, { kind: 'microg-files-mismatch', file });
+      if (!expected || actual !== expected) throw new APKError(`The microG package ${name} does not match ${files.provenance} (SHA-256 ${actual}); the device does not install it.`, { kind: 'microg-files-mismatch', file });
       packages.push(bytes);
     }
     return { version: MICROG_VERSION, packages };
@@ -435,7 +435,7 @@ async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } 
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=ca92aaad0948').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  import('../vmcore/js/attach.js?v=d422379a2a38').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
   try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
   sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
   warmLoadCode();
@@ -467,16 +467,16 @@ async function handleMessage({ data }) {
   const send = (message) => { logcat.flush(); netlog.flush(); self.postMessage({ requestId, ...message }, rasterSender.takeTransfers()); };   // log lines first, so the page has them when the reply arrives; raw pixel rasters first seen by the page travel as transferred buffers
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
   if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
-  if (type === 'screen-state') {   // read-only picture of the screen for "Copiar estado da tela"; answered even while the VM is between operations, always with whatever could be read
+  if (type === 'screen-state') {   // read-only picture of the screen for "Copy screen state"; answered even while the VM is between operations, always with whatever could be read
     try {
-      if (!runtime) { send({ type: 'result', screenState: { text: 'Estado da tela\nNenhum APK carregado.', blank: false, reasons: [] } }); return; }
+      if (!runtime) { send({ type: 'result', screenState: { text: 'Screen state\nNo APK loaded.', blank: false, reasons: [] } }); return; }
       const notes = [];
-      const semantics = runtime.runDiagnostic(() => composeSemantics?.snapshot?.() ?? null, null, error => notes.push(`semântica do Compose indisponível: ${String(error?.message ?? error).slice(0, 200)}`));
-      const state = runtime.runDiagnostic(() => buildScreenState(runtime, { semantics, heartbeat: runtime.monitor.snapshot(performance.now(), 'screen-state') }), null, error => notes.push(`parte do estado indisponível: ${String(error?.message ?? error).slice(0, 200)}`));
-      const result = state ?? { text: 'Estado da tela\nNão foi possível montar o estado da tela.', blank: false, reasons: [] };
-      if (notes.length) result.text += '\nAvisos do relatório: ' + notes.join('; ');
+      const semantics = runtime.runDiagnostic(() => composeSemantics?.snapshot?.() ?? null, null, error => notes.push(`Compose semantics unavailable: ${String(error?.message ?? error).slice(0, 200)}`));
+      const state = runtime.runDiagnostic(() => buildScreenState(runtime, { semantics, heartbeat: runtime.monitor.snapshot(performance.now(), 'screen-state') }), null, error => notes.push(`part of the state unavailable: ${String(error?.message ?? error).slice(0, 200)}`));
+      const result = state ?? { text: 'Screen state\nCould not build the screen state.', blank: false, reasons: [] };
+      if (notes.length) result.text += '\nReport warnings: ' + notes.join('; ');
       send({ type: 'result', screenState: result });
-    } catch (error) { send({ type: 'result', screenState: { text: `Estado da tela\nNão foi possível montar o estado da tela: ${String(error?.message ?? error).slice(0, 300)}`, blank: false, reasons: [] } }); }
+    } catch (error) { send({ type: 'result', screenState: { text: `Screen state\nCould not build the screen state: ${String(error?.message ?? error).slice(0, 300)}`, blank: false, reasons: [] } }); }
     return;
   }
   if (type === 'logcat-stream') {   // the page's Logcat panel opened (the ring's recent lines are posted first, then the rows stream) or closed (only a counter): src/logcat.js setStreaming
@@ -486,9 +486,9 @@ async function handleMessage({ data }) {
   if (type === 'compose-inspect') {   // the page's "Compose" panel asked for one inspection of the screen (src/compose-inspector.js): read-only, between two VM events, never paced or repeated
     try {
       if (!runtime) { send({ type: 'result', loaded: false, inspection: null }); return; }
-      if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM está processando uma operação; tente Capturar de novo.' } }); return; }
+      if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'The VM is processing an operation; try Capture again.' } }); return; }
       const notes = [], startedAt = performance.now();
-      const inspection = runtime.runDiagnostic(() => inspectCompose(runtime, { maxNodes: Math.min(4000, Math.max(1, Number(data.maxNodes) || 2000)) }), null, error => notes.push(`inspeção do Compose indisponível: ${String(error?.message ?? error).slice(0, 240)}`));
+      const inspection = runtime.runDiagnostic(() => inspectCompose(runtime, { maxNodes: Math.min(4000, Math.max(1, Number(data.maxNodes) || 2000)) }), null, error => notes.push(`Compose inspection unavailable: ${String(error?.message ?? error).slice(0, 240)}`));
       const result = inspection ?? { schemaVersion: 1, owners: [], totalNodes: 0, truncated: false, notes: [] };
       result.notes = [...(result.notes ?? []), ...notes]; result.ms = Math.round(performance.now() - startedAt); result.activityName = runtime.activityType ? runtime.activityType.slice(1, -1).replaceAll('/', '.') : null; result.uptimeMs = Math.round(runtime.clock?.now?.() ?? 0);
       send({ type: 'result', loaded: true, inspection: result });
@@ -496,18 +496,18 @@ async function handleMessage({ data }) {
     return;
   }
   if (type === 'plugin-query') { queuePluginQuery(requestId, data); return; }   // a page plugin's read-only query (src/plugin-queries.js): low priority, served between VM events within a time budget
-  if (type === 'renderer') {   // "Renderização" (Controles) / player `renderer`: applied between two VM events; the next snapshot replays the screen with the new backend
+  if (type === 'renderer') {   // "Rendering" (Controls) / player `renderer`: applied between two VM events; the next snapshot replays the screen with the new backend
     try {
       const status = selectRenderer(data.renderer); send({ type: 'result', renderer: status, loaded: !!runtime });
       if (runtime?.activity) { if (busy) snapshotOwed = true; else { busy = true; try { postRuntimeEvent(); } catch { snapshotOwed = true; } finally { busy = false; scheduleEvents(); } } }
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
-  if (type === 'raster-settings') {   // "Resolução no movimento" / "Tela nova em baixa resolução" (Controles): the next snapshot uses them
+  if (type === 'raster-settings') {   // "Resolution in motion" / "New screen in low resolution" (Controls): the next snapshot uses them
     try { send({ type: 'result', raster: motionRaster.configure({ scale: Number(data.scale), navigation: data.navigation !== false, ...(SETTLED_SCALE_STEPS.includes(Number(data.settled)) ? { settled: Number(data.settled) } : {}) }) }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
-  if (type === 'time-limits') {   // "Tempo máximo por evento": applied between two events, takes effect at the next budget check
+  if (type === 'time-limits') {   // "Maximum time per event": applied between two events, takes effect at the next budget check
     try { send({ type: 'result', limits: runtime ? applyTimeLimits(runtime, data.seconds) : timeLimitsFor(data.seconds), loaded: !!runtime }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
@@ -527,7 +527,7 @@ async function handleMessage({ data }) {
     try { send({ type: 'result', entryPoints: runtime ? applyMicrogMocks(runtime, data.mocks ?? []) : [], loaded: !!(runtime?.platform?.microg) }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
-  if (type === 'permissions-config') {   // the "Permissões" section: the permission states and the simulated location (src/runtime-permissions.js, src/permission-host.js); takes effect on the next permission check
+  if (type === 'permissions-config') {   // the "Permissions" section: the permission states and the simulated location (src/runtime-permissions.js, src/permission-host.js); takes effect on the next permission check
     try {
       const host = runtime?.platform?.runtimePermissions;
       if (host) { if (data.dialogs !== undefined) runtime.platform.permissionDialogs = data.dialogs === true; if (data.config) host.setConfig(data.config); if ('location' in data) host.setLocation(runtime, data.location); }
@@ -535,7 +535,7 @@ async function handleMessage({ data }) {
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
-  if (type === 'shared-files') {   // "Arquivos do dispositivo": the files of the virtual device's shared storage (src/shared-storage-host.js); the page keeps the originals, the VM gets copies
+  if (type === 'shared-files') {   // "Device files": the files of the virtual device's shared storage (src/shared-storage-host.js); the page keeps the originals, the VM gets copies
     try {
       const host = runtime?.platform?.sharedStorage;
       if (host && data.dialogs !== undefined) runtime.platform.systemPickerDialogs = data.dialogs === true;
@@ -559,7 +559,7 @@ async function handleMessage({ data }) {
     return;
   }
   if (type === 'debug-static') {   // measurement aid (scripts/validation/bench-worker.mjs): runs one static method of the loaded APK and reports wall time, instructions and the host's clock cost
-    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'No APK loaded.' } }); return; }
     try {
       const { owner, name, argument } = data, signature = '(Ljava/lang/String;)Ljava/lang/String;', counted = () => runtime.executionByOrigin.apk.instructions + runtime.executionByOrigin.framework.instructions;
       const before = counted(), start = performance.now();
@@ -575,7 +575,7 @@ async function handleMessage({ data }) {
   }
   if (type === 'debug-counters') {   // measurement aid (scripts/validation/profile-scroll.mjs --counters): cumulative counters of the core's boundary, and per call site key the calls the core
     // handed to the host (env.bridge: bridged and dispatched) with their inclusive ms since `start`; counting wraps the engine's `call` until the Worker ends (it is a measurement run)
-    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'No APK loaded.' } }); return; }
     const engine = runtime.wasm, state = engine ? (engine.debugCounting ??= { counts: new Map() }) : null;
     if (data.start && engine) {
       state.counts = new Map();
@@ -587,7 +587,7 @@ async function handleMessage({ data }) {
     return;
   }
   if (type === 'debug-gc') {   // measurement aid (scripts/validation/bench-gc.mjs): keeps `live` small objects of mixed shapes reachable, then collects and reports the phase timings
-    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'Nenhum APK carregado.' } }); return; }
+    if (!runtime) { send({ type: 'error', error: { name: 'ProtocolError', message: 'No APK loaded.' } }); return; }
     try {
       const { live = 100000, garbage = 100000, big = false } = data;
       if (big && !runtime.platform.fakeResourceTable) {   // the pure data a large app keeps on the platform (see scripts/validation/bench-gc-node.mjs)
@@ -621,7 +621,7 @@ async function handleMessage({ data }) {
     } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
-  if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'A VM já está processando outra operação.' } }); return; }
+  if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'The VM is already processing another operation.' } }); return; }
   busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer); if (type === 'load' || type === 'launch') operationSpans[type] = { start: epochNow(), end: null }; taskLog.begin('request:' + type, runtime);
   try {
     if (type === 'load') {
@@ -630,9 +630,9 @@ async function handleMessage({ data }) {
       runtime?.fileMappings?.flushAll();   // the VM stops: nothing else writes a mapping back
       if (appData) { await appData.close().catch(() => {}); } appData = null; appDataInfo = null;
       if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime?.gpuRaster?.dispose(); runtime = null; rendererNote = null; reportedCensus = 0; composeSemantics = null; lastComposeSemantics = null; semanticsPacer.stale = false;
-      if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('O Worker precisa receber um ArrayBuffer de APK.');
+      if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('The Worker needs to receive an APK ArrayBuffer.');
       // data.companionPackages: APK ArrayBuffers installed as further packages of the virtual device (src/package-registry.js, docs/MULTI-PACKAGE.md); absent = the app alone.
-      if (data.companionPackages !== undefined && (!Array.isArray(data.companionPackages) || data.companionPackages.some(bytes => !(bytes instanceof ArrayBuffer)))) throw new TypeError('companionPackages precisa ser uma lista de ArrayBuffers de APK.');
+      if (data.companionPackages !== undefined && (!Array.isArray(data.companionPackages) || data.companionPackages.some(bytes => !(bytes instanceof ArrayBuffer)))) throw new TypeError('companionPackages must be a list of APK ArrayBuffers.');
       // the lab's own assets: this Worker's providers, all started at once by warmAssets (already when the page opened, if it sent 'prewarm'), unless the caller sent its own bytes
       const shared = await warmAssets({ framework: !data.frameworkDex, frameworkResources: !data.frameworkResources, resourceConfig: !data.resourceConfigBytes, layouts: !data.layoutProfileDex });
       assetProviders = null;   // taken by this load: another load in this Worker gets its own framework, framework resources and resource configuration (as before warming existed); Skia, ICU and the rest stay shared
@@ -652,16 +652,16 @@ async function handleMessage({ data }) {
       runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
       loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=ca92aaad0948')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=d422379a2a38')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
       inventory = result.inventory; logcat.clear(); logcat.setStreaming(data.logcatStreaming === true); logcat.attach(runtime); netlog.clear(); netlog.attach(runtime);
       runtime.contentRasterOptions = { transport: 'rgba' };   // Compose/Canvas content reaches the page as raw RGBA8 (src/raster-cache.js), not as a PNG
       if (sanitizeRenderer(data.renderer) === 'gpu') selectRenderer('gpu');   // opt-in experimental GPU replay (src/gpu-raster.js); CPU (the default) leaves everything as above
-      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false, scale: MOTION_SCALE_STEPS.includes(data.rasterScale) && data.rasterScale < 1 ? data.rasterScale : 1, navigation: data.rasterNavigation === true }); if (data.rasterScale === 1) motionRaster.configure({ scale: 1 }); if (SETTLED_SCALE_STEPS.includes(data.rasterSettled)) motionRaster.configure({ settled: data.rasterSettled }); lastPointerAt = 0; readyTracker = new ScreenReadyTracker(); warmTracker = new WarmupTracker(); warmTracker.observe(firstTimeWork(runtime), performance.now());   // the clock of "aquecendo" starts at the load: the launch is part of it   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
+      motionRaster = new MotionRasterPolicy({ enabled: data.motionRaster !== false, scale: MOTION_SCALE_STEPS.includes(data.rasterScale) && data.rasterScale < 1 ? data.rasterScale : 1, navigation: data.rasterNavigation === true }); if (data.rasterScale === 1) motionRaster.configure({ scale: 1 }); if (SETTLED_SCALE_STEPS.includes(data.rasterSettled)) motionRaster.configure({ settled: data.rasterSettled }); lastPointerAt = 0; readyTracker = new ScreenReadyTracker(); warmTracker = new WarmupTracker(); warmTracker.observe(firstTimeWork(runtime), performance.now());   // the clock of "warming" starts at the load: the launch is part of it   // progressive raster while the screen moves (src/motion-raster.js); ?raster=full on the page turns it off
       runtime.monitor.configure({ sink: message => { logcat.flush(); self.postMessage({ ...message, requestId: activeRequestId }); snapshotScreenDuringOperation(message); }, budgetMs: OPERATION_WALL_LIMIT_MS });   // heartbeats to the page + the operation wall budget
-      applyTimeLimits(runtime, data.eventSeconds);   // "Tempo máximo por evento" (src/time-limits.js): the per-event watchdog, the operation budget and the main-event caps
+      applyTimeLimits(runtime, data.eventSeconds);   // "Maximum time per event" (src/time-limits.js): the per-event watchdog, the operation budget and the main-event caps
       runtime.platform.onPermissionRequest = request => self.postMessage({ type: 'permission-request', request });   // Activity.requestPermissions that needs the user: the page shows the dialog
       runtime.platform.permissionDialogs = false;   // until the page says it can show the permission dialog (permissions-config { dialogs: true }), a request is dismissed like a closed dialog
       runtime.platform.onPermissionConfig = config => self.postMessage({ type: 'permission-config', config });
@@ -680,7 +680,7 @@ async function handleMessage({ data }) {
       send({ type: 'result', inventory: result.inventory, appData: appDataInfo, renderer: rendererStatus(), loadTiming: lastLoadTiming });
     } else if (type === 'app-data-clear') {
       // Settings > Apps > Clear storage: the stored data is wiped and this process stops persisting; the page restarts the app.
-      if (!runtime) throw new Error('Abra um APK antes de limpar os dados do app.');
+      if (!runtime) throw new Error('Open an APK before clearing the app data.');
       if (appData) appDataInfo = await appData.clear();
       else { const backend = sharedAppDataBackend(); if (backend) { const { key } = await appKeyFor(runtime.platform.packageName, runtime.apkSigningCertificates?.() ?? []); await backend.clear(key); } appDataInfo = { ...(appDataInfo ?? {}), bytes: 0, files: 0 }; }
       send({ type: 'result', appData: appDataInfo });
@@ -691,7 +691,7 @@ async function handleMessage({ data }) {
     } else if (type === 'app-data') {
       // "Dados do app" (src/app-storage.js): the app's SharedPreferences and SQLite databases, read and edited through the app's own stack, between VM events. A change runs what it
       // makes due (a SharedPreferences listener the app registered) and answers a fresh snapshot.
-      if (!runtime) throw new Error('Abra um APK antes de ver os dados do app.');
+      if (!runtime) throw new Error('Open an APK before viewing the app data.');
       const storage = createAppStorage(runtime), op = String(data.op ?? 'overview'), changing = op === 'edit-prefs' || op === 'edit-row' || (op === 'sql' && !/^\s*(select|pragma|with|explain|values)\b/i.test(String(data.sql ?? '')));
       runtime.steps = 0;
       const output = monitored('app-data', () => {
@@ -701,14 +701,14 @@ async function handleMessage({ data }) {
         if (op === 'rows') return storage.tableRows(data.db, data.table, { offset: data.offset, limit: data.limit });
         if (op === 'edit-row') return storage.editRow(data.db, data.table, data.change ?? {});
         if (op === 'sql') return storage.sql(data.db, data.sql, Array.isArray(data.params) ? data.params : [], { limit: data.limit });
-        throw new Error(`Operação de dados do app desconhecida: ${op}`);
+        throw new Error(`Unknown app data operation: ${op}`);
       });
       if (changing) drainReadyEvents();
       send({ type: 'result', appData: output, ...(changing && runtime.activity ? { snapshot: currentSnapshot() } : {}) });
     } else if (type === 'invoke-method') {
       // lab.invoke (src/app-invoke.js): one of the app's methods, called on the VM's main thread as an operation of the page (like a click). What it schedules and is due
       // (a Handler message, a coroutine resumed on the main dispatcher, a recomposition) runs before the answer, which carries a fresh snapshot.
-      if (!runtime) throw new Error('Abra um APK antes de chamar um método do app.');
+      if (!runtime) throw new Error('Open an APK before calling an app method.');
       runtime.steps = 0; lastOperationAt = performance.now();
       let invocation;
       try { invocation = monitored('invoke', () => invokeAppMethod(runtime, data)); }
@@ -716,17 +716,17 @@ async function handleMessage({ data }) {
       drainReadyEvents();
       send({ type: 'result', invocation, ...(runtime.activity ? { snapshot: currentSnapshot() } : {}) });
     } else if (type === 'inspect-native') {
-      if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reabra o APK para disponibilizar a inspeção ELF.');
+      if (!runtime || typeof inspectNativeLibraries !== 'function') throw new Error('Reopen the APK to make ELF inspection available.');
       const libraries = await inspectNativeLibraries(data.paths, data.limits);
       send({ type: 'result', libraries, nativeInspection: inventory.nativeInspection });
     } else if (type === 'launcher-info') {
       // What the device's launcher shows for this app: label and icon read through the app's PackageManager (src/launcher-info.js).
-      if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
+      if (!runtime) throw new Error('Reopen an APK before running the VM.');
       const info = launcherInfo(runtime); send({ type: 'result', launcher: info });
     } else if (type === 'render-variant') {
       // lab.renderVariant (src/render-variant.js, docs/RENDER-VARIANT.md): a second instance of the Activity on top runs in the background with its own endpoint mocks, its window
       // is returned as RGBA images (transferred) and it is destroyed. It holds the one-operation slot: page input waits, no snapshot of the background instance reaches the page.
-      if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
+      if (!runtime) throw new Error('Reopen an APK before running the VM.');
       lastOperationAt = performance.now();
       const refresh = () => { try { if (runtime?.activity) postRuntimeEvent(); } catch { snapshotOwed = true; } };   // the visible windows were redrawn: the page gets a fresh frame of them
       let variant;
@@ -741,7 +741,7 @@ async function handleMessage({ data }) {
       logcat.flush(); netlog.flush(); lastOperationAt = performance.now();
       self.postMessage({ requestId, type: 'result', variant }, [...rasterSender.takeTransfers(), ...pixels]); refresh();
     } else if (type === 'launch' || type === 'intent' || type === 'click' || type === 'back' || type === 'home' || type === 'resume-task' || type === 'reload-activity' || type === 'input' || type === 'check' || type === 'focus' || type === 'press' || type === 'scroll' || type === 'compose-action' || type === 'ime' || type === 'pointer' || type === 'scrollby' || type === 'action-item') {
-      if (!runtime) throw new Error('Reabra um APK antes de executar a VM.');
+      if (!runtime) throw new Error('Reopen an APK before running the VM.');
       send({ type: 'progress', progress: { phase: type, completed: 0, total: 1 } });
       lastOperationAt = performance.now(); runtime.monitor.begin(type); if (type !== 'launch' && type !== 'intent') runtime.platform.noteInput?.();   // scroll, focus, press and the rest reach the View directly below: the collector's input signal (heap-gc.js deferral)
       runtime.steps = 0; let droppedComposeAction = null, droppedEvent = null, deepLink = null, imeFallback = null;
@@ -752,14 +752,14 @@ async function handleMessage({ data }) {
         runtime.record(`EVENT dropped (${type} on View ${staleId} that no longer exists)`);
       }
       else if (type === 'scroll') {
-        if (![data.x,data.y].every(value=>Number.isInteger(value)&&value>=-2147483648&&value<=2147483647)) throw new TypeError('A rolagem requer coordenadas inteiras Android.');
+        if (![data.x,data.y].every(value=>Number.isInteger(value)&&value>=-2147483648&&value<=2147483647)) throw new TypeError('Scrolling requires integer Android coordinates.');
         const receiver={ref:data.id};
-        if(!runtime.isSubtype(runtime.object(receiver).type,'Landroid/view/View;'))throw new TypeError('O alvo de rolagem precisa ser uma View real.');
+        if(!runtime.isSubtype(runtime.object(receiver).type,'Landroid/view/View;'))throw new TypeError('The scroll target must be a real View.');
         runtime.dispatch({owner:'Landroid/view/View;',name:'scrollTo',parameters:['I','I'],result:'V',signature:'(II)V'},[receiver,data.x,data.y],'virtual');
       }
       else if (type === 'action-item') {
         // A click on an item of a floating action-mode toolbar the page drew from the snapshot: what the toolbar's OnMenuItemClickListener does (MenuBuilder.performItemAction).
-        if (!Number.isSafeInteger(data.modeId) || !Number.isSafeInteger(data.itemId)) throw new TypeError('O item da barra de ação requer ids inteiros.');
+        if (!Number.isSafeInteger(data.modeId) || !Number.isSafeInteger(data.itemId)) throw new TypeError('The action bar item requires integer ids.');
         const outcome = isFreedId(runtime, data.modeId) || isFreedId(runtime, data.itemId) ? null : runtime.platform.actionModes.performToolbarItem(runtime, data.modeId, data.itemId);
         if (!outcome) { droppedEvent = { kind: 'stale-action-mode', type, id: data.modeId }; runtime.record(`EVENT dropped (action item ${data.itemId} of an action mode ${data.modeId} that is no longer shown)`); }
       }
@@ -800,7 +800,7 @@ async function handleMessage({ data }) {
       const motionRequest = type === 'scrollby' ? 'scrollby' : type === 'pointer' && data.action !== 1 && data.action !== 3 ? 'pointer-motion' : null;   // input in flight: a wheel step, a pointer DOWN/MOVE (UP/CANCEL end the gesture)
       const resultSnapshot = currentSnapshot({ request: motionRequest, pacedSemantics: type === 'scrollby' || (type === 'pointer' && data.action === 2) }); if (deepLink) resultSnapshot.deepLink = deepLink; if (droppedComposeAction) resultSnapshot.droppedComposeAction = droppedComposeAction; if (droppedEvent) resultSnapshot.droppedEvent = droppedEvent; if (imeFallback) resultSnapshot.imeFallback = imeFallback;
       send({ type: 'result', snapshot: resultSnapshot });
-    } else throw new Error(`Operação de Worker desconhecida: ${type}`);
+    } else throw new Error(`Unknown Worker operation: ${type}`);
     succeeded = true;
   } catch (error) {
     send({ type: 'error', error: errorData(error) });

@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ca92aaad0948';
-import { describeNativeLibrary } from './native-library-hints.js?v=ca92aaad0948';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d422379a2a38';
+import { describeNativeLibrary } from './native-library-hints.js?v=d422379a2a38';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -209,49 +209,49 @@ function isPacked(bytes) {
 
 const NATIVE_LINE_MAX = 420;
 const sizeText = n => n >= 1048576 ? `${(n / 1048576).toFixed(1)} MiB` : `${Math.max(1, Math.round(n / 1024))} KiB`;
-const HINT_KIND = { provides: 'parece', uses: 'usa', banner: 'texto indica' };
+const HINT_KIND = { provides: 'seems to provide', uses: 'uses', banner: 'text indicates' };
 /** One compact description of a library's ELF (see describeNativeLibrary). */
 function describeElf(e) {
-  if (e.error) return `${e.size !== undefined ? sizeText(e.size) + ', ' : ''}ELF ilegível (${e.error})`;
+  if (e.error) return `${e.size !== undefined ? sizeText(e.size) + ', ' : ''}unreadable ELF (${e.error})`;
   const parts = [`${sizeText(e.size)} ${e.architecture} ${e.bits}-bit`];
-  if (e.noSymbols) parts.push('sem tabela de símbolos dinâmicos');
-  else parts.push(`${e.exportCount} exportados${e.exportSample.length ? ': ' + e.exportSample.join(', ') + (e.exportCount > e.exportSample.length ? ', ...' : '') : ''}`, `${e.importCount} importados`);
-  parts.push(`JNI_OnLoad ${e.jniOnLoad ? 'sim' : 'não'}`, `RegisterNatives ${e.registerNatives ? 'sim' : 'não'}`);
-  if (e.neededCount) parts.push(`precisa de ${e.needed.join(' ')}${e.neededCount > e.needed.length ? ` +${e.neededCount - e.needed.length}` : ''}`);
+  if (e.noSymbols) parts.push('no dynamic symbol table');
+  else parts.push(`${e.exportCount} exported${e.exportSample.length ? ': ' + e.exportSample.join(', ') + (e.exportCount > e.exportSample.length ? ', ...' : '') : ''}`, `${e.importCount} imported`);
+  parts.push(`JNI_OnLoad ${e.jniOnLoad ? 'yes' : 'no'}`, `RegisterNatives ${e.registerNatives ? 'yes' : 'no'}`);
+  if (e.neededCount) parts.push(`needs ${e.needed.join(' ')}${e.neededCount > e.needed.length ? ` +${e.neededCount - e.needed.length}` : ''}`);
   if (e.hints?.length) parts.push(e.hints.map(h => `${HINT_KIND[h.kind]} ${h.label}`).join(' / '));
   return parts.join('; ');
 }
 
-const MARK = { direct: 'incond.', sdk: 'SDK_INT', unknown: '?' };
-const STATUS = { available: 'disponível', 'version-gated': 'porta de versão', protected: 'protegida', missing: 'ausente' };
-export const API_GAPS_TITLE = 'APIs referenciadas sem implementação (estimativa estática)';
+const MARK = { direct: 'uncond.', sdk: 'SDK_INT', unknown: '?' };
+const STATUS = { available: 'available', 'version-gated': 'version-gated', protected: 'protected', missing: 'missing' };
+export const API_GAPS_TITLE = 'Referenced APIs without an implementation (static estimate)';
 
-/** The compact, text-only section for "Copiar diagnóstico": top classes and methods by call sites, then the native library table. Bounded by the arguments. */
+/** The compact, text-only section for "Copy diagnostics": top classes and methods by call sites, then the native library table. Bounded by the arguments. */
 export function formatApiGapReport(report, { topClasses = 20, topMethods = 3, topNative = 20 } = {}) {
   if (!report) return '';
   const lines = [`${API_GAPS_TITLE}:`,
-    `Limite superior: conta pontos de chamada no DEX (sem chamadas via interface, que dependem do objeto em execução), inclusive código atrás de SDK_INT ou de recursos que o app talvez não use; nada foi executado. Só nomes de API do framework/JDK. Marcas: incond. = sem SDK_INT na classe, SDK_INT = após leitura de Build.VERSION.SDK_INT, ? = guarda possível em outro método.`,
-    `${report.rejectedMethods} métodos e ${report.rejectedClasses} classes do framework/JDK referenciados e sem implementação, de ${report.referencedFrameworkMethods} métodos referenciados (${report.scannedMethods} métodos do app varridos).`];
+    `Upper bound: counts call sites in the DEX (without calls through an interface, which depend on the object at run time), including code behind SDK_INT or features the app may not use; nothing was executed. Framework/JDK API names only. Marks: uncond. = no SDK_INT in the class, SDK_INT = after reading Build.VERSION.SDK_INT, ? = possible guard in another method.`,
+    `${report.rejectedMethods} methods and ${report.rejectedClasses} classes of the framework/JDK referenced and without an implementation, out of ${report.referencedFrameworkMethods} referenced methods (${report.scannedMethods} app methods scanned).`];
   for (const c of report.classes.slice(0, topClasses)) {
-    const detail = c.missingClass ? `classe ausente${c.kinds.length ? ' (' + c.kinds.join('/') + ')' : ''}` : `${c.methodCount} métodos`;
-    lines.push(`- ${c.name}: ${c.sites} pontos, ${detail}`);
+    const detail = c.missingClass ? `missing class${c.kinds.length ? ' (' + c.kinds.join('/') + ')' : ''}` : `${c.methodCount} methods`;
+    lines.push(`- ${c.name}: ${c.sites} sites, ${detail}`);
     for (const m of c.methods.slice(0, topMethods)) lines.push(`    ${m.name}(${m.params}) x${m.sites} [${MARK[m.mark]}]`);
     if (c.methods.length > topMethods) lines.push(`    ... +${c.methods.length - topMethods}`);
   }
   if (report.classes.length > topClasses) lines.push(`... +${report.classes.length - topClasses} classes`);
-  if (report.omittedNonFramework) lines.push(`(${report.omittedNonFramework} referências fora do framework/JDK omitidas)`);
+  if (report.omittedNonFramework) lines.push(`(${report.omittedNonFramework} references outside the framework/JDK omitted)`);
   const rank = { protected: 0, 'version-gated': 1, missing: 2, available: 3 };   // what needs attention first, so a bounded table never hides it
   const libs = [...(report.native ?? [])].sort((x, y) => (rank[x.status] ?? 4) - (rank[y.status] ?? 4) || x.name.localeCompare(y.name));
   if (libs.length) {
-    lines.push('Bibliotecas nativas do APK (estado no laboratório):');
+    lines.push('Native libraries of the APK (state in the lab):');
     for (const lib of libs.slice(0, topNative)) {
-      const line = `- ${lib.name} [${lib.abis.join(',')}]: ${STATUS[lib.status] ?? lib.status}${lib.needs ? ` (precisa de ${lib.needs})` : ''}${lib.elf ? ' | ' + describeElf(lib.elf) : ''}`;
+      const line = `- ${lib.name} [${lib.abis.join(',')}]: ${STATUS[lib.status] ?? lib.status}${lib.needs ? ` (needs ${lib.needs})` : ''}${lib.elf ? ' | ' + describeElf(lib.elf) : ''}`;
       lines.push(line.length > NATIVE_LINE_MAX ? line.slice(0, NATIVE_LINE_MAX - 3) + '...' : line);
     }
-    if (libs.length > topNative) lines.push(`... +${libs.length - topNative} bibliotecas`);
-    if (libs.some(l => l.elf)) lines.push('Descrição estática lida do próprio ELF (ABI preferida arm64-v8a); nada foi executado. RegisterNatives só é detectável como texto na imagem.');
+    if (libs.length > topNative) lines.push(`... +${libs.length - topNative} libraries`);
+    if (libs.some(l => l.elf)) lines.push('Static description read from the ELF itself (preferred ABI arm64-v8a); nothing was executed. RegisterNatives is only detectable as text in the image.');
     const stubbed = libs.filter(l => l.status === 'missing').length;
-    if (stubbed) lines.push(`Se o modo tolerante substituiu ${stubbed} biblioteca${stubbed > 1 ? 's' : ''} nativa${stubbed > 1 ? 's' : ''} ausente${stubbed > 1 ? 's' : ''} (STUB-LIB) e a execução falhar depois com um erro sem relação com nativos, a falha pode ser consequência das bibliotecas substituídas listadas acima (os resultados delas são vazios).`);
+    if (stubbed) lines.push(`If tolerant mode replaced ${stubbed} missing native librar${stubbed > 1 ? 'ies' : 'y'} (STUB-LIB) and the run later fails with an error unrelated to native code, the failure may be a consequence of the replaced libraries listed above (their results are empty).`);
   }
   return lines.join('\n');
 }

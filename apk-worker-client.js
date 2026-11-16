@@ -1,10 +1,10 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=ca92aaad0948';
-import { createRasterReceiver } from './raster-cache.js?v=ca92aaad0948';
+import { createWebAudioPlayer } from './web-audio-player.js?v=d422379a2a38';
+import { createRasterReceiver } from './raster-cache.js?v=d422379a2a38';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=ca92aaad0948', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d422379a2a38', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
-      if (typeof Worker === 'undefined') throw new Error('Web Workers não estão disponíveis neste navegador. Use um navegador com suporte a module Workers; o APK não será processado na interface principal.');
+      if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
       return new Worker(url, { type: 'module', name: 'apk-dex-vm' });
     });
     this.loadTimeoutMs = loadTimeoutMs; this.eventTimeoutMs = eventTimeoutMs;
@@ -31,7 +31,7 @@ export class APKWorkerClient {
       if (data?.type === 'system-picker-request') { this.onSystemPickerRequest?.(data.request); return; }   // a file picker Intent (GET_CONTENT, OPEN_DOCUMENT, PICK, PICK_IMAGES) waits for the user's choice
       if (data?.type === 'camera') { this.onCamera?.(data.message); return; }   // the VM's cameras asking the page for frames or for the camera screen (src/camera-lab.js)
       const call = this.sideCalls?.get(data?.requestId);
-      if (call && (data.type === 'result' || data.type === 'error')) { clearTimeout(call.timer); this.sideCalls.delete(data.requestId); if (data.type === 'result') call.resolve(data); else call.reject(Object.assign(new Error(data.error?.message || 'Falha na VM.'), data.error || {})); return; }
+      if (call && (data.type === 'result' || data.type === 'error')) { clearTimeout(call.timer); this.sideCalls.delete(data.requestId); if (data.type === 'result') call.resolve(data); else call.reject(Object.assign(new Error(data.error?.message || 'VM failure.'), data.error || {})); return; }
       const side = this.sideRequests?.get(data?.requestId);
       if (side && (data.type === 'result' || data.type === 'error')) { clearTimeout(side.timer); this.sideRequests.delete(data.requestId); side.resolve(data.type === 'result' ? data.screenState : this.cachedScreenState()); return; }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
@@ -46,48 +46,48 @@ export class APKWorkerClient {
       if (data?.type === 'runtime-event') { this.onRuntimeSnapshot?.(data.snapshot, data.seq); return; }
       if (data?.type === 'thread-failure') { this.onThreadFailure?.(data.failure ?? {}); return; }   // a lab error ended a background thread of the app (src/apk-worker.js surfaceThreadFailure), never part of a request
       if (data?.type === 'runtime-error') this.onRuntimeBusy?.(false);
-      if (data?.type === 'runtime-error') { const error = new Error(data.error?.message || 'Falha em callback assíncrono da VM.'); Object.assign(error, data.error || {}); this.onRuntimeError?.(error); return; }
+      if (data?.type === 'runtime-error') { const error = new Error(data.error?.message || 'Failure in an asynchronous VM callback.'); Object.assign(error, data.error || {}); this.onRuntimeError?.(error); return; }
       const pending = this.pending;
       if (worker !== this.worker || !pending || data?.requestId !== pending.requestId) return;
       if (data.type === 'progress') { pending.onProgress?.(data.progress); return; }
       clearTimeout(pending.timer); this.pending = null;
       if (data.type === 'result') pending.resolve(data);
       else {
-        const error = new Error(data.error?.message || 'Resposta inválida do Worker.');
+        const error = new Error(data.error?.message || 'Invalid response from the Worker.');
         Object.assign(error, data.error || {}); pending.reject(error);
       }
     };
     worker.onerror = (event) => {
       if (worker !== this.worker) return;
       event.preventDefault?.();
-      this.cancel(new Error(`Falha no Web Worker: ${event.message || 'verifique o carregamento dos módulos locais'}. Reabra o APK para tentar novamente.`));
+      this.cancel(new Error(`Web Worker failure: ${event.message || 'check the loading of the local modules'}. Reopen the APK to try again.`));
     };
-    worker.onmessageerror = () => { if (worker === this.worker) this.cancel(new Error('Não foi possível receber os dados da VM. Reabra o APK.')); };
+    worker.onmessageerror = () => { if (worker === this.worker) this.cancel(new Error('Could not receive the data from the VM. Reopen the APK.')); };
   }
   /** "Último sinal da VM ...": what the last heartbeat said, and whether the VM went silent after it (a long synchronous host call or a loop that never reaches a tick). */
   describeLastSignal(type) {
     const beat = this.lastHeartbeat;
-    if (!beat) return { heartbeat: null, silentSeconds: null, text: `Nenhum sinal da VM foi recebido durante a operação ${type}; o Worker não chegou a executar código da VM.` };
+    if (!beat) return { heartbeat: null, silentSeconds: null, text: `No signal from the VM was received during the ${type} operation; the Worker never ran VM code.` };
     const silent = Math.max(0, (Date.now() - beat.receivedAt) / 1000), seconds = Math.round(silent * 10) / 10;
-    let text = `Último sinal da VM há ${seconds} s: ${beat.operation ?? type}, ${beat.thread ?? 'sem thread'}, ${(beat.stack ?? []).join(' < ') || 'sem pilha'}, chamada do host: ${beat.hostCall ?? 'nenhuma'}, eventos nesta operação: ${beat.events ?? 0}, instruções: ${beat.instructions ?? 0}`;
-    if (beat.busiest?.length) text += `, mais ocupados: ${beat.busiest.join(', ')}`;
-    if (beat.queueDepth !== null && beat.queueDepth !== undefined) text += `, fila: ${beat.queueDepth}${beat.nextDelay === null || beat.nextDelay === undefined ? '' : ` (próximo em ${Math.round(beat.nextDelay)} ms)`}`;
+    let text = `Last VM signal ${seconds} s ago: ${beat.operation ?? type}, ${beat.thread ?? 'no thread'}, ${(beat.stack ?? []).join(' < ') || 'no stack'}, host call: ${beat.hostCall ?? 'none'}, events in this operation: ${beat.events ?? 0}, instructions: ${beat.instructions ?? 0}`;
+    if (beat.busiest?.length) text += `, busiest: ${beat.busiest.join(', ')}`;
+    if (beat.queueDepth !== null && beat.queueDepth !== undefined) text += `, queue: ${beat.queueDepth}${beat.nextDelay === null || beat.nextDelay === undefined ? '' : ` (next in ${Math.round(beat.nextDelay)} ms)`}`;
     text += '.';
-    if (silent > 2) text += ` A VM não respondeu desde esse sinal${beat.hostCall ? ` (última chamada do host em andamento: ${beat.hostCall})` : ''}.`;
+    if (silent > 2) text += ` The VM has not responded since that signal${beat.hostCall ? ` (last host call in progress: ${beat.hostCall})` : ''}.`;
     return { heartbeat: beat, silentSeconds: seconds, text };
   }
   request(type, payload = {}, { onProgress, timeoutMs, transfer = [] } = {}) {
-    if (this.pending) return Promise.reject(Object.assign(new Error('Uma operação da VM já está em andamento.'), { kind: 'vm-busy', operation: this.pending.type ?? null }));
+    if (this.pending) return Promise.reject(Object.assign(new Error('A VM operation is already in progress.'), { kind: 'vm-busy', operation: this.pending.type ?? null }));
     try { this.ensureWorker(); } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
       const requestId = ++this.sequence; if (type !== 'screen-state') this.lastHeartbeat = null;   // a state request must not forget the signals of the work the VM is busy with
       const timer = setTimeout(() => {
-        const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
+        const signal = this.describeLastSignal(type), error = new Error(`The ${type} operation exceeded ${Math.round(timeoutMs / 1000)} s. The Worker was terminated; reopen the APK to continue.${signal ? ' ' + signal.text : ''}`);
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       }, timeoutMs);
       this.pending = { requestId, resolve, reject, timer, onProgress, type, startedAt: Date.now() };
       const fire = () => {
-        const signal = this.describeLastSignal(type), error = new Error(`A operação ${type} excedeu ${Math.round(timeoutMs / 1000)} s. O Worker foi encerrado; reabra o APK para continuar.${signal ? ' ' + signal.text : ''}`);
+        const signal = this.describeLastSignal(type), error = new Error(`The ${type} operation exceeded ${Math.round(timeoutMs / 1000)} s. The Worker was terminated; reopen the APK to continue.${signal ? ' ' + signal.text : ''}`);
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);
       };
       // Silence, not total time: every heartbeat of this operation re-arms the timer (up to 5x the timeout in all); without heartbeats the original timeout stands.
@@ -112,16 +112,16 @@ export class APKWorkerClient {
   /** The last screen-state text captured during an operation, marked as such: the Worker cannot answer while it executes VM code. */
   cachedScreenState() {
     const last = this.lastScreenSnapshot; if (!last) return null;
-    return { text: `${last.text}\n(captura feita há ${Math.round((Date.now() - last.receivedAt) / 100) / 10} s durante uma operação da VM: o Worker não responde enquanto executa código da VM; a semântica do Compose não está incluída)`, blank: false, reasons: [], stale: true };
+    return { text: `${last.text}\n(captured ${Math.round((Date.now() - last.receivedAt) / 100) / 10} s ago during a VM operation: the Worker does not respond while it runs VM code; the Compose semantics are not included)`, blank: false, reasons: [], stale: true };
   }
   /** Tells the Worker that the page has drawn the scheduled-event snapshot `seq` (back-pressure: the Worker does not take the next one while one is undrawn, src/apk-worker.js). */
   ackFrame(seq) { try { this.worker?.postMessage({ type: 'frame-ack', seq }); } catch { /* the Worker is gone */ } }
   /** A request answered from the Worker's message loop between two VM events, outside the one-operation slot (method overrides, permission state): resolves with the reply, rejects when there is no Worker or it stays silent. */
   sideCall(type, payload = {}, timeoutMs = 8000) {
-    if (!this.worker) return Promise.reject(new Error('Nenhum APK está carregado na VM.'));
+    if (!this.worker) return Promise.reject(new Error('No APK is loaded in the VM.'));
     return new Promise((resolve, reject) => {
       const requestId = ++this.sequence, calls = this.sideCalls ??= new Map();
-      const timer = setTimeout(() => { calls.delete(requestId); reject(new Error(`A VM não respondeu a "${type}" em ${Math.round(timeoutMs / 1000)} s (ocupada com uma operação).`)); }, timeoutMs);
+      const timer = setTimeout(() => { calls.delete(requestId); reject(new Error(`The VM did not respond to "${type}" in ${Math.round(timeoutMs / 1000)} s (busy with an operation).`)); }, timeoutMs);
       calls.set(requestId, { resolve, reject, timer });
       try { this.worker.postMessage({ ...payload, type, requestId }); } catch (error) { clearTimeout(timer); calls.delete(requestId); reject(error); }
     });
@@ -139,7 +139,7 @@ export class APKWorkerClient {
 
   async inspectCompose({ maxNodes = 2000 } = {}) { if (!this.worker) return null; return (await this.sideCall('compose-inspect', { maxNodes }, 15000)).inspection ?? null; }
   /** A page plugin's read-only query (src/plugin-queries.js; queued and served at low priority by the Worker). Rejects with `code` 'no-apk' when no APK is loaded. */
-  async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('Nenhum APK em execução.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args }, 10000); return { value: reply.value, ms: reply.ms }; }
+  async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args }, 10000); return { value: reply.value, ms: reply.ms }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
   /** The "com microG" entry points (src/microg-entry-points.js): sets the page's constant-value mocks ([{ id, value }]; an id left out is unmocked) and resolves the entry-point rows. */
   async setMicrogMocks(mocks) { return (await this.sideCall('microg-mocks', { mocks })).entryPoints ?? []; }
@@ -221,12 +221,12 @@ export class APKWorkerClient {
     if (this.worker && !(keepFresh && this.fresh)) { this.worker.terminate(); this.worker = null; }
     for (const side of this.sideRequests?.values() ?? []) { clearTimeout(side.timer); side.resolve(this.cachedScreenState()); }
     this.sideRequests?.clear();
-    for (const call of this.sideCalls?.values() ?? []) { clearTimeout(call.timer); call.reject(new Error('A VM foi encerrada.')); }
+    for (const call of this.sideCalls?.values() ?? []) { clearTimeout(call.timer); call.reject(new Error('The VM was terminated.')); }
     this.sideCalls?.clear();
     if (this.pending) {
       clearTimeout(this.pending.timer);
       const reject = this.pending.reject; this.pending = null;
-      if (!error) { error = new Error('Operação cancelada. O Worker foi encerrado; reabra o APK para continuar.'); error.name = 'AbortError'; }
+      if (!error) { error = new Error('Operation canceled. The Worker was terminated; reopen the APK to continue.'); error.name = 'AbortError'; }
       reject(error);
     } else if (error) this.onRuntimeError?.(error);   // the Worker died between requests (a module or memory failure): the page hears of it as of any asynchronous VM error
   }

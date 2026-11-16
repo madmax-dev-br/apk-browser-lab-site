@@ -1,4 +1,4 @@
-// "Tela pronta" (screenReady): a flag that says the current Activity, and the fragments on it, finished loading and the screen is still, so a plugin, the player or a
+// "Screen ready" (screenReady): a flag that says the current Activity, and the fragments on it, finished loading and the screen is still, so a plugin, the player or a
 // backend can take a screenshot or read the screen at the right moment. It is derived from what the VM already knows, read-only, and costs a few field reads per snapshot:
 //   - the Activity on top is resumed and its window drew at least one frame;
 //   - no androidx fragment on the screen is between states (each added, visible fragment is RESUMED);
@@ -7,7 +7,7 @@
 // and all of that held for READY_QUIET_MS (a short quiet period, so a response that triggers the next request or a postDelayed of a few frames is not "ready" in between).
 // A screen that keeps animating forever (a progress spinner, a blinking cursor of a focused field) never becomes ready: `waitingFor` names why. The Worker attaches the result
 // to every snapshot (snapshot.screenReady) and wakes once the quiet period ends so the flip to ready is posted even when nothing else happens. DOM-free, no process.*.
-import { runPluginQuery } from './plugin-queries.js?v=ca92aaad0948';
+import { runPluginQuery } from './plugin-queries.js?v=d422379a2a38';
 
 export const READY_QUIET_MS = 300;
 const FRAGMENT_RESUMED = 7;   // androidx.fragment.app.Fragment.RESUMED (INITIALIZING -1 … AWAITING_ENTER_EFFECTS 6, RESUMED 7)
@@ -35,18 +35,18 @@ export function readinessProbe(runtime) {
   };
 }
 
-/** Why the screen is not settled (Portuguese, for the page and the report), empty when it is. */
+/** Why the screen is not settled (English, for the page and the report), empty when it is. */
 export function waitingFor(probe) {
   const reasons = [];
-  if (!probe.activity) return ['nenhuma Activity em execução'];
-  if (!probe.resumed) reasons.push('a Activity ainda não chegou a onResume');
-  if (!probe.firstFrame) reasons.push('o primeiro quadro ainda não foi desenhado');
+  if (!probe.activity) return ['no Activity running'];
+  if (!probe.resumed) reasons.push('the Activity has not reached onResume yet');
+  if (!probe.firstFrame) reasons.push('the first frame has not been drawn yet');
   const loading = probe.fragments.filter(fragment => !fragment.hidden && fragment.state !== null && fragment.state < FRAGMENT_RESUMED);
-  if (loading.length) reasons.push(`${loading.length === 1 ? 'um fragment ainda carregando' : `${loading.length} fragments ainda carregando`} (${loading.slice(0, 3).map(fragment => String(fragment.className ?? '?').split('.').pop()).join(', ')})`);
-  if (probe.pendingFrames > 0) reasons.push('quadro pendente (animação, transição ou recomposição)');
-  if (probe.layoutPending) reasons.push('passada de layout pendente');
-  if (probe.dueEvents) reasons.push('mensagens da thread principal para processar');
-  if (probe.network > 0) reasons.push(`${probe.network === 1 ? 'uma requisição de rede' : `${probe.network} requisições de rede`} em andamento`);
+  if (loading.length) reasons.push(`${loading.length === 1 ? 'one fragment still loading' : `${loading.length} fragments still loading`} (${loading.slice(0, 3).map(fragment => String(fragment.className ?? '?').split('.').pop()).join(', ')})`);
+  if (probe.pendingFrames > 0) reasons.push('frame pending (animation, transition or recomposition)');
+  if (probe.layoutPending) reasons.push('layout pass pending');
+  if (probe.dueEvents) reasons.push('main-thread messages to process');
+  if (probe.network > 0) reasons.push(`${probe.network === 1 ? 'one network request' : `${probe.network} network requests`} in flight`);
   return reasons;
 }
 
@@ -65,7 +65,7 @@ export class ScreenReadyTracker {
     if (ready && this.readySince === null) this.readySince = now;
     this.lastSettled = settled;
     this.state = { ready, activity: probe.activity, readySince: ready ? Date.now() - Math.round(now - this.readySince) : null, settledForMs: settled ? Math.round(now - this.settledSince) : 0, quietMs: this.quietMs,
-      waitingFor: settled && !ready ? [`tela parada há ${Math.round(now - this.settledSince)} ms (pronta após ${this.quietMs} ms)`] : reasons,
+      waitingFor: settled && !ready ? [`screen still for ${Math.round(now - this.settledSince)} ms (ready after ${this.quietMs} ms)`] : reasons,
       network: probe.network ?? 0, onlyNetwork: (probe.network ?? 0) > 0 && waitingFor({ ...probe, network: 0 }).length === 0,
       fragments: probe.fragments.map(fragment => ({ className: fragment.className, state: fragment.state, hidden: fragment.hidden, ready: fragment.hidden || fragment.state === null || fragment.state >= FRAGMENT_RESUMED })) };
     return this.state;

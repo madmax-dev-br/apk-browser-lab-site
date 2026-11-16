@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=ca92aaad0948';
-import {getVectorGraphics} from './vector-native.js?v=ca92aaad0948';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=ca92aaad0948';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=ca92aaad0948';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=ca92aaad0948';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=ca92aaad0948';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=ca92aaad0948';
-import {createBitmapHost} from './bitmap-host.js?v=ca92aaad0948';
-import { gcRoot } from './heap-gc.js?v=ca92aaad0948';
-import {sha256Hex} from './sha256-sync.js?v=ca92aaad0948';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=ca92aaad0948';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=ca92aaad0948';
+import {APKError} from './apk-runtime.js?v=d422379a2a38';
+import {getVectorGraphics} from './vector-native.js?v=d422379a2a38';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=d422379a2a38';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=d422379a2a38';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=d422379a2a38';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=d422379a2a38';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=d422379a2a38';
+import {createBitmapHost} from './bitmap-host.js?v=d422379a2a38';
+import { gcRoot } from './heap-gc.js?v=d422379a2a38';
+import {sha256Hex} from './sha256-sync.js?v=d422379a2a38';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=d422379a2a38';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=d422379a2a38';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -323,7 +323,7 @@ function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,o
  catch(error){
   if(error instanceof GpuRasterError){gpu.fallback(error.reason,runtime);return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);}
   const cpu=rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);   // throws when the recording itself fails: the GPU is not the cause
-  gpu.fallback(`erro na reprodução GPU: ${String(error?.message??error).slice(0,160)}`,runtime);return cpu;
+  gpu.fallback(`GPU replay error: ${String(error?.message??error).slice(0,160)}`,runtime);return cpu;
  }
  gpu.noteFrame(performance.now()-g0,runtime);
  if(result.kind==='bitmap-raster')result.rasterId='g'+(runtime.rasterUid=(runtime.rasterUid??0)+1);
@@ -566,7 +566,7 @@ export function createSkiaCanvasHost(runtime,backend){
   /** The commands and fill type of the Path object `ref` (what JNI code sees through Path.mNativePath: src/skia-path-layout.js). */
   pathSnapshot(ref){return snapshot(ref);},
   pathByHandle(handle){const ref=pathHandles.get(handle);if(!ref)fail('Invalid or released VM SkPath token');return snapshot(ref);},
-  recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');bitmaps.flattenFullCanvas(handle);let rasterBytes=(command.raster?.dataURL?.length??0)+(command.pixelData?.base64?.length??0);if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES){runtime.collectForNativeHandles?.('rasters gravados de Canvas');if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES)fail(`Recorded Canvas rasters of the live canvases exceed ${RECORDED_RASTER_BYTES/1048576} MiB`);}/* a collection first: canvases the app dropped release theirs (vector-native releaseWithOwner) */getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
+  recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');bitmaps.flattenFullCanvas(handle);let rasterBytes=(command.raster?.dataURL?.length??0)+(command.pixelData?.base64?.length??0);if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES){runtime.collectForNativeHandles?.('recorded Canvas rasters');if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES)fail(`Recorded Canvas rasters of the live canvases exceed ${RECORDED_RASTER_BYTES/1048576} MiB`);}/* a collection first: canvases the app dropped release theirs (vector-native releaseWithOwner) */getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,...faceState(face)});},
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,...faceState(face)});},
   /** Paint.hasGlyph: the paint's typeface (else Roboto of its weight/style) has a glyph for every character, the Android fallback chain included. */

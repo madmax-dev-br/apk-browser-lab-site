@@ -1,6 +1,6 @@
 // "Tela" -> "Personalizado" in the device panel: width, height and a dp/px unit, converted with the VM density (device-profile.js checkCustomScreen).
 // The panel only reads and writes these inputs; the value goes through sanitizeSettings / resolveDevice like a preset does.
-import { checkCustomScreen, SCREEN_DENSITY } from './device-profile.js?v=ca92aaad0948';
+import { checkCustomScreen, SCREEN_DENSITY } from './device-profile.js?v=d422379a2a38';
 
 /**
  * @param $ id -> element
@@ -9,7 +9,7 @@ import { checkCustomScreen, SCREEN_DENSITY } from './device-profile.js?v=ca92aaa
 export function createCustomScreenPanel({ $ }) {
   const box = $('dev-custom-screen'), width = $('dev-custom-w'), height = $('dev-custom-h'), unit = $('dev-custom-unit'), message = $('dev-custom-msg');
   let shownUnit = 'dp';
-  const describe = checked => `${checked.widthPx} × ${checked.heightPx} px · ${checked.widthDp} × ${checked.heightDp} dp (densidade ${String(SCREEN_DENSITY).replace('.', ',')}). Largura e altura em retrato; a orientação gira a tela.`;
+  const describe = checked => `${checked.widthPx} × ${checked.heightPx} px · ${checked.widthDp} × ${checked.heightDp} dp (density ${String(SCREEN_DENSITY)}). Width and height in portrait; the orientation rotates the screen.`;
   const show = (text, invalid) => { message.textContent = text; message.dataset.state = invalid ? 'error' : ''; width.setAttribute('aria-invalid', String(!!invalid)); height.setAttribute('aria-invalid', String(!!invalid)); };
   // Switching the unit converts the typed numbers (px = dp x density), so the screen keeps its size. Capture phase, registered before the panel's own
   // 'input' listener: the conversion happens before the settings are read.

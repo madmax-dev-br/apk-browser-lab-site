@@ -32,22 +32,22 @@ function splitScheme(text) {
 /** The key a rule's hit counts are kept under (Worker) and looked up with (panel): its text, trimmed, the source in lower case. */
 export const ruleKey = rule => `${String(rule?.from ?? '').trim().toLowerCase()} -> ${String(rule?.to ?? '').trim()}`;
 
-/** One rule from the panel: { from, to, enabled } with `error` when it cannot be used (the reason, in Portuguese, for the panel). */
+/** One rule from the panel: { from, to, enabled } with `error` when it cannot be used (the reason, for the panel). */
 export function parseRule(rule) {
   const from = String(rule?.from ?? '').trim(), to = String(rule?.to ?? '').trim(), enabled = rule?.enabled !== false;
   if (!from && !to) return { from, to, enabled, empty: true };
   const left = splitScheme(from.toLowerCase());
-  if (left.scheme && left.scheme !== 'http' && left.scheme !== 'https') return { from, to, enabled, error: `Origem inválida: o esquema ${left.scheme}:// não é HTTP; use http://, https:// ou só o host.` };
-  if (left.path) return { from, to, enabled, error: 'Origem com caminho não é suportada: use só o host (ex.: https://api.exemplo.com, api.exemplo.com:8443 ou *.exemplo.com); o caminho da requisição é mantido.' };
+  if (left.scheme && left.scheme !== 'http' && left.scheme !== 'https') return { from, to, enabled, error: `Invalid source: the scheme ${left.scheme}:// is not HTTP; use http://, https:// or just the host.` };
+  if (left.path) return { from, to, enabled, error: 'A source with a path is not supported: use just the host (e.g. https://api.example.com, api.example.com:8443 or *.example.com); the request path is kept.' };
   const source = splitHostPort(left.rest);
-  if (!source || !(HOST.test(source.host) || IPV6.test(source.host))) return { from, to, enabled, error: 'Origem inválida: use host, *.dominio, host:porta ou https://host.' };
+  if (!source || !(HOST.test(source.host) || IPV6.test(source.host))) return { from, to, enabled, error: 'Invalid source: use a host, *.domain, host:port or https://host.' };
   source.scheme = left.scheme;
-  if (!to) return { from, to, enabled, error: 'Falta o destino: host, host:porta ou http://host:porta.' };
+  if (!to) return { from, to, enabled, error: 'The target is missing: host, host:port or http://host:port.' };
   const right = splitScheme(to);
-  if (right.scheme && right.scheme !== 'http' && right.scheme !== 'https') return { from, to, enabled, error: `Destino inválido: o esquema ${right.scheme}:// não é HTTP; use http:// ou https://.` };
-  if (right.path) return { from, to, enabled, error: 'Destino inválido: só host, host:porta ou http(s)://host:porta (sem caminho).' };
+  if (right.scheme && right.scheme !== 'http' && right.scheme !== 'https') return { from, to, enabled, error: `Invalid target: the scheme ${right.scheme}:// is not HTTP; use http:// or https://.` };
+  if (right.path) return { from, to, enabled, error: 'Invalid target: only a host, host:port or http(s)://host:port (no path).' };
   const target = splitHostPort(right.rest);
-  if (!target || target.host.startsWith('*.') || !(HOST.test(target.host) || IPV6.test(target.host))) return { from, to, enabled, error: 'Destino inválido: use host, host:porta ou http(s)://host:porta.' };
+  if (!target || target.host.startsWith('*.') || !(HOST.test(target.host) || IPV6.test(target.host))) return { from, to, enabled, error: 'Invalid target: use a host, host:port or http(s)://host:port.' };
   // A target without a scheme: loopback is a local development server (plain http); anything else keeps the app's scheme.
   const scheme = right.scheme ?? (isLoopbackHost(target.host) ? 'http' : null);
   return { from, to, enabled, source, target: { ...target, scheme, schemeDefaulted: !right.scheme && scheme !== null } };
@@ -62,8 +62,8 @@ export function describeRule(parsed) {
   const port = target.port !== null ? ':' + target.port : keepsPort && source.port !== null && (target.scheme === null || source.scheme === target.scheme) ? ':' + source.port : '';
   const right = `${target.scheme ?? (source.scheme ?? 'http(s)')}://${target.host}${port}/*`;
   const notes = [];
-  if (target.scheme === null && source.scheme === null) notes.push('mesmo esquema do app');
-  if (keepsPort && (source.port === null || (target.schemeDefaulted && source.scheme === null))) notes.push(target.schemeDefaulted ? 'porta do app quando ela é http' : 'mesma porta do app');
+  if (target.scheme === null && source.scheme === null) notes.push('same scheme as the app');
+  if (keepsPort && (source.port === null || (target.schemeDefaulted && source.scheme === null))) notes.push(target.schemeDefaulted ? 'the app port when it is http' : 'same port as the app');
   return `${left} → ${right}${notes.length ? ` (${notes.join(', ')})` : ''}`;
 }
 
@@ -135,16 +135,16 @@ export function hostMapSummaryLines(rules, table) {
   const active = activeRules(rules); if (!active.length) return null;
   const counts = active.map(({ raw, parsed }) => ({ shape: describeRule(parsed), record: table?.get(ruleKey(raw)) ?? null }));
   const hits = counts.reduce((sum, { record }) => sum + (record?.hits ?? 0), 0);
-  const lines = [`Hosts REDIRECIONADOS: ${active.length} ${active.length === 1 ? 'regra ativa' : 'regras ativas'} (${hits} ${hits === 1 ? 'requisição foi' : 'requisições foram'} para outro destino; o app viu a URL original)`];
+  const lines = [`Hosts REDIRECTED: ${active.length} ${active.length === 1 ? 'active rule' : 'active rules'} (${hits} ${hits === 1 ? 'request went' : 'requests went'} to another target; the app saw the original URL)`];
   for (const { shape, record } of counts.slice(0, 8)) lines.push(`  ${shape}: ${hitText(record)}`);
-  if (counts.length > 8) lines.push(`  … e mais ${counts.length - 8}`);
+  if (counts.length > 8) lines.push(`  … and ${counts.length - 8} more`);
   return lines;
 }
-/** "3 respostas · 1 falha" (or "nenhuma requisição"). */
+/** "3 responses · 1 failure" (or "no request"). */
 export function hitText(record) {
   const responses = record?.responses ?? 0, failures = record?.failures ?? 0, pending = Math.max(0, (record?.hits ?? 0) - responses - failures - (record?.closed ?? 0));
-  const parts = [`${responses} ${responses === 1 ? 'resposta' : 'respostas'}`];
-  if (failures) parts.push(`${failures} ${failures === 1 ? 'falha' : 'falhas'}`);
-  if (pending) parts.push(`${pending} em andamento`);
+  const parts = [`${responses} ${responses === 1 ? 'response' : 'responses'}`];
+  if (failures) parts.push(`${failures} ${failures === 1 ? 'failure' : 'failures'}`);
+  if (pending) parts.push(`${pending} in progress`);
   return parts.join(' · ');
 }

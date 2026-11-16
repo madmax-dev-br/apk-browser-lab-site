@@ -59,21 +59,21 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ca92aaad0948';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=ca92aaad0948';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ca92aaad0948';
-import { HandleTable } from './handles.js?v=ca92aaad0948';
-import { Exceptions } from './exceptions.js?v=ca92aaad0948';
-import { coreImports } from './boundary-imports.js?v=ca92aaad0948';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=ca92aaad0948';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=ca92aaad0948';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=ca92aaad0948';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=ca92aaad0948';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=ca92aaad0948';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ca92aaad0948';
-import { Blocked } from '../../runtime/scheduler.js?v=ca92aaad0948';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=ca92aaad0948';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ca92aaad0948';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=d422379a2a38';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=d422379a2a38';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=d422379a2a38';
+import { HandleTable } from './handles.js?v=d422379a2a38';
+import { Exceptions } from './exceptions.js?v=d422379a2a38';
+import { coreImports } from './boundary-imports.js?v=d422379a2a38';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=d422379a2a38';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=d422379a2a38';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=d422379a2a38';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=d422379a2a38';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=d422379a2a38';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d422379a2a38';
+import { Blocked } from '../../runtime/scheduler.js?v=d422379a2a38';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=d422379a2a38';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=d422379a2a38';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -139,7 +139,7 @@ export class WasmEngine {
     const layout = this.layout = coreLayout(pages != null ? { ...(memory ?? CORE_MEMORY_DEFAULT), mode: 'fixed' } : memory ?? CORE_MEMORY_DEFAULT), LAYOUT = layout; pages ??= layout.pages;
     this.dynamic = layout.dynamic && pages === layout.pages;
     try { this.memory = new WebAssembly.Memory({ initial: Math.min(pages, 2048), maximum: 32768, shared }); if (pages > 2048) this.memory.grow(pages - 2048); }
-    catch (error) { throw new APKError(`vmcore: o navegador recusou ${Math.round(pages / 16)} MiB de memória para o núcleo Wasm (${String(error?.message ?? error).slice(0, 120)}); ${layout.dynamic ? 'use o modo travado com tamanhos menores' : 'reduza heap, metaspace ou threads'} em Controles › Execução`, { kind: 'vmcore-memory' }); }   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists
+    catch (error) { throw new APKError(`vmcore: the browser refused ${Math.round(pages / 16)} MiB of memory for the Wasm core (${String(error?.message ?? error).slice(0, 120)}); ${layout.dynamic ? 'use fixed mode with smaller sizes' : 'reduce heap, metaspace or threads'} in Controls › Execution`, { kind: 'vmcore-memory' }); }   // `shared: false` needs the module of vmcore/js/unshared.js; the memory only grows here, before any view of it exists
     this.pages = pages; this.maxDepth = maxDepth; this.stress = stress; this.guestNext = this.guestBlockEnd = 0;
     if (pages * 65536 <= LAYOUT.HEAP + 16 * MiB) throw new Error(`vmcore: ${pages} pages leave no heap above the ${LAYOUT.HEAP / MiB} MiB of metaspace and thread records`);
     this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives, ...LINKER_LIMITS });

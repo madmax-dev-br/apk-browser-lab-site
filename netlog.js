@@ -64,7 +64,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
       method: String(fields.method ?? 'GET'), url, scheme: fields.scheme ?? parts.scheme, host: fields.host ?? parts.host, port: fields.port ?? parts.port, path: fields.path ?? parts.path,
       requestHeaders: pairs(fields.headers), requestBytes: fields.bytes ?? 0, outcome: 'pending', complete: false, status: null, reason: '', responseHeaders: [], contentType: null, responseBytes: 0,
       finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null, mappedUrl: fields.mappedUrl ?? null, mappedRule: fields.mappedRule ?? null,   // mappedUrl: where "Redirecionar hosts" sent it (src/host-map.js)
-      mockId: fields.mockId ?? null, mockLabel: fields.mockLabel ?? null };   // the "Mock de endpoints" entry that answered it in the lab (src/endpoint-mocks.js); it never went to the network
+      mockId: fields.mockId ?? null, mockLabel: fields.mockLabel ?? null, proxiedVia: fields.proxiedVia ?? null };   // proxiedVia: the host of the proxy (Dispositivo › Proxy) the browser's request went through   // the "Mock de endpoints" entry that answered it in the lab (src/endpoint-mocks.js); it never went to the network
     buffer.push(entry); total++;
     if (buffer.length > maxEntries + 256) trim();   // amortized: trim in chunks, never per entry
     return touch(entry);
@@ -78,7 +78,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
   };
   const api = {
     /** A request that started: `request` is the network layer's { method, url, headers, body }. Returns the entry (kept by the caller to update it). */
-    begin(request, { api: via = 'java.net', mapped = null, mock = null } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0, mappedUrl: mock ? null : mapped?.url ?? null, mappedRule: mock ? null : mapped?.rule ?? null, mockId: mock?.id ?? null, mockLabel: mock?.label ?? null }); },
+    begin(request, { api: via = 'java.net', mapped = null, mock = null, proxy = null } = {}) { return create({ api: via, method: request.method, url: request.url, headers: request.headers, bytes: request.body?.length ?? 0, proxiedVia: mock ? null : proxy, mappedUrl: mock ? null : mapped?.url ?? null, mappedRule: mock ? null : mapped?.rule ?? null, mockId: mock?.id ?? null, mockLabel: mock?.label ?? null }); },
     /** A request the policy refused before anything left the device: outcome 'offline' when the device is offline, else 'refused-by-allowlist' (with the host). */
     refuse({ api: via = 'java.net', kind = 'http', method = 'GET', url, host, port = null, headers = [], bytes = 0, offline = false }) {
       const entry = create({ api: via, kind, method, url, host, port, headers, bytes }); entry.refusedHost = offline ? null : (host ?? entry.host);

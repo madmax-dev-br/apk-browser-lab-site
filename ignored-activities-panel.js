@@ -1,7 +1,7 @@
 // The "Activities ignoradas" section of the Controles panel (src/ignored-activities.js): a debugging tool that drops the starts of the Activities on the list. The section previews the
 // Activities the manifest declares (click one to add it), keeps N rows per package in localStorage (every access guarded) and applies them live to the Worker; counts come back with
 // every snapshot.
-import { activityDescriptor } from './ignored-activities.js?v=ca92aaad0948';
+import { activityDescriptor } from './ignored-activities.js?v=d422379a2a38';
 
 const KEY_PREFIX = 'apkweb-ignored-activities-v1:';
 const MAX_ROWS = 50;
@@ -21,25 +21,25 @@ export function createIgnoredActivitiesPanel({ $, vm }) {
   function meta(row, index) {
     if (!row.name.trim()) return ['', ''];
     const descriptor = descriptorOf(row.name), status = S.statuses[index];
-    if (!descriptor) return ['Nome inválido: use pacote.Classe, .Classe ou Lpacote/Classe;.', 'error'];
+    if (!descriptor) return ['Invalid name: use package.Class, .Class or Lpackage/Class;.', 'error'];
     if (status?.state === 'invalid' || status?.state === 'missing') return [status.error, 'error'];
-    const hits = S.hits.get(descriptor) ?? status?.hits ?? 0, launcher = descriptor === S.launcher ? ' · é a Activity de abertura: o lançamento do app não é afetado, só as aberturas que o app pedir' : '';
-    if (!row.enabled) return [`desligada${launcher}`, ''];
-    return [`${hits} ${hits === 1 ? 'abertura descartada' : 'aberturas descartadas'}${launcher}`, 'ok'];
+    const hits = S.hits.get(descriptor) ?? status?.hits ?? 0, launcher = descriptor === S.launcher ? ' · this is the launch Activity: the app launch is not affected, only the starts the app asks for' : '';
+    if (!row.enabled) return [`off${launcher}`, ''];
+    return [`${hits} ${hits === 1 ? 'start dropped' : 'starts dropped'}${launcher}`, 'ok'];
   }
   function updateMeta() {
     [...list().children].forEach((li, index) => { const [text, state] = meta(S.rows[index], index), element = li.querySelector('.ia-meta'); element.textContent = text; element.dataset.state = state; element.hidden = !text; });
     const active = S.rows.filter((row, index) => row.enabled && S.statuses[index]?.state === 'active'), starts = active.reduce((sum, row) => sum + (S.hits.get(descriptorOf(row.name)) ?? 0), 0);
-    $('ia-summary').textContent = `${active.length} ${active.length === 1 ? 'ativa' : 'ativas'}`;
-    $('ia-status').textContent = active.length ? `Activities ignoradas: ${active.length}, ${starts} ${starts === 1 ? 'abertura descartada' : 'aberturas descartadas'}. O relatório, o Resumo e o Logcat avisam.` : 'Nenhuma Activity ignorada.';
+    $('ia-summary').textContent = `${active.length} active`;
+    $('ia-status').textContent = active.length ? `Ignored activities: ${active.length}, ${starts} ${starts === 1 ? 'start dropped' : 'starts dropped'}. The report, the Summary and Logcat say so.` : 'No ignored Activity.';
     renderAvailable();
   }
   function render() {
     list().replaceChildren(...S.rows.map((row, index) => {
       const li = document.createElement('li'); li.className = 'ia-row';
-      const check = document.createElement('input'); check.type = 'checkbox'; check.checked = row.enabled; check.setAttribute('aria-label', `Ativar a Activity ignorada ${index + 1}`);
-      const name = document.createElement('input'); name.type = 'text'; name.className = 'ia-name'; name.value = row.name; name.spellcheck = false; name.autocomplete = 'off'; name.autocapitalize = 'off'; name.placeholder = 'pacote.NomeActivity'; name.setAttribute('list', 'ia-options'); name.setAttribute('aria-label', `Activity ignorada ${index + 1}`);
-      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'cp-button ia-remove'; remove.textContent = 'Remover'; remove.setAttribute('aria-label', `Remover a Activity ignorada ${index + 1}`);
+      const check = document.createElement('input'); check.type = 'checkbox'; check.checked = row.enabled; check.setAttribute('aria-label', `Turn on ignored Activity ${index + 1}`);
+      const name = document.createElement('input'); name.type = 'text'; name.className = 'ia-name'; name.value = row.name; name.spellcheck = false; name.autocomplete = 'off'; name.autocapitalize = 'off'; name.placeholder = 'pacote.NomeActivity'; name.setAttribute('list', 'ia-options'); name.setAttribute('aria-label', `Ignored Activity ${index + 1}`);
+      const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'cp-button ia-remove'; remove.textContent = 'Remove'; remove.setAttribute('aria-label', `Remove ignored Activity ${index + 1}`);
       const info = document.createElement('span'); info.className = 'ia-meta'; info.setAttribute('role', 'status');
       check.addEventListener('change', () => { row.enabled = check.checked; changed(true); });
       name.addEventListener('input', () => { row.name = name.value; changed(); });
@@ -51,14 +51,14 @@ export function createIgnoredActivitiesPanel({ $, vm }) {
   /** The manifest's Activities, filtered by the search box, as buttons that add a row (already listed ones are marked). */
   function renderAvailable() {
     const container = $('ia-available'), query = $('ia-filter').value.trim().toLowerCase(), listed = new Set(S.rows.map(row => descriptorOf(row.name)).filter(Boolean));
-    if (!S.pkg) { container.replaceChildren(Object.assign(document.createElement('li'), { className: 'ia-empty', textContent: 'Abra um APK para ver as Activities dele.' })); return; }
+    if (!S.pkg) { container.replaceChildren(Object.assign(document.createElement('li'), { className: 'ia-empty', textContent: 'Open an APK to see its Activities.' })); return; }
     const matches = S.activities.filter(activity => !query || activity.name.toLowerCase().includes(query));
-    if (!matches.length) { container.replaceChildren(Object.assign(document.createElement('li'), { className: 'ia-empty', textContent: S.activities.length ? 'Nenhuma Activity com esse nome.' : 'O manifesto não declara Activities.' })); return; }
+    if (!matches.length) { container.replaceChildren(Object.assign(document.createElement('li'), { className: 'ia-empty', textContent: S.activities.length ? 'No Activity with that name.' : 'The manifest declares no Activities.' })); return; }
     container.replaceChildren(...matches.map(activity => {
       const li = document.createElement('li'), button = document.createElement('button'), descriptor = descriptorOf(activity.name), already = listed.has(descriptor);
-      button.type = 'button'; button.disabled = already; button.title = already ? 'Já está na lista' : `Ignorar as aberturas de ${activity.name}`;
+      button.type = 'button'; button.disabled = already; button.title = already ? 'Already on the list' : `Ignore starts of ${activity.name}`;
       const label = activity.name.startsWith(S.pkg + '.') ? activity.name.slice(S.pkg.length) : activity.name;
-      button.textContent = `${label}${activity.launcher ? '  · abertura' : ''}${already ? '  · na lista' : ''}`;
+      button.textContent = `${label}${activity.launcher ? '  · launch' : ''}${already ? '  · on the list' : ''}`;
       button.addEventListener('click', () => addRow({ name: activity.name, enabled: true }));
       li.append(button); return li;
     }));
@@ -71,11 +71,11 @@ export function createIgnoredActivitiesPanel({ $, vm }) {
       const statuses = vm.worker ? await vm.setIgnoredActivities(send) : [];
       if (token !== S.sequence) return;
       statuses.forEach((status, i) => { S.statuses[map[i]] = status; if (status.descriptor) S.hits.set(status.descriptor, status.hits); });
-    } catch (error) { for (const index of map) S.statuses[index] = { state: 'invalid', error: `A VM não aplicou: ${error?.message ?? error}` }; }
+    } catch (error) { for (const index of map) S.statuses[index] = { state: 'invalid', error: `The VM did not apply it: ${error?.message ?? error}` }; }
     updateMeta();
   }
   function addRow(row) {
-    if (S.rows.length >= MAX_ROWS) { $('ia-status').textContent = `No máximo ${MAX_ROWS} Activities ignoradas.`; return; }
+    if (S.rows.length >= MAX_ROWS) { $('ia-status').textContent = `At most ${MAX_ROWS} ignored Activities.`; return; }
     S.rows.push(row); render(); changed(true);
   }
   $('ia-filter').addEventListener('input', renderAvailable);

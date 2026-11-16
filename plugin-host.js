@@ -7,11 +7,11 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=ca92aaad0948';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=ca92aaad0948';
-import { encodeVariantImages } from './render-variant-image.js?v=ca92aaad0948';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=ca92aaad0948';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=ca92aaad0948';
+import { pluginWorkerSource } from './plugin-runtime.js?v=d422379a2a38';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d422379a2a38';
+import { encodeVariantImages } from './render-variant-image.js?v=d422379a2a38';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=d422379a2a38';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=d422379a2a38';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -33,7 +33,7 @@ export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } =
     ready: snapshot.screenReady ? { ready: !!snapshot.screenReady.ready, activity: snapshot.screenReady.activity ?? null, readySince: snapshot.screenReady.readySince ?? null, waitingFor: [...(snapshot.screenReady.waitingFor ?? [])], network: snapshot.screenReady.network ?? 0, onlyNetwork: !!snapshot.screenReady.onlyNetwork, fragments: (snapshot.screenReady.fragments ?? []).map(f => ({ ...f })) } : null };
 }
 /** What makes two screens different (the frame counter does not). */
-export const screenKey = screen => JSON.stringify([screen.activity, screen.activityStack, screen.windows, screen.closed, screen.packageName, screen.ready?.ready ?? null]);   // the flip to "Tela pronta" is a screen change
+export const screenKey = screen => JSON.stringify([screen.activity, screen.activityStack, screen.windows, screen.closed, screen.packageName, screen.ready?.ready ?? null]);   // the flip to "Screen ready" is a screen change
 /** '' or '*' = every package; otherwise package ids separated by commas or spaces, `*` as a wildcard. */
 export function packageMatches(filter, packageName) {
   const patterns = String(filter ?? '').split(/[\s,]+/).map(item => item.trim()).filter(Boolean);
@@ -54,7 +54,7 @@ export function sanitizeBlock(op) {
       return { id, kind: 'table', columns, rows: (Array.isArray(op.rows) ? op.rows : []).slice(0, MAX_TABLE_ROWS).map(row => columns.map((_, index) => clipText(Array.isArray(row) ? row[index] : '', 500))) };
     }
     case 'image': {   // a Blob from lab.screenshot (or any image Blob the plugin made); the panel shows it through an object URL it revokes
-      const blob = op.blob; if (typeof Blob === 'undefined' || !(blob instanceof Blob) || !/^image\//.test(blob.type) || blob.size > MAX_IMAGE_BYTES) return { id, kind: 'text', text: `imagem recusada: ${!(typeof Blob !== 'undefined' && blob instanceof Blob) ? 'não é um Blob' : blob.size > MAX_IMAGE_BYTES ? 'maior que 8 MiB' : 'tipo não é image/*'}` };
+      const blob = op.blob; if (typeof Blob === 'undefined' || !(blob instanceof Blob) || !/^image\//.test(blob.type) || blob.size > MAX_IMAGE_BYTES) return { id, kind: 'text', text: `image refused: ${!(typeof Blob !== 'undefined' && blob instanceof Blob) ? 'not a Blob' : blob.size > MAX_IMAGE_BYTES ? 'larger than 8 MiB' : 'type is not image/*'}` };
       return { id, kind: 'image', blob, caption: clipText(op.caption ?? '', 300), width: Number.isFinite(op.width) ? op.width : null, height: Number.isFinite(op.height) ? op.height : null };
     }
     case 'json': { let text; try { text = JSON.stringify(op.value, null, 2) ?? 'undefined'; } catch { text = String(op.value); } return { id, kind: 'json', text: clipText(text, MAX_JSON_CHARS) }; }
@@ -82,7 +82,7 @@ export function applyUiOps(model, ops) {
 }
 
 function defaultCreateWorker(name) {
-  if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL?.createObjectURL !== 'function') throw new Error('Este navegador não oferece Web Workers de módulo: plugins indisponíveis.');
+  if (typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL?.createObjectURL !== 'function') throw new Error('This browser does not offer module Web Workers: plugins are unavailable.');
   const url = URL.createObjectURL(new Blob([pluginWorkerSource()], { type: 'text/javascript' }));
   const worker = new Worker(url, { type: 'module', name: `apk-lab-plugin:${String(name).slice(0, 40)}` });
   return { worker, release: () => URL.revokeObjectURL(url) };
@@ -125,7 +125,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     const wait = vmLastAt + VM_QUERY_GAP_MS - now(); if (wait > 0) { vmTimer = setTimer(() => { vmTimer = null; pumpVm(); }, wait); return; }
     const job = vmQueue.shift(); vmBusy = true; vmLastAt = now(); stats.vmQueries++;
     const started = now();
-    Promise.resolve().then(() => { if (!vm?.worker || typeof vm.pluginQuery !== 'function') throw Object.assign(new Error('Nenhum APK em execução.'), { code: 'no-apk' }); return vm.pluginQuery(job.method, job.args); })
+    Promise.resolve().then(() => { if (!vm?.worker || typeof vm.pluginQuery !== 'function') throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); return vm.pluginQuery(job.method, job.args); })
       .then(reply => job.resolve(reply?.value ?? null), error => job.reject(error))
       .finally(() => { stats.vmMs += now() - started; vmBusy = false; vmLastAt = now(); pumpVm(); });
   }
@@ -137,7 +137,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     return promise;
   }
   // Without a running APK the questions about "the screen" have an empty answer (a plugin may start before any APK); questions about an object are an error.
-  const EMPTY = { viewModels: () => [], fragments: () => [], activity: () => null, composeTree: () => ({ owners: [], totalNodes: 0, truncated: false, notes: ['nenhum APK em execução'] }) };
+  const EMPTY = { viewModels: () => [], fragments: () => [], activity: () => null, composeTree: () => ({ owners: [], totalNodes: 0, truncated: false, notes: ['no APK is running'] }) };
   /** "Mostrar limites de layout" as data: the boxes the overlay draws (Views and Compose semantics nodes), named from the Compose tree (one composeTree, rate-limited) unless names: false. */
   async function layoutBoundsFor(plugin, { names = true } = {}) {
     if (!lastSnapshot) return [];
@@ -162,7 +162,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     let names = {}; try { names = (await ask(plugin, 'resourceIds', { ids }))?.names ?? {}; } catch { return list; }
     return list.map(element => Number.isFinite(element.viewId) ? { ...element, viewIdName: names[element.viewId] ?? null } : element);
   }
-  const pageCaller = { id: 'page', name: 'página (MCP)', worker: {}, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 }, lastComposeAt: -Infinity, lastShotAt: -Infinity };
+  const pageCaller = { id: 'page', name: 'page (MCP)', worker: {}, stats: { queries: 0, logLines: 0, logDropped: 0, droppedMessages: 0 }, lastComposeAt: -Infinity, lastShotAt: -Infinity };
   // ---- the plugin's own buttons (lab.button, src/plugin-buttons.js): state kept here, rendered by the panel (card, Controles row) and the preview bar --------------------
   function buttonCall(plugin, args) {
     const op = String(args?.op ?? ''), list = plugin.buttons;
@@ -170,17 +170,17 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     if (op === 'add') {
       const wanted = buttonId(args.config?.id), existing = wanted ? find(wanted) : null;
       if (existing) { Object.assign(existing, sanitizeButtonConfig(args.config, existing)); changed(plugin); return { id: existing.id, replaced: true, button: buttonOut(existing) }; }
-      if (list.length >= BUTTON_LIMITS.perPlugin) throw Object.assign(new Error(`No máximo ${BUTTON_LIMITS.perPlugin} botões por plugin.`), { code: 'limit' });
+      if (list.length >= BUTTON_LIMITS.perPlugin) throw Object.assign(new Error(`At most ${BUTTON_LIMITS.perPlugin} buttons per plugin.`), { code: 'limit' });
       let id = wanted; while (!id || find(id)) id = `b${++plugin.buttonSeq}`;
       const button = { id, ...sanitizeButtonConfig(args.config), busy: false, clicks: 0 }; list.push(button); changed(plugin);
       return { id, replaced: false, button: buttonOut(button) };
     }
     if (op === 'list') return list.map(buttonOut);
     if (op === 'clear') { const removed = list.length; list.splice(0); finishClicks(plugin, null, { ok: false, reason: 'removed' }); changed(plugin); return { removed }; }
-    const button = find(args.id); if (!button) throw Object.assign(new Error('Botão removido ou desconhecido.'), { code: 'not-found' });
+    const button = find(args.id); if (!button) throw Object.assign(new Error('Button removed or unknown.'), { code: 'not-found' });
     if (op === 'update') { Object.assign(button, sanitizeButtonConfig(args.config, button)); changed(plugin); return buttonOut(button); }
     if (op === 'remove') { list.splice(list.indexOf(button), 1); finishClicks(plugin, button.id, { ok: false, reason: 'removed' }); changed(plugin); return { removed: 1 }; }
-    throw Object.assign(new Error(`Operação de botão desconhecida: ${op.slice(0, 20)}`), { code: 'bad-args' });
+    throw Object.assign(new Error(`Unknown button operation: ${op.slice(0, 20)}`), { code: 'bad-args' });
   }
   /** Resolves the waiters of a click (one button, or every one with id null). */
   function finishClicks(plugin, id, result) {
@@ -188,9 +188,9 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   }
   async function serve(plugin, method, args) {
     if (method === 'screen') return currentScreen();
-    if (method === 'button') { if (plugin === pageCaller) throw Object.assign(new Error('Botões são de um plugin.'), { code: 'unsupported' }); return buttonCall(plugin, args ?? {}); }
+    if (method === 'button') { if (plugin === pageCaller) throw Object.assign(new Error('Buttons belong to a plugin.'), { code: 'unsupported' }); return buttonCall(plugin, args ?? {}); }
     if (method === 'overlay' || method === 'track') {   // lab.overlay / lab.track (src/lab-overlays.js): HTML beside or over the device, a component followed frame by frame
-      const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
+      const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} is not available here.`), { code: 'unsupported' });
       const caller = { id: plugin.id, name: plugin.name }, op = String(args?.op ?? (method === 'track' ? 'start' : 'open'));
       const anchor = method === 'overlay' ? args?.config?.anchor : 'target', target = method === 'overlay' ? args?.target : args?.target;
       if ((op === 'open' || op === 'update' || op === 'start') && anchor !== undefined && anchor !== 'screen' && anchor !== 'window' && target !== undefined && target !== null) {
@@ -202,7 +202,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       return action(caller, { ...args, op });
     }
     if (ACTION_METHODS.has(method)) {   // the lab's own controls (reload, endpoint mocks, modals): only where the page provides them (not in the embedded player or a backend)
-      const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} não está disponível aqui.`), { code: 'unsupported' });
+      const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} is not available here.`), { code: 'unsupported' });
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
     }
     if (method === 'find') {   // lab.find: the components a target names, as lab.layoutBounds() elements (Views with the resource name of their android:id)
@@ -210,7 +210,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       return withViewIdNames(plugin, index === null ? found.matches.slice(0, 200) : found.matches.slice(index, index + 1));
     }
     if (method === 'highlight') {   // lab.highlight: an outline on the device around the component(s) a target names (src/lab-highlight.js), following them frame by frame
-      const action = actions?.highlight; if (typeof action !== 'function') throw Object.assign(new Error('lab.highlight não está disponível aqui.'), { code: 'unsupported' });
+      const action = actions?.highlight; if (typeof action !== 'function') throw Object.assign(new Error('lab.highlight is not available here.'), { code: 'unsupported' });
       const caller = { id: plugin.id, name: plugin.name }, op = String(args?.op ?? 'show');
       if (op !== 'show') return action(caller, { op, id: args?.id, options: args?.options });
       const found = await targetsFor(plugin, args?.target);
@@ -222,31 +222,31 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     // The only way a background render starts. The page's own operation slot when it provides one (actions.renderVariant: user input waits), else the VM client's.
     if (method === 'renderVariant') {
       const run = typeof actions?.renderVariant === 'function' ? actions.renderVariant : typeof vm?.renderVariant === 'function' ? (_caller, options) => vm.renderVariant(options) : null;
-      if (!run) throw Object.assign(new Error('lab.renderVariant não está disponível aqui.'), { code: 'unsupported' });
+      if (!run) throw Object.assign(new Error('lab.renderVariant is not available here.'), { code: 'unsupported' });
       const options = JSON.parse(JSON.stringify(args ?? {}));
       let result; try { result = await run({ id: plugin.id, name: plugin.name }, options); } catch (error) { throw Object.assign(error, { code: error?.code ?? (error?.kind === 'vm-busy' ? 'busy' : 'failed') }); }
       return encodeVariantImages(result, { type: options.type, pixels: options.pixels === true });
     }
     // ---- lab.renderVariant: end ------------------------------------------------------------------------------------------------------------------------------------------
     if (method === 'screenshot') {
-      if (typeof captureImage !== 'function') throw Object.assign(new Error('Captura de imagem indisponível nesta página.'), { code: 'unsupported' });
+      if (typeof captureImage !== 'function') throw Object.assign(new Error('Image capture is not available on this page.'), { code: 'unsupported' });
       const wait = (plugin.lastShotAt ?? -Infinity) + SCREENSHOT_MS - now(); if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
-      if (!plugin.worker) throw Object.assign(new Error('Plugin parado.'), { code: 'stopped' });
+      if (!plugin.worker) throw Object.assign(new Error('Plugin stopped.'), { code: 'stopped' });
       plugin.lastShotAt = now();
       let element = null, named = null;
       if (args?.target !== undefined && args?.target !== null) {   // a component by id (src/lab-target.js): src/screen-capture.js cuts it from its raster (with `padding`, from every raster under the enlarged box) or, for a View the page draws with its DOM, images the page's element
         const found = await targetsFor(plugin, args.target), chosen = chooseTarget(found.matches, found.selector); if (!chosen) throw targetNotFound(found.selector);
         named = { element: chosen, matches: found.matches.length }; element = found.raw.find(item => item.key === chosen.key);
-      } else if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Elemento ${String(args.key).slice(0, 60)} não está na tela (use lab.layoutBounds() para as chaves atuais).`), { code: 'not-found' }); }
+      } else if (args?.key) { element = (await layoutBoundsFor(plugin, { names: false })).find(item => item.key === String(args.key)) ?? null; if (!element) throw Object.assign(new Error(`Element ${String(args.key).slice(0, 60)} is not on the screen (use lab.layoutBounds() for the current keys).`), { code: 'not-found' }); }
       let region = null;
       if (args?.bounds !== undefined && args?.bounds !== null) {   // a box of the window: a layoutBounds element's bounds, a composeTree node's boundsInWindow, or a rectangle
-        const b = args.bounds; if (![b?.left, b?.top, b?.right, b?.bottom].every(Number.isFinite) || !(b.right > b.left && b.bottom > b.top)) throw Object.assign(new Error('bounds precisa de { left, top, right, bottom } com área (coordenadas da janela).'), { code: 'bad-args' });
+        const b = args.bounds; if (![b?.left, b?.top, b?.right, b?.bottom].every(Number.isFinite) || !(b.right > b.left && b.bottom > b.top)) throw Object.assign(new Error('bounds needs { left, top, right, bottom } with an area (window coordinates).'), { code: 'bad-args' });
         region = { left: b.left, top: b.top, right: b.right, bottom: b.bottom };
       }
       const shot = await captureImage({ snapshot: lastSnapshot, element: region ? null : element, region, padding: named ? args?.padding : 0, maxWidth: args?.maxWidth, type: args?.type });
       return named ? { ...shot, element: named.element, matches: named.matches } : shot;
     }
-    if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Método desconhecido: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
+    if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Unknown method: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }
     catch (error) { if (error?.code === 'no-apk' && EMPTY[method]) return EMPTY[method](); throw error; }
   }
@@ -259,7 +259,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       if (cacheFrame === frame && cache.has(key)) { stats.cacheHits++; return cache.get(key); }
       const wait = plugin.lastComposeAt + COMPOSE_TREE_MS - now();
       if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
-      if (!plugin.worker) throw Object.assign(new Error('Plugin parado.'), { code: 'stopped' });
+      if (!plugin.worker) throw Object.assign(new Error('Plugin stopped.'), { code: 'stopped' });
       plugin.lastComposeAt = now();
       return cached(key, () => vmCall('composeTree', safeArgs));
     }
@@ -293,7 +293,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       }
       case 'call': {
         const id = data.id; if (!Number.isSafeInteger(id)) return;
-        if (plugin.pendingCalls >= MAX_PENDING_CALLS) { send(plugin, { t: 'reply', id, ok: false, error: { code: 'busy', message: `Mais de ${MAX_PENDING_CALLS} consultas pendentes neste plugin; aguarde as respostas.` } }); return; }
+        if (plugin.pendingCalls >= MAX_PENDING_CALLS) { send(plugin, { t: 'reply', id, ok: false, error: { code: 'busy', message: `More than ${MAX_PENDING_CALLS} pending queries in this plugin; wait for the replies.` } }); return; }
         plugin.pendingCalls++;
         serve(plugin, String(data.method), data.args).then(value => send(plugin, { t: 'reply', id, ok: true, value }), error => send(plugin, { t: 'reply', id, ok: false, error: { code: error?.code ?? 'failed', message: clipText(error?.message ?? error, 400), ...(error?.exception && typeof error.exception === 'object' ? { exception: { type: clipText(error.exception.type, 200), message: clipText(error.exception.message, 1000), stack: (Array.isArray(error.exception.stack) ? error.exception.stack : []).slice(0, 12).map(line => clipText(line, 200)), cause: error.exception.cause ? clipText(error.exception.cause, 400) : null } } : {}) } }))
           .finally(() => { plugin.pendingCalls--; });
@@ -310,7 +310,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     plugin.output = { blocks: [], badge: '' }; plugin.buttons = []; plugin.buttonSeq = 0; plugin.clickStarted = new Map(); stats.workersStarted++;
     const worker = created.worker;
     worker.onmessage = event => { if (plugin.worker === worker) onMessage(plugin, event.data); };
-    worker.onerror = event => { if (plugin.worker !== worker) return; event?.preventDefault?.(); record(plugin, plugin.errors, { phase: 'worker', message: clipText(event?.message || 'O Worker do plugin falhou (erro de módulo ou de memória).', 2000), stack: '', at: Date.now() }, MAX_ERRORS); plugin.errorCount++; stopWorker(plugin, 'erro'); };
+    worker.onerror = event => { if (plugin.worker !== worker) return; event?.preventDefault?.(); record(plugin, plugin.errors, { phase: 'worker', message: clipText(event?.message || 'The plugin Worker failed (module or memory error).', 2000), stack: '', at: Date.now() }, MAX_ERRORS); plugin.errorCount++; stopWorker(plugin, 'erro'); };
     worker.onmessageerror = () => { if (plugin.worker === worker) { plugin.stats.droppedMessages++; } };
     changed(plugin);
   }
@@ -331,7 +331,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     const pkg = getPackage() ?? null;
     for (const plugin of plugins.values()) {
       const should = plugin.enabled && !plugin.userStopped && packageMatches(plugin.packageFilter, pkg);
-      plugin.reason = !plugin.enabled ? 'desligado' : plugin.userStopped ? 'parado no painel' : !packageMatches(plugin.packageFilter, pkg) ? (pkg ? `só para ${plugin.packageFilter}` : 'aguardando um APK do pacote') : '';
+      plugin.reason = !plugin.enabled ? 'off' : plugin.userStopped ? 'stopped in the panel' : !packageMatches(plugin.packageFilter, pkg) ? (pkg ? `only for ${plugin.packageFilter}` : 'waiting for an APK of the package') : '';
       if (should && !plugin.worker && plugin.status !== 'erro') startWorker(plugin);
       else if (!should && plugin.worker) stopWorker(plugin);
       else changed(plugin);
@@ -357,7 +357,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       reconcile();
     },
     /** Parar on the card: stays stopped until Reiniciar (or the plugin is edited / toggled). */
-    stop(id) { const plugin = plugins.get(id); if (!plugin) return; plugin.userStopped = true; stopWorker(plugin); plugin.reason = 'parado no painel'; changed(plugin); },
+    stop(id) { const plugin = plugins.get(id); if (!plugin) return; plugin.userStopped = true; stopWorker(plugin); plugin.reason = 'stopped in the panel'; changed(plugin); },
     /** A query from the page itself (the MCP bridge, src/mcp-tools.js): the same broker, cache and limits as a plugin's lab.* calls, as a plugin of its own that never stops. */
     query(method, args = {}) { return serve(pageCaller, String(method), args ?? {}); },
     /** Atualizar on the card: the plugin's lab.on('refresh') handlers run (a plugin that reads on demand recomputes). Returns whether the plugin listens. */
@@ -383,7 +383,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     restart(id) { const plugin = plugins.get(id); if (!plugin) return; stopWorker(plugin); plugin.userStopped = false; plugin.status = 'parado'; plugin.console = []; plugin.errors = []; plugin.errorCount = 0; reconcile(); },
     /** The page drew a snapshot (device-view `rendered`): a new frame for every caller, so the screen and the per-frame cache of VM answers are this frame's. That holds with
      *  no plugin installed too: the page's own callers (query(): the MCP tools, the adb interpreter) read the screen then, and a frame counter that only moved with plugins left
-     *  them the first answer forever (a "Tela pronta" that never arrived, the layout of a screen already left). Without running plugins nothing else happens here. */
+     *  them the first answer forever (a "Screen ready" that never arrived, the layout of a screen already left). Without running plugins nothing else happens here. */
     snapshot(snapshot) {
       lastSnapshot = snapshot ?? null; frame++;
       if (!plugins.size || !running().length) return;

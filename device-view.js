@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=ca92aaad0948';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=ca92aaad0948';
-import { isTrustedRasterURL } from './raster-cache.js?v=ca92aaad0948';
+import { updateWebViewSlot } from './webview-slot.js?v=d422379a2a38';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=d422379a2a38';
+import { isTrustedRasterURL } from './raster-cache.js?v=d422379a2a38';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -38,8 +38,8 @@ export function stackBackgroundImage(image, existing) { return existing && !/^(?
 /** A View's raw-pixel content raster on its canvas layer. The canvas holds the raster's own pixels (a reduced-scale replay while the screen moves, src/motion-raster.js,
  * has fewer); its CSS box is the View's, so the browser stretches it over the same size. `counters.putMs` / `counters.reducedDrawn` are the page's frame stats. */
 export function paintRgbaContentLayer(element, drawing, counters) {
-  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Pixels de conteúdo Canvas inválidos recebidos da VM.');
-  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Escala de raster inválida recebida da VM.');
+  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Invalid Canvas content pixels received from the VM.');
+  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Invalid raster scale received from the VM.');
   let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
   if (layer._image !== drawing.image) {
     if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
@@ -50,8 +50,8 @@ export function paintRgbaContentLayer(element, drawing, counters) {
 }
 /** A GPU frame (renderer "GPU (experimental)", src/gpu-raster.js): the ImageBitmap the Worker transferred is drawn on the content layer's canvas (a GPU copy, no pixel decode). */
 export function paintBitmapContentLayer(element, drawing, counters) {
-  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Quadro GPU de conteúdo Canvas inválido recebido da VM.');
-  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Escala de raster inválida recebida da VM.');
+  if (!(drawing.image?.width === drawing.width && drawing.image?.height === drawing.height && drawing.width > 0 && drawing.height > 0)) throw new Error('Invalid Canvas content GPU frame received from the VM.');
+  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Invalid raster scale received from the VM.');
   let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
   if (layer._image !== drawing.image) {
     if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
@@ -72,7 +72,7 @@ const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKErr
 let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
 const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, reducedDrawn: 0, log: [], drawn: [] };   // reducedDrawn: reduced-scale rasters put on a canvas (src/motion-raster.js)   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
 // The next display frame, or FRAME_FALLBACK_MS later when the browser is not painting this page: a background tab, a covered window or a hidden pane runs no animation frames,
-// and the VM's newest snapshot would wait for one forever. The page then held a stale screen (the last frame it drew, "Tela pronta" never arriving), which is what an MCP client or
+// and the VM's newest snapshot would wait for one forever. The page then held a stale screen (the last frame it drew, "Screen ready" never arriving), which is what an MCP client or
 // a plugin reads while nobody is looking at the tab. With the timer the state stays current; a visible page still draws on the display's own frame.
 const FRAME_FALLBACK_MS = 250;
 const nextFrame = globalThis.requestAnimationFrame ? callback => {
@@ -84,7 +84,7 @@ function flushRuntimeSnapshot(vm) {
   runtimeFrames.requested = false; const snapshot = runtimeFrames.pending; runtimeFrames.pending = null;
   if (!snapshot || state.runtime !== vm) return;
   const drawStarted = Date.now();
-  try { renderSnapshot(snapshot); } catch (error) { reportAPKError(error, 'Falha ao renderizar callback da VM'); }
+  try { renderSnapshot(snapshot); } catch (error) { reportAPKError(error, 'Failed to render a VM callback'); }
   runtimeFrames.drawMs += Date.now() - drawStarted;
   vm.ackFrame?.(runtimeFrames.seq);   // drawn (or failed): the Worker may take the next snapshot
 }
@@ -99,12 +99,12 @@ function bindVM(vm) {
     if (Number.isSafeInteger(seq)) runtimeFrames.seq = seq;
     runtimeFrames.pending = snapshot; if (!runtimeFrames.requested) { runtimeFrames.requested = true; nextFrame(() => flushRuntimeSnapshot(vm)); }
   };
-  vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Callback assíncrono interrompido'); };
+  vm.onRuntimeError = error => { if (state.runtime === vm) reportAPKError(error, 'Asynchronous callback interrupted'); };
   // A lab error that ended a background thread of the app. The reply that carried the JavaScript exception (if any did) may already be on screen; either way the panel stays until the
   // person reopens, relaunches or goes back: the frames the app keeps producing (the other threads go on) used to hide it at once, and the app looked like it was loading forever.
   vm.onThreadFailure = failure => {
     if (state.runtime !== vm) return;
-    const error = Object.assign(new Error(String(failure.message ?? 'Uma thread do app foi interrompida por um erro do laboratório.')), { details: { kind: failure.kind ?? 'thread-failure', thread: failure.thread } });
+    const error = Object.assign(new Error(String(failure.message ?? 'An app thread was interrupted by a lab error.')), { details: { kind: failure.kind ?? 'thread-failure', thread: failure.thread } });
     state.stickyError = true; reportAPKError(error, `Thread "${failure.thread ?? '?'}" interrompida`);
   };
   if (ctx.webViews !== false) { webviews?.close(); webviews = createWebViewManager({ send: event => vm.webViewEvent?.(event) }); vm.onWebView = message => { if (state.runtime === vm) webviews.handle(message); }; }
@@ -136,7 +136,7 @@ function renderNativeCanvasOverlays(views) {
       activeWrappers.add(key);
       element.style.cssText = `position:absolute;left:${b.left}px;top:${b.top}px;width:${b.right-b.left}px;height:${b.bottom-b.top}px;margin:0;padding:0;border:0;pointer-events:none`;
       if (parent.clipChildren !== false) element.style.clipPath = 'inset(0)';
-      if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value)) || m[6] !== 0 || m[7] !== 0 || m[8] !== 1) throw new Error('Matriz inválida na sobreposição AndroidView.'); element.style.transformOrigin = '0 0'; element.style.transform = `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})`; }
+      if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value)) || m[6] !== 0 || m[7] !== 0 || m[8] !== 1) throw new Error('Invalid matrix in the AndroidView overlay.'); element.style.transformOrigin = '0 0'; element.style.transform = `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})`; }
       if (view.visibility === 8) element.style.display = 'none'; else if (view.visibility === 4) element.style.visibility = 'hidden';
     }
     if (!interactive || ['linear','frame','scroll','group'].includes(view.kind)) {
@@ -232,7 +232,7 @@ let liveShadowKeys = new Set();
 function shadowElement(child) {
   const shadow = child.shadow, key = String(child.id); if (shadow) liveShadowKeys.add(key);
   if (!shadow) { state.shadowElements.delete(key); return null; }
-  if (!child.bounds || !['z', 'margin', 'width', 'height'].every(name => Number.isFinite(shadow[name])) || shadow.width <= 0 || shadow.height <= 0 || !pngURLOk(shadow.dataURL)) throw new Error('Sombra de View inválida recebida da VM.');
+  if (!child.bounds || !['z', 'margin', 'width', 'height'].every(name => Number.isFinite(shadow[name])) || shadow.width <= 0 || shadow.height <= 0 || !pngURLOk(shadow.dataURL)) throw new Error('Invalid View shadow received from the VM.');
   let element = state.shadowElements.get(key);
   if (!element) { element = document.createElement('img'); element.className = 'android-view-shadow'; element.alt = ''; element.draggable = false; element.setAttribute('aria-hidden', 'true'); state.shadowElements.set(key, element); }
   if (element.src !== shadow.dataURL) element.src = shadow.dataURL;
@@ -246,18 +246,18 @@ function viewSignature(view, parentKind, parentLaidOut, clipOwnBounds, renderChi
   return `${parentKind}|${parentLaidOut}|${clipOwnBounds}|${renderChildren}|${focusBusy}|${state.viewSession}|${JSON.stringify(view, (key, value) => SIGNATURE_SKIP.has(key) ? undefined : value)}`;
 }
 function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds = false, renderChildren = true) {
-  if (!view || typeof view !== 'object') throw new Error('A VM retornou uma árvore de interface inválida.');
+  if (!view || typeof view !== 'object') throw new Error('The VM returned an invalid interface tree.');
   const kind = view.kind, key = String(view.id);
   let element = state.viewElements.get(key);
   if (element?.dataset.kind !== kind) element = null;
   if (!element) {
     const session = state.viewSession;
     if (kind === 'button') { element = document.createElement('button'); element.type = 'button'; element.addEventListener('click', () => { if (element._session === state.viewSession) clickView(view.id); }); }
-    else if (kind === 'input') { element = document.createElement('input'); element.type = 'text'; for (const event of ['focus', 'blur']) element.addEventListener(event, () => { if (session !== state.viewSession) return; if (state.pendingFocus.length >= 128) { reportAPKError(new Error('A fila de foco excedeu 128 eventos; reabra o APK.'), 'Fila de foco interrompida'); return; } state.pendingFocus.push({ id: view.id, focused: event === 'focus' }); flushPendingInputs(); }); element.addEventListener('input', () => { if (session !== state.viewSession) return; state.pendingInputs.set(view.id, element.value); flushPendingInputs(); }); }
+    else if (kind === 'input') { element = document.createElement('input'); element.type = 'text'; for (const event of ['focus', 'blur']) element.addEventListener(event, () => { if (session !== state.viewSession) return; if (state.pendingFocus.length >= 128) { reportAPKError(new Error('A fila de foco excedeu 128 eventos; reabra o APK.'), 'Focus queue interrupted'); return; } state.pendingFocus.push({ id: view.id, focused: event === 'focus' }); flushPendingInputs(); }); element.addEventListener('input', () => { if (session !== state.viewSession) return; state.pendingInputs.set(view.id, element.value); flushPendingInputs(); }); }
     else if (kind === 'check') { element = document.createElement('label'); element._control = document.createElement('input'); element._control.type = 'checkbox'; element._label = document.createElement('span'); element.append(element._control, element._label); element._control.addEventListener('change', () => { if (element._session === state.viewSession) checkView(view.id, element._control.checked); }); }
     else if (kind === 'progress') element = document.createElement('progress');
     else if (['linear', 'frame', 'scroll', 'text', 'image', 'group', 'view', 'webview'].includes(kind)) { element = document.createElement('div'); if (kind === 'text' || kind === 'image' || kind === 'view') { element.addEventListener('click', () => { if (element._session === state.viewSession && element.dataset.clickable === 'true') clickView(view.id); }); element.addEventListener('keydown', (event) => { if (element._session === state.viewSession && element.dataset.clickable === 'true' && ['Enter', ' '].includes(event.key)) { event.preventDefault(); clickView(view.id); } }); } }
-    else throw new Error(`Tipo de interface não suportado pelo renderizador: ${view.type || kind}.`);
+    else throw new Error(`Interface type not supported by the renderer: ${view.type || kind}.`);
     // Touch/pointer down presses the View (drawable state + StateListAnimator elevation); up/cancel/leave releases it.
     // A clickable View of another kind (a list row, a text, an image) is pressed the same way when the pointer goes down on it and not on a control inside it: the
     // innermost clickable View takes the touch, as ViewGroup.dispatchTouchEvent gives it to the deepest child that handles it.
@@ -281,7 +281,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       if (session !== state.viewSession || !state.runtime || state.lastAPKError) return;
       const x = Math.round(element.scrollLeft), y = Math.round(element.scrollTop);
       if (element._vmScroll?.x === x && element._vmScroll?.y === y) return;
-      if (!state.pendingScrolls.has(view.id) && state.pendingScrolls.size >= 128) { reportAPKError(new Error('A fila de rolagem excedeu 128 Views.'), 'Fila de rolagem interrompida'); return; }
+      if (!state.pendingScrolls.has(view.id) && state.pendingScrolls.size >= 128) { reportAPKError(new Error('A fila de rolagem excedeu 128 Views.'), 'Scroll queue interrupted'); return; }
       state.pendingScrolls.set(view.id, { x, y }); flushPendingInputs();
     });
     element.className = `android-view android-${kind}`; element.dataset.kind = kind; element.dataset.viewId = key; element._session = state.viewSession; state.viewElements.set(key, element);
@@ -295,10 +295,10 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.textInContent) element.dataset.textInContent = 'true'; else delete element.dataset.textInContent;   // the glyphs are in the content raster: the element keeps its text for accessibility and typing, transparent (styles.css)
   if (kind === 'button') element.disabled = view.clickable === false || view.enabled === false;
   if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
-  if (kind === 'button' || view.clickable && ['text','view'].includes(kind)) element.setAttribute('aria-label', view.contentDescription || view.displayText || view.text || `Ação ${view.androidId || view.id}`);
-  if (kind === 'image') { element.setAttribute('role', view.clickable ? 'button' : 'img'); element.setAttribute('aria-label', view.contentDescription || 'Imagem do APK'); }
-  if (kind === 'input') { if (!(focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id)) && element.value !== (view.text ?? '')) element.value = view.text ?? ''; element.readOnly = !!view.readOnly; element.placeholder = view.hint || ''; element.setAttribute('aria-label', view.contentDescription || view.hint || `Campo ${view.androidId || view.id}`); element.disabled = view.enabled === false; element.inputMode = (view.inputType & 15) === 2 ? 'decimal' : 'text'; }
-  if (kind === 'check') { element._control.checked = !!view.checked; element._control.disabled = view.enabled === false; element._control.setAttribute('aria-label', view.text || 'Opção'); element._label.textContent = view.text || ''; element.classList.toggle('android-switch', view.type?.includes('/Switch;') && !view.switchWidget); element.classList.toggle('android-switch-vm', !!view.switchWidget); }
+  if (kind === 'button' || view.clickable && ['text','view'].includes(kind)) element.setAttribute('aria-label', view.contentDescription || view.displayText || view.text || `Action ${view.androidId || view.id}`);
+  if (kind === 'image') { element.setAttribute('role', view.clickable ? 'button' : 'img'); element.setAttribute('aria-label', view.contentDescription || 'APK image'); }
+  if (kind === 'input') { if (!(focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id)) && element.value !== (view.text ?? '')) element.value = view.text ?? ''; element.readOnly = !!view.readOnly; element.placeholder = view.hint || ''; element.setAttribute('aria-label', view.contentDescription || view.hint || `Field ${view.androidId || view.id}`); element.disabled = view.enabled === false; element.inputMode = (view.inputType & 15) === 2 ? 'decimal' : 'text'; }
+  if (kind === 'check') { element._control.checked = !!view.checked; element._control.disabled = view.enabled === false; element._control.setAttribute('aria-label', view.text || 'Option'); element._label.textContent = view.text || ''; element.classList.toggle('android-switch', view.type?.includes('/Switch;') && !view.switchWidget); element.classList.toggle('android-switch-vm', !!view.switchWidget); }
   if (kind === 'webview') updateWebViewSlot(element, view.webview, { manager: webviews });
   if (kind === 'progress') { element.max = view.max ?? 100; if (view.indeterminate) element.removeAttribute('value'); else element.value = view.progress || 0; }
   element.style.cssText = '';
@@ -330,8 +330,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.background) element.style.background = cssColor(view.background);
   if (view.drawableSVG) {
     const drawing = view.drawableSVG; let url;
-    if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Raster PNG inválido ou excessivo recebido da VM.'); }
-    else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Estado de desenho vetorial inválido ou excessivo.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
+    if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid or excessive PNG raster received from the VM.'); }
+    else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Invalid or excessive vector drawing state.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
     element.style.backgroundImage = `url("${layerURLToShow(element, url)}")`; element.style.backgroundRepeat = 'no-repeat'; element.style.backgroundSize = '100% 100%';
   } else element._layerShown = undefined;
   // The VM owns geometry: the page stylesheet's 48px minimums/web borders must not alter laid-out bounds, and a
@@ -340,7 +340,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.drawableSVG && ['input', 'button'].includes(kind)) { element.style.border = '0'; element.style.borderRadius = '0'; element.style.boxShadow = 'none'; element.style.backgroundColor = 'transparent'; }
   if (view.textRaster && ['text', 'button'].includes(kind)) {
     const drawing = view.textRaster;
-    if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('PNG de parágrafo inválido recebido da VM.');
+    if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('Invalid paragraph PNG received from the VM.');
     const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${((view.compoundPadding || view.padding)?.top || 0) + (view.textParagraph?.padTop || 0)}px`;
     element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
     element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
@@ -379,7 +379,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       reconcileChildren(layer, children); reconcileChildren(element, [element._contentLayer, layer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
     } else reconcileChildren(element, [element._contentLayer, ...children, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
   }
-  if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('A captura Canvas não retornou uma imagem de conteúdo.');
+  if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('The Canvas capture did not return a content image.');
   // The View's own Canvas content (its onDraw) goes under its children, as View.draw orders it (onDraw, then dispatchDraw, then the foreground): the content layer is the
   // element's first child. A recording with no draw at all (a ViewGroup whose onDraw drew nothing, typically the window's root) gets no layer: a transparent composited canvas
   // stretched over the whole subtree is a layer the browser has to keep in step with everything under it, and the screen was seen keeping an old picture under one until
@@ -394,7 +394,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     else if (drawing.kind === 'bitmap-raster') paintBitmapContentLayer(element, drawing, runtimeFrames);   // GPU renderer (opt-in): an ImageBitmap drawn on the same canvas layer
     else {
       let layer = element._contentLayer; if (!layer || layer.tagName !== 'IMG') layer = element._contentLayer = document.createElement('img');
-      if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('PNG de conteúdo Canvas inválido recebido da VM.');
+      if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL) || !(drawing.width > 0 && drawing.height > 0)) throw new Error('Invalid Canvas content PNG received from the VM.');
       if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0'; }
     }
     const layer = element._contentLayer;
@@ -408,11 +408,11 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     }
   } else { element._contentLayer?.remove(); element._contentLayer = null; if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
   if (view.foregroundSVG) {
-    if (kind === 'input' || kind === 'progress') throw new Error('Foreground sobre este controle nativo HTML exige um contêiner de desenho.');
+    if (kind === 'input' || kind === 'progress') throw new Error('A foreground over this native HTML control requires a drawing container.');
     const drawing = view.foregroundSVG, layer = element._foregroundLayer ||= document.createElement('img');
     let url;
-    if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('PNG de foreground inválido recebido da VM.'); }
-    else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('SVG de foreground inválido recebido da VM.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
+    if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid foreground PNG received from the VM.'); }
+    else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Invalid foreground SVG received from the VM.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
     if (layer._url !== url) { layer.src = url; layer._url = url; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-foreground-layer'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1'; }
     if (!element.style.position) element.style.position = 'relative';
     if (layer.parentNode !== element) element.append(layer);
@@ -429,7 +429,7 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
       const last = state.pendingComposeActions.at(-1);
       if (last?.key === key && last.action === 'ime' && last.args.length < IME_OPS_PER_REQUEST) last.args.push(op);
       else if (state.pendingComposeActions.length < 128) state.pendingComposeActions.push({ key, ownerViewId, nodeId, action, args: [op], session: state.viewSession, control: state.composeElements.get(key) });
-      else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
+      else { reportAPKError(new Error('The Compose action queue exceeded 128 events; reopen the APK.'), 'Accessibility queue interrupted'); return; }
     }
     return flushPendingInputs();
   }
@@ -442,7 +442,7 @@ function queueComposeAction(ownerViewId, nodeId, action, args = []) {
   else if (action === 'SetSelection' && last?.key === key && last.action === action) last.args = args;
   else if (action === 'SetText' && last?.key === key && last.action === 'SetSelection' && before?.key === key && before.action === 'SetText') { before.args = args; return flushPendingInputs(); }   // the pair of an edit: the following selection is updated next
   else if (state.pendingComposeActions.length < 128) state.pendingComposeActions.push(entry);
-  else { reportAPKError(new Error('A fila de ações Compose excedeu 128 eventos; reabra o APK.'), 'Fila de acessibilidade interrompida'); return; }
+  else { reportAPKError(new Error('The Compose action queue exceeded 128 events; reopen the APK.'), 'Accessibility queue interrupted'); return; }
   flushPendingInputs();
 }
 /** A click whose press started on Compose content already reached the app as real MotionEvents through the window (src/pointer-input-host.js): Android decided there whether a
@@ -536,7 +536,7 @@ function renderComposeSemantics(snapshot) {
     const id = String(owner.ownerViewId), view = views.get(id), host = state.viewElements.get(id);
     if (!owner.attached || !view?.contentRaster || !view.canvasChildrenCaptured || !host || !inAndroidWindow(host)) continue;
     const nodes = owner.nodes || [];
-    if (nodes.length > 4096) throw new Error('Árvore de acessibilidade Compose excessiva.');
+    if (nodes.length > 4096) throw new Error('Compose accessibility tree too large.');
     const byId = new Map(nodes.map(node => [node.nodeId, node]));
     const visible = node => { const seen = new Set(); while (node) { if (node.invisibleToUser || seen.has(node.nodeId)) return false; seen.add(node.nodeId); node = byId.get(node.parentId); } return true; };
     bindPointerInput(host, owner);
@@ -626,7 +626,7 @@ function renderComposeSemantics(snapshot) {
       control._scrollTarget = scrollTarget || null; control.dataset.ownerViewId = id; control.dataset.nodeId = String(node.nodeId);
       if (node.testTag) control.dataset.testTag = node.testTag; else delete control.dataset.testTag;
       control.style.cssText = `position:absolute;left:${b.left}px;top:${b.top}px;width:${b.right-b.left}px;height:${b.bottom-b.top}px;box-sizing:border-box;min-width:0;min-height:0;margin:0;padding:0;border:0;border-radius:0;background:transparent;color:transparent;text-shadow:none;box-shadow:none;resize:none;overflow:hidden;caret-color:transparent;pointer-events:${editable || clickable || scrollable ? 'auto' : 'none'};font:16px sans-serif`;
-      const label = texts.join(' · ') || node.testTag || (editable ? 'Campo de texto do APK' : (node.actions || []).find(action => action.label)?.label) || 'Ação do APK';
+      const label = texts.join(' · ') || node.testTag || (editable ? 'APK text field' : (node.actions || []).find(action => action.label)?.label) || 'APK action';
       control.setAttribute('aria-label', label); control.setAttribute('aria-disabled', String(!!node.disabled));
       if (editable) {
         const pending = state.composeInFlight === key || state.pendingComposeActions.some(action => action.key === key && (action.action === 'SetText' || action.action === 'ime')) || !!control._composing;
@@ -700,12 +700,12 @@ async function flushPendingInputs() {
       if (!state.pendingInputs.size && state.pendingComposeActions.length) {
         const action = state.pendingComposeActions.shift();
         // Bound to the session and overlay element it was created from: a pruned/replaced control or an older session can no longer be targeted.
-        if (action.session !== state.viewSession || action.control && state.composeElements.get(action.key) !== action.control) { appendTrace(`Ação Compose descartada: o nó ${action.key} não está mais na tela (${action.action}).`); continue; }
+        if (action.session !== state.viewSession || action.control && state.composeElements.get(action.key) !== action.control) { appendTrace(`Compose action discarded: node ${action.key} is no longer on screen (${action.action}).`); continue; }
         state.composeInFlight = action.key;
         try { const snapshot = action.kind === 'action-item' ? await state.runtime.actionItem(action.modeId, action.itemId) : action.action === 'ime' ? await state.runtime.ime(action.ownerViewId, action.nodeId, action.args) : await state.runtime.composeAction(action.ownerViewId, action.nodeId, action.action, action.args); state.composeInFlight = null; /* its own reply is no longer pending: the field mirrors it */ if (token === state.operation) renderSnapshot(snapshot); }
         catch (error) {
-          if (error?.details?.kind === 'compose-semantics-stale-node') { appendTrace(`Ação Compose descartada pela VM: ${error.message}`); continue; }
-          if (token === state.operation) reportAPKError(error, 'Ação de acessibilidade Compose interrompida'); state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); break; }
+          if (error?.details?.kind === 'compose-semantics-stale-node') { appendTrace(`Compose action discarded by the VM: ${error.message}`); continue; }
+          if (token === state.operation) reportAPKError(error, 'Compose accessibility action interrupted'); state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); break; }
         finally { state.composeInFlight = null; }
         continue;
       }
@@ -719,9 +719,9 @@ async function flushPendingInputs() {
 }
 async function checkView(id, checked) {
   if (!state.runtime || state.busy) return;
-  await flushPendingInputs(); const token = beginOperation('Atualizando opção no DEX…');
+  await flushPendingInputs(); const token = beginOperation('Updating option in the DEX…');
   try { const snapshot = await state.runtime.check(id, checked); if (token === state.operation) renderSnapshot(snapshot); }
-  catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de opção interrompido'); }
+  catch (error) { if (token === state.operation) reportAPKError(error, 'Option callback interrupted'); }
   finally { finishOperation(token); }
 }
 const inAndroidWindow = element => $('android-content').contains(element) || $('android-window-layer').contains(element);
@@ -730,7 +730,7 @@ function renderWindowSurfaces(surfaces) {
   const layer = $('android-window-layer'), seen = new Set(), ordered = [];
   for (const view of surfaces) {
     const window = view.windowSurface, id = String(window.id);
-    if (!Number.isFinite(window.id) || !['x', 'y', 'width', 'height', 'dimAmount'].every(name => Number.isFinite(window[name]))) throw new Error('A VM retornou uma janela Android inválida.');
+    if (!Number.isFinite(window.id) || !['x', 'y', 'width', 'height', 'dimAmount'].every(name => Number.isFinite(window[name]))) throw new Error('The VM returned an invalid Android window.');
     seen.add(id); let entry = state.windowSurfaceElements.get(id);
     if (!entry) { entry = { scrim: document.createElement('div'), box: document.createElement('div') }; entry.scrim.className = 'android-window-scrim'; entry.box.className = 'android-window-surface'; state.windowSurfaceElements.set(id, entry); }
     entry.scrim.hidden = window.visible === false || !window.modal; entry.scrim.style.background = `rgba(0,0,0,${Math.max(0, Math.min(1, window.dimAmount))})`; entry.scrim.dataset.windowId = id;
@@ -756,7 +756,7 @@ function actionModeLayer() {
 }
 function queueActionItem(modeId, itemId) {
   if (!state.runtime || state.lastAPKError) return;
-  if (state.pendingComposeActions.length >= 128) { reportAPKError(new Error('A fila de ações excedeu 128 eventos; reabra o APK.'), 'Fila de entrada interrompida'); return; }
+  if (state.pendingComposeActions.length >= 128) { reportAPKError(new Error('The action queue exceeded 128 events; reopen the APK.'), 'Input queue interrupted'); return; }
   state.pendingComposeActions.push({ kind: 'action-item', key: `action-mode:${modeId}:${itemId}`, modeId, itemId, session: state.viewSession, action: 'ActionItem' });
   flushPendingInputs();
 }
@@ -801,7 +801,7 @@ function renderActionModes(modes = []) {
   for (const mode of Array.isArray(modes) ? modes : []) {
     const origin = state.viewElements.get(String(mode.originViewId));
     if (mode.type !== 'floating' || !origin || !inAndroidWindow(origin) || !Array.isArray(mode.items) || !mode.items.length) continue;
-    if (![...mode.contentRect, ...mode.viewport, ...mode.viewLocation, ...mode.windowLocation].every(Number.isFinite)) throw new Error('A VM retornou uma barra de ação inválida.');
+    if (![...mode.contentRect, ...mode.viewport, ...mode.viewLocation, ...mode.windowLocation].every(Number.isFinite)) throw new Error('The VM returned an invalid action bar.');
     // VM screen pixels -> this screen element: the originating View's element is where the VM says the View is
     const box = origin.getBoundingClientRect(), dx = (box.left - screenRect.left) / scale - mode.viewLocation[0], dy = (box.top - screenRect.top) / scale - mode.viewLocation[1];
     const m = mode.metrics, content = { left: mode.contentRect[0] + dx, top: mode.contentRect[1] + dy, right: mode.contentRect[2] + dx, bottom: mode.contentRect[3] + dy };
@@ -830,7 +830,7 @@ function renderSnapshot(snapshot) {
   if (runtimeFrames.pending && state.runtime?.ackFrame) state.runtime.ackFrame(runtimeFrames.seq);   // an RPC reply replaces a queued scheduled-event snapshot: it counts as drawn
   runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
   if (snapshot && 'ime' in snapshot) state.imeState = snapshot.ime;
-  if (snapshot?.droppedComposeAction) appendTrace(`Ação Compose descartada: nó ${snapshot.droppedComposeAction.ownerViewId}:${snapshot.droppedComposeAction.nodeId} não existe mais (${snapshot.droppedComposeAction.action}).`);
+  if (snapshot?.droppedComposeAction) appendTrace(`Compose action discarded: node ${snapshot.droppedComposeAction.ownerViewId}:${snapshot.droppedComposeAction.nodeId} no longer exists (${snapshot.droppedComposeAction.action}).`);
   if (!state.stickyError) state.lastAPKError = null;
   state.canGoBack = !!snapshot.canGoBack; hooks.navigationChanged?.(state.canGoBack);
   if (snapshot.closed) {
@@ -838,7 +838,7 @@ function renderSnapshot(snapshot) {
     state.apkRunning = false; hideError();   // the device stays: its launcher shows the app (hooks.closed)
     updateTrace(snapshot); hooks.closed?.(snapshot); return;
   }
-  if (!Array.isArray(snapshot?.views) || !snapshot.views.length) throw new Error('A Activity executou sem produzir uma interface Android Views suportada. Consulte o log de execução.');
+  if (!Array.isArray(snapshot?.views) || !snapshot.views.length) throw new Error('The Activity ran without producing a supported Android Views interface. See the execution log.');
   // Roots registered through the real WindowManager (windowSurface) are layered above the Activity window; the DOM invents no dialog UI.
   const surfaces = snapshot.views.filter(view => view.windowSurface);
   liveShadowKeys = new Set();
@@ -849,7 +849,7 @@ function renderSnapshot(snapshot) {
   // PhoneWindow background from the Activity theme (android:windowBackground, resolved by the VM through the real theme).
   { const content = $('android-content'), background = snapshot.views.find(view => !view.windowSurface)?.windowBackground; content.style.background = ''; content.style.backgroundColor = '#fff'; content.style.backgroundImage = '';
     if (background?.kind === 'color') { const a = background.argb >>> 0; content.style.backgroundColor = `rgba(${(a >>> 16) & 255},${(a >>> 8) & 255},${a & 255},${(a >>> 24) / 255})`; }
-    else if (background?.kind === 'drawable') { const drawing = background.drawing; let url; if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Window background raster inválido.'); } else { const svg = drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Window background vetorial inválido.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; } content.style.backgroundImage = `url("${url}")`; content.style.backgroundSize = '100% 100%'; content.style.backgroundRepeat = 'no-repeat'; } }
+    else if (background?.kind === 'drawable') { const drawing = background.drawing; let url; if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid window background raster.'); } else { const svg = drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Invalid window background vector.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; } content.style.backgroundImage = `url("${url}")`; content.style.backgroundSize = '100% 100%'; content.style.backgroundRepeat = 'no-repeat'; } }
   for (const key of [...state.shadowElements.keys()]) if (!liveShadowKeys.has(key)) state.shadowElements.delete(key);
   renderNativeCanvasOverlays(snapshot.views);
   syncNativeScroll(snapshot.views);
@@ -861,7 +861,7 @@ function renderSnapshot(snapshot) {
   hooks.rendered?.(snapshot, composeReady);
   updateTrace(snapshot);
   // after the VM trace replaced the log: a key the Worker could not send through an InputConnection (its own trace has the WEB InputMethod line too)
-  if (snapshot.imeFallback) { const f = snapshot.imeFallback; state.imeFallbacks = (state.imeFallbacks ?? 0) + 1; appendTrace(`Teclado: ${f.keys} tecla(s) sem InputConnection (${f.reason}); ${f.via === 'SetText' ? 'usada a ação SetText com o texto do campo' : 'tecla descartada'}.`); }
+  if (snapshot.imeFallback) { const f = snapshot.imeFallback; state.imeFallbacks = (state.imeFallbacks ?? 0) + 1; appendTrace(`Keyboard: ${f.keys} key(s) without an InputConnection (${f.reason}); ${f.via === 'SetText' ? 'used the SetText action with the field text' : 'key discarded'}.`); }
   notifyParent('apk-lab-snapshot', { activityName: snapshot.activityName, texts: snapshot.texts, counters: snapshot.counters });
 }
 return { resetWebViews: () => webviews?.reset(), renderSnapshot, createView, queueComposeAction, flushPendingInputs, bindVM, runtimeFrames, renderSystemBars, updateSystemBarIcons, fitDevice, startClock };

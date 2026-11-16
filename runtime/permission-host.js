@@ -1,8 +1,8 @@
 // The VM side of the runtime-permission model (src/runtime-permissions.js): the state the page sends, what checkSelfPermission sees (platform.grantedPermissions), the requests that wait
 // for the page's permission dialog and the rationale flag. The Worker posts `permission-request` to the page and takes the answer back with `respond`; nothing blocks in between, as on
 // Android (Activity.requestPermissions returns at once and the result is delivered later through onRequestPermissionsResult).
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ca92aaad0948';
-import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=ca92aaad0948';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d422379a2a38';
+import { computeGranted, emptyConfig, sanitizeConfig, planRequest, answerDialog, settleRequest, rationale, sectionOf } from './runtime-permissions.js?v=d422379a2a38';
 
 export function createPermissionHost(platform) {
   let config = emptyConfig(), sequence = 0;
@@ -56,7 +56,7 @@ export function createPermissionHost(platform) {
       const previous = platform.locationSimulation ?? null;
       if (!value || typeof value !== 'object') { platform.locationSimulation = null; if (previous) platform.locationChanged?.(r, previous); return; }
       const latitude = Number(value.latitude), longitude = Number(value.longitude), accuracy = Number(value.accuracy);
-      if (!(latitude >= -90 && latitude <= 90) || !(longitude >= -180 && longitude <= 180) || !(accuracy >= 0 && accuracy < 1e7)) throw new RangeError('Localização simulada inválida: latitude -90..90, longitude -180..180, precisão em metros >= 0.');
+      if (!(latitude >= -90 && latitude <= 90) || !(longitude >= -180 && longitude <= 180) || !(accuracy >= 0 && accuracy < 1e7)) throw new RangeError('Invalid simulated location: latitude -90..90, longitude -180..180, accuracy in meters >= 0.');
       const enabled = !!value.enabled, changed = !previous || previous.latitude !== latitude || previous.longitude !== longitude || previous.accuracy !== accuracy || previous.enabled !== enabled;
       if (!changed) return;
       const fresh = !previous || previous.latitude !== latitude || previous.longitude !== longitude || previous.accuracy !== accuracy || (enabled && !previous.enabled);   // a new fix: new time

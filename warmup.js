@@ -3,7 +3,7 @@
 // constants) -- and the app feels slow until that tapers off. Both engines already time that work (src/time-breakdown.js: the DECODE, COMPILE and INIT buckets; the core charges
 // its linker to DECODE). The tracker looks at the share of the last WARM_WINDOW_MS of wall time spent there: warming while it is at least WARM_SHARE, warm once a whole window
 // stayed below it, and warmAfterMs is when the first-time work stopped (the end of the last busy interval), not the end of that confirming window. A new screen brings new classes and methods, so the state can go back to warming: `episodes` counts those. DOM-free, no process.*.
-import { BUCKET } from './time-breakdown.js?v=ca92aaad0948';
+import { BUCKET } from './time-breakdown.js?v=d422379a2a38';
 
 export const WARM_WINDOW_MS = 3000, WARM_SHARE = 0.03, WARM_POLL_MS = 500, WARM_HOT = 8;   // WARM_HOT: methods compiled within a window that still count as warming
 
@@ -41,12 +41,12 @@ export class WarmupTracker {
   }
 }
 
-/** The chip's text and title (Portuguese) for a snapshot.warmup. */
+/** The chip's text and title for a snapshot.warmup. */
 export function warmupLabel(warmup) {
   if (!warmup) return null;
-  const seconds = ms => (ms / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 1 });
-  if (warmup.warming) return { text: `◌ aquecendo ${Math.round(warmup.share * 100)}%`, warming: true,
-    title: `Aquecendo: ${Math.round(warmup.share * 100)}% dos últimos ${seconds(warmup.windowMs)} s foram trabalho de primeira vez (carga e inicialização de classes, preparo de métodos)${warmup.recentCompiled ? `; ${warmup.recentCompiled} métodos compilados nesse intervalo` : ''}. Total até agora: ${seconds(warmup.totalMs)} s.${warmup.episodes > 1 ? ' Uma tela nova trouxe classes e métodos novos.' : ''}` };
-  return { text: `● aquecido${warmup.warmAfterMs !== null ? ` em ${seconds(warmup.warmAfterMs)} s` : ''}`, warming: false,
-    title: `Aquecido: quase nenhum trabalho de primeira vez nos últimos ${seconds(warmup.windowMs)} s. O trabalho de primeira vez parou ${warmup.warmAfterMs !== null ? seconds(warmup.warmAfterMs) + ' s depois de abrir (confirmado depois de ' + seconds(warmup.windowMs) + ' s sem ele)' : '—'}; trabalho de primeira vez no total: ${seconds(warmup.totalMs)} s.` };
+  const seconds = ms => (ms / 1000).toLocaleString('en-US', { maximumFractionDigits: 1 });
+  if (warmup.warming) return { text: `◌ warming ${Math.round(warmup.share * 100)}%`, warming: true,
+    title: `Warming up: ${Math.round(warmup.share * 100)}% of the last ${seconds(warmup.windowMs)} s was first-time work (class loading and initialization, method preparation)${warmup.recentCompiled ? `; ${warmup.recentCompiled} methods compiled in that interval` : ''}. Total so far: ${seconds(warmup.totalMs)} s.${warmup.episodes > 1 ? ' A new screen brought new classes and methods.' : ''}` };
+  return { text: `● warm${warmup.warmAfterMs !== null ? ` in ${seconds(warmup.warmAfterMs)} s` : ''}`, warming: false,
+    title: `Warm: almost no first-time work in the last ${seconds(warmup.windowMs)} s. First-time work stopped ${warmup.warmAfterMs !== null ? seconds(warmup.warmAfterMs) + ' s after opening (confirmed after ' + seconds(warmup.windowMs) + ' s without it)' : '—'}; first-time work in total: ${seconds(warmup.totalMs)} s.` };
 }

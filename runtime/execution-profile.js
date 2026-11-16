@@ -1,4 +1,4 @@
-import { foldDirectCalls } from './interpreter.js?v=ca92aaad0948';
+import { foldDirectCalls } from './interpreter.js?v=d422379a2a38';
 // What a long-running event was doing, for the error report of an instruction-budget or wall-clock failure (and for "Copiar diagnóstico"): a cheap sampling profile that starts only once an event has run
 // PROFILE_AFTER instructions on one thread, or a tenth of the per-event budget when that is smaller (so ordinary short events pay one comparison per scheduling quantum). From then on, at every scheduling tick (QUANTUM instructions) the running thread's innermost
 // methods are sampled (self share and the distinct stacks), the per-method invocation counters the VM already keeps (methodEvidence) are compared with a snapshot taken at the start, and host-bridge calls
@@ -53,7 +53,7 @@ export class ExecutionProfile {
   /** { text, ... } for the failure report; `limit` rows per list. */
   report(limit = 10) {
     const stack = this.currentStack();
-    if (!this.active) return { active: false, stack, text: `Perfil do evento: não coletado (o evento rodou poucas instruções numa thread).\nPilha na falha (mais interna primeiro):\n${stack.map(line => '  ' + line).join('\n')}` };
+    if (!this.active) return { active: false, stack, text: `Event profile: not collected (the event ran few instructions in a thread).\nStack at the failure (innermost first):\n${stack.map(line => '  ' + line).join('\n')}` };
     const bySelf = [...this.self].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ method: short(key), samples: count, share: count / Math.max(1, this.samples) }));
     const byCalls = [];
     foldDirectCalls(this.rt);
@@ -62,12 +62,12 @@ export class ExecutionProfile {
     const hosts = [...this.hostCalls].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([key, count]) => ({ call: short(key), count }));
     const stacks = [...this.stacks].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([signature, count]) => ({ stack: signature, share: count / Math.max(1, this.samples) }));
     const lines = [
-      `Perfil do evento (amostra a cada tick de agendamento, ${this.samples} amostras, a partir da instrução ${this.startSteps} da thread):`,
-      `Por instruções próprias (fatia das amostras):\n${bySelf.map(row => `  ${pct(row.samples, this.samples)} ${row.method}`).join('\n') || '  (nenhuma)'}`,
-      `Por chamadas desde o início do perfil:\n${byCalls.map(row => `  ${row.calls} ${row.method}`).join('\n') || '  (nenhuma)'}`,
-      `Chamadas à ponte do host, por nome:\n${hosts.map(row => `  ${row.count} ${row.call}`).join('\n') || '  (nenhuma)'}`,
-      `Pilhas distintas mais amostradas (interna < chamadores):\n${stacks.map(row => `  ${pct(row.share, 1)} ${row.stack}`).join('\n') || '  (nenhuma)'}`,
-      `Pilha na falha (mais interna primeiro):\n${stack.map(line => '  ' + line).join('\n')}`,
+      `Event profile (sampled at every scheduling tick, ${this.samples} samples, from instruction ${this.startSteps} of the thread):`,
+      `By own instructions (share of the samples):\n${bySelf.map(row => `  ${pct(row.samples, this.samples)} ${row.method}`).join('\n') || '  (none)'}`,
+      `By calls since the start of the profile:\n${byCalls.map(row => `  ${row.calls} ${row.method}`).join('\n') || '  (none)'}`,
+      `Host bridge calls, by name:\n${hosts.map(row => `  ${row.count} ${row.call}`).join('\n') || '  (none)'}`,
+      `Most sampled distinct stacks (innermost < callers):\n${stacks.map(row => `  ${pct(row.share, 1)} ${row.stack}`).join('\n') || '  (none)'}`,
+      `Stack at the failure (innermost first):\n${stack.map(line => '  ' + line).join('\n')}`,
     ];
     return { active: true, samples: this.samples, bySelf, byCalls, hostCalls: hosts, stacks, stack, text: lines.join('\n') };
   }
@@ -75,6 +75,6 @@ export class ExecutionProfile {
   summary() {
     if (!this.active || this.samples === 0) return '';
     const top = [...this.self].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([key, count]) => `${short(key)} ${pct(count, this.samples)}`);
-    return `; mais ocupados: ${top.join(', ')}`;
+    return `; busiest: ${top.join(', ')}`;
   }
 }

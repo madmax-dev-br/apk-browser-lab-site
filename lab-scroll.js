@@ -18,7 +18,7 @@ const textOf = element => [...(element.texts ?? []), element.editableText ?? '',
 export function scrollSelector(raw) {
   if (raw === undefined || raw === null || raw === '') return null;
   if (typeof raw === 'string') return { key: null, testTag: raw, text: null, at: null };   // a bare string is a testTag
-  if (typeof raw !== 'object') throw fail('bad-args', 'O alvo da rolagem é { testTag }, { text }, { key } ou { x, y }.');
+  if (typeof raw !== 'object') throw fail('bad-args', 'The scroll target is { testTag }, { text }, { key } or { x, y }.');
   const key = raw.key ?? raw.element_key ?? null, testTag = raw.testTag ?? raw.test_tag ?? null, text = raw.text ?? null;
   const at = finite(raw.x) && finite(raw.y) ? { x: Number(raw.x), y: Number(raw.y) } : null;
   if (key === null && testTag === null && text === null && !at) return null;
@@ -43,7 +43,7 @@ export function findElement(elements, selector) {
 export function resolveScrollTarget(elements, views, selector) {
   const element = findElement(elements, selector);
   if (selector && (selector.key !== null || selector.testTag !== null || selector.text !== null) && !element)
-    throw fail('not-found', `Nenhum componente na tela com ${selector.key !== null ? `a chave ${selector.key}` : [selector.testTag !== null ? `testTag "${selector.testTag}"` : '', selector.text !== null ? `texto "${selector.text}"` : ''].filter(Boolean).join(' e ')} (veja lab.layoutBounds()).`);
+    throw fail('not-found', `No component on the screen with ${selector.key !== null ? `key ${selector.key}` : [selector.testTag !== null ? `testTag "${selector.testTag}"` : '', selector.text !== null ? `text "${selector.text}"` : ''].filter(Boolean).join(' and ')} (see lab.layoutBounds()).`);
   const point = element?.bounds ? { x: (element.bounds.left + element.bounds.right) / 2, y: (element.bounds.top + element.bounds.bottom) / 2 } : selector?.at ?? null;
   const scrollables = elements.filter(item => item.kind === 'compose' && item.actions?.includes('ScrollBy') && item.bounds);
   const compose = (element?.kind === 'compose' && element.actions?.includes('ScrollBy') ? element : null) ?? (element?.kind === 'view' ? null : point ? scrollables.filter(item => inside(item, point)).sort((a, b) => area(a) - area(b))[0] : [...scrollables].sort((a, b) => area(b) - area(a))[0]) ?? null;
@@ -51,7 +51,7 @@ export function resolveScrollTarget(elements, views, selector) {
   const candidates = views.filter(view => view.visible && view.bounds && (view.kind === 'scroll' || SCROLLABLE_VIEW.test(String(view.type ?? ''))));
   const direct = element?.kind === 'view' ? candidates.find(view => String(view.id) === String(element.id)) : null;
   const view = direct ?? (point ? candidates.filter(item => inside(item, point)).sort((a, b) => b.depth - a.depth)[0] : [...candidates].sort((a, b) => area(b) - area(a))[0]) ?? null;
-  if (!view) throw fail('not-found', point ? 'Nada rolável nesse ponto da tela.' : 'Nada rolável na tela.');
+  if (!view) throw fail('not-found', point ? 'Nothing scrollable at that point of the screen.' : 'Nothing scrollable on the screen.');
   return { kind: 'view', id: view.id, key: `v:${view.id}`, name: String(view.type ?? 'View').replace(/^L|;$/g, '').split('/').pop(), bounds: view.bounds };
 }
 
@@ -60,13 +60,13 @@ export function scrollRequest(args = {}) {
   const out = {};
   for (const [axis, percent] of [['x', 'percentX'], ['y', 'percentY']]) {
     const hasPosition = finite(args[axis]), hasPercent = finite(args[percent]);
-    if (args[axis] !== undefined && args[axis] !== null && !hasPosition) throw fail('bad-args', `${axis} precisa ser um número (px).`);
-    if (args[percent] !== undefined && args[percent] !== null && !hasPercent) throw fail('bad-args', `${percent} precisa ser um número de 0 a 100.`);
-    if (hasPosition && hasPercent) throw fail('bad-args', `Diga ${axis} (px) ou ${percent} (0 a 100), não os dois.`);
-    if (hasPosition) { const value = Number(args[axis]); if (value < 0) throw fail('bad-args', `${axis} não pode ser negativo: a posição é em px a partir do início da rolagem.`); out[axis] = value; }
-    if (hasPercent) { const value = Number(args[percent]); if (value < 0 || value > 100) throw fail('bad-args', `${percent} vai de 0 a 100.`); out[percent] = value; }
+    if (args[axis] !== undefined && args[axis] !== null && !hasPosition) throw fail('bad-args', `${axis} must be a number (px).`);
+    if (args[percent] !== undefined && args[percent] !== null && !hasPercent) throw fail('bad-args', `${percent} must be a number from 0 to 100.`);
+    if (hasPosition && hasPercent) throw fail('bad-args', `Give ${axis} (px) or ${percent} (0 to 100), not both.`);
+    if (hasPosition) { const value = Number(args[axis]); if (value < 0) throw fail('bad-args', `${axis} cannot be negative: the position is in px from the start of the scroll.`); out[axis] = value; }
+    if (hasPercent) { const value = Number(args[percent]); if (value < 0 || value > 100) throw fail('bad-args', `${percent} goes from 0 to 100.`); out[percent] = value; }
   }
-  if (!Object.keys(out).length) throw fail('bad-args', 'Diga para onde rolar: x / y (px) ou percentX / percentY (0 a 100).');
+  if (!Object.keys(out).length) throw fail('bad-args', 'Say where to scroll: x / y (px) or percentX / percentY (0 to 100).');
   return out;
 }
 
@@ -115,7 +115,7 @@ export function createLabScroll({ query, elements, views, scrollBy, scrollToInde
   const queryArgs = target => target.kind === 'compose' ? { compose: { ownerViewId: target.ownerViewId, nodeId: target.nodeId } } : { view: target.id };
   async function read(target) {
     const info = await query(queryArgs(target));
-    if (!info) throw fail('not-found', 'O componente rolável saiu da tela.');
+    if (!info) throw fail('not-found', 'The scrollable component left the screen.');
     return info;
   }
   /** Reads until two reads in a row agree (the app's scroll may be animated) or settleMs passed. */
@@ -136,11 +136,11 @@ export function createLabScroll({ query, elements, views, scrollBy, scrollToInde
    */
   async function lazy(target, request, first) {
     const axis = first.vertical || !first.horizontal ? 'y' : 'x', percentKey = axis === 'y' ? 'percentY' : 'percentX', maxKey = axis === 'y' ? 'maxY' : 'maxX', percent = request[percentKey], position = request[axis];
-    if (percent === undefined && position === undefined) throw fail('bad-args', `Esta lista rola só na ${axis === 'y' ? 'vertical' : 'horizontal'}: diga ${axis} ou ${percentKey}.`);
+    if (percent === undefined && position === undefined) throw fail('bad-args', `This list only scrolls ${axis === 'y' ? 'vertically' : 'horizontally'}: give ${axis} or ${percentKey}.`);
     const along = value => axis === 'y' ? [0, value] : [value, 0], ended = info => (axis === 'y' ? info.maxY - info.y : info.maxX - info.x) <= 0.01, started = info => (axis === 'y' ? info.y : info.x) <= 0.01;
     const extent = Math.max(64, axis === 'y' ? target.bounds.bottom - target.bounds.top : target.bounds.right - target.bounds.left);
     let steps = 0, info = first;
-    const spend = () => { if (++steps > limits.measureSteps) throw fail('unsupported', `A lista é longa demais para rolar até uma porcentagem (mais de ${limits.measureSteps} passos); use uma posição em px (y) ou 0 / 100.`); };
+    const spend = () => { if (++steps > limits.measureSteps) throw fail('unsupported', `The list is too long to scroll to a percentage (more than ${limits.measureSteps} steps); use a position in px (y) or 0 / 100.`); };
     const by = async value => { spend(); await scrollBy(target, ...along(value)); info = await settled(target); };
     const toStart = async () => {
       if (first.scrollToIndex && typeof scrollToIndex === 'function') { spend(); await scrollToIndex(target, 0); info = await settled(target); }
@@ -166,7 +166,7 @@ export function createLabScroll({ query, elements, views, scrollBy, scrollToInde
     while (!ended(info)) {
       const before = await elements(); await by(small);
       const moved = ended(info) ? contentShift(before, await elements(), target, axis) : small;
-      if (moved === null) throw fail('unsupported', 'Não foi possível medir o conteúdo desta lista (nenhum componente inteiro ficou na tela entre dois passos); use uma posição em px ou 0 / 100.');
+      if (moved === null) throw fail('unsupported', 'Could not measure the content of this list (no whole component stayed on the screen between two steps); use a position in px or 0 / 100.');
       range += Math.max(0, moved);
     }
     const goal = Math.round(range * percent / 100);
@@ -180,7 +180,7 @@ export function createLabScroll({ query, elements, views, scrollBy, scrollToInde
     async scrollTo(args = {}) {
       const request = scrollRequest(args), target = await resolve(args.target);
       let info = await read(target), steps = 0, reached = false, previous = null;
-      if (info.disabled) throw fail('bad-args', `${target.name ?? 'O componente'} está desabilitado: não rola.`);
+      if (info.disabled) throw fail('bad-args', `${target.name ?? 'The component'} is disabled: it does not scroll.`);
       if (info.lazy) return lazy(target, request, info);
       for (;;) {
         const goal = scrollGoal(info, request), dx = goal.x - info.x, dy = goal.y - info.y;

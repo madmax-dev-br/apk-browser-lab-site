@@ -1,15 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=ca92aaad0948';
-import { createDeviceView, createViewState } from '../device-view.js?v=ca92aaad0948';
-import { createGlSurfaces } from '../gl-surfaces.js?v=ca92aaad0948';
-import { sanitizeSettings } from '../device-settings.js?v=ca92aaad0948';
-import { createFrameController } from './frame-controller.js?v=ca92aaad0948';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=ca92aaad0948';
-import { createPluginHost } from '../plugin-host.js?v=ca92aaad0948';
-import { captureImage } from '../screen-capture.js?v=ca92aaad0948';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=ca92aaad0948';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=ca92aaad0948';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=ca92aaad0948';
+import { APKWorkerClient } from '../apk-worker-client.js?v=d422379a2a38';
+import { createDeviceView, createViewState } from '../device-view.js?v=d422379a2a38';
+import { createGlSurfaces } from '../gl-surfaces.js?v=d422379a2a38';
+import { sanitizeSettings } from '../device-settings.js?v=d422379a2a38';
+import { createFrameController } from './frame-controller.js?v=d422379a2a38';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=d422379a2a38';
+import { createPluginHost } from '../plugin-host.js?v=d422379a2a38';
+import { captureImage } from '../screen-capture.js?v=d422379a2a38';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=d422379a2a38';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=d422379a2a38';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=d422379a2a38';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -30,8 +30,8 @@ document.getElementById('player-error-copy')?.addEventListener('click', async ev
   const button = event.currentTarget, pre = document.getElementById('player-error-report'); let copied = false;
   try { await navigator.clipboard.writeText(lastReport); copied = true; } catch { /* permission policy of the embedding page */ }
   if (!copied) { pre.textContent = lastReport; pre.hidden = false; const range = document.createRange(); range.selectNodeContents(pre); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); try { copied = document.execCommand('copy'); } catch { /* selection stays for manual copy */ } }
-  button.textContent = copied ? 'Diagnóstico copiado' : 'Selecionado: copie com Ctrl/Cmd+C';
-  setTimeout(() => { button.textContent = 'Copiar diagnóstico'; }, 2500);
+  button.textContent = copied ? 'Diagnostics copied' : 'Selected: copy with Ctrl/Cmd+C';
+  setTimeout(() => { button.textContent = 'Copy diagnostics'; }, 2500);
 });
 const post = message => { if (window.parent !== window && parentOrigin) window.parent.postMessage(message, parentOrigin); };
 const getHost = id => state.viewElements.get(String(id)) ?? null;
@@ -56,7 +56,7 @@ function permissionDialog(request) {
       scrim.classList.toggle('dark', !!deviceState.settings.darkTheme);
       button('perm-question').textContent = dialog.question; button('perm-detail').textContent = dialog.permissions.map(shortPermission).join(', ');
       button('perm-icon').innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${PERMISSION_ICONS[dialog.group] ?? PERMISSION_ICONS.OTHER}"/></svg>`;
-      button('perm-allow').textContent = dialog.oneTime ? 'Enquanto o app está em uso' : 'Permitir'; button('perm-once').hidden = !dialog.oneTime;
+      button('perm-allow').textContent = dialog.oneTime ? 'While using the app' : 'Allow'; button('perm-once').hidden = !dialog.oneTime;
       const answer = choice => { answers.push(choice); if (index + 1 < request.dialogs.length) show(index + 1); else close(answers); };
       button('perm-allow').onclick = () => answer('allow'); button('perm-once').onclick = () => answer('once'); button('perm-deny').onclick = () => answer('deny');
       scrim.onkeydown = event => {
@@ -79,7 +79,7 @@ const controller = createFrameController({ vm, state, deviceState, post, createP
   error(info) {
     lastReport = info.report ?? info.message;
     document.getElementById('player-error-title').textContent = info.kind; document.getElementById('player-error-message').textContent = info.cause ?? info.message;
-    document.getElementById('player-error-report').hidden = true; document.getElementById('player-error-copy').textContent = 'Copiar diagnóstico';
+    document.getElementById('player-error-report').hidden = true; document.getElementById('player-error-copy').textContent = 'Copy diagnostics';
     document.getElementById('player-error').hidden = false; status('');
   },
   cleared() { document.getElementById('player-error').hidden = true; status('Loading the APK…'); },   // a stop says so right after (stopped)

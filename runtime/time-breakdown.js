@@ -1,7 +1,7 @@
 // Where the host time of an operation goes, with exclusive attribution: the bucket on top of the stack owns the clock. Rare, long phases (method decoding, JIT compilation, class initialization,
 // garbage collection) and host calls switch the bucket; everything else is the interpreter (and compiled code). The per-thread split counts interpreter time by the thread that ran.
 export const BUCKET = { INTERP: 0, HOST: 1, DECODE: 2, COMPILE: 3, INIT: 4, GC: 5 };
-const NAMES = ['interpretador e código compilado', 'chamadas do host', 'decodificação de métodos (primeira execução)', 'compilação JIT', 'carga/inicialização de classes', 'coleta de lixo'];
+const NAMES = ['interpreter and compiled code', 'host calls', 'method decoding (first run)', 'JIT compilation', 'class loading/initialization', 'garbage collection'];
 export class TimeBreakdown {
   constructor() { this.reset(); }
   reset() {
@@ -38,7 +38,7 @@ export class TimeBreakdown {
   static text(snapshot) {
     if (!snapshot) return '';
     const total = snapshot.ms.reduce((a, b) => a + b, 0) || 1;
-    return `Tempo do host: ${snapshot.ms.map((v, i) => `${NAMES[i]} ${v} ms (${Math.round(100 * v / total)}%${snapshot.counts[i] ? ', ' + snapshot.counts[i] + '×' : ''})`).join('; ')}; ${(snapshot.pollers ?? []).map(p => `; thread ${p.thread} está em polling (${p.perSecond} chamadas do host/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`).join('')}; interpretador por thread: ${snapshot.threads.map(([name, ms]) => `${name} ${ms} ms`).join(', ') || '-'}; chamadas do host mais frequentes: ${(snapshot.hostByCount ?? []).map(([key, n, ms]) => `${key} ${n}× (${ms} ms)`).join(', ') || '-'}; mais lentas (tempo inclusivo): ${(snapshot.hostByTime ?? []).map(([key, n, ms]) => `${key} ${ms} ms (${n}×)`).join(', ') || '-'}`;
+    return `Host time: ${snapshot.ms.map((v, i) => `${NAMES[i]} ${v} ms (${Math.round(100 * v / total)}%${snapshot.counts[i] ? ', ' + snapshot.counts[i] + '×' : ''})`).join('; ')}; ${(snapshot.pollers ?? []).map(p => `; thread ${p.thread} is polling (${p.perSecond} host calls/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`).join('')}; interpreter by thread: ${snapshot.threads.map(([name, ms]) => `${name} ${ms} ms`).join(', ') || '-'}; most frequent host calls: ${(snapshot.hostByCount ?? []).map(([key, n, ms]) => `${key} ${n}× (${ms} ms)`).join(', ') || '-'}; slowest (inclusive time): ${(snapshot.hostByTime ?? []).map(([key, n, ms]) => `${key} ${ms} ms (${n}×)`).join(', ') || '-'}`;
   }
 }
 
@@ -54,5 +54,5 @@ export function createLoadTiming(now = () => performance.now()) {
     finish() { close(); return { totalMs: Math.round(last - started), phases: [...phases].map(([phase, ms]) => [phase, Math.round(ms)]).filter(row => row[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 16) }; },
   };
 }
-/** 'Carga do APK: 2140 ms (framework 900 ms, dex 500 ms, ...)' for the diagnostic summary. */
-export const loadTimingText = timing => timing ? `Carga do APK: ${timing.totalMs} ms (${timing.phases.slice(0, 8).map(([phase, ms]) => `${phase} ${ms} ms`).join(', ')})` : '';
+/** 'APK load: 2140 ms (framework 900 ms, dex 500 ms, ...)' for the diagnostic summary. */
+export const loadTimingText = timing => timing ? `APK load: ${timing.totalMs} ms (${timing.phases.slice(0, 8).map(([phase, ms]) => `${phase} ${ms} ms`).join(', ')})` : '';

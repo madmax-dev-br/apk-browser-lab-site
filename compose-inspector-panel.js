@@ -1,18 +1,19 @@
-// The "Compose" panel of the lab page: a one-shot inspection of the screen's Compose layout tree (src/compose-inspector.js, run in the Worker) and of its Views, with a
-// carousel of every element cut out of the frame the page shows, by the element's bounds, its details, a highlight on the device screen and a filterable table.
-// Nothing runs while the panel is closed: no Worker message, no DOM, no images. Opening captures once; "Capturar" takes a new capture; "Atualizar ao navegar" (off by
-// default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
-// By default the elements are the boxes "Mostrar limites de layout" draws (src/layout-bounds.js: Views and Compose semantics nodes), each crop outlined like that overlay and named from
-// the inspected LayoutNode with the same semanticsId; "Árvore completa" lists every LayoutNode of the inspection instead.
+// The "Compose" panel of the lab page: a one-shot inspection of the screen's Compose layout tree (src/compose-inspector.js, run in the Worker) and of its Views.
+// After a capture the panel shows the status line and a two-column split: on the left the elements as a tree (one row per element, indented by depth, with its name, kind and
+// size; a filterable list that scrolls inside its column), on the right the details of the clicked element (its crop cut from the frame the page shows, name, properties). Until an
+// element is clicked the right column is an empty state and no crop is cut; selecting an element cuts exactly one crop and highlights the element on the device screen.
+// Nothing runs while the panel is closed: no Worker message, no DOM, no images. Opening captures once; "Capture" takes a new capture (keeping the selection when the same element
+// is still there); "Update on navigation" (off by default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
+// "Full tree" is on by default: every LayoutNode of the inspection. Off, the elements are the boxes "Show layout bounds" draws (src/layout-bounds.js: Views and Compose semantics
+// nodes), each crop outlined like that overlay and named from the inspected LayoutNode with the same semanticsId.
+// The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=ca92aaad0948';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=d422379a2a38';
 
-export const MAX_CROPS = 300;   // cards with an image in the carousel; the table lists every element
-export const EAGER_CROPS = 12;   // without IntersectionObserver, the first cards are cut at once and the others when chosen
-const NO_RASTER = 'o quadro exibido não tem raster de conteúdo para este elemento';
-const THUMB_W = 200, THUMB_H = 120, DETAIL_W = 360, DETAIL_H = 260;
-const NAME_SOURCES = { composable: 'nome do composable (informação de fonte do slot table)', semantics: 'semântica (Role, texto ou ação do nó)', layout: 'classe da measure policy e modificadores (sem nome de composable no APK)', view: 'classe da View' };
+const NO_RASTER = 'the displayed frame has no content raster for this element';
+const DETAIL_W = 360, DETAIL_H = 260;
+const NAME_SOURCES = { composable: 'composable name (source information from the slot table)', semantics: 'semantics (Role, text or action of the node)', layout: 'measure policy class and modifiers (no composable name in the APK)', view: 'View class' };
 
 const round = value => Math.round(value * 100) / 100;
 const simple = type => { const name = String(type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.'); return name.slice(name.lastIndexOf('.') + 1) || name; };
@@ -43,10 +44,10 @@ export function semanticsName(node) {
   const text = [...(node.texts ?? []), ...(node.contentDescriptions ?? [])].find(value => typeof value === 'string' && value.trim()), short = value => value.length > 40 ? value.slice(0, 39) + '…' : value;
   const actions = new Set((node.actions ?? []).map(action => action.name ?? action)), tag = node.testTag ? ` #${node.testTag}` : '';
   if (node.role) return `${node.role}${text ? ` "${short(text)}"` : ''}${tag}`;
-  if (actions.has('SetText')) return `Campo de texto${node.editableText ? ` "${short(node.editableText)}"` : ''}${tag}`;
-  if (text) return `Texto "${short(text)}"${tag}`;
-  if (actions.has('OnClick')) return `Clicável${tag}`;
-  return node.testTag ? `#${node.testTag}` : `Nó semântico ${node.nodeId}`;
+  if (actions.has('SetText')) return `Text field${node.editableText ? ` "${short(node.editableText)}"` : ''}${tag}`;
+  if (text) return `Text "${short(text)}"${tag}`;
+  if (actions.has('OnClick')) return `Clickable${tag}`;
+  return node.testTag ? `#${node.testTag}` : `Semantic node ${node.nodeId}`;
 }
 
 /**
@@ -64,7 +65,7 @@ export function buildLayoutBoundsElements(inspection, snapshot) {
       const r = node.boundsInRoot; if (!r || node.invisibleToUser || node.placed === false || !(r.right > r.left && r.bottom > r.top)) continue;
       const match = inspected.get(`${owner.ownerViewId}:${node.nodeId}`), semantics = { texts: node.texts ?? [], editableText: node.editableText ?? null, role: node.role ?? null, testTag: node.testTag ?? null, contentDescriptions: node.contentDescriptions ?? [],
         actions: (node.actions ?? []).map(action => action.name ?? action), enabled: !node.disabled, focused: node.focused ?? null, selected: node.selected ?? null, toggleState: node.toggleState ?? null, textSelection: node.textSelection ?? null };
-      const named = match && (match.nameSource === 'composable' || match.nameSource === 'semantics'), fromSemantics = semanticsName(node), bare = fromSemantics.startsWith('Nó semântico ');
+      const named = match && (match.nameSource === 'composable' || match.nameSource === 'semantics'), fromSemantics = semanticsName(node), bare = fromSemantics.startsWith('Semantic node ');
       const name = named ? match.name : bare && match ? match.name : fromSemantics, nameSource = named ? match.nameSource : bare && match ? match.nameSource : 'semantics';   // a node with no semantics text takes its LayoutNode's description
       list.push({ key: `c:${owner.ownerViewId}:${node.nodeId}`, kind: 'compose', name, nameSource, id: node.nodeId, ownerViewId: owner.ownerViewId,
         parentName: null, depth: match?.depth ?? 0, childCount: match?.childCount ?? 0, hostId: owner.ownerViewId, hostSize, cropBounds: r, bounds: match?.bounds ?? r, visibleBounds: r, windowBounds: shift(r, ownerView.bounds),
@@ -102,20 +103,20 @@ const shift = (b, origin) => ({ left: round(b.left + origin.left), top: round(b.
 
 /** "16, 42 · 219 × 28 px · 219 × 28 dp" (dp only when the density is known). */
 export function formatBounds(b, density = null) {
-  if (!b) return 'sem limites';
+  if (!b) return 'no bounds';
   const { width, height } = sizeOf(b), px = `${round(b.left)}, ${round(b.top)} · ${width} × ${height} px`;
   return density > 0 ? `${px} · ${round(width / density)} × ${round(height / density)} dp` : px;
 }
 
 /** Why an element has no crop, or null when it has one. `hostSize` is the raster host's size in px (the Compose owner's width and height). */
 export function cropProblem(element, hostSize = element.hostSize) {
-  if (element.kind === 'compose' && !element.attached) return 'nó desanexado (não está na árvore)';
-  if (element.kind === 'compose' && !element.placed) return 'não posicionado (isPlaced = false)';
-  if (element.kind === 'view' && !element.placed) return 'View invisível (visibility GONE/INVISIBLE)';
-  if (element.hostId === null || element.hostId === undefined) return 'sem raster de conteúdo (View desenhada pelo DOM da página)';
-  const b = element.cropBounds; if (!b) return 'sem limites';
-  const { width, height } = sizeOf(b); if (!(width > 0 && height > 0)) return 'tamanho zero (ou recortado inteiro pelos pais)';
-  if (hostSize && (b.right <= 0 || b.bottom <= 0 || b.left >= hostSize.width || b.top >= hostSize.height)) return 'fora da área visível';
+  if (element.kind === 'compose' && !element.attached) return 'detached node (not in the tree)';
+  if (element.kind === 'compose' && !element.placed) return 'not placed (isPlaced = false)';
+  if (element.kind === 'view' && !element.placed) return 'invisible View (visibility GONE/INVISIBLE)';
+  if (element.hostId === null || element.hostId === undefined) return 'no content raster (View drawn by the page DOM)';
+  const b = element.cropBounds; if (!b) return 'no bounds';
+  const { width, height } = sizeOf(b); if (!(width > 0 && height > 0)) return 'zero size (or fully clipped by its parents)';
+  if (hostSize && (b.right <= 0 || b.bottom <= 0 || b.left >= hostSize.width || b.top >= hostSize.height)) return 'outside the visible area';
   return null;
 }
 
@@ -146,36 +147,36 @@ export function exportJSON(capture) {
 
 /** Label/value rows of the details pane for one element. */
 export function detailRows(element) {
-  const rows = [['Nome', element.name], ['Origem do nome', NAME_SOURCES[element.nameSource] ?? element.nameSource]];
-  if (element.calls?.length) rows.push(['Chamadas', element.calls.join(' › ')]);
-  rows.push([element.kind === 'compose' ? 'Id (semanticsId)' : 'Id da View', String(element.id)], ['Profundidade', `${element.depth}${element.parentName ? ` · pai: ${element.parentName}` : ''}`]);
+  const rows = [['Name', element.name], ['Name source', NAME_SOURCES[element.nameSource] ?? element.nameSource]];
+  if (element.calls?.length) rows.push(['Calls', element.calls.join(' › ')]);
+  rows.push([element.kind === 'compose' ? 'Id (semanticsId)' : 'View id', String(element.id)], ['Depth', `${element.depth}${element.parentName ? ` · parent: ${element.parentName}` : ''}`]);
   if (element.kind === 'compose') {
-    rows.push(['Na janela (visível)', formatBounds(element.windowBounds, element.density)], ['No AndroidComposeView', formatBounds(element.bounds, element.density)]);
-    if (element.visibleBounds && element.bounds && JSON.stringify(element.visibleBounds) !== JSON.stringify(element.bounds)) rows.push(['Recortado pelos pais', formatBounds(element.visibleBounds, element.density)]);
-    rows.push(['z-index', String(element.zIndex)], ['Posicionado', element.placed ? 'sim (isPlaced)' : 'não'], ['Filhos', String(element.childCount)], ['Measure policy', element.measurePolicy ?? '—'],
-      ['Modificadores', element.modifiers.length ? element.modifiers.map(m => m.label === simple(m.className) ? m.label : `${m.label} (${simple(m.className)})`).join(', ') : '—']);
+    rows.push(['In the window (visible)', formatBounds(element.windowBounds, element.density)], ['In the AndroidComposeView', formatBounds(element.bounds, element.density)]);
+    if (element.visibleBounds && element.bounds && JSON.stringify(element.visibleBounds) !== JSON.stringify(element.bounds)) rows.push(['Clipped by parents', formatBounds(element.visibleBounds, element.density)]);
+    rows.push(['z-index', String(element.zIndex)], ['Placed', element.placed ? 'yes (isPlaced)' : 'no'], ['Children', String(element.childCount)], ['Measure policy', element.measurePolicy ?? '—'],
+      ['Modifiers', element.modifiers.length ? element.modifiers.map(m => m.label === simple(m.className) ? m.label : `${m.label} (${simple(m.className)})`).join(', ') : '—']);
     const s = element.semantics;
     if (s) {
-      if (s.texts?.length) rows.push(['Texto', s.texts.join(' · ')]);
-      if (s.editableText !== null && s.editableText !== undefined) rows.push(['Texto editável', s.editableText]);
+      if (s.texts?.length) rows.push(['Text', s.texts.join(' · ')]);
+      if (s.editableText !== null && s.editableText !== undefined) rows.push(['Editable text', s.editableText]);
       if (s.role) rows.push(['Role', s.role]);
       if (s.testTag) rows.push(['testTag', s.testTag]);
       if (s.contentDescriptions?.length) rows.push(['contentDescription', s.contentDescriptions.join(' · ')]);
-      rows.push(['Ações', s.actions?.length ? s.actions.join(', ') : '—'], ['Habilitado', s.enabled ? 'sim' : 'não']);
-      if (s.focused !== null && s.focused !== undefined) rows.push(['Focado', s.focused ? 'sim' : 'não']);
-      if (s.selected !== null && s.selected !== undefined) rows.push(['Selecionado', s.selected ? 'sim' : 'não']);
-      if (s.toggleState) rows.push(['Estado', s.toggleState]);
-      if (Array.isArray(s.textSelection)) rows.push(['Seleção', s.textSelection.join('–')]);
-    } else rows.push(['Semântica', 'nenhuma neste nó']);
+      rows.push(['Actions', s.actions?.length ? s.actions.join(', ') : '—'], ['Enabled', s.enabled ? 'yes' : 'no']);
+      if (s.focused !== null && s.focused !== undefined) rows.push(['Focused', s.focused ? 'yes' : 'no']);
+      if (s.selected !== null && s.selected !== undefined) rows.push(['Selected', s.selected ? 'yes' : 'no']);
+      if (s.toggleState) rows.push(['State', s.toggleState]);
+      if (Array.isArray(s.textSelection)) rows.push(['Selection', s.textSelection.join('–')]);
+    } else rows.push(['Semantics', 'none on this node']);
   } else {
-    rows.push(['Classe', String(element.type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.')], ['Tipo no renderizador', element.viewKind ?? '—'], ['Na janela', formatBounds(element.windowBounds, element.density)]);
-    if (element.text) rows.push(['Texto', element.text]);
+    rows.push(['Class', String(element.type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.')], ['Renderer type', element.viewKind ?? '—'], ['In the window', formatBounds(element.windowBounds, element.density)]);
+    if (element.text) rows.push(['Text', element.text]);
     if (element.contentDescription) rows.push(['contentDescription', element.contentDescription]);
-    rows.push(['Visível', element.placed ? 'sim' : `não (visibility ${element.visibility})`], ['Clicável', element.clickable ? 'sim' : 'não']);
-    if (element.compose) rows.push(['Compose', 'hospeda uma composição: veja os elementos Compose']);
+    rows.push(['Visible', element.placed ? 'yes' : `no (visibility ${element.visibility})`], ['Clickable', element.clickable ? 'yes' : 'no']);
+    if (element.compose) rows.push(['Compose', 'hosts a composition: see the Compose elements']);
   }
-  if (element.window && element.window.id !== null) rows.push(['Janela', `${element.window.kind ?? 'janela'} ${element.window.id}${element.window.modal ? ' · modal' : ''}`]);
-  const problem = cropProblem(element); rows.push(['Recorte', problem ? `sem recorte: ${problem}` : 'cortado do quadro exibido pela página']);
+  if (element.window && element.window.id !== null) rows.push(['Window', `${element.window.kind ?? 'window'} ${element.window.id}${element.window.modal ? ' · modal' : ''}`]);
+  const problem = cropProblem(element); rows.push(['Crop', problem ? `no crop: ${problem}` : 'cut from the frame shown by the page']);
   return rows;
 }
 
@@ -188,23 +189,24 @@ export function detailRows(element) {
 export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000 } = {}) {
   const q = selector => root.querySelector(selector), body = q('.ci-body'), count = q('.ci-count'), captureButton = q('.ci-capture'), follow = q('.ci-follow'), filterInput = q('.ci-filter'), copyButton = q('.ci-copy');
   const el = (tag, className = '', text = null) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== null) node.textContent = text; return node; };
-  // "Árvore completa" (off by default): every LayoutNode of the inspection instead of the boxes "Mostrar limites de layout" draws
+  // "Full tree" (on by default): every LayoutNode of the inspection instead of the boxes "Show layout bounds" draws
   let treeToggle = q('.ci-tree');
-  if (!treeToggle && follow?.parentElement?.parentElement) { const label = document.createElement('label'); label.className = 'logcat-auto'; label.title = 'Mostra cada LayoutNode da árvore do Compose, não só as caixas de \'Mostrar limites de layout\''; treeToggle = document.createElement('input'); treeToggle.type = 'checkbox'; treeToggle.className = 'ci-tree'; label.append(treeToggle, ' Árvore completa'); follow.parentElement.after(label); }
-  const mode = () => treeToggle?.checked ? 'tree' : 'layout';
-  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], waitingRaster: new Set(), observer: null, highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
+  if (!treeToggle && follow?.parentElement?.parentElement) { const label = document.createElement('label'); label.className = 'logcat-auto'; label.title = 'Shows every LayoutNode of the Compose tree, not only the boxes of \'Show layout bounds\''; treeToggle = document.createElement('input'); treeToggle.type = 'checkbox'; treeToggle.className = 'ci-tree'; label.append(treeToggle, ' Full tree'); follow.parentElement.after(label); }
+  if (treeToggle) treeToggle.checked = true;
+  const mode = () => treeToggle && !treeToggle.checked ? 'layout' : 'tree';
+  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
   const setCount = text => { count.textContent = text; };
-  setCount('fechado');
+  setCount('closed');
 
   const navigationKey = snapshot => {
     if (!snapshot) return null; const owner = snapshot.composeSemantics?.owners?.[0];
     return `${snapshot.activityName ?? ''}|${JSON.stringify(snapshot.navigation ?? null).slice(0, 400)}|${(owner?.nodes ?? []).slice(0, 24).map(node => node.nodeId).join(',')}`;
   };
   const release = () => {
-    S.token++; S.observer?.disconnect(); S.observer = null; clearTimeout(S.followTimer); S.followTimer = null;
+    S.token++; clearTimeout(S.followTimer); S.followTimer = null;
     for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
     for (const frame of S.frames.values()) { if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } } S.frames.clear();
-    S.waitingRaster.clear(); S.highlight?.remove(); S.highlight = null; S.capture = null; S.elements = []; S.visible = []; S.selected = null;
+    S.highlight?.remove(); S.highlight = null; S.capture = null; S.elements = []; S.visible = []; S.selected = null;
     for (const resolve of S.waiters.splice(0)) resolve(null);
     body.replaceChildren();
   };
@@ -228,19 +230,12 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
   const paint = (element, canvas, maxW, maxH) => {
     const size = element.hostSize, problem = cropProblem(element, size); if (problem) return problem;
     const frame = freeze(element.hostId); if (!frame.canvas) return NO_RASTER;
-    const r = cropRect(element.cropBounds, size, frame); if (!r) return 'fora da área visível';
+    const r = cropRect(element.cropBounds, size, frame); if (!r) return 'outside the visible area';
     const css = fit(r.sw, r.sh, maxW, maxH), ratio = Math.min(2, globalThis.devicePixelRatio || 1), px = fit(r.sw, r.sh, css.width * ratio, css.height * ratio);
     canvas.width = px.width; canvas.height = px.height; canvas.style.width = `${css.width}px`; canvas.style.height = "auto";   // height follows the canvas aspect, also when max-width narrows it
     const ctx = canvas.getContext('2d'); ctx.imageSmoothingQuality = 'high'; ctx.drawImage(frame.canvas, r.sx, r.sy, r.sw, r.sh, 0, 0, px.width, px.height);
     if (element.layoutBounds) { const line = Math.max(1, Math.round(ratio)); ctx.strokeStyle = LAYOUT_BOUNDS_COLORS.bounds; ctx.lineWidth = line; ctx.strokeRect(line / 2, line / 2, px.width - line, px.height - line); }   // the box as "Mostrar limites de layout" draws it
     return null;
-  };
-  const drawThumb = card => {
-    if (card._drawn) return; card._drawn = true; const element = card._element, canvas = card.querySelector('canvas'), note = card.querySelector('.ci-noimage');
-    const problem = card._index >= MAX_CROPS ? `limite de ${MAX_CROPS} recortes por captura` : paint(element, canvas, THUMB_W, THUMB_H);
-    S.waitingRaster.delete(card);
-    if (problem === NO_RASTER) { card._drawn = false; S.waitingRaster.add(card); }   // the host's layer was empty (the app had not drawn yet, or a canvas being resized): cut again on the next frame
-    if (problem) { canvas.hidden = true; note.textContent = `sem recorte: ${problem}`; note.hidden = false; } else { canvas.hidden = false; note.hidden = true; S.thumbs.push(canvas); }
   };
 
   const highlight = element => {
@@ -255,80 +250,61 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     screen.append(mark); S.highlight = mark;
   };
 
+  const treeRows = () => [...body.querySelectorAll('.ci-row')];
   const select = (key, { focus = false } = {}) => {
     const element = S.elements.find(item => item.key === key); if (!element) return; S.selected = key;
-    for (const card of body.querySelectorAll('.ci-card')) { const on = card._element?.key === key; card.setAttribute('aria-selected', String(on)); card.classList.toggle('selected', on); if (on && focus) { card.focus(); card.scrollIntoView?.({ block: 'nearest', inline: 'center' }); } if (on) drawThumb(card); }
-    for (const row of body.querySelectorAll('.ci-row')) row.classList.toggle('selected', row._key === key);
+    for (const row of treeRows()) { const on = row._key === key; row.setAttribute('aria-selected', String(on)); row.classList.toggle('selected', on); row.tabIndex = on ? 0 : -1; if (on && focus) { row.focus(); row.scrollIntoView?.({ block: 'nearest' }); } }
     const details = body.querySelector('.ci-details'); if (details) renderDetails(details, element);
     highlight(element);
   };
   const renderDetails = (pane, element) => {
+    for (const old of pane.querySelectorAll('canvas')) { old.width = 0; old.height = 0; } S.thumbs = S.thumbs.filter(canvas => canvas.width > 0);
     const canvas = el('canvas', 'ci-detail-image'), note = el('p', 'ci-noimage'), problem = paint(element, canvas, DETAIL_W, DETAIL_H);
-    if (problem) { canvas.hidden = true; note.textContent = `sem recorte: ${problem}`; } else { note.hidden = true; S.thumbs.push(canvas); }
-    for (const old of pane.querySelectorAll('canvas')) { old.width = 0; old.height = 0; }
+    if (problem) { canvas.hidden = true; note.textContent = `no crop: ${problem}`; } else { note.hidden = true; S.thumbs.push(canvas); }
     const list = el('dl', 'ci-props'); for (const [label, value] of detailRows(element)) list.append(el('dt', '', label), el('dd', '', String(value ?? '—')));
     pane.replaceChildren(el('h4', '', element.name), canvas, note, list);
   };
+  const emptyDetails = () => el('p', 'logcat-empty', 'Click an element in the tree to see its crop and details.');
 
+  const treeRow = (element, index) => {
+    const row = el('div', 'ci-row'); row._key = element.key; row.tabIndex = -1; row.setAttribute('role', 'treeitem'); row.setAttribute('aria-level', String(Math.max(0, element.depth ?? 0) + 1)); row.setAttribute('aria-selected', 'false');
+    row.style.setProperty?.('--ci-depth', String(Math.min(element.depth ?? 0, 24)));
+    const { width, height } = sizeOf(element.windowBounds ?? element.bounds);
+    row.append(el('span', 'ci-name', element.name), el('small', 'ci-kind', `${element.kind === 'compose' ? 'Compose' : 'View'} · ${width}×${height}`));
+    row.addEventListener('click', () => select(element.key, { focus: true }));
+    row.addEventListener('keydown', event => {
+      const rows = treeRows(), at = rows.indexOf(row), to = event.key === 'ArrowDown' ? at + 1 : event.key === 'ArrowUp' ? at - 1 : event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : null;
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(element.key, { focus: true }); return; }
+      if (to === null || !rows[to]) return; event.preventDefault(); select(rows[to]._key, { focus: true });
+    });
+    return row;
+  };
   const renderList = () => {
     const capture = S.capture; if (!capture) return;
-    S.observer?.disconnect(); S.observer = null; for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = []; S.waitingRaster.clear();
+    for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
     S.visible = S.elements.filter(element => matchesElement(element, filterInput.value));
     const compose = S.elements.filter(element => element.kind === 'compose').length, views = S.elements.length - compose;
     const status = el('p', 'ci-status'), notes = [...(capture.inspection?.notes ?? [])];
     for (const owner of capture.inspection?.owners ?? []) if (owner.names?.note) notes.push(owner.names.note);
-    if (!capture.fullDensity) notes.push('o quadro ainda estava em densidade reduzida (tela em movimento): recortes menos nítidos');
-    status.textContent = `${mode() === 'layout' ? 'Limites de layout: ' : 'Árvore completa: '}${compose} elementos Compose · ${views} Views${capture.inspection?.ms !== undefined ? ` · inspeção em ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} passam pelo filtro` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
-    // carousel
-    const strip = el('div', 'ci-strip'), track = el('div', 'ci-track'); track.setAttribute('role', 'listbox'); track.setAttribute('aria-label', 'Elementos da tela'); track.setAttribute('aria-orientation', 'horizontal');
-    const shown = S.visible.slice(0, MAX_CROPS), cards = shown.map((element, index) => {
-      const card = el('div', 'ci-card'); card.tabIndex = index === 0 ? 0 : -1; card.setAttribute('role', 'option'); card.setAttribute('aria-selected', 'false'); card._element = element; card._index = index;
-      const image = el('div', 'ci-thumb'), canvas = el('canvas'), noimage = el('span', 'ci-noimage'); canvas.width = 0; canvas.height = 0; noimage.hidden = true; image.append(canvas, noimage);   // no pixels until the card is cut
-      card.append(image, el('strong', '', element.name), el('small', '', `${element.kind === 'compose' ? 'Compose' : 'View'} · ${formatBounds(element.windowBounds ?? element.bounds, element.density)}`));
-      card.addEventListener('click', () => select(element.key, { focus: true }));
-      card.addEventListener('keydown', event => {
-        const at = cards.indexOf(card), to = event.key === 'ArrowRight' ? at + 1 : event.key === 'ArrowLeft' ? at - 1 : event.key === 'Home' ? 0 : event.key === 'End' ? cards.length - 1 : null;
-        if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(element.key, { focus: true }); return; }
-        if (to === null || !cards[to]) return; event.preventDefault(); card.tabIndex = -1; cards[to].tabIndex = 0; select(cards[to]._element.key, { focus: true });
-      });
-      return card;
-    });
-    track.append(...cards);
-    const step = delta => { const at = Math.max(0, cards.findIndex(card => card._element.key === S.selected)), to = Math.min(cards.length - 1, Math.max(0, at + delta)); if (cards[to]) { for (const card of cards) card.tabIndex = -1; cards[to].tabIndex = 0; select(cards[to]._element.key, { focus: true }); } };
-    const prev = el('button', 'ci-nav', '‹'), next = el('button', 'ci-nav', '›'); prev.type = next.type = 'button'; prev.setAttribute('aria-label', 'Elemento anterior'); next.setAttribute('aria-label', 'Próximo elemento');
-    prev.addEventListener('click', () => step(-1)); next.addEventListener('click', () => step(1));
-    strip.append(prev, track, next);
-    const more = S.visible.length > MAX_CROPS ? el('p', 'ci-status', `O carrossel mostra os primeiros ${MAX_CROPS} de ${S.visible.length} elementos (limite de recortes); a tabela lista todos. Filtre para ver outros.`) : null;
-    if (!cards.length) strip.replaceChildren(el('p', 'logcat-empty', S.elements.length ? 'Nenhum elemento passa pelo filtro.' : 'Nenhum elemento na tela.'));
-    // details + table
-    const details = el('div', 'ci-details'); details.append(el('p', 'logcat-empty', 'Escolha um elemento no carrossel ou na tabela para ver os detalhes e destacá-lo na tela.'));
-    const table = el('table', 'ci-table'), head = el('thead'), headRow = el('tr'); for (const title of ['Elemento', 'Origem', 'Limites na janela', 'z', 'Modificadores / tipo']) headRow.append(el('th', '', title)); head.append(headRow);
-    const tbody = el('tbody');
-    for (const element of S.visible) {
-      const row = el('tr', 'ci-row'); row._key = element.key; row.tabIndex = 0;
-      const name = el('td', 'ci-name', `${'· '.repeat(Math.min(element.depth, 12))}${element.name}`);
-      row.append(name, el('td', '', element.kind === 'compose' ? element.nameSource : 'view'), el('td', '', formatBounds(element.windowBounds ?? element.bounds, element.density)), el('td', '', element.zIndex === null || element.zIndex === undefined ? '—' : String(element.zIndex)),
-        el('td', '', element.kind === 'compose' ? element.modifiers.map(m => m.label).join(', ') || simple(element.measurePolicy) : simple(element.type)));
-      row.addEventListener('click', () => select(element.key)); row.addEventListener('keydown', event => { if (event.key === 'Enter') select(element.key); });
-      tbody.append(row);
-    }
-    table.append(head, tbody); const wrap = el('div', 'ci-table-wrap'); wrap.append(table);
-    body.replaceChildren(...[status, strip, more, details, wrap].filter(Boolean));
+    if (!capture.fullDensity) notes.push('the frame was still at reduced density (screen moving): crops are less sharp');
+    status.textContent = `${mode() === 'layout' ? 'Layout bounds: ' : 'Full tree: '}${compose} Compose elements · ${views} Views${capture.inspection?.ms !== undefined ? ` · inspected in ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} match the filter` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
+    const split = el('div', 'ci-split'), tree = el('div', 'ci-tree'), details = el('div', 'ci-details');
+    tree.setAttribute('role', 'tree'); tree.setAttribute('aria-label', 'Screen elements');
+    if (S.visible.length) tree.append(...S.visible.map(treeRow)); else tree.append(el('p', 'logcat-empty', S.elements.length ? 'No element matches the filter.' : 'No element on the screen.'));
+    details.append(emptyDetails()); split.append(tree, details);
+    body.replaceChildren(status, split);
     setCount(`${compose} Compose · ${views} Views`);
-    // lazy crops: only the cards scrolled into view
-    if (typeof IntersectionObserver === 'function') {
-      S.observer = new IntersectionObserver(entries => { for (const entry of entries) if (entry.isIntersecting) { drawThumb(entry.target); S.observer?.unobserve(entry.target); } }, { root: track, rootMargin: '0px 240px' });
-      for (const card of cards) S.observer.observe(card);
-    } else cards.slice(0, EAGER_CROPS).forEach(drawThumb);
-    if (S.selected && S.visible.some(element => element.key === S.selected)) select(S.selected); else highlight(null);
+    if (S.selected && !S.visible.some(element => element.key === S.selected)) S.selected = null;
+    const rows = treeRows(); if (rows[0]) rows[0].tabIndex = 0;
+    if (S.selected) select(S.selected); else highlight(null);
   };
 
   const capture = async () => {
-    if (!root.open || S.busy) return; S.busy = true; const token = ++S.token; captureButton.disabled = true; setCount('capturando…');
-    if (!S.capture) body.replaceChildren(el('p', 'logcat-empty', 'Capturando a tela…'));
+    if (!root.open || S.busy) return; S.busy = true; const token = ++S.token; captureButton.disabled = true; setCount('capturing…');
+    if (!S.capture) body.replaceChildren(el('p', 'logcat-empty', 'Capturing the screen…'));
     try {
       const snapshot = await fullDensity(); if (token !== S.token || !root.open) return;
-      if (!snapshot) { body.replaceChildren(el('p', 'logcat-empty', 'Nenhum aplicativo em execução. Execute um APK e capture de novo.')); setCount('sem tela'); return; }
+      if (!snapshot) { body.replaceChildren(el('p', 'logcat-empty', 'No app is running. Run an APK and capture again.')); setCount('no screen'); return; }
       const inspection = await inspect(); if (token !== S.token || !root.open) return;
       const shownNow = getSnapshot() ?? snapshot;
       for (const frame of S.frames.values()) if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } S.frames.clear();
@@ -338,17 +314,17 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       renderList();
     } catch (error) {
       if (token !== S.token) return;
-      body.replaceChildren(el('p', 'logcat-empty', `Não foi possível inspecionar a tela: ${String(error?.message ?? error).slice(0, 300)}`)); setCount('erro');
+      body.replaceChildren(el('p', 'logcat-empty', `Could not inspect the screen: ${String(error?.message ?? error).slice(0, 300)}`)); setCount('error');
     } finally { if (token === S.token) { S.busy = false; captureButton.disabled = false; } else S.busy = false; }
   };
 
-  root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('fechado'); } });
+  root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('closed'); } });
   captureButton.addEventListener('click', () => capture());
   filterInput.addEventListener('input', () => { if (S.capture) renderList(); });
   treeToggle?.addEventListener('change', () => { if (S.capture) { S.elements = buildElements(S.capture.inspection, S.capture.snapshot, { mode: mode() }); S.selected = null; renderList(); } });
   copyButton.addEventListener('click', async () => {
     if (!S.capture) return; const label = copyButton.textContent;
-    try { await copyText(exportJSON(S.capture)); copyButton.textContent = 'Copiado'; } catch { copyButton.textContent = 'Falhou'; }
+    try { await copyText(exportJSON(S.capture)); copyButton.textContent = 'Copied'; } catch { copyButton.textContent = 'Failed'; }
     setTimeout(() => { copyButton.textContent = label; }, 1800);
   });
   return {
@@ -359,10 +335,10 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       if (!root.open) return;
       if (!snapshot?.rasterReduced && S.waiters.length) for (const resolve of S.waiters.splice(0)) resolve(snapshot);
       if (S.selected) highlight(S.elements.find(element => element.key === S.selected));
-      if (S.waitingRaster.size) { for (const card of [...S.waitingRaster]) drawThumb(card); const pane = body.querySelector('.ci-details'), chosen = S.elements.find(element => element.key === S.selected); if (pane && chosen && pane.querySelector('.ci-noimage')?.textContent.includes(NO_RASTER)) renderDetails(pane, chosen); }   // the app drew: cut what was waiting
+      { const pane = body.querySelector('.ci-details'), chosen = S.elements.find(element => element.key === S.selected); if (pane && chosen && pane.querySelector('.ci-noimage')?.textContent.includes(NO_RASTER)) renderDetails(pane, chosen); }   // the app drew: cut what was waiting
       if (follow?.checked && S.capture && !S.busy && navigationKey(snapshot) !== S.followKey) { clearTimeout(S.followTimer); S.followTimer = setTimeout(() => { S.followTimer = null; capture(); }, 600); }
     },
     /** A new run: what the panel shows belongs to the previous one. */
-    reset() { const open = root.open; release(); setCount(open ? 'sem captura' : 'fechado'); if (open) body.replaceChildren(el('p', 'logcat-empty', 'Execute o APK e use Capturar.')); },
+    reset() { const open = root.open; release(); setCount(open ? 'no capture' : 'closed'); if (open) body.replaceChildren(el('p', 'logcat-empty', 'Run the APK and use Capture.')); },
   };
 }

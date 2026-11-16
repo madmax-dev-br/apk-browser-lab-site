@@ -16,13 +16,13 @@ export function workerMemoryParts(health) {
 /** The status-line text and the tooltip line for those parts. -> { short, detail } */
 export function workerMemoryText(health) {
   const parts = workerMemoryParts(health);
-  if (!parts) return { short: 'indisponível', detail: 'Memória do Worker: este Worker ainda não reservou memória WebAssembly e o navegador não expõe o heap JS dele.' };
-  if (parts.reserved === null) return { short: mib(parts.used), detail: `Heap JS do Worker: ${mib(parts.used)}.` };
+  if (!parts) return { short: 'unavailable', detail: 'Worker memory: this Worker has not reserved WebAssembly memory yet and the browser does not expose its JS heap.' };
+  if (parts.reserved === null) return { short: mib(parts.used), detail: `Worker JS heap: ${mib(parts.used)}.` };
   const pieces = [];
-  if (parts.core) pieces.push(`núcleo da VM: ${mib(parts.core.meta)} de classes e métodos e ${parts.core.live === null ? 'heap Java ainda sem coleta (o que está em uso nele não é conhecido)' : `${mib(parts.core.live)} de heap Java vivos na última coleta`}, de ${mib(parts.core.reserved)} reservados`);
-  if (parts.skia) pieces.push(`Skia ${mib(parts.skia)}`); if (parts.other > 0) pieces.push(`outros módulos ${mib(parts.other)}`);
+  if (parts.core) pieces.push(`VM core: ${mib(parts.core.meta)} of classes and methods and ${parts.core.live === null ? 'Java heap with no collection yet (what is in use in it is not known)' : `${mib(parts.core.live)} of live Java heap at the last collection`}, of ${mib(parts.core.reserved)} reserved`);
+  if (parts.skia) pieces.push(`Skia ${mib(parts.skia)}`); if (parts.other > 0) pieces.push(`other modules ${mib(parts.other)}`);
   // The reserved size is a limit, not a cost: a WebAssembly memory is address space until a page is written, and only written pages take RAM (reserving the core's 2 GiB
   // adds nothing to the process; writing 300 MiB of it adds 300 MiB). So the line leads with what is in use and names the reservation as the ceiling it is.
-  return { short: `~${mib(parts.used)} em uso (limite ${mib(parts.reserved)})`,
-    detail: `Memória do Worker (${parts.memories} ${parts.memories === 1 ? 'memória WebAssembly' : 'memórias WebAssembly'}): ${pieces.join('; ')}. O limite (${mib(parts.reserved)}) é espaço de endereço reservado, não RAM: só as páginas já escritas ocupam memória, então o uso cresce sob demanda até esse teto${parts.core ? ' (os tamanhos do núcleo são os de Controles › Execução)' : ''}.${parts.heap === null ? ' O heap JavaScript do Worker não é exposto pelo navegador e não entra na soma' + (parts.core ? '.' : '; sem o núcleo em WebAssembly, é nele que ficam os objetos Java.') : ` Heap JS do Worker: ${mib(parts.heap)}.`} "Em uso" é uma estimativa: objetos Java criados depois da última coleta não entram.` };
+  return { short: `~${mib(parts.used)} in use (limit ${mib(parts.reserved)})`,
+    detail: `Worker memory (${parts.memories} ${parts.memories === 1 ? 'WebAssembly memory' : 'WebAssembly memories'}): ${pieces.join('; ')}. The limit (${mib(parts.reserved)}) is reserved address space, not RAM: only pages already written take memory, so usage grows on demand up to that ceiling${parts.core ? ' (the core sizes are the ones in Controls › Execution)' : ''}.${parts.heap === null ? ' The Worker JavaScript heap is not exposed by the browser and is not in the sum' + (parts.core ? '.' : '; without the WebAssembly core, the Java objects live in it.') : ` Worker JS heap: ${mib(parts.heap)}.`} "In use" is an estimate: Java objects created after the last collection are not included.` };
 }

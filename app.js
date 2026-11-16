@@ -1,52 +1,52 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=ca92aaad0948';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=ca92aaad0948';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE } from './device-settings.js?v=ca92aaad0948';
-import { initCollapsibleSections } from './panel-sections.js?v=ca92aaad0948';
-import { warmupLabel } from './warmup.js?v=ca92aaad0948';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=ca92aaad0948';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=ca92aaad0948';
-import { initHelpTips } from './help-tips.js?v=ca92aaad0948';
-import { createToolDock } from './tool-dock.js?v=ca92aaad0948';
-import { createPermissionsPanel } from './permissions-panel.js?v=ca92aaad0948';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=ca92aaad0948';
-import { createAppDataPanel } from './app-data-panel.js?v=ca92aaad0948';
-import { createCameraLab } from './camera-lab.js?v=ca92aaad0948';
-import { createOverridesPanel } from './overrides-panel.js?v=ca92aaad0948';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=ca92aaad0948';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=ca92aaad0948';
-import { createHostMapPanel } from './host-map-panel.js?v=ca92aaad0948';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=ca92aaad0948';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ca92aaad0948';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=ca92aaad0948';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=ca92aaad0948';
-import { createDeviceView, createViewState } from './device-view.js?v=ca92aaad0948';
-import { createTaskSwitcher } from './task-switcher.js?v=ca92aaad0948';
-import { createDeviceZoom } from './device-zoom.js?v=ca92aaad0948';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=ca92aaad0948';
-import { formatApiGapReport } from './api-gap-scan.js?v=ca92aaad0948';
-import { createLogcatPanel } from './logcat-panel.js?v=ca92aaad0948';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=ca92aaad0948';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=ca92aaad0948';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=ca92aaad0948';
-import { captureImage, paintScreen } from './screen-capture.js?v=ca92aaad0948';
-import { createScreenRecorder } from './screen-recorder.js?v=ca92aaad0948';
-import { createPluginsPanel } from './plugins-panel.js?v=ca92aaad0948';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=ca92aaad0948';
-import { createAdb } from './adb-commands.js?v=ca92aaad0948';
-import { createAdbTerminal } from './adb-terminal.js?v=ca92aaad0948';
-import { workerMemoryText } from './worker-memory.js?v=ca92aaad0948';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=ca92aaad0948';
-import { createModalHost } from './lab-modal.js?v=ca92aaad0948';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=ca92aaad0948';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=ca92aaad0948';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=ca92aaad0948';
-import { createDragLayer } from './lab-drag.js?v=ca92aaad0948';
-import { createLabScroll } from './lab-scroll.js?v=ca92aaad0948';
-import { createGlSurfaces } from './gl-surfaces.js?v=ca92aaad0948';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=ca92aaad0948';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=ca92aaad0948';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=ca92aaad0948';
-import { resolveIntentFields } from './intent-resolver.js?v=ca92aaad0948';
+import { APKWorkerClient } from './apk-worker-client.js?v=d422379a2a38';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d422379a2a38';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=d422379a2a38';
+import { initCollapsibleSections } from './panel-sections.js?v=d422379a2a38';
+import { warmupLabel } from './warmup.js?v=d422379a2a38';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d422379a2a38';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d422379a2a38';
+import { initHelpTips } from './help-tips.js?v=d422379a2a38';
+import { createToolDock } from './tool-dock.js?v=d422379a2a38';
+import { createPermissionsPanel } from './permissions-panel.js?v=d422379a2a38';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d422379a2a38';
+import { createAppDataPanel } from './app-data-panel.js?v=d422379a2a38';
+import { createCameraLab } from './camera-lab.js?v=d422379a2a38';
+import { createOverridesPanel } from './overrides-panel.js?v=d422379a2a38';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d422379a2a38';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d422379a2a38';
+import { createHostMapPanel } from './host-map-panel.js?v=d422379a2a38';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d422379a2a38';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d422379a2a38';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d422379a2a38';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d422379a2a38';
+import { createDeviceView, createViewState } from './device-view.js?v=d422379a2a38';
+import { createTaskSwitcher } from './task-switcher.js?v=d422379a2a38';
+import { createDeviceZoom } from './device-zoom.js?v=d422379a2a38';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d422379a2a38';
+import { formatApiGapReport } from './api-gap-scan.js?v=d422379a2a38';
+import { createLogcatPanel } from './logcat-panel.js?v=d422379a2a38';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d422379a2a38';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d422379a2a38';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d422379a2a38';
+import { captureImage, paintScreen } from './screen-capture.js?v=d422379a2a38';
+import { createScreenRecorder } from './screen-recorder.js?v=d422379a2a38';
+import { createPluginsPanel } from './plugins-panel.js?v=d422379a2a38';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d422379a2a38';
+import { createAdb } from './adb-commands.js?v=d422379a2a38';
+import { createAdbTerminal } from './adb-terminal.js?v=d422379a2a38';
+import { workerMemoryText } from './worker-memory.js?v=d422379a2a38';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d422379a2a38';
+import { createModalHost } from './lab-modal.js?v=d422379a2a38';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d422379a2a38';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d422379a2a38';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d422379a2a38';
+import { createDragLayer } from './lab-drag.js?v=d422379a2a38';
+import { createLabScroll } from './lab-scroll.js?v=d422379a2a38';
+import { createGlSurfaces } from './gl-surfaces.js?v=d422379a2a38';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d422379a2a38';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d422379a2a38';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d422379a2a38';
+import { resolveIntentFields } from './intent-resolver.js?v=d422379a2a38';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -59,20 +59,20 @@ function describeSavedApp() {
 /** The Activities of a manifest that answer Intents (those with filters), as the home screen keeps them for each installed app: what a deep link is resolved against while the
  *  app is not the one in the VM. */
 const intentActivities = inventory => (inventory?.activities ?? []).filter(activity => activity.filters?.length).map(activity => ({ name: activity.name, enabled: activity.enabled ?? null, filters: activity.filters }));
-async function refreshShelf() { if (!apkShelf) return; try { taskSwitcher?.setShelf(await apkShelf.list(), state.shelfId ?? null); } catch (error) { appendTrace(`Tela inicial: ${error?.message ?? error}`); } }
+async function refreshShelf() { if (!apkShelf) return; try { taskSwitcher?.setShelf(await apkShelf.list(), state.shelfId ?? null); } catch (error) { appendTrace(`Home screen: ${error?.message ?? error}`); } }
 async function openSavedApp(id) {
   if (!apkShelf) return;   // another app while one loads or runs: importSource ends the current VM first
   try {
     const got = await apkShelf.file(id); if (!got) { await refreshShelf(); return; }
-    appendTrace(got.fromDisk ? `Abrindo ${got.file.name} do disco (arquivo salvo na tela inicial)` : `Abrindo a cópia salva de ${got.file.name}`);
+    appendTrace(got.fromDisk ? `Opening ${got.file.name} from disk (file saved on the home screen)` : `Opening the saved copy of ${got.file.name}`);
     await importSource({ file: got.file, name: got.file.name, shelfId: id }, true);   // a tap on a launcher icon starts the app
-  } catch (error) { reportAPKError(error, 'Não foi possível abrir o app salvo', { crash: false }); }
+  } catch (error) { reportAPKError(error, 'Could not open the saved app', { crash: false }); }
 }
 async function removeSavedApp(item) {
   if (!apkShelf || state.busy) return;
   const name = item.label || item.name;
-  if (!confirm(`Remover ${name} da tela inicial?\n\nA cópia guardada neste navegador é apagada. O arquivo APK no seu disco não muda.`)) return;
-  await apkShelf.remove(item.id); if (state.shelfId === item.id) state.shelfId = null; await refreshShelf(); setStatus(`${name} removido da tela inicial`);
+  if (!confirm(`Remove ${name} from the home screen?\n\nThe copy stored in this browser is deleted. The APK file on your disk is not changed.`)) return;
+  await apkShelf.remove(item.id); if (state.shelfId === item.id) state.shelfId = null; await refreshShelf(); setStatus(`${name} removed from the home screen`);
 }
 // The VM Worker starts with the page and fetches and compiles the lab's assets (framework, Skia, ICU, the core) while the user picks an APK; the first load uses it (src/apk-worker-client.js prewarm).
 setTimeout(() => apkVM.prewarm?.(), 0);
@@ -85,8 +85,8 @@ if (params.get('embed') === '1') document.body.classList.add('is-embedded');
 function notifyParent(type, data = {}) {
   if (window.parent !== window) window.parent.postMessage({ type, ...data }, location.origin);
 }
-/** The empty stage's hint. The published site carries no example APKs (no catalog): there the hint does not point at an Exemplos tab that is not there. */
-function emptyPreviewHint() { return state.noBundledApks ? 'Selecione um APK: ele é instalado e aberto na hora.' : 'Selecione um APK: ele é instalado e aberto na hora.<br>Ou escolha um dos exemplos na aba Exemplos, na barra de baixo.'; }
+/** The empty stage's hint. The published site carries no example APKs (no catalog): there the hint does not point at an Examples tab that is not there. */
+function emptyPreviewHint() { return state.noBundledApks ? 'Select an APK: it is installed and opened right away.' : 'Select an APK: it is installed and opened right away.<br>Or pick one of the examples in the Examples tab, on the bottom bar.'; }
 function setStatus(message, kind = '') {
   $('status-text').textContent = message;
   $('status-dot').className = kind;
@@ -98,8 +98,8 @@ function syncReloadButton() { for (const id of ['reopen-activity']) { const butt
 function showScreenReady(ready) {
   const chip = $('screen-ready'); if (!chip) return;
   if (!ready || !state.apkRunning) { chip.hidden = true; return; }
-  chip.hidden = false; chip.dataset.ready = String(!!ready.ready); chip.textContent = ready.ready ? '● pronta' : '◌ carregando';
-  chip.title = ready.ready ? `Tela pronta: ${ready.activity ?? ''}${ready.fragments?.length ? ` com ${ready.fragments.length} fragment(s)` : ''}` : `Ainda carregando: ${(ready.waitingFor ?? []).join('; ')}`;
+  chip.hidden = false; chip.dataset.ready = String(!!ready.ready); chip.textContent = ready.ready ? '● ready' : '◌ loading';
+  chip.title = ready.ready ? `Screen ready: ${ready.activity ?? ''}${ready.fragments?.length ? ` with ${ready.fragments.length} fragment(s)` : ''}` : `Still loading: ${(ready.waitingFor ?? []).join('; ')}`;
 }
 // "Aquecendo" (src/warmup.js): the VM is still paying for first-time work (classes, methods prepared on their first call); the title has the numbers.
 function showWarmup(warmup) {
@@ -120,51 +120,51 @@ function appendTrace(message) {
   state.trace.push(message);
   if (state.trace.length > 1000) state.trace = state.trace.slice(-1000);
   $('trace-output').textContent = state.trace.join('\n');
-  $('trace-count').textContent = `${state.trace.length} eventos`;
+  $('trace-count').textContent = `${state.trace.length} events`;
 }
 function updateTrace(snapshot) {
   if (!Array.isArray(snapshot.trace)) return;
   state.trace = snapshot.trace.map((item) => typeof item === 'string' ? item : JSON.stringify(item));
-  $('trace-output').textContent = state.trace.join('\n') || 'Nenhum evento registrado.';
-  $('trace-count').textContent = `${state.trace.length} eventos`;
+  $('trace-output').textContent = state.trace.join('\n') || 'No events recorded.';
+  $('trace-count').textContent = `${state.trace.length} events`;
 }
 function resetWebViews() { try { deviceView.resetWebViews?.(); } catch { /* the device view is not created yet: no WebView exists either */ } }
 function hideError() { $('error-panel').hidden = true; }
 /** A launch or click that passed the soft wall budget keeps running while it makes progress: say so instead of looking frozen. */
-apkVM.onHeartbeat = beat => { if (beat?.soft && state.mode === 'apk') setStatus(`Ainda executando (${Math.round((beat.wallMs ?? 0) / 1000)} s) · a VM continua avançando: ${(beat.stack ?? []).slice(0, 1).join('') || 'sem pilha Java'}`); };
-/** "Estado da tela" from the live Worker (null when it is gone or has nothing loaded). */
+apkVM.onHeartbeat = beat => { if (beat?.soft && state.mode === 'apk') setStatus(`Still running (${Math.round((beat.wallMs ?? 0) / 1000)} s) · the VM keeps advancing: ${(beat.stack ?? []).slice(0, 1).join('') || 'no Java stack'}`); };
+/** "Screen state" from the live Worker (null when it is gone or has nothing loaded). */
 /** The page-side account of a VM that cannot answer: why (no Worker, an operation still running, a failed request), the last signal it sent, its memory at the last snapshot and the tail of the log. */
 function screenStateUnavailable(reason) {
-  const pending = apkVM.pending, lines = ['Estado da tela', `A VM não respondeu ao pedido de estado: ${reason}.`];
-  if (!apkVM.worker) lines.push('Não há Web Worker: nenhum APK foi carregado nesta página, ou o Worker foi encerrado (erro, tempo limite ou "Encerrar"); reabra o APK.');
-  else if (pending) lines.push(`A VM ainda está ocupada com a operação "${pending.type}" há ${Math.round((Date.now() - pending.startedAt) / 1000)} s; um Worker ocupado só responde entre dois eventos. Os dados abaixo são o último sinal que ele enviou.`);
-  if (apkVM.worker) { try { lines.push(apkVM.describeLastSignal(pending?.type ?? 'estado').text); } catch { /* no signal yet */ } }
-  const beat = apkVM.lastHeartbeat?.vm; if (beat) lines.push(`No último sinal: ${beat.objects} de ${beat.limit} objetos vivos, ${beat.collections} coletas de lixo (${beat.gcMs} ms), Activity no topo: ${beat.activity ?? 'nenhuma'}. Coletor: ${beat.gcEnabled ? 'ligado' : 'DESLIGADO'}, piso de coleta ${beat.gcFloor ?? '?'} objetos, ${beat.gcBlocked ? `bloqueado agora por "${beat.gcBlocked}"` : 'livre para coletar agora'}, execuções aninhadas ${beat.nestedRuns ?? 0}, coletas puladas ${JSON.stringify(beat.gcSkips ?? {})}.`);
-  const health = state.lastVmHealth; if (health) lines.push(`Memória no último quadro: ${health.liveObjects} de ${health.limit} objetos vivos (${Math.round(100 * health.liveObjects / health.limit)}%), ${health.collections ?? 0} coletas, último evento ${health.lastEventMs ?? 0} ms${health.oomCount ? `, ${health.oomCount} OutOfMemoryError` : ''}.`);
-  lines.push(`Status da página: ${$('status-text')?.textContent ?? ''}`, `Operação na tela: ${$('operation-panel')?.hidden ? 'nenhuma' : $('operation-message')?.textContent}`);
-  const log = ($('trace-output')?.textContent ?? '').split('\n').filter(Boolean).slice(-25); if (log.length) lines.push('Fim do log de execução:', ...log.map(line => '  ' + line));
+  const pending = apkVM.pending, lines = ['Screen state', `The VM did not answer the state request: ${reason}.`];
+  if (!apkVM.worker) lines.push('There is no Web Worker: no APK has been loaded in this page, or the Worker was ended (error, time limit or "Terminate"); reopen the APK.');
+  else if (pending) lines.push(`The VM is still busy with the "${pending.type}" operation for ${Math.round((Date.now() - pending.startedAt) / 1000)} s; a busy Worker only answers between two events. The data below is the last signal it sent.`);
+  if (apkVM.worker) { try { lines.push(apkVM.describeLastSignal(pending?.type ?? 'state').text); } catch { /* no signal yet */ } }
+  const beat = apkVM.lastHeartbeat?.vm; if (beat) lines.push(`In the last signal: ${beat.objects} of ${beat.limit} live objects, ${beat.collections} garbage collections (${beat.gcMs} ms), top Activity: ${beat.activity ?? 'none'}. Collector: ${beat.gcEnabled ? 'on' : 'OFF'}, collection floor ${beat.gcFloor ?? '?'} objects, ${beat.gcBlocked ? `blocked right now by "${beat.gcBlocked}"` : 'free to collect right now'}, nested runs ${beat.nestedRuns ?? 0}, skipped collections ${JSON.stringify(beat.gcSkips ?? {})}.`);
+  const health = state.lastVmHealth; if (health) lines.push(`Memory at the last frame: ${health.liveObjects} of ${health.limit} live objects (${Math.round(100 * health.liveObjects / health.limit)}%), ${health.collections ?? 0} collections, last event ${health.lastEventMs ?? 0} ms${health.oomCount ? `, ${health.oomCount} OutOfMemoryError` : ''}.`);
+  lines.push(`Page status: ${$('status-text')?.textContent ?? ''}`, `Operation on screen: ${$('operation-panel')?.hidden ? 'none' : $('operation-message')?.textContent}`);
+  const log = ($('trace-output')?.textContent ?? '').split('\n').filter(Boolean).slice(-25); if (log.length) lines.push('End of the execution log:', ...log.map(line => '  ' + line));
   return { text: lines.join('\n'), blank: false };
 }
 async function fetchScreenState() {
-  if (!apkVM.worker) return screenStateUnavailable('sem Worker');
+  if (!apkVM.worker) return screenStateUnavailable('no Worker');
   try { return await apkVM.screenState(); } catch (error) { return screenStateUnavailable(error?.message ?? String(error)); }
 }
 document.getElementById('screen-state-copy')?.addEventListener('click', async event => {
   const button = event.currentTarget, screen = await fetchScreenState(), report = screen.text;
-  try { await navigator.clipboard.writeText(report); button.textContent = screen?.blank ? 'Copiado (tela em branco)' : 'Estado da tela copiado'; }
-  catch { $('trace-output').textContent = report; $('trace').open = true; getSelection()?.selectAllChildren($('trace-output')); button.textContent = 'Selecionado: copie com Cmd+C'; }
-  setTimeout(() => { button.textContent = 'Copiar estado da tela'; }, 2500);
+  try { await navigator.clipboard.writeText(report); button.textContent = screen?.blank ? 'Copied (blank screen)' : 'Screen state copied'; }
+  catch { $('trace-output').textContent = report; $('trace').open = true; getSelection()?.selectAllChildren($('trace-output')); button.textContent = 'Selected: copy with Cmd+C'; }
+  setTimeout(() => { button.textContent = 'Copy screen state'; }, 2500);
 });
-/** The "== Resumo ==" block of a report (at most 40 lines): what one photo of the screen must contain. */
+/** The "== Summary ==" block of a report (at most 40 lines): what one photo of the screen must contain. */
 function extractSummary(text) {
-  const lines = String(text ?? '').split('\n'), start = lines.findIndex(line => line === '== Resumo =='); if (start < 0) return null;
-  const end = lines.findIndex((line, index) => index > start && line === '== fim do resumo ==');
+  const lines = String(text ?? '').split('\n'), start = lines.findIndex(line => /^== (Summary|Resumo) ==$/.test(line)); if (start < 0) return null;
+  const end = lines.findIndex((line, index) => index > start && /^== (end of summary|fim do resumo) ==$/.test(line));
   // wrapped at ~70 characters with a hanging indent, never cut with an ellipsis: the overlay scrolls if the block is longer than the screen
   const wrap = line => { if (line.length <= 70) return [line]; const out = []; let rest = line, first = true; while (rest.length > 0) { const width = first ? 70 : 66; if (rest.length <= width) { out.push((first ? '' : '    ') + rest); break; } let cut = rest.lastIndexOf(' ', width); if (cut < 20) cut = width; out.push((first ? '' : '    ') + rest.slice(0, cut)); rest = rest.slice(cut).trimStart(); first = false; } return out; };
   return lines.slice(start, end > start ? end : start + 60).flatMap(wrap).join('\n');
 }
 function showSummary(text) {
-  const summary = extractSummary(text) ?? 'Resumo indisponível: ainda não há dados da VM (nenhum APK em execução, ou o Worker foi encerrado antes de gerar o relatório).';
+  const summary = extractSummary(text) ?? 'Summary unavailable: there is no VM data yet (no APK running, or the Worker was ended before generating the report).';
   $('summary-text').textContent = summary; $('summary-overlay').hidden = false;
 }
 document.getElementById('summary-close')?.addEventListener('click', () => { $('summary-overlay').hidden = true; });
@@ -173,20 +173,20 @@ document.getElementById('error-summary')?.addEventListener('click', async () => 
 document.getElementById('error-copy')?.addEventListener('click', async event => {
   const screen = await fetchScreenState();
   const button = event.currentTarget, report = (state.errorReport ?? $('error-message').textContent) + (screen ? '\n\n' + screen.text : '') + (state.apiGaps ? '\n\n' + formatApiGapReport(state.apiGaps) : '');   // the static API estimate may arrive after the error was shown
-  try { await navigator.clipboard.writeText(report); button.textContent = 'Diagnóstico copiado'; }
-  catch { $('error-detail').textContent = report; $('error-detail').hidden = false; $('error-diagnostics').hidden = false; $('error-diagnostics').open = true; getSelection()?.selectAllChildren($('error-detail')); button.textContent = 'Selecionado: copie com Cmd+C'; }
-  setTimeout(() => { button.textContent = 'Copiar diagnóstico'; }, 2500);
+  try { await navigator.clipboard.writeText(report); button.textContent = 'Diagnostics copied'; }
+  catch { $('error-detail').textContent = report; $('error-detail').hidden = false; $('error-diagnostics').hidden = false; $('error-diagnostics').open = true; getSelection()?.selectAllChildren($('error-detail')); button.textContent = 'Selected: copy with Cmd+C'; }
+  setTimeout(() => { button.textContent = 'Copy diagnostics'; }, 2500);
 });
-function showError(error, title = 'Tentativa de execução interrompida') {
+function showError(error, title = 'Run attempt interrupted') {
   const inventory = state.mode === 'apk' ? state.inventory : null;
   const raw = error?.message || String(error);
-  $('error-title').textContent = /JNI|native method|native library/i.test(raw) ? 'Limite de execução nativa' : title;
+  $('error-title').textContent = /JNI|native method|native library/i.test(raw) ? 'Native execution limit' : title;
   const cause = causeOf(raw);
   $('error-message').textContent = cause.length > 800 ? '…' + cause.slice(-800) : cause;
   const details = [...(inventory?.unsupportedFeatures || [])];
-  if (cause !== raw || cause.length > 800) details.push('Pilha de chamadas:\n' + raw);
+  if (cause !== raw || cause.length > 800) details.push('Call stack:\n' + raw);
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
-  if (error.trace?.length) details.push('Últimas instruções da VM:\n' + error.trace.slice(-40).join('\n'));
+  if (error.trace?.length) details.push('Last VM instructions:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
   state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), ignoredActivities: ignoredPanel.activeCount(), endpointMocks: mocksPanel.activeCount(), hostRedirects: hostMapPanel.activeLines(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
   $('error-detail').hidden = !details.length;
@@ -194,9 +194,9 @@ function showError(error, title = 'Tentativa de execução interrompida') {
   $('error-diagnostics').open = false;
   $('error-panel').hidden = false;
   $('runtime-badge').className = 'runtime-badge';
-  $('runtime-badge').innerHTML = '<span></span> INTERROMPIDO';
-  setStatus('Tentativa interrompida · diagnóstico real da VM', 'error');
-  appendTrace(`ERRO: ${raw}`);
+  $('runtime-badge').innerHTML = '<span></span> INTERRUPTED';
+  setStatus('Run attempt interrupted · real VM diagnostics', 'error');
+  appendTrace(`ERROR: ${raw}`);
 }
 /** A failure shown in the error window. `crash` (default: an app was started in this VM) means the app died: its window closes, the device shows the launcher with the app's
  *  icon, and the VM is detached from the page (no frame or later error of it reaches the screen; it stays alive only for the diagnostics of the error window). A tap on the icon
@@ -211,27 +211,27 @@ function reportAPKError(error, title, { crash = state.launchAttempted } = {}) {
   $('back-button').hidden = state.mode !== 'apk' || !state.canGoBack;
   $('back-button').disabled = state.busy || !state.runtime || !state.canGoBack; syncReloadButton();
   if (state.mode === 'apk') showError(error, title);
-  else appendTrace(`ERRO APK: ${error.message || error}`);
-  if (crash && state.mode === 'apk' && state.currentSource) setStatus('O app parou por um erro · toque no ícone dele na tela inicial para abrir de novo', 'error');
+  else appendTrace(`APK ERROR: ${error.message || error}`);
+  if (crash && state.mode === 'apk' && state.currentSource) setStatus('The app stopped because of an error · tap its icon on the home screen to open it again', 'error');
 }
 /** The app died (an uncaught exception, an unsupported API, the VM or its Worker lost): as Android does, its window goes and the launcher is on screen with the app's icon. */
-function closeCrashedApp(note = 'O app foi encerrado pelo erro; toque no ícone dele na tela inicial para abri-lo de novo numa VM nova.') {
+function closeCrashedApp(note = 'The app was ended by the error; tap its icon on the home screen to open it again in a new VM.') {
   state.runtime = null; state.apkRunning = false; state.canGoBack = false; state.stickyError = false; state.viewSession++;   // the VM is detached: its frames and errors no longer reach the page
   $('android-action-mode-layer')?.replaceChildren(); showScreenReady(null); showWarmup(null);
-  taskSwitcher?.closed(); $('preview-name').textContent = state.inventory?.packageName || state.currentSource?.name || 'Prévia do aplicativo';
+  taskSwitcher?.closed(); $('preview-name').textContent = state.inventory?.packageName || state.currentSource?.name || 'App preview';
   appendTrace(note);
 }
 /** The user threw the app away (its recents card dragged off, or the window flung up: src/task-switcher.js), or an MCP client closed it (close_app): as when Android removes a
  *  task from the recents, the app's process is killed with no further callback. Here the process is the Worker; the launcher icon opens the APK again in a new one. */
-function dismissApp(by = 'pelo usuário (jogado para fora dos recentes)') {
+function dismissApp(by = 'by the user (swiped out of the recents)') {
   if (state.mode !== 'apk' || !state.currentSource || !state.runtime) return;
   state.needsRestart = true; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   apkVM.cancel(); hideError(); markLastRunEnded();   // ended by the user: the next visit must not report it as a run that stopped without warning
-  closeCrashedApp(`O app foi encerrado ${by}: o processo dele foi finalizado; toque no ícone na tela inicial para abri-lo de novo numa VM nova.`);
+  closeCrashedApp(`The app was ended ${by}: its process was killed; tap its icon on the home screen to open it again in a new VM.`);
   $('back-button').hidden = true; syncReloadButton();
-  setStatus('Aplicativo encerrado · toque no ícone dele na tela inicial para abrir de novo'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO';
+  setStatus('App ended · tap its icon on the home screen to open it again'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENDED';
 }
-/** "Fechar" (or Esc) on the error window: the device is on screen again, its launcher with the app's icon focused (Enter reopens it). */
+/** "Close" (or Esc) on the error window: the device is on screen again, its launcher with the app's icon focused (Enter reopens it). */
 function dismissError() {
   if ($('error-panel').hidden) return;
   hideError(); state.lastAPKError = null; state.stickyError = false;
@@ -289,28 +289,28 @@ function notePhase(phase) {
   if (last) last.ms = Math.round(now - last.at);
   times.phases.push({ phase, at: now, ms: 0 });
 }
-const PHASE_LABEL = { manifest: 'manifesto', dex: 'código (DEX)', framework: 'framework', 'framework-resources': 'estilos Android', resources: 'recursos', 'resources-xml': 'layouts e XML', native: 'bibliotecas nativas', core: 'núcleo da VM' };
+const PHASE_LABEL = { manifest: 'manifest', dex: 'code (DEX)', framework: 'framework', 'framework-resources': 'Android styles', resources: 'resources', 'resources-xml': 'layouts and XML', native: 'native libraries', core: 'VM core' };
 /** The phases of a load as the line shows them: the Worker's own measurement when it sent one (loadTiming: the loader prepares resources while the DEX files expand and releases its
- *  progress reports together, so the intervals between the reports the page receives are not the phases' times), else those intervals. Phases without a label add up as "outros". */
+ *  progress reports together, so the intervals between the reports the page receives are not the phases' times), else those intervals. Phases without a label add up as "other". */
 function loadPhaseParts(times) {
   const rows = times.workerPhases ?? times.phases.map(item => [item.phase, item.ms]), byLabel = new Map(); let other = 0;
   for (const [phase, ms] of rows) { if (!(ms > 0)) continue; const label = PHASE_LABEL[phase]; if (label) byLabel.set(label, (byLabel.get(label) ?? 0) + ms); else if (times.workerPhases) other += ms; }
-  const parts = [...byLabel].map(([label, ms]) => `${label} ${ms} ms`); if (other > 0) parts.push(`outros ${other} ms`);
+  const parts = [...byLabel].map(([label, ms]) => `${label} ${ms} ms`); if (other > 0) parts.push(`other ${other} ms`);
   return parts;
 }
-/** "Carregado em 0,21 s (...)" and, once an Activity opened, "Activity aberta em 1,14 s": two times, each of its own operation (a launch can come long after the load, or again). */
+/** "Loaded in 0.21 s (...)" and, once an Activity opened, "Activity opened in 1.14 s": two times, each of its own operation (a launch can come long after the load, or again). */
 function showLoadTimes() {
   const times = state.loadTimes; if (!times) return;
-  const seconds = ms => (ms / 1000).toFixed(2).replace('.', ',');
-  let text = `Carregado em ${seconds(times.loadMs)} s (${[`leitura do arquivo ${times.readMs} ms`, ...loadPhaseParts(times)].join(' · ')})`;
-  if (times.launchMs !== undefined) text += ` · Activity aberta em ${seconds(times.launchMs)} s`;
+  const seconds = ms => (ms / 1000).toFixed(2);
+  let text = `Loaded in ${seconds(times.loadMs)} s (${[`file read ${times.readMs} ms`, ...loadPhaseParts(times)].join(' · ')})`;
+  if (times.launchMs !== undefined) text += ` · Activity opened in ${seconds(times.launchMs)} s`;
   $('load-times').hidden = false;
   $('load-times').textContent = text;
 }
 function onWorkerProgress(progress = {}) {
   notePhase(progress.phase);
-  const phases = { 'framework-resources': 'Carregando dados originais de estilos Android', framework: 'Carregando código AOSP compilado', manifest: 'Lendo o manifesto', dex: 'Inspecionando DEX', native: 'Inventariando bibliotecas nativas', complete: 'Inspeção concluída', launch: 'Tentando iniciar a Activity', intent: 'Abrindo o link', click: 'Executando callback DEX', back: 'Retornando à Activity anterior', resources: 'Lendo recursos e layouts XML' };
-  const message = `${phases[progress.phase] || 'Processando no Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
+  const phases = { 'framework-resources': 'Loading original Android styles data', framework: 'Loading compiled AOSP code', manifest: 'Reading the manifest', dex: 'Inspecting DEX', native: 'Taking inventory of native libraries', complete: 'Inspection complete', launch: 'Trying to start the Activity', intent: 'Opening the link', click: 'Running DEX callback', back: 'Returning to the previous Activity', resources: 'Reading resources and XML layouts' };
+  const message = `${phases[progress.phase] || 'Processing in the Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
   $('operation-message').textContent = message; if (state.bootVisible) setBootCaption(message);
   const bar = $('operation-progress');
   if (progress.total > 0) { bar.max = progress.total; bar.value = progress.completed || 0; }
@@ -323,24 +323,24 @@ function cancelOperation() {
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   state.homeMode = 'idle'; showDeviceHome('idle');
   setBusy(false);
-  if (state.mode === 'apk') { hideError(); setStatus('VM encerrada · reabra o APK para continuar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> CANCELADO'; }
+  if (state.mode === 'apk') { hideError(); setStatus('VM ended · reopen the APK to continue'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> CANCELED'; }
 }
 // ---- App data persistence (src/app-data-store.js): the toggle, the usage line and Clear storage.
 function showAppData(info) {
   const element = $('app-data-usage'); if (!element) return;
-  if (!info) { element.textContent = 'Dados do app: abra um APK para ver o uso.'; return; }
-  const cap = formatSize(info.limitBytes ?? 0), used = `${formatSize(info.bytes ?? 0)} de ${cap} · ${info.files ?? 0} arquivo(s)`;
-  element.textContent = info.enabled === false ? (info.reason === 'disabled' ? `Persistência desligada para esta execução · guardado: ${used}` : 'Persistência indisponível neste navegador (sem IndexedDB).')
-    : info.error ? `Dados do app: erro ao gravar (${info.error}) · ${used}` : info.overLimit ? `Dados do app acima do limite: a gravação foi recusada e o último estado salvo foi mantido · ${used}` : `Dados do app guardados: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restaurado(s)` : ''}`;
+  if (!info) { element.textContent = 'App data: open an APK to see usage.'; return; }
+  const cap = formatSize(info.limitBytes ?? 0), used = `${formatSize(info.bytes ?? 0)} of ${cap} · ${info.files ?? 0} file(s)`;
+  element.textContent = info.enabled === false ? (info.reason === 'disabled' ? `Persistence is off for this run · stored: ${used}` : 'Persistence is unavailable in this browser (no IndexedDB).')
+    : info.error ? `App data: error while saving (${info.error}) · ${used}` : info.overLimit ? `App data over the limit: the write was refused and the last saved state was kept · ${used}` : `App data stored: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restored` : ''}`;
 }
 apkVM.onAppData = showAppData;
 apkVM.onApiGaps = report => { state.apiGaps = report; };
 // Page plugins (docs/PLUGINS.md, src/plugin-host.js): each enabled plugin runs in its own Worker and only reads. With no plugin running nothing here does any work.
 let pluginsPanel = null;
 let mcpLink = null;
-const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.modal) and "Expandir" on a plugin card
+const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.modal) and "Expand" on a plugin card
 const pluginModals = new Map();   // modal id -> { modal, pluginId }
-/** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controles and in the Logcat like the user's. */
+/** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controls and in the Logcat like the user's. */
 const pluginActions = {
   /** lab.adb: an adb command line run by the page's interpreter, as the adb terminal runs it (no files of the computer: a plugin runs in a sandboxed Worker). */
   async adb(plugin, { command = null, args = null } = {}) {
@@ -348,7 +348,7 @@ const pluginActions = {
     return { stdout: result.stdout, stderr: result.stderr, code: result.code, notes: result.notes ?? [], images: (result.images ?? []).map(image => ({ blob: image.blob, type: image.type })) };
   },
   async reload(plugin, { mode }) {
-    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando para recarregar.'), { code: 'no-apk' });
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('No app is running to reload.'), { code: 'no-apk' });
     await reloadActivity(mode === 'reopen' ? 'reopen' : 'recreate'); const screen = await pluginHost.query('screen', {}).catch(() => null);
     return { mode: mode === 'reopen' ? 'reopen' : 'recreate', activity: screen?.activity ?? null };
   },
@@ -363,10 +363,10 @@ const pluginActions = {
   unmock(plugin, { id }) { return { removed: mocksPanel.remove(String(id)) }; },
   /** lab.renderVariant (src/render-variant.js): one operation of the page like a click, so the user's input waits for it; nothing of the background instance is drawn here. */
   async renderVariant(plugin, options) {
-    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando.'), { code: 'no-apk' });
-    if (state.busy) throw Object.assign(new Error('A VM está ocupada com outra operação; tente de novo.'), { code: 'busy' });
-    await flushPendingInputs(); if (state.busy) throw Object.assign(new Error('A VM está ocupada com outra operação; tente de novo.'), { code: 'busy' });
-    const token = beginOperation(`Renderizando uma variante da tela em segundo plano (plugin ${plugin.name})…`);
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('No app is running.'), { code: 'no-apk' });
+    if (state.busy) throw Object.assign(new Error('The VM is busy with another operation; try again.'), { code: 'busy' });
+    await flushPendingInputs(); if (state.busy) throw Object.assign(new Error('The VM is busy with another operation; try again.'), { code: 'busy' });
+    const token = beginOperation(`Rendering a variant of the screen in the background (plugin ${plugin.name})…`);
     try { return await state.runtime.renderVariant(options); } finally { finishOperation(token); }
   },
   mocks() { return mocksPanel.list(); },
@@ -378,11 +378,11 @@ const pluginActions = {
         onClose: reason => { pluginModals.delete(modal.id); pluginHost.emit(plugin.id, 'modal', { id: modal.id, type: 'closed', reason }); } });
       pluginModals.set(modal.id, { modal, pluginId: plugin.id }); return { id: modal.id };
     }
-    if (!entry || entry.pluginId !== plugin.id) throw Object.assign(new Error('Modal fechado ou desconhecido.'), { code: 'not-found' });
+    if (!entry || entry.pluginId !== plugin.id) throw Object.assign(new Error('Modal closed or unknown.'), { code: 'not-found' });
     if (args.op === 'update') { if (args.title !== undefined) entry.modal.setTitle(args.title); if (args.size !== undefined) entry.modal.setSize(args.size); if (args.html !== undefined) entry.modal.setHtml(args.html); return { id: entry.modal.id }; }
     if (args.op === 'post') { entry.modal.post(args.data); return { id: entry.modal.id }; }
     if (args.op === 'close') { entry.modal.close('code'); return { id: entry.modal.id }; }
-    throw Object.assign(new Error(`op desconhecida: ${args.op}`), { code: 'bad-args' });
+    throw Object.assign(new Error(`unknown op: ${args.op}`), { code: 'bad-args' });
   },
 };
 // Plugin side tabs (src/lab-side-tabs.js), the drag from a tab onto the device (src/lab-drag.js: positions from the screen's live rectangle) and scrolling a scrollable to
@@ -415,21 +415,21 @@ const overlayActions = createOverlayAction({ host: labOverlays, emit: (id, name,
 Object.assign(pluginActions, { overlay: overlayActions.overlay, track: overlayActions.track, frame: () => overlayActions.frame() ?? { visible: false, screen: null, window: null, scale: null, device: null, windowDp: null, viewport: { width: window.innerWidth, height: window.innerHeight }, orientation: null } });
 /** lab.invoke (src/app-invoke.js): one of the app's methods on its main thread, as an operation of the page like a click (the user's input waits for it; it shows in the operation bar). */
 pluginActions.invoke = async (plugin, args) => {
-  if (state.runtime !== apkVM || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK (ele abre ao ser carregado) ou toque no ícone dele na tela inicial.'), { code: 'no-apk' });
+  if (state.runtime !== apkVM || !state.apkRunning) throw Object.assign(new Error('No app is running: open an APK (it opens when loaded) or tap its icon on the home screen.'), { code: 'no-apk' });
   await flushPendingInputs(); await waitIdle(10000);
-  if (state.busy || apkVM.pending) throw Object.assign(new Error('A VM está ocupada com outra operação; tente de novo.'), { code: 'busy' });
-  const token = beginOperation(`Chamando ${String(args.method ?? '').slice(0, 60)}() (plugin ${plugin.name})…`);
+  if (state.busy || apkVM.pending) throw Object.assign(new Error('The VM is busy with another operation; try again.'), { code: 'busy' });
+  const token = beginOperation(`Calling ${String(args.method ?? '').slice(0, 60)}() (plugin ${plugin.name})…`);
   let reply;
   try { reply = await apkVM.invokeMethod({ handle: args.handle, className: args.className, method: args.method, signature: args.signature, args: Array.isArray(args.args) ? args.args : [] }); }
   finally { finishOperation(token); }
   if (reply.snapshot) renderSnapshot(reply.snapshot);
   const invocation = reply.invocation ?? {};
   if (invocation.error) throw Object.assign(new Error(invocation.error.message), { code: invocation.error.code ?? 'failed' });
-  if (invocation.exception) { appendTrace(`Plugin ${plugin.name}: ${invocation.method} lançou ${invocation.exception.type}`); throw Object.assign(new Error(`${invocation.method} lançou ${invocation.exception.type}${invocation.exception.message ? ': ' + invocation.exception.message : ''}`), { code: 'exception', exception: invocation.exception }); }
-  appendTrace(`Plugin ${plugin.name}: ${invocation.method} em ${invocation.ms} ms`);
+  if (invocation.exception) { appendTrace(`Plugin ${plugin.name}: ${invocation.method} threw ${invocation.exception.type}`); throw Object.assign(new Error(`${invocation.method} threw ${invocation.exception.type}${invocation.exception.message ? ': ' + invocation.exception.message : ''}`), { code: 'exception', exception: invocation.exception }); }
+  appendTrace(`Plugin ${plugin.name}: ${invocation.method} in ${invocation.ms} ms`);
   return invocation;
 };
-const labScrollCall = (method, args) => { if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK (ele é aberto ao ser carregado) ou toque no ícone dele na tela inicial.'), { code: 'no-apk' }); return labScroll[method](args ?? {}); };
+const labScrollCall = (method, args) => { if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('No app is running: open an APK (it opens when loaded) or tap its icon on the home screen.'), { code: 'no-apk' }); return labScroll[method](args ?? {}); };
 Object.assign(pluginActions, { tab: createTabAction({ tabs: sideTabs, emit: (id, event) => pluginHost.emit(id, 'tab', event) }), scrollTo: (plugin, args) => labScrollCall('scrollTo', args), scrollInfo: (plugin, args) => labScrollCall('info', args) });
 const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); labHighlights.closeOwner(id); labOverlays.closeOwner(id); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); }, onFrameWatch: on => labOverlays.setFrameWatch(on) });
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
@@ -446,30 +446,30 @@ window.apkLabComposeInspector = composeInspector;   // test and console access: 
 apkVM.onLogcat = message => { logcatPanel.push(message); pluginHost.logcat(message); };
 const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
   allowHost: host => { if ($('dev-hosts-all').checked) return; $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); },
-  // right click on a request: a mock of it (the dialog opens filled; nothing is saved until Salvar) or a host redirect rule with that origin
+  // right click on a request: a mock of it (the dialog opens filled; nothing is saved until Save) or a host redirect rule with that origin
   createMock: entry => {
     const skip = new Set(['content-length', 'content-encoding', 'transfer-encoding', 'connection', 'keep-alive', 'date', 'set-cookie', 'vary', 'age', 'server', 'alt-svc', 'strict-transport-security']);
     let url = entry.url; try { const parsed = new URL(entry.url); url = `${parsed.origin}${parsed.pathname}`; } catch { /* kept as is */ }
     const headers = (entry.responseHeaders ?? []).filter(([name]) => !skip.has(String(name).toLowerCase())).map(([name, value]) => ({ name, value }));
-    mocksPanel.openPrefilled({ name: `${entry.method} ${entry.host}${entry.path?.split('?')[0] ?? ''}${entry.responseBodyTruncated ? ' (corpo cortado em 48 KB)' : ''}`.slice(0, 120), method: entry.method,
+    mocksPanel.openPrefilled({ name: `${entry.method} ${entry.host}${entry.path?.split('?')[0] ?? ''}${entry.responseBodyTruncated ? ' (body cut at 48 KB)' : ''}`.slice(0, 120), method: entry.method,
       url, status: entry.status ?? 200, reason: entry.reason ?? '', headers: headers.length ? headers : [{ name: 'Content-Type', value: entry.contentType ?? 'application/json' }], body: entry.responseBody ?? '' });
   },
   redirectHost: entry => {
-    for (const id of ['control-panel', 'cp-sec-hostmap']) { const section = $(id); if (section) section.open = true; }   // the Controles card and the section, so the destination field can take the focus
+    for (const id of ['control-panel', 'cp-sec-hostmap']) { const section = $(id); if (section) section.open = true; }   // the Controls card and the section, so the destination field can take the focus
     hostMapPanel.addRule(`${entry.scheme ? entry.scheme + '://' : ''}${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}`);
-  } });   // src/netlog-panel.js; "Permitir" types the host into the Dispositivo field, the same path as typing it
+  } });   // src/netlog-panel.js; "Allow" types the host into the Device field, the same path as typing it
 apkVM.onNetlog = message => { netlogPanel.push(message); pluginHost.netlog(message); };
 const glSurfaces = createGlSurfaces();   // OpenGL ES window surfaces of the app (src/gles-native.js -> src/gl-surfaces.js)
 apkVM.onGlFrame = frame => glSurfaces.frame(frame);
 window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
 window.apkLabLogcat = logcatPanel;   // test and console access: .store.entries
 try { if (localStorage.getItem('apkweb.keepAppData') === '0') $('keep-app-data').checked = false; } catch { /* storage may be blocked */ }
-$('keep-app-data')?.addEventListener('change', () => { try { localStorage.setItem('apkweb.keepAppData', $('keep-app-data').checked ? '1' : '0'); } catch { /* ignore */ } setStatus($('keep-app-data').checked ? 'Os dados do app serão mantidos a partir da próxima abertura do APK.' : 'Os dados do app não serão lidos nem gravados a partir da próxima abertura do APK.'); });
+$('keep-app-data')?.addEventListener('change', () => { try { localStorage.setItem('apkweb.keepAppData', $('keep-app-data').checked ? '1' : '0'); } catch { /* ignore */ } setStatus($('keep-app-data').checked ? 'App data will be kept from the next time the APK is opened.' : 'App data will not be read or written from the next time the APK is opened.'); });
 $('clear-app-data')?.addEventListener('click', async () => {
   if (state.busy || !state.runtime) return;
-  if (!confirm('Apagar todos os dados guardados deste app (preferências, bancos e arquivos)? O app será reiniciado.')) return;
-  try { const info = await apkVM.clearAppData(); showAppData(info); appendTrace('Dados do app apagados (como Configurações > Apps > Limpar armazenamento).'); if (state.currentSource) await importSource(state.currentSource); setStatus('Dados do app apagados · abra o app de novo para iniciar do zero'); }
-  catch (error) { reportAPKError(error, 'Não foi possível limpar os dados do app', { crash: false }); }
+  if (!confirm('Delete all the data stored by this app (preferences, databases and files)? The app will be restarted.')) return;
+  try { const info = await apkVM.clearAppData(); showAppData(info); appendTrace('App data deleted (like Settings > Apps > Clear storage).'); if (state.currentSource) await importSource(state.currentSource); setStatus('App data deleted · open the app again to start from scratch'); }
+  catch (error) { reportAPKError(error, 'Could not clear the app data', { crash: false }); }
 });
 // Page hidden or closing: ask the Worker to store the app data right away (best effort; the write is already a transaction by the time the page goes).
 document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'hidden') apkVM.flushAppData(); });
@@ -481,7 +481,7 @@ const lastRunStore = { read() { try { return JSON.parse(globalThis.localStorage?
 let recorderSawWorker = false;   // only a page that ran a VM may close a record: a fresh page must leave a crashed run's record for showPreviousCrash
 function recordLastRun() {
   if (!apkVM.worker) { if (recorderSawWorker) { recorderSawWorker = false; markLastRunEnded(); } return; }
-  recorderSawWorker = true;   // the VM ended in a way the page knows about (Encerrar, an error, a timeout): not a crash
+  recorderSawWorker = true;   // the VM ended in a way the page knows about (Terminate, an error, a timeout): not a crash
   const health = state.lastVmHealth, beat = apkVM.lastHeartbeat, text = apkVM.lastScreenSnapshot?.text ?? null, heap = globalThis.performance?.memory;
   lastRunStore.write({ v: 1, ended: false, at: Date.now(), startedAt: state.runStartedAt ?? Date.now(), page: location.href.split('#')[0], package: state.inventory?.packageName ?? null, mode: state.mode,
     pageHeapMiB: heap ? Math.round(heap.usedJSHeapSize / 1048576) : null, pageHeapLimitMiB: heap ? Math.round(heap.jsHeapSizeLimit / 1048576) : null, deviceMemoryGiB: globalThis.navigator?.deviceMemory ?? null,
@@ -494,17 +494,17 @@ function markLastRunEnded() { const last = lastRunStore.read(); if (last && last
 globalThis.addEventListener?.('pagehide', () => { if (recorderSawWorker) markLastRunEnded(); });
 function showPreviousCrash() {
   const last = lastRunStore.read(); if (!last || last.ended !== false || Date.now() - last.at > 24 * 3600 * 1000) return;
-  const seconds = Math.round((last.at - last.startedAt) / 1000), lines = ['Última execução interrompida sem aviso', `Pacote: ${last.package ?? '?'} · modo ${last.mode ?? '?'} · rodou cerca de ${seconds} s antes do último registro (${new Date(last.at).toLocaleString()}).`,
-    last.pageHeapMiB != null ? `Heap JS da página no último registro: ${last.pageHeapMiB} MiB de ${last.pageHeapLimitMiB} MiB (só o Chrome informa; o Worker da VM não entra nessa conta).` : 'Heap JS da página: indisponível neste navegador.',
-    last.deviceMemoryGiB != null ? `Memória do dispositivo informada pelo navegador: ${last.deviceMemoryGiB} GiB.` : '',
-    last.vm ? `VM: ${last.vm.objects} de ${last.vm.limit} objetos vivos, ${last.vm.collections} coletas (${last.vm.gcMs} ms), último evento ${last.vm.lastEventMs} ms${last.vm.oom ? `, ${last.vm.oom} OutOfMemoryError` : ''}.` : '',
-    last.beat ? `Último sinal da VM (há ${Math.round(last.beat.ageMs / 1000)} s do registro): ${last.beat.operation ?? 'sem operação'}, thread ${last.beat.thread ?? '?'}, ${last.beat.stack.join(' < ') || 'sem pilha'}, chamada do host: ${last.beat.hostCall ?? 'nenhuma'}, ${last.beat.events} eventos, ${last.beat.instructions} instruções, fila ${last.beat.queueDepth}.` : '',
-    `Status da página: ${last.status}`, 'Possíveis causas: o navegador encerrou a aba por falta de memória (o mais comum), a aba foi recarregada à força ou o computador dormiu. Nada disso gera erro dentro da página.', last.screen ? `\n${last.screen}` : ''].filter(Boolean);
+  const seconds = Math.round((last.at - last.startedAt) / 1000), lines = ['Last run interrupted without warning', `Package: ${last.package ?? '?'} · mode ${last.mode ?? '?'} · ran about ${seconds} s before the last record (${new Date(last.at).toLocaleString()}).`,
+    last.pageHeapMiB != null ? `Page JS heap at the last record: ${last.pageHeapMiB} MiB of ${last.pageHeapLimitMiB} MiB (only Chrome reports it; the VM Worker is not counted).` : 'Page JS heap: unavailable in this browser.',
+    last.deviceMemoryGiB != null ? `Device memory reported by the browser: ${last.deviceMemoryGiB} GiB.` : '',
+    last.vm ? `VM: ${last.vm.objects} of ${last.vm.limit} live objects, ${last.vm.collections} collections (${last.vm.gcMs} ms), last event ${last.vm.lastEventMs} ms${last.vm.oom ? `, ${last.vm.oom} OutOfMemoryError` : ''}.` : '',
+    last.beat ? `Last VM signal (${Math.round(last.beat.ageMs / 1000)} s before the record): ${last.beat.operation ?? 'no operation'}, thread ${last.beat.thread ?? '?'}, ${last.beat.stack.join(' < ') || 'no stack'}, host call: ${last.beat.hostCall ?? 'none'}, ${last.beat.events} events, ${last.beat.instructions} instructions, queue ${last.beat.queueDepth}.` : '',
+    `Page status: ${last.status}`, 'Possible causes: the browser ended the tab for lack of memory (the most common), the tab was force-reloaded or the computer went to sleep. None of these raises an error inside the page.', last.screen ? `\n${last.screen}` : ''].filter(Boolean);
   const banner = document.createElement('div'); banner.className = 'crash-notice'; banner.setAttribute('role', 'alert');
-  const text = document.createElement('span'); text.textContent = 'A última execução parou sem aviso (provável falta de memória do navegador).';
-  const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Copiar o último estado';
-  copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(lines.join('\n')); copy.textContent = 'Copiado'; } catch { $('trace-output').textContent = lines.join('\n'); $('trace').open = true; copy.textContent = 'Veja o log de execução'; } });
-  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Dispensar'; close.addEventListener('click', () => { lastRunStore.clear(); banner.remove(); });
+  const text = document.createElement('span'); text.textContent = 'The last run stopped without warning (probably the browser ran out of memory).';
+  const copy = document.createElement('button'); copy.type = 'button'; copy.textContent = 'Copy the last state';
+  copy.addEventListener('click', async () => { try { await navigator.clipboard.writeText(lines.join('\n')); copy.textContent = 'Copied'; } catch { $('trace-output').textContent = lines.join('\n'); $('trace').open = true; copy.textContent = 'See the execution log'; } });
+  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Dismiss'; close.addEventListener('click', () => { lastRunStore.clear(); banner.remove(); });
   banner.append(text, copy, close); document.body.prepend(banner);
 }
 showPreviousCrash();
@@ -514,61 +514,61 @@ function formatSize(size) {
 function listSection(title, items) {
   const section = document.createElement('section');
   const heading = document.createElement('h4'); heading.textContent = title; section.append(heading);
-  if (!items?.length) { const line = document.createElement('p'); line.textContent = 'Nenhum item encontrado.'; section.append(line); return section; }
+  if (!items?.length) { const line = document.createElement('p'); line.textContent = 'No items found.'; section.append(line); return section; }
   const list = document.createElement('ul');
   items.slice(0, 200).forEach((item) => { const li = document.createElement('li'); li.textContent = typeof item === 'string' ? item : item.name || JSON.stringify(item); list.append(li); });
-  section.append(list); if (items.length > 200) { const note = document.createElement('p'); note.textContent = `${items.length} itens no inventário; exibindo os primeiros 200.`; section.append(note); } return section;
+  section.append(list); if (items.length > 200) { const note = document.createElement('p'); note.textContent = `${items.length} items in the inventory; showing the first 200.`; section.append(note); } return section;
 }
 function showInventory(inventory) {
   $('inventory-empty').hidden = true; $('inventory').hidden = false;
-  $('package-name').textContent = inventory.packageName || 'Pacote não identificado';
+  $('package-name').textContent = inventory.packageName || 'Package not identified';
   $('class-count').textContent = Array.isArray(inventory.classes) ? inventory.classes.length : inventory.classes ?? '—';
-  $('class-count').title = inventory.classes == null ? 'Classes DEX não inspecionadas' : 'Classes presentes no DEX';
+  $('class-count').title = inventory.classes == null ? 'DEX classes not inspected' : 'Classes present in the DEX';
   $('activity-count').textContent = inventory.activities?.length || 0;
   $('dependency-count').textContent = inventory.dependencies?.length || 0;
-  { const badge = $('inspection-badge'); if (badge) badge.textContent = inventory.inspectionComplete === false ? 'Inspeção parcial' : inventory.compose ? 'Compose APK' : 'Analisado'; }
+  { const badge = $('inspection-badge'); if (badge) badge.textContent = inventory.inspectionComplete === false ? 'Partial inspection' : inventory.compose ? 'Compose APK' : 'Analyzed'; }
   const unsupported = inventory.unsupportedFeatures || [];
   $('unsupported-notice').hidden = !unsupported.length;
   $('unsupported-list').replaceChildren(...unsupported.map((item) => { const li = document.createElement('li'); li.textContent = item; return li; }));
   const archiveSummary = $('archive-summary'); archiveSummary.replaceChildren();
-  const dexSummary = document.createElement('strong'); dexSummary.textContent = `${inventory.dexFiles?.length || 0} DEX · ${inventory.inspectionComplete === false ? 'contagem parcial' : 'contagem completa de classes'}`;
+  const dexSummary = document.createElement('strong'); dexSummary.textContent = `${inventory.dexFiles?.length || 0} DEX · ${inventory.inspectionComplete === false ? 'partial count' : 'complete class count'}`;
   archiveSummary.append(dexSummary);
   const nativeCount = inventory.nativeLibraries?.length || 0;
-  const nativeSummary = document.createElement('p'); nativeSummary.textContent = `${nativeCount} bibliotecas empacotadas; suporte JNI será verificado no uso.`; archiveSummary.append(nativeSummary); archiveSummary.hidden = false;
+  const nativeSummary = document.createElement('p'); nativeSummary.textContent = `${nativeCount} packaged libraries; JNI support will be checked on use.`; archiveSummary.append(nativeSummary); archiveSummary.hidden = false;
   const select = $('activity-select'); select.replaceChildren();
   (inventory.activities || []).forEach((activity) => {
     const name = typeof activity === 'string' ? activity : activity.name;
     const option = document.createElement('option'); option.value = name; option.textContent = `${name}${activity.launcher ? ' · launcher' : ''}`;
     option.selected = name === inventory.launcherActivity; select.append(option);
   });
-  if (!select.options.length) { const option = document.createElement('option'); option.value = ''; option.textContent = 'Seleção automática'; select.append(option); }
+  if (!select.options.length) { const option = document.createElement('option'); option.value = ''; option.textContent = 'Automatic selection'; select.append(option); }
   const details = $('inventory-details'); details.replaceChildren();
-  if (inventory.classNames?.length || Array.isArray(inventory.classes)) { const names = inventory.classNames || inventory.classes; details.append(listSection(`CLASSES DEX · ${Math.min(120, names.length)} NOMES EXIBIDOS DE ${inventory.classes ?? names.length} · ${Math.max(0, names.length - 120)} NOMES ADICIONAIS NO INVENTÁRIO`, names.slice(0, 120))); }
-  if (inventory.dexSummaries?.length) details.append(listSection('INVENTÁRIO POR DEX', inventory.dexSummaries.map((dex) => `${dex.filename}: ${dex.classes ?? '—'} classes · ${dex.methods ?? '—'} métodos · ${formatSize(dex.bytes || 0)}`)));
+  if (inventory.classNames?.length || Array.isArray(inventory.classes)) { const names = inventory.classNames || inventory.classes; details.append(listSection(`DEX CLASSES · ${Math.min(120, names.length)} NAMES SHOWN OF ${inventory.classes ?? names.length} · ${Math.max(0, names.length - 120)} MORE NAMES IN THE INVENTORY`, names.slice(0, 120))); }
+  if (inventory.dexSummaries?.length) details.append(listSection('INVENTORY PER DEX', inventory.dexSummaries.map((dex) => `${dex.filename}: ${dex.classes ?? '—'} classes · ${dex.methods ?? '—'} methods · ${formatSize(dex.bytes || 0)}`)));
   if (inventory.nativeLibraryDetails?.length) {
     const groups = new Map();
-    for (const lib of inventory.nativeLibraryDetails) { const abi = lib.abi || 'ABI desconhecida'; if (!groups.has(abi)) groups.set(abi, []); groups.get(abi).push(`${lib.basename || lib.path} (${formatSize(lib.bytes || 0)})`); }
-    for (const [abi, libraries] of groups) details.append(listSection(`NATIVAS · ${abi} · ${libraries.length} ARQUIVOS`, libraries));
+    for (const lib of inventory.nativeLibraryDetails) { const abi = lib.abi || 'Unknown ABI'; if (!groups.has(abi)) groups.set(abi, []); groups.get(abi).push(`${lib.basename || lib.path} (${formatSize(lib.bytes || 0)})`); }
+    for (const [abi, libraries] of groups) details.append(listSection(`NATIVE · ${abi} · ${libraries.length} FILES`, libraries));
   }
-  details.append(listSection('ARQUIVOS DEX', inventory.dexFiles));
-  details.append(listSection('DEPENDÊNCIAS REFERENCIADAS', inventory.dependencies));
+  details.append(listSection('DEX FILES', inventory.dexFiles));
+  details.append(listSection('REFERENCED DEPENDENCIES', inventory.dependencies));
   if (inventory.applicationName) details.append(listSection('APPLICATION', [inventory.applicationName]));
-  const components = ['activities', 'services', 'providers', 'receivers'].map((key) => `${key}: ${inventory[key]?.length || 0}`); details.append(listSection('COMPONENTES DO MANIFESTO', components));
-  if (inventory.embeddedFrameworks?.length) details.append(listSection('FRAMEWORKS EMPACOTADOS', inventory.embeddedFrameworks));
-  if (inventory.bundles?.length) details.append(listSection('BUNDLES', inventory.bundles.map((bundle) => `${bundle.path}: ${bundle.format}${bundle.bytecodeVersion ? ` v${bundle.bytecodeVersion}` : ''} · ${formatSize(bundle.bytes)} · não executado`)));
-  if (inventory.framework?.enabled) details.append(listSection('FRAMEWORK AOSP · CÓDIGO DEX SEPARADO', [`${inventory.framework.classes} classes · ${inventory.framework.bytes} bytes`, `Origem: ${inventory.framework.source} · ${inventory.framework.policy}`, `SHA-256: ${inventory.framework.sha256 || 'indisponível'}`]));
-  if (inventory.framework?.profiles?.length) details.append(listSection('PERFIS ORIGINAIS CARREGADOS', inventory.framework.profiles.map(profile => `${profile.profile || profile.name || 'AOSP'} · ${profile.classes ?? profile.classCount ?? '—'} classes · ${profile.reason || 'seleção explícita'} · SHA-256 ${profile.sha256 || 'indisponível'}`)));
-  if (inventory.frameworkResources?.enabled) details.append(listSection('DADOS DE RECURSOS FRAMEWORK', [`${inventory.frameworkResources.selectedUniqueResourceIds} IDs originais · perfil parcial sem qualificadores`, inventory.frameworkResources.source || '', `Integridade: ${inventory.frameworkResources.integrity}`]));
-  if (inventory.resourceSummary) details.append(listSection('RECURSOS ANDROID', [`${inventory.resourceSummary.entries} recursos · ${inventory.resourceSummary.parsedLayouts}/${inventory.resourceSummary.layoutFiles} layouts XML preparados${inventory.resourceSummary.xml?.deferred || inventory.resourceSummary.deferredLayouts ? ` · ${(inventory.resourceSummary.xml?.deferred || 0)} XML sob demanda` : ''}`, ...(inventory.resourceSummary.errors || [])]));
+  const components = ['activities', 'services', 'providers', 'receivers'].map((key) => `${key}: ${inventory[key]?.length || 0}`); details.append(listSection('MANIFEST COMPONENTS', components));
+  if (inventory.embeddedFrameworks?.length) details.append(listSection('PACKAGED FRAMEWORKS', inventory.embeddedFrameworks));
+  if (inventory.bundles?.length) details.append(listSection('BUNDLES', inventory.bundles.map((bundle) => `${bundle.path}: ${bundle.format}${bundle.bytecodeVersion ? ` v${bundle.bytecodeVersion}` : ''} · ${formatSize(bundle.bytes)} · not executed`)));
+  if (inventory.framework?.enabled) details.append(listSection('AOSP FRAMEWORK · SEPARATE DEX CODE', [`${inventory.framework.classes} classes · ${inventory.framework.bytes} bytes`, `Source: ${inventory.framework.source} · ${inventory.framework.policy}`, `SHA-256: ${inventory.framework.sha256 || 'unavailable'}`]));
+  if (inventory.framework?.profiles?.length) details.append(listSection('ORIGINAL PROFILES LOADED', inventory.framework.profiles.map(profile => `${profile.profile || profile.name || 'AOSP'} · ${profile.classes ?? profile.classCount ?? '—'} classes · ${profile.reason || 'explicit selection'} · SHA-256 ${profile.sha256 || 'unavailable'}`)));
+  if (inventory.frameworkResources?.enabled) details.append(listSection('FRAMEWORK RESOURCE DATA', [`${inventory.frameworkResources.selectedUniqueResourceIds} original IDs · partial profile without qualifiers`, inventory.frameworkResources.source || '', `Integrity: ${inventory.frameworkResources.integrity}`]));
+  if (inventory.resourceSummary) details.append(listSection('ANDROID RESOURCES', [`${inventory.resourceSummary.entries} resources · ${inventory.resourceSummary.parsedLayouts}/${inventory.resourceSummary.layoutFiles} XML layouts prepared${inventory.resourceSummary.xml?.deferred || inventory.resourceSummary.deferredLayouts ? ` · ${(inventory.resourceSummary.xml?.deferred || 0)} XML on demand` : ''}`, ...(inventory.resourceSummary.errors || [])]));
   configureNativeInspection(inventory);
-  if (inventory.unsupportedFeatures?.length) details.append(listSection('LIMITAÇÕES ENCONTRADAS', inventory.unsupportedFeatures));
-  if (inventory.warnings?.length) details.append(listSection('OBSERVAÇÕES', inventory.warnings));
+  if (inventory.unsupportedFeatures?.length) details.append(listSection('LIMITATIONS FOUND', inventory.unsupportedFeatures));
+  if (inventory.warnings?.length) details.append(listSection('NOTES', inventory.warnings));
 }
 function configureNativeInspection(inventory) {
   const libraries = inventory.nativeLibraryDetails || [];
   $('native-inspection').hidden = !libraries.length;
   const abiSelect = $('native-abi'); const selected = abiSelect.value; abiSelect.replaceChildren();
-  [...new Set(libraries.map((lib) => lib.abi))].sort().forEach((abi) => { const option = document.createElement('option'); option.value = abi; option.textContent = `${abi} · ${libraries.filter((lib) => lib.abi === abi).length} arquivos`; abiSelect.append(option); });
+  [...new Set(libraries.map((lib) => lib.abi))].sort().forEach((abi) => { const option = document.createElement('option'); option.value = abi; option.textContent = `${abi} · ${libraries.filter((lib) => lib.abi === abi).length} files`; abiSelect.append(option); });
   if ([...abiSelect.options].some((option) => option.value === selected)) abiSelect.value = selected;
   populateNativeLibraries();
 }
@@ -579,7 +579,7 @@ function populateNativeLibraries() {
 async function inspectSelectedNative() {
   if (!state.runtime || state.busy || !$('native-library').value) return;
   const path = $('native-library').value;
-  const token = beginOperation('Analisando ELF no Worker…'); $('native-result').hidden = true;
+  const token = beginOperation('Analyzing ELF in the Worker…'); $('native-result').hidden = true;
   try {
     const response = await state.runtime.inspectNative([path], { maxFiles: 1, maxBytes: 32 * 1024 * 1024, maxTotalBytes: 32 * 1024 * 1024 }, { onProgress: onWorkerProgress });
     if (token !== state.operation) return;
@@ -587,11 +587,11 @@ async function inspectSelectedNative() {
     const target = state.inventory.nativeLibraryDetails.find((entry) => entry.path === path); if (target) Object.assign(target, library);
     state.inventory.nativeInspection = response.nativeInspection;
     const elf = library.elf;
-    $('native-result').textContent = elf ? JSON.stringify({ path, inspection: library.elfInspection, format: elf.format, bits: elf.bits, architecture: elf.architecture, soname: elf.soname, needed: elf.needed, jniOnLoad: elf.jniOnLoad, jniExports: elf.jniExports.slice(0, 80), jniExportsTotal: elf.jniExports.length, symbolInspectionComplete: elf.symbolInspectionComplete, warnings: elf.warnings, executed: false }, null, 2) : JSON.stringify({ path, inspection: library.elfInspection, error: library.elfError || 'Análise omitida: arquivo acima do limite de 32 MiB.' }, null, 2);
+    $('native-result').textContent = elf ? JSON.stringify({ path, inspection: library.elfInspection, format: elf.format, bits: elf.bits, architecture: elf.architecture, soname: elf.soname, needed: elf.needed, jniOnLoad: elf.jniOnLoad, jniExports: elf.jniExports.slice(0, 80), jniExportsTotal: elf.jniExports.length, symbolInspectionComplete: elf.symbolInspectionComplete, warnings: elf.warnings, executed: false }, null, 2) : JSON.stringify({ path, inspection: library.elfInspection, error: library.elfError || 'Analysis skipped: file above the 32 MiB limit.' }, null, 2);
     $('native-result').hidden = false;
-    if (state.mode === 'apk') setStatus('Metadados ELF inspecionados · nenhuma biblioteca nativa foi executada');
+    if (state.mode === 'apk') setStatus('ELF metadata inspected · no native library was run');
     appendTrace(`ELF ${path}: ${library.elfInspection}`);
-  } catch (error) { if (token === state.operation) reportAPKError(error, 'Não foi possível inspecionar o ELF', { crash: false }); }
+  } catch (error) { if (token === state.operation) reportAPKError(error, 'Could not inspect the ELF', { crash: false }); }
   finally { finishOperation(token); }
 }
 async function importSource(source, autoRun = false) {
@@ -600,18 +600,18 @@ async function importSource(source, autoRun = false) {
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or the app opened again from its launcher icon) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
-  // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Manter dados do app" option; the panel settings are kept.
+  // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Keep app data" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
   taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
-  $('empty-preview').querySelector('h2').textContent = 'Seu aplicativo começa aqui.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
-  const token = beginOperation('Lendo o arquivo APK…');
-  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; if ($('inspection-badge')) $('inspection-badge').textContent = 'Analisando';
-  $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · arquivo local` : 'APK de teste hospedado localmente';
+  $('empty-preview').querySelector('h2').textContent = 'Your app starts here.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
+  const token = beginOperation('Reading the APK file…');
+  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; if ($('inspection-badge')) $('inspection-badge').textContent = 'Analyzing';
+  $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · local file` : 'Test APK hosted locally';
   $('preview-name').textContent = source.name;
   state.shelfId = source.shelfId ?? null; await refreshShelf();
   showDeviceHome('installing', source.name);   // the app shows up on the launcher at once, under a spinner, while the package is read
-  state.trace = []; appendTrace(`Abrindo ${source.name} em Web Worker isolado. Sem upload.`);
-  setStatus('Lendo o arquivo APK…');
+  state.trace = []; appendTrace(`Opening ${source.name} in an isolated Web Worker. No upload.`);
+  setStatus('Reading the APK file…');
   try {
     let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0 };
     $('load-times').hidden = true;
@@ -619,58 +619,58 @@ async function importSource(source, autoRun = false) {
     else {
       state.abortController = new AbortController();
       const response = await fetch(source.url, { cache: 'no-store', signal: state.abortController.signal });
-      if (!response.ok) throw new Error(`Não foi possível carregar o APK (HTTP ${response.status}).`);
-      if (Number(response.headers.get('Content-Length')) > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
+      if (!response.ok) throw new Error(`Could not load the APK (HTTP ${response.status}).`);
+      if (Number(response.headers.get('Content-Length')) > 1024 * 1024 * 1024) throw new Error('The APK exceeds the 1 GiB limit.');
       buffer = await response.arrayBuffer();
     }
     if (token !== state.operation) return;
-    if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('O APK excede o limite de 1 GiB.');
-    $('file-size').textContent = `${formatSize(buffer.byteLength)} · processado no navegador`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
+    if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('The APK exceeds the 1 GiB limit.');
+    $('file-size').textContent = `${formatSize(buffer.byteLength)} · processed in the browser`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, microg: deviceState.settings.microg === true }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
-      showLoadTimes(); appendTrace(`Carregado em ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
+      showLoadTimes(); appendTrace(`Loaded in ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
     await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory); showDeviceHome('installed');
     if (source.file && apkShelf) {   // an APK from a file is kept on the home screen (one entry per package: a new build replaces the old one); a hosted example is not
       try { const saved = await apkShelf.save({ name: source.name, packageName: result.inventory.packageName || null, blob: source.file, handle: source.handle ?? null, previousId: source.shelfId ?? null }); state.shelfId = saved.id; source.shelfId = saved.id; describeSavedApp(); apkShelf.describe(saved.id, { activities: intentActivities(result.inventory) }).catch(() => {}); navigator.storage?.persist?.().catch(() => {}); }
-      catch (error) { appendTrace(`Tela inicial: não foi possível guardar o APK (${error?.message ?? error})`); }
+      catch (error) { appendTrace(`Home screen: could not store the APK (${error?.message ?? error})`); }
       await refreshShelf();
     }
-    appendTrace(`Pacote: ${result.inventory.packageName || '(não identificado)'}`);
+    appendTrace(`Package: ${result.inventory.packageName || '(not identified)'}`);
     if (state.mode === 'apk') {
-      setStatus(result.inventory.unsupportedFeatures?.length ? 'Arquivo inspecionado · veja os limites de arquivo' : autoRun ? 'Instalado · abrindo o app…' : 'Instalado · toque no ícone na tela inicial para abrir', result.inventory.unsupportedFeatures?.length ? 'error' : '');
-      $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = `<span></span> ${result.inventory.unsupportedFeatures?.length ? 'LIMITE DE ARQUIVO' : 'INSPECIONADO'}`;
+      setStatus(result.inventory.unsupportedFeatures?.length ? 'File inspected · see the file limits' : autoRun ? 'Installed · opening the app…' : 'Installed · tap its icon on the home screen to open it', result.inventory.unsupportedFeatures?.length ? 'error' : '');
+      $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = `<span></span> ${result.inventory.unsupportedFeatures?.length ? 'FILE LIMIT' : 'INSPECTED'}`;
     }
   } catch (error) {
     if (token !== state.operation) return;
-    if ($('inspection-badge')) $('inspection-badge').textContent = 'Erro'; state.homeMode = 'idle'; showDeviceHome('idle'); reportAPKError(error, 'Não foi possível inspecionar o APK', { crash: false });
+    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle'; showDeviceHome('idle'); reportAPKError(error, 'Could not inspect the APK', { crash: false });
   } finally { finishOperation(token); }
   if (token === state.operation && autoRun && state.runtime && !state.inventory?.unsupportedFeatures?.length) await runAPK();
 }
 async function chooseFile(file, handle = null) {   // handle: a FileSystemFileHandle (or a promise of one) where the browser gives it, kept with the saved app
   if (!file) return;
-  if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('O limite deste laboratório é 1 GiB por APK. Escolha um arquivo menor para continuar.'), 'APK acima do limite de tamanho'); return; }
-  if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Escolha um arquivo .apk.'), 'Formato de arquivo inválido'); return; }
+  if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('This lab limits APKs to 1 GiB. Choose a smaller file to continue.'), 'APK above the size limit'); return; }
+  if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Choose an .apk file.'), 'Invalid file format'); return; }
   let fileHandle = null; try { fileHandle = await handle; if (fileHandle?.kind !== 'file') fileHandle = null; } catch { fileHandle = null; }
   await importSource({ file, name: file.name, handle: fileHandle }, true);   // installed and opened at once; the launcher keeps its icon to open it again
 }
 // Memory readout in the status bar: live VM objects against the object budget (the OutOfMemoryError threshold), an estimate of what they cost (bytesPerObject, sent by the Worker, is the measured
 // all-in cost used to derive the budget, src/memory-budget.js) and, where the browser exposes it (Chrome), the JS heap of this page; the Worker's own heap is not part of that number.
-const MIB = 1048576, mib = bytes => `${(bytes / MIB).toFixed(bytes < 10 * MIB ? 1 : 0)} MiB`, count = value => value >= 10000 ? `${Math.round(value / 1000)} mil` : String(value);
+const MIB = 1048576, mib = bytes => `${(bytes / MIB).toFixed(bytes < 10 * MIB ? 1 : 0)} MiB`, count = value => value >= 10000 ? `${Math.round(value / 1000)}k` : String(value);
 function updateMemoryMeter(health) {
   const meter = $('memory-meter'); if (!meter || !health || !Number.isFinite(health.liveObjects) || !health.limit) return;
   const ratio = Math.min(1, health.liveObjects / health.limit), page = globalThis.performance?.memory?.usedJSHeapSize, bytesPerObject = health.bytesPerObject || 1600, estimate = health.liveObjects * bytesPerObject;
   meter.hidden = false; meter.dataset.level = ratio >= 0.9 ? 'high' : ratio >= 0.7 ? 'warn' : 'ok'; meter.style.setProperty('--fill', `${Math.round(ratio * 100)}%`);
-  const pct = ratio < 0.1 ? (ratio * 100).toFixed(1) : String(Math.round(ratio * 100)), worker = workerMemoryText(health), browser = `Memória do browser: Worker ${worker.short} · página ${page ? mib(page) : 'indisponível'}`;
+  const pct = ratio < 0.1 ? (ratio * 100).toFixed(1) : String(Math.round(ratio * 100)), worker = workerMemoryText(health), browser = `Browser memory: Worker ${worker.short} · page ${page ? mib(page) : 'unavailable'}`;
   const lines = meter.lastElementChild.children; if (lines.length !== 2) meter.lastElementChild.replaceChildren(document.createElement('span'), document.createElement('span'));
-  meter.lastElementChild.children[0].textContent = `Heap Java: ${count(health.liveObjects)} objetos (${pct} % do limite) · ~${mib(estimate)} estimados`; meter.lastElementChild.children[1].textContent = browser;
-  meter.title = ['O heap Java conta só os objetos da VM; o browser gasta além disso com as tabelas DEX, o CanvasKit, os rasters e cada objeto Java como objeto JavaScript.', `Objetos vivos da VM: ${health.liveObjects} de ${health.limit} (acima disso a VM lança java.lang.OutOfMemoryError).`, `Custo estimado: ${bytesPerObject} bytes por objeto (medido em exemplos reais), ≈ ${mib(estimate)}.`,
-    worker.detail, page ? `Heap JS da página (sem o Web Worker): ${mib(page)}.` : 'Heap JS da página: indisponível neste navegador.', `Coletas de lixo: ${health.collections ?? 0} (${health.freedObjects ?? 0} objetos liberados, ${health.gcMs ?? 0} ms); último evento ${health.lastEventMs ?? 0} ms.`, health.oomCount ? `OutOfMemoryError já lançado ${health.oomCount} vez(es).` : ''].filter(Boolean).join('\n');
+  meter.lastElementChild.children[0].textContent = `Java heap: ${count(health.liveObjects)} objects (${pct} % of the limit) · ~${mib(estimate)} estimated`; meter.lastElementChild.children[1].textContent = browser;
+  meter.title = ['The Java heap counts only the VM objects; the browser spends more on top of that with the DEX tables, CanvasKit, rasters and each Java object as a JavaScript object.', `Live VM objects: ${health.liveObjects} of ${health.limit} (above that the VM throws java.lang.OutOfMemoryError).`, `Estimated cost: ${bytesPerObject} bytes per object (measured on real examples), ≈ ${mib(estimate)}.`,
+    worker.detail, page ? `Page JS heap (without the Web Worker): ${mib(page)}.` : 'Page JS heap: unavailable in this browser.', `Garbage collections: ${health.collections ?? 0} (${health.freedObjects ?? 0} objects freed, ${health.gcMs ?? 0} ms); last event ${health.lastEventMs ?? 0} ms.`, health.oomCount ? `OutOfMemoryError already thrown ${health.oomCount} time(s).` : ''].filter(Boolean).join('\n');
 }
-// "Mostrar limites de layout": page overlay over the device screen, redrawn only when a snapshot is drawn or the option changes.
+// "Show layout bounds": page overlay over the device screen, redrawn only when a snapshot is drawn or the option changes.
 function redrawLayoutBounds() {
   labHighlights.refresh();   // a plugin's highlights follow their components (nothing to do without highlights)
   labOverlays.refresh();     // and its overlays and tracks (src/lab-overlays.js; nothing to do without them)
@@ -681,8 +681,8 @@ function redrawLayoutBounds() {
 }
 const deviceState = { settings: loadDeviceSettings(), clockTimer: null };
 const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get: () => deviceState.settings.location, set: block => { deviceState.settings = { ...deviceState.settings, location: block }; saveDeviceSettings(deviceState.settings); } } });
-const filesPanel = createSharedFilesPanel({ $, vm: apkVM });   // "Arquivos do dispositivo": the shared storage the file pickers and MediaStore read (src/shared-files-panel.js)
-// "Dados do app": the app's SharedPreferences and SQLite databases, viewed and edited in modals (src/app-data-panel.js, src/app-storage.js); read when the section is opened and after a run
+const filesPanel = createSharedFilesPanel({ $, vm: apkVM });   // "Device files": the shared storage the file pickers and MediaStore read (src/shared-files-panel.js)
+// "App data": the app's SharedPreferences and SQLite databases, viewed and edited in modals (src/app-data-panel.js, src/app-storage.js); read when the section is opened and after a run
 const appDataPanel = createAppDataPanel({ $, vm: apkVM, modals: modalHost, ready: () => state.runtime === apkVM && state.launchAttempted && !state.busy, render: snapshot => renderSnapshot(snapshot) });
 $('cp-sec-appdata')?.addEventListener('toggle', () => { if ($('cp-sec-appdata').open) appDataPanel.refresh(); });
 const cameraLab = createCameraLab({ $, vm: apkVM });   // the device's cameras: source, frames for the VM, the camera screen of the capture Intents
@@ -690,7 +690,7 @@ const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 const microgEntriesPanel = createMicrogEntriesPanel({ $, vm: apkVM });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
 pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost, toolbarRoot: $('plugin-toolbar') });   // toolbarRoot: lab.button({ placement: 'toolbar' }) in the preview bar
-// "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Conectar
+// "MCP" (src/mcp-link.js, src/mcp-tools.js, scripts/lab-mcp.mjs): an MCP client on this machine uses this page through the local bridge; off until Connect
 const MCP_KEY = 'apkweb-mcp-v1';
 const mcpCaller = { id: 'mcp', name: 'MCP' };
 /** Input for the MCP client through the page's own input paths (src/device-view.js): a tap on Compose content is a real touch (MotionEvents through the window), a View
@@ -698,7 +698,7 @@ const mcpCaller = { id: 'mcp', name: 'MCP' };
  * InputConnection, like Android's soft keyboard; SetText only when the field has no InputConnection) or the field's input (View), scrolling by the ScrollBy action (Compose) or the View's scroll. */
 const mcpInput = {
   async target(args) {
-    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('Nenhum app rodando: abra um APK (ele abre ao ser carregado) ou toque no ícone dele na tela inicial.'), { code: 'no-apk' });
+    if (!state.runtime || !state.apkRunning) throw Object.assign(new Error('No app is running: open an APK (it opens when loaded) or tap its icon on the home screen.'), { code: 'no-apk' });
     const elements = await pluginHost.query('layoutBounds', { names: false }), wanted = args.text ? String(args.text).toLowerCase() : null;
     const textOf = element => [...(element.texts ?? []), element.editableText ?? '', ...(element.contentDescriptions ?? [])].join(' ').toLowerCase();
     let element = null;
@@ -707,35 +707,35 @@ const mcpInput = {
       const matches = elements.filter(item => (!args.test_tag || item.testTag === String(args.test_tag)) && (!wanted || textOf(item).includes(wanted)));
       element = matches.find(item => item.actions?.includes('OnClick')) ?? matches[0] ?? null;   // the clickable one first (a Button and its inner Text share the text)
     }
-    if ((args.element_key || args.test_tag || wanted) && !element) throw Object.assign(new Error(`Nenhum componente na tela com ${args.element_key ? `a chave ${args.element_key}` : [args.test_tag ? `testTag "${args.test_tag}"` : '', wanted ? `texto "${args.text}"` : ''].filter(Boolean).join(' e ')} (veja layout_bounds).`), { code: 'not-found' });
+    if ((args.element_key || args.test_tag || wanted) && !element) throw Object.assign(new Error(`No component on screen with ${args.element_key ? `key ${args.element_key}` : [args.test_tag ? `testTag "${args.test_tag}"` : '', wanted ? `text "${args.text}"` : ''].filter(Boolean).join(' and ')} (see layout_bounds).`), { code: 'not-found' });
     const point = element?.bounds ? { x: (element.bounds.left + element.bounds.right) / 2, y: (element.bounds.top + element.bounds.bottom) / 2 } : Number.isFinite(args.x) && Number.isFinite(args.y) ? { x: args.x, y: args.y } : null;
     return { element, point, elements };
   },
   views() { return flattenViews(state.lastSnapshot).filter(view => view.visible && view.bounds); },
   ownerAt(point) { return this.views().filter(view => view.compose && point.x >= view.bounds.left && point.x < view.bounds.right && point.y >= view.bounds.top && point.y < view.bounds.bottom).at(-1) ?? null; },
   async tap(args) {
-    const { element, point } = await this.target(args); if (!point) throw Object.assign(new Error('Diga onde tocar: test_tag, text, element_key ou x e y.'), { code: 'bad-args' });
+    const { element, point } = await this.target(args); if (!point) throw Object.assign(new Error('Say where to tap: test_tag, text, element_key or x and y.'), { code: 'bad-args' });
     const owner = element?.kind === 'view' ? null : this.ownerAt(point);
     if (owner) {   // a real touch: DOWN and UP at the point, in the Compose owner's coordinates (as the page's pointer handler sends them)
       const x = point.x - owner.bounds.left, y = point.y - owner.bounds.top, t = performance.now();
       state.pendingPointers.push({ ownerViewId: owner.id, action: 0, x, y, t }, { ownerViewId: owner.id, action: 1, x, y, t: t + 60 }); await flushPendingInputs();
-      return { via: 'toque', element: element?.name ?? null, x: Math.round(point.x), y: Math.round(point.y) };
+      return { via: 'touch', element: element?.name ?? null, x: Math.round(point.x), y: Math.round(point.y) };
     }
     const view = element?.kind === 'view' ? { id: element.id } : this.views().filter(item => item.clickable && point.x >= item.bounds.left && point.x < item.bounds.right && point.y >= item.bounds.top && point.y < item.bounds.bottom).sort((a, b) => b.depth - a.depth)[0];
-    if (!view) throw Object.assign(new Error('Nada clicável nesse ponto.'), { code: 'not-found' });
-    await clickView(view.id); return { via: 'clique na View', element: element?.name ?? null, id: view.id };
+    if (!view) throw Object.assign(new Error('Nothing clickable at that point.'), { code: 'not-found' });
+    await clickView(view.id); return { via: 'click on the View', element: element?.name ?? null, id: view.id };
   },
   async type(args) {
-    const { element } = await this.target(args); if (!element) throw Object.assign(new Error('Diga em qual campo escrever: test_tag, text ou element_key.'), { code: 'bad-args' });
+    const { element } = await this.target(args); if (!element) throw Object.assign(new Error('Say which field to type in: test_tag, text or element_key.'), { code: 'bad-args' });
     const text = String(args.value ?? '');
     if (element.kind === 'compose') {
-      if (!element.actions?.includes('SetText')) throw Object.assign(new Error(`${element.name} não é um campo de texto (sem a ação SetText).`), { code: 'bad-args' });
+      if (!element.actions?.includes('SetText')) throw Object.assign(new Error(`${element.name} is not a text field (no SetText action).`), { code: 'bad-args' });
       const [, owner, node] = String(element.key).split(':'), ownerId = Number(owner), nodeId = Number(node), fallbacks = state.imeFallbacks ?? 0;
       if (element.actions.includes('RequestFocus')) deviceView.queueComposeAction(ownerId, nodeId, 'RequestFocus');   // the field gains focus first: that starts its input session
       // replace the whole text as a person would: select all, then type character by character (each key carries the SetText fallback the field would get without a connection)
       const characters = [...text], ops = [{ kind: 'selectAll', fallbackText: null }, ...(characters.length ? characters.map((character, index) => ({ kind: 'commit', text: character, fallbackText: characters.slice(0, index + 1).join('') })) : [{ kind: 'deleteBackward', fallbackText: '' }])];
       deviceView.queueComposeAction(ownerId, nodeId, 'ime', ops); await flushPendingInputs();
-      return { element: element.name, value: text, via: (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (o campo não tem InputConnection; veja o log de execução)' : 'teclado (InputConnection)' };
+      return { element: element.name, value: text, via: (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (the field has no InputConnection; see the execution log)' : 'keyboard (InputConnection)' };
     } else { state.pendingInputs.set(element.id, text); await flushPendingInputs(); }
     return { element: element.name, value: text };
   },
@@ -748,14 +748,14 @@ const mcpInput = {
     const composeTarget = (element?.actions?.includes('ScrollBy') ? element : null) ?? (point ? scrollables.filter(item => inside(item, point)).sort((a, b) => area(a) - area(b))[0] : scrollables.sort((a, b) => area(b) - area(a))[0]);
     if (composeTarget) { const [, owner, node] = String(composeTarget.key).split(':'); deviceView.queueComposeAction(Number(owner), Number(node), 'ScrollBy', [dx, dy]); await flushPendingInputs(); return { via: 'ScrollBy', element: composeTarget.name, dx, dy }; }
     const views = this.views().filter(view => /ScrollView|RecyclerView|ListView|NestedScrollView/.test(String(view.type)) && (!point || inside(view, point))).sort((a, b) => b.depth - a.depth);
-    if (!views.length) throw Object.assign(new Error('Nada rolável na tela.'), { code: 'not-found' });
+    if (!views.length) throw Object.assign(new Error('Nothing scrollable on screen.'), { code: 'not-found' });
     const previous = state.pendingScrollBys.get(views[0].id) ?? { dx: 0, dy: 0 }; state.pendingScrollBys.set(views[0].id, { dx: previous.dx + dx, dy: previous.dy + dy }); await flushPendingInputs();
-    return { via: 'rolagem da View', id: views[0].id, dx, dy };
+    return { via: 'View scroll', id: views[0].id, dx, dy };
   },
-  async back() { if (!state.canGoBack) throw Object.assign(new Error('Não há tela anterior para voltar.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
+  async back() { if (!state.canGoBack) throw Object.assign(new Error('There is no previous screen to go back to.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
   scrollTo: args => labScrollCall('scrollTo', args), scrollInfo: args => labScrollCall('info', args),   // to a position / percentage (src/lab-scroll.js), as lab.scrollTo of the plugins
 };
-// The Controles panel and the device's apps for MCP (src/mcp-tools.js: app_data, device, apps, install_apk, open_app, close_app, open_link, host_redirects, permissions): each does
+// The Controls panel and the device's apps for MCP (src/mcp-tools.js: app_data, device, apps, install_apk, open_app, close_app, open_link, host_redirects, permissions): each does
 // what the page's own control does.
 const DEVICE_KEYS_MCP = ['screen', 'orientation', 'locale', 'darkTheme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'connectivity', 'navigation', 'renderer', 'engine', 'eventSeconds', 'memoryMiB', 'raster'];
 /** The apps of the device's home screen as the MCP tools name them (ids an agent can carry: printableShelfId), and the app of this VM. */
@@ -766,39 +766,39 @@ const mcpNamedApp = async ({ id = null, packageName = null, name = null } = {}) 
 const waitIdle = async (ms = 60000) => { for (const until = Date.now() + ms; (state.busy || state.runStarting || apkVM.pending) && Date.now() < until;) await new Promise(resolve => setTimeout(resolve, 50)); };
 const mcpControls = {
   async appData(payload) {
-    if (state.runtime !== apkVM || !state.launchAttempted) throw new Error('Nenhum app em execução: abra e inicie um app primeiro.');
+    if (state.runtime !== apkVM || !state.launchAttempted) throw new Error('No app is running: open and start an app first.');
     await waitIdle(); const { appData, snapshot } = await apkVM.appStorage(payload); if (snapshot) renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open && payload.op !== 'overview') appDataPanel.refresh(); return appData;
   },
   device(set = null) {
     const pick = settings => Object.fromEntries(DEVICE_KEYS_MCP.filter(key => settings[key] !== undefined).map(key => [key, settings[key]]));
     if (set && typeof set === 'object' && (set.language || set.region)) { const [language, region] = String(set.locale ?? deviceState.settings.locale).split('-'); set = { ...set, locale: `${set.language ?? language}-${String(set.region ?? region).toUpperCase()}` }; delete set.language; delete set.region; }
-    if (set && typeof set === 'object') { const unknown = Object.keys(set).filter(key => !DEVICE_KEYS_MCP.includes(key)); if (unknown.length) throw new Error(`Ajustes desconhecidos: ${unknown.join(', ')} (há: ${DEVICE_KEYS_MCP.join(', ')})`); applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, ...set })); }
+    if (set && typeof set === 'object') { const unknown = Object.keys(set).filter(key => !DEVICE_KEYS_MCP.includes(key)); if (unknown.length) throw new Error(`Unknown settings: ${unknown.join(', ')} (available: ${DEVICE_KEYS_MCP.join(', ')})`); applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, ...set })); }
     return { settings: pick(deviceState.settings), screens: DEVICE_SCREENS.map(([id]) => id), languages: DEVICE_LANGUAGE_CODES, regions: 'any ISO 3166 alpha-2 country (set.region), with set.language: locale = language-REGION', connectivity: ['online', 'metered', 'offline'], appRunning: state.apkRunning };
   },
   async apps(action = 'list', id = null) {
     if (action === 'list') return { apps: await mcpAppList(), running: state.apkRunning, file: state.currentSource?.name ?? null };
-    if (action === 'open') { if (!id) throw new Error('id é obrigatório (de apps list)'); return mcpControls.openApp({ id: String(id) }); }
+    if (action === 'open') { if (!id) throw new Error('id is required (from apps list)'); return mcpControls.openApp({ id: String(id) }); }
     await waitIdle();
-    if (action === 'restart') { if (!state.currentSource) throw new Error('Nenhum APK aberto'); state.needsRestart = true; await runAPK(); }
+    if (action === 'restart') { if (!state.currentSource) throw new Error('No APK open'); state.needsRestart = true; await runAPK(); }
     else if (action === 'stop') cancelOperation();
-    else throw new Error('action é list, open, restart ou stop');
+    else throw new Error('action is list, open, restart or stop');
     await waitIdle(); return mcpAppState();
   },
   /** install_apk: the file the bridge handed over is installed as a file dropped on the page is (read in the Worker, kept on the home screen); `open` also starts it. */
   async installApk(file, { open = false } = {}) {
-    if (!file || !/\.apk$/i.test(file.name)) throw new Error('O arquivo precisa ser um .apk.');
-    if (file.size > 1024 * 1024 * 1024) throw new Error('O limite deste laboratório é 1 GiB por APK.');
+    if (!file || !/\.apk$/i.test(file.name)) throw new Error('The file must be an .apk.');
+    if (file.size > 1024 * 1024 * 1024) throw new Error('This lab limits APKs to 1 GiB.');
     const source = { file, name: file.name };
     await importSource(source, open); await waitIdle();
-    if (state.currentSource !== source) throw new Error(`A instalação de ${file.name} foi interrompida: outro APK foi aberto na página.`);
-    if (!state.inventory) throw new Error(`Não foi possível instalar ${file.name}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'a leitura do APK foi cancelada'}`);
-    appendTrace(`MCP (install_apk): ${file.name} instalado${open ? ' e aberto' : ''}`);
-    return { installed: true, ...mcpAppState(), launcherActivity: state.inventory.launcherActivity ?? null, sizeBytes: file.size, ...(open ? { opened: state.apkRunning } : { note: 'Instalado na tela inicial; open_app abre.' }) };
+    if (state.currentSource !== source) throw new Error(`The installation of ${file.name} was interrupted: another APK was opened in the page.`);
+    if (!state.inventory) throw new Error(`Could not install ${file.name}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'reading the APK was canceled'}`);
+    appendTrace(`MCP (install_apk): ${file.name} installed${open ? ' and opened' : ''}`);
+    return { installed: true, ...mcpAppState(), launcherActivity: state.inventory.launcherActivity ?? null, sizeBytes: file.size, ...(open ? { opened: state.apkRunning } : { note: 'Installed on the home screen; open_app opens it.' }) };
   },
   /** open_app: what a tap on the app's launcher icon does. The app of this VM is started (or brought back from the background); another installed one is loaded and started. */
   async openApp(selector = {}) {
     const entry = await mcpNamedApp(selector);
-    if (!entry && !state.currentSource) throw new Error('Nenhum app atual: diga qual abrir (id, package ou name; apps lista os instalados) ou instale um com install_apk.');
+    if (!entry && !state.currentSource) throw new Error('No current app: say which one to open (id, package or name; apps lists the installed ones) or install one with install_apk.');
     await waitIdle();
     const current = entry ? entry.id === state.shelfId && !!state.currentSource : true;
     if (current && state.runtime && state.apkRunning) {
@@ -808,17 +808,17 @@ const mcpControls = {
     if (current && (state.runtime || state.needsRestart)) await runAPK();
     else if (entry) await openSavedApp(entry.id);
     else { state.needsRestart = true; await runAPK(); }   // the VM of the current APK was ended (apps stop): reopened in a fresh Worker
-    await waitIdle(); if (state.apkRunning) appendTrace('MCP (open_app): app aberto');
+    await waitIdle(); if (state.apkRunning) appendTrace('MCP (open_app): app opened');
     return { opened: state.apkRunning, ...mcpAppState() };
   },
   /** close_app: the app is thrown away as from the recents (dismissApp). One app runs at a time: a named app that is not the open one is reported, not closed. */
   async closeApp(selector = {}) {
     const entry = await mcpNamedApp(selector);
-    if (entry && entry.id !== state.shelfId) return { closed: false, ...mcpAppState(), note: `${printableShelfId(entry.id)} não é o app aberto.` };
+    if (entry && entry.id !== state.shelfId) return { closed: false, ...mcpAppState(), note: `${printableShelfId(entry.id)} is not the open app.` };
     if (state.busy || state.runStarting) await waitIdle(5000);
-    if (state.busy || state.runStarting) { cancelOperation(); appendTrace('MCP (close_app): o app ainda estava abrindo; a VM foi encerrada'); return { closed: true, ...mcpAppState(), note: 'O app ainda estava abrindo: a VM foi encerrada.' }; }
-    if (!state.runtime || !state.apkRunning) return { closed: false, ...mcpAppState(), note: state.currentSource ? 'O app atual não está aberto.' : 'Nenhum app aberto.' };
-    dismissApp('pelo MCP (close_app)');
+    if (state.busy || state.runStarting) { cancelOperation(); appendTrace('MCP (close_app): the app was still opening; the VM was ended'); return { closed: true, ...mcpAppState(), note: 'The app was still opening: the VM was ended.' }; }
+    if (!state.runtime || !state.apkRunning) return { closed: false, ...mcpAppState(), note: state.currentSource ? 'The current app is not open.' : 'No app is open.' };
+    dismissApp('by MCP (close_app)');
     return { closed: !state.apkRunning, ...mcpAppState() };
   },
   async openLink({ link = '', action = '', component = '' } = {}) {
@@ -831,7 +831,7 @@ const mcpControls = {
     if (Array.isArray(rules)) applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } }));
     return { rules: deviceState.settings.network?.hostMap ?? [], allowedHosts: deviceState.settings.network?.allowedHosts ?? [] };
   },
-  permissions(name = null, value = null) { if (!permissionsPanel) throw new Error('Permissões não estão disponíveis'); return { permissions: name ? permissionsPanel.set(name, value) : permissionsPanel.list() }; },
+  permissions(name = null, value = null) { if (!permissionsPanel) throw new Error('Permissions are not available'); return { permissions: name ? permissionsPanel.set(name, value) : permissionsPanel.list() }; },
 };
 /** The device as the adb interpreter drives it (src/adb-commands.js, the `adb` MCP tool): each method is the page's own path for that action, the same ones the panels, the launcher and
  * the other MCP tools use. Failures are Errors with what is missing; nothing answers for a path the page does not have. */
@@ -872,25 +872,25 @@ const adbDevice = {
   /** Loads the package's APK into the VM (not started) when it is not the one there: one app at a time. -> a note, or null when it was already loaded. */
   async ensureLoaded(packageName) {
     await waitIdle();
-    if (state.inventory?.packageName === packageName && state.currentSource) { if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); if (!state.inventory) throw adbFail(`Não foi possível carregar ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'a leitura do APK foi cancelada'}`); } return null; }
-    const entry = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName === packageName).sort((a, b) => b.openedAt - a.openedAt)[0]; if (!entry) throw adbFail(`O pacote ${packageName} não está instalado.`);
-    const replaced = state.apkRunning ? state.inventory?.packageName : null, got = await apkShelf.file(entry.id); if (!got) throw adbFail(`O APK de ${packageName} não está mais guardado neste navegador.`);
+    if (state.inventory?.packageName === packageName && state.currentSource) { if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); if (!state.inventory) throw adbFail(`Could not load ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'reading the APK was canceled'}`); } return null; }
+    const entry = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName === packageName).sort((a, b) => b.openedAt - a.openedAt)[0]; if (!entry) throw adbFail(`The package ${packageName} is not installed.`);
+    const replaced = state.apkRunning ? state.inventory?.packageName : null, got = await apkShelf.file(entry.id); if (!got) throw adbFail(`The APK of ${packageName} is no longer stored in this browser.`);
     await importSource({ file: got.file, name: got.file.name, shelfId: entry.id }, false); await waitIdle();
-    if (state.inventory?.packageName !== packageName) throw adbFail(`Não foi possível carregar ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'a leitura do APK foi cancelada'}`);
-    return `${packageName} foi carregado no aparelho${replaced ? `; ${replaced}, que estava aberto, foi encerrado (um app por vez)` : ''}.`;
+    if (state.inventory?.packageName !== packageName) throw adbFail(`Could not load ${packageName}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'reading the APK was canceled'}`);
+    return `${packageName} was loaded on the device${replaced ? `; ${replaced}, which was open, was ended (one app at a time)` : ''}.`;
   },
   async uninstall(packageName, { keepData = false } = {}) {
     const entries = (apkShelf ? await apkShelf.list() : []).filter(item => item.packageName === packageName), isCurrent = state.inventory?.packageName === packageName;
     if (!entries.length && !isCurrent) return false;
     if (!keepData) { await this.ensureLoaded(packageName); await waitIdle(); showAppData(await apkVM.clearAppData()); }   // the data goes with the package, as on a device
     await waitIdle();
-    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'Prévia do aplicativo'; setStatus(`${packageName} desinstalado`); }
+    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; setStatus(`${packageName} uninstalled`); }
     for (const entry of entries) await apkShelf.remove(entry.id);
-    await refreshShelf(); appendTrace(`adb: ${packageName} desinstalado${keepData ? ' (dados mantidos)' : ' (dados apagados)'}`); return true;
+    await refreshShelf(); appendTrace(`adb: ${packageName} uninstalled${keepData ? ' (data kept)' : ' (data deleted)'}`); return true;
   },
   async clearData() {   // Settings > Apps > Clear storage: the data is wiped and the app's process ends (the APK stays loaded, not started)
-    await waitIdle(); if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); } if (!state.runtime) throw adbFail('Nenhum app carregado.');
-    showAppData(await apkVM.clearAppData()); appendTrace('adb: dados do app apagados (pm clear)'); if (state.currentSource) await importSource(state.currentSource); await waitIdle();
+    await waitIdle(); if (!state.runtime) { await importSource(state.currentSource); await waitIdle(); } if (!state.runtime) throw adbFail('No app is loaded.');
+    showAppData(await apkVM.clearAppData()); appendTrace('adb: app data deleted (pm clear)'); if (state.currentSource) await importSource(state.currentSource); await waitIdle();
   },
   async openApp() { const result = await mcpControls.openApp({}); return { opened: !!result.opened, error: result.error ?? (result.cannotRun ? result.cannotRun.join('; ') : null) }; },
   async closeApp() { return mcpControls.closeApp({}); },
@@ -915,67 +915,67 @@ const adbDevice = {
     if (!packageName && !intent.component) {
       const handler = await this.intentHandler(intent);
       if (handler.packageName && handler.packageName !== state.inventory?.packageName) { const note = await this.ensureLoaded(handler.packageName); if (note) notes.push(note); }
-      if (handler.others.length) notes.push(`Outros apps instalados também atendem este Intent: ${handler.others.join(', ')} (num aparelho o sistema mostraria a escolha).`);
-      if (!handler.packageName && handler.unknown.length) notes.push(`Apps instalados antes de o lab guardar os filtros do manifesto não entraram na busca: ${handler.unknown.join(', ')}. Abra cada um uma vez para registrá-los.`);
+      if (handler.others.length) notes.push(`Other installed apps also answer this Intent: ${handler.others.join(', ')} (on a device the system would show the choice).`);
+      if (!handler.packageName && handler.unknown.length) notes.push(`Apps installed before the lab kept the manifest filters were not searched: ${handler.unknown.join(', ')}. Open each one once to register them.`);
     }
     if (!state.runtime && state.currentSource) { await importSource(state.currentSource); await waitIdle(); }
-    if (!state.runtime) throw adbFail(`Nenhum app instalado atende este Intent.${notes.length ? ' ' + notes.join(' ') : ' Instale o app (adb install) ou diga o componente (-n pacote/.Activity).'}`);
+    if (!state.runtime) throw adbFail(`No installed app answers this Intent.${notes.length ? ' ' + notes.join(' ') : ' Install the app (adb install) or name the component (-n package/.Activity).'}`);
     await flushPendingInputs(); switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false;
-    const token = beginOperation('Abrindo Intent…'); state.runStartedAt = Date.now();
+    const token = beginOperation('Opening Intent…'); state.runStartedAt = Date.now();
     try { const { deepLink, snapshot } = await state.runtime.startIntent(intent, { onProgress: onWorkerProgress }); if (token === state.operation) { if (deepLink?.ok && deepLink.launched) state.launchAttempted = true; if (snapshot) renderSnapshot(snapshot); } return { ...deepLink, packageName: state.inventory?.packageName ?? null, notes }; }
-    catch (error) { if (token === state.operation && error?.name !== 'TypeError') reportAPKError(error, 'Não foi possível abrir o Intent', { crash: true }); throw error; }
+    catch (error) { if (token === state.operation && error?.name !== 'TypeError') reportAPKError(error, 'Could not open the Intent', { crash: true }); throw error; }
     finally { finishOperation(token); }
   },
   async waitReady(ms = 15000) { const result = await waitScreenReady({ screen: () => pluginHost.query('screen', {}).catch(() => null), requests: () => netlogPanel.store.entries }, ms); return { ready: result.ready, activity: result.screen?.activity ?? null }; },
   async permissions() { return permissionsPanel?.list() ?? []; },
-  async setPermission(name, value) { if (!permissionsPanel) throw adbFail('Permissões não estão disponíveis'); permissionsPanel.set(name, value); },
+  async setPermission(name, value) { if (!permissionsPanel) throw adbFail('Permissions are not available'); permissionsPanel.set(name, value); },
   async tap(x, y) { const result = await mcpInput.tap({ x, y }); return result.via; },
   async swipe(x1, y1, x2, y2, ms) {
-    if (!state.runtime || !state.apkRunning) throw adbFail('Nenhum app aberto.');
+    if (!state.runtime || !state.apkRunning) throw adbFail('No app is open.');
     await flushPendingInputs(); const from = { x: x1, y: y1 }, owner = mcpInput.ownerAt(from), still = Math.hypot(x2 - x1, y2 - y1) < 1;
     if (owner && still) {   // `input swipe x y x y 1000` is how adb long-presses: the OnLongClick action of the component at the point
       const inside = item => item.bounds && x1 >= item.bounds.left && x1 < item.bounds.right && y1 >= item.bounds.top && y1 < item.bounds.bottom, area = item => (item.bounds.right - item.bounds.left) * (item.bounds.bottom - item.bounds.top);
       const target = (await pluginHost.query('layoutBounds', { names: false })).filter(item => item.kind === 'compose' && item.actions?.includes('OnLongClick') && inside(item)).sort((a, b) => area(a) - area(b))[0];
-      if (!target) throw adbFail('Toque longo: nenhum componente nesse ponto tem a ação OnLongClick.');
-      const [, ownerId, node] = String(target.key).split(':'); deviceView.queueComposeAction(Number(ownerId), Number(node), 'OnLongClick'); await flushPendingInputs(); return `toque longo em ${target.name} (ação OnLongClick do componente)`;
+      if (!target) throw adbFail('Long press: no component at that point has the OnLongClick action.');
+      const [, ownerId, node] = String(target.key).split(':'); deviceView.queueComposeAction(Number(ownerId), Number(node), 'OnLongClick'); await flushPendingInputs(); return `long press on ${target.name} (the component's OnLongClick action)`;
     }
     if (owner) {   // a real drag through the window: DOWN, MOVEs and UP with the gesture's own clock, one sample per request so none is merged
       const steps = Math.max(2, Math.min(40, Math.round(ms / 16))), t0 = performance.now(), at = k => ({ x: x1 + (x2 - x1) * k - owner.bounds.left, y: y1 + (y2 - y1) * k - owner.bounds.top, t: t0 + ms * k });
       for (let i = 0; i <= steps + 1; i++) { const k = Math.min(1, i / steps), sample = at(k); state.pendingPointers.push({ ownerViewId: owner.id, action: i === 0 ? 0 : i === steps + 1 ? 1 : 2, x: sample.x, y: sample.y, t: i === steps + 1 ? sample.t + 1 : sample.t }); await flushPendingInputs(); }
-      return `arrasto real (MotionEvents) de ${Math.round(x1)},${Math.round(y1)} a ${Math.round(x2)},${Math.round(y2)} em ${ms} ms`;
+      return `real drag (MotionEvents) from ${Math.round(x1)},${Math.round(y1)} to ${Math.round(x2)},${Math.round(y2)} in ${ms} ms`;
     }
     const view = mcpInput.views().filter(item => /ScrollView|RecyclerView|ListView|NestedScrollView|ViewPager/.test(String(item.type)) && x1 >= item.bounds.left && x1 < item.bounds.right && y1 >= item.bounds.top && y1 < item.bounds.bottom).sort((a, b) => b.depth - a.depth)[0];
-    if (!view) throw adbFail('Nada nesse ponto recebe o gesto: fora de uma tela Compose a página rola Views roláveis (View.scrollBy), e não há uma ali.');
+    if (!view) throw adbFail('Nothing at that point takes the gesture: outside a Compose screen the page scrolls scrollable Views (View.scrollBy), and there is none there.');
     const previous = state.pendingScrollBys.get(view.id) ?? { dx: 0, dy: 0 }; state.pendingScrollBys.set(view.id, { dx: previous.dx + (x1 - x2), dy: previous.dy + (y1 - y2) }); await flushPendingInputs();
-    return `rolagem da View ${view.id} por View.scrollBy (fora do Compose a página não envia MotionEvents)`;
+    return `scroll of View ${view.id} by View.scrollBy (outside Compose the page does not send MotionEvents)`;
   },
   async text(text) {
-    const field = await adbFocusedField(); if (!field) throw adbFail('Nenhum campo de texto com foco: toque no campo antes (input tap).');
-    if (!field.compose) { state.pendingInputs.set(field.id, field.text + text); await flushPendingInputs(); return 'acrescentado ao fim do campo (View)'; }
+    const field = await adbFocusedField(); if (!field) throw adbFail('No text field has focus: tap the field first (input tap).');
+    if (!field.compose) { state.pendingInputs.set(field.id, field.text + text); await flushPendingInputs(); return 'appended to the end of the field (View)'; }
     const characters = [...text], fallbacks = state.imeFallbacks ?? 0;
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', characters.map((character, index) => ({ kind: 'commit', text: character, fallbackText: field.text + characters.slice(0, index + 1).join('') }))); await flushPendingInputs();
-    return (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (o campo não tem InputConnection)' : 'teclado (InputConnection), caractere por caractere';
+    return (state.imeFallbacks ?? 0) > fallbacks ? 'SetText (the field has no InputConnection)' : 'keyboard (InputConnection), character by character';
   },
   async key(code) {
     const enter = code === 66 || code === 160, character = ADB_KEY_CHARACTERS.get(code);
     const cursor = ADB_CURSOR_KEYS.has(code);
-    if (!enter && code !== 67 && code !== 112 && character === undefined && !cursor) throw adbFail(`Tecla ${code}: a página não tem despacho de KeyEvent para a janela. Têm caminho BACK (4), HOME (3), APP_SWITCH (187) e, num campo de texto com foco, letras, números, pontuação, espaço, ENTER, DEL, FORWARD_DEL e as teclas de cursor.`);
+    if (!enter && code !== 67 && code !== 112 && character === undefined && !cursor) throw adbFail(`Key ${code}: the page has no KeyEvent dispatch to the window. BACK (4), HOME (3), APP_SWITCH (187) have a path and, in a focused text field, letters, digits, punctuation, space, ENTER, DEL, FORWARD_DEL and the cursor keys.`);
     const field = await adbFocusedField();
-    if (!field) throw adbFail(`Tecla ${code}: nenhum campo de texto com foco (toque no campo antes). A página não tem despacho de KeyEvent para a janela; fora de um campo só BACK (4), HOME (3) e APP_SWITCH (187) têm caminho.`);
+    if (!field) throw adbFail(`Key ${code}: no text field has focus (tap the field first). The page has no KeyEvent dispatch to the window; outside a field only BACK (4), HOME (3) and APP_SWITCH (187) have a path.`);
     if (!field.compose) {
-      if (code === 67) { state.pendingInputs.set(field.id, [...field.text].slice(0, -1).join('')); await flushPendingInputs(); return 'último caractere apagado (View)'; }
-      if (character !== undefined) { state.pendingInputs.set(field.id, field.text + character); await flushPendingInputs(); return `"${character}" acrescentado ao fim do campo (View)`; }
-      throw adbFail(`Tecla ${code}: num campo de View a página escreve caracteres e apaga o último (DEL, 67); as teclas de cursor só têm caminho num campo Compose.`);
+      if (code === 67) { state.pendingInputs.set(field.id, [...field.text].slice(0, -1).join('')); await flushPendingInputs(); return 'last character deleted (View)'; }
+      if (character !== undefined) { state.pendingInputs.set(field.id, field.text + character); await flushPendingInputs(); return `"${character}" appended to the end of the field (View)`; }
+      throw adbFail(`Key ${code}: in a View field the page types characters and deletes the last one (DEL, 67); the cursor keys only have a path in a Compose field.`);
     }
     const op = enter ? { kind: 'enter' } : code === 67 ? { kind: 'deleteBackward', fallbackText: [...field.text].slice(0, -1).join('') } : code === 112 ? { kind: 'deleteForward' } : cursor ? { kind: 'key', code, meta: 0, fallbackText: null } : { kind: 'commit', text: character, fallbackText: field.text + character };
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
-    return op.kind === 'key' ? 'tecla de cursor pelo InputConnection do campo com foco (sendKeyEvent)' : op.kind === 'enter' ? 'ação do teclado (Enter) no campo com foco' : op.kind === 'commit' ? `"${character}" pelo teclado (commitText) no campo com foco` : 'apagar no campo com foco';
+    return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
   async keyCode(name) { const table = (await import('./framework-constants-data.js')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
-    if (!done) throw adbFail(button === 'back' ? 'BACK: não há app na frente.' : button === 'home' ? 'HOME: o aparelho já está na tela inicial.' : 'APP_SWITCH: não há app aberto.');
-    await waitIdle(); return { back: 'voltou uma tela (onBackPressed)', home: 'app em segundo plano, tela inicial', overview: 'recentes', foreground: 'de volta ao app' }[done];
+    if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
+    await waitIdle(); return { back: 'went back one screen (onBackPressed)', home: 'app in the background, home screen', overview: 'recents', foreground: 'back to the app' }[done];
   },
   async screenshot() { return pluginHost.query('screenshot', {}); },
   async snapshot() { await flushPendingInputs(); return state.lastSnapshot; },
@@ -986,15 +986,15 @@ const adbDevice = {
   async setSettings(patch) { applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, ...patch })); await waitIdle(); },
   async buildProps() { return null; },   // android.os.Build is modelled by the VM's hosts inside the Worker and no request reads it yet: getprop ro.product.* / ro.build.* fail by name
   async sharedFiles() { await filesPanel.ready?.catch?.(() => {}); return filesPanel.state.files.map(file => ({ id: file.id, name: file.name, mime: file.mime, size: file.size, modified: file.modified })); },
-  async pushShared(file) { const before = new Set(filesPanel.state.files.map(item => item.id)); await filesPanel.addFiles([file]); const added = filesPanel.state.files.find(item => !before.has(item.id)); if (!added) throw adbFail(filesPanel.state.note || 'O arquivo não foi aceito pelo armazenamento do dispositivo.'); return { name: added.name }; },
+  async pushShared(file) { const before = new Set(filesPanel.state.files.map(item => item.id)); await filesPanel.addFiles([file]); const added = filesPanel.state.files.find(item => !before.has(item.id)); if (!added) throw adbFail(filesPanel.state.note || 'The file was not accepted by the device storage.'); return { name: added.name }; },
   async removeShared(id) { await filesPanel.removeFile(id); },
-  async sharedBlob(id) { const file = filesPanel.state.files.find(item => item.id === id); if (!file) throw adbFail('O arquivo não está mais no dispositivo.'); return file.blob; },
+  async sharedBlob(id) { const file = filesPanel.state.files.find(item => item.id === id); if (!file) throw adbFail('The file is no longer on the device.'); return file.blob; },
 };
 // record_screen (MCP): the video is painted from the rasters on screen (src/screen-recorder.js); starting and stopping show in the execution log and the status line
 const screenRecorder = createScreenRecorder({ paint: (canvas, options) => paintScreen(state.lastSnapshot, id => state.viewElements.get(String(id)) ?? null, canvas, options) });
 mcpControls.recordScreen = {
-  start(options) { if (!state.runtime || !state.apkRunning) throw new Error('Nenhum app aberto: abra um app antes de gravar a tela.'); const started = screenRecorder.start(options); appendTrace(`MCP (record_screen): gravando a tela, ${started.width}×${started.height} a ${started.fps} quadros/s, até ${started.maxSeconds} s (${started.container})`); return started; },
-  async stop() { const video = await screenRecorder.stop(); appendTrace(`MCP (record_screen): gravação encerrada, ${video.seconds} s, ${video.frames} quadros, ${formatSize(video.bytes)}`); return video; },
+  start(options) { if (!state.runtime || !state.apkRunning) throw new Error('No app is open: open an app before recording the screen.'); const started = screenRecorder.start(options); appendTrace(`MCP (record_screen): recording the screen, ${started.width}×${started.height} at ${started.fps} frames/s, up to ${started.maxSeconds} s (${started.container})`); return started; },
+  async stop() { const video = await screenRecorder.stop(); appendTrace(`MCP (record_screen): recording ended, ${video.seconds} s, ${video.frames} frames, ${formatSize(video.bytes)}`); return video; },
   status: () => screenRecorder.status(), discard: () => screenRecorder.discard(),
 };
 const adbInterpreter = createAdb(adbDevice);
@@ -1007,10 +1007,10 @@ const mcpTools = createMcpTools({ controls: mcpControls, input: mcpInput, action
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
 mcpLink = createMcpLink({ execute: (tool, args, context) => mcpTools.execute(tool, args, context), onState: ({ state: linkState, message, calls, lastTool }) => {
   const connected = linkState === 'conectado';
-  $('mcp-summary').textContent = connected ? 'conectado' : linkState === 'conectando' ? 'conectando' : linkState === 'erro' ? 'erro' : 'desligado';
-  $('mcp-status').textContent = connected ? `Conectado a ${message}. ${calls ? `${calls} ${calls === 1 ? 'chamada' : 'chamadas'} (última: ${lastTool}).` : 'Peça algo ao cliente MCP.'}` : message || 'Desconectado.';
+  $('mcp-summary').textContent = connected ? 'connected' : linkState === 'conectando' ? 'connecting' : linkState === 'erro' ? 'error' : 'off';
+  $('mcp-status').textContent = connected ? `Connected to ${message}. ${calls ? `${calls} ${calls === 1 ? 'call' : 'calls'} (last: ${lastTool}).` : 'Ask the MCP client for something.'}` : message || 'Disconnected.';
   $('mcp-status').dataset.state = connected ? 'ok' : linkState === 'erro' ? 'error' : '';
-  $('mcp-connect').textContent = connected || linkState === 'conectando' ? 'Desconectar' : 'Conectar';
+  $('mcp-connect').textContent = connected || linkState === 'conectando' ? 'Disconnect' : 'Connect';
   syncLogcatStreaming().catch(() => {});   // Logcat lines reach the page while the MCP client may ask for them
 } });
 // Pairing: the token is generated here (or one pasted from an older setup is kept), saved in this browser, and goes into the JSON for the MCP client's configuration
@@ -1020,7 +1020,7 @@ const saveMcp = () => { try { globalThis.localStorage?.setItem(MCP_KEY, JSON.str
 const mcpTexts = masked => {
   const raw = $('mcp-token').value.trim(), token = raw, port = mcpBridgePort($('mcp-url').value), lan = $('mcp-lan').checked, hide = text => masked && raw ? text.replaceAll(encodeURIComponent(raw), '•'.repeat(12)).replaceAll(raw, '•'.repeat(12)) : text;
   let scriptUrl = 'tools/lab-mcp.mjs'; try { scriptUrl = new URL('tools/lab-mcp.mjs', location.href).href; } catch { /* keeps the relative form */ }
-  const setup = mcpAgentSetup(mcpAgent, { token, port, host: lan ? '<IP local que a ponte mostrar>' : '127.0.0.1' });
+  const setup = mcpAgentSetup(mcpAgent, { token, port, host: lan ? '<local IP the bridge shows>' : '127.0.0.1' });
   return { serve: hide(mcpServeCommand({ token, port, origin: location.origin, lan, scriptUrl })), agent: hide(setup.text), where: setup.where, link: lan ? null : setup.link };   // the one-click link needs a real address, so not in the network mode
 };
 const renderMcpConfig = () => {
@@ -1034,143 +1034,146 @@ if (!$('mcp-token').value.trim()) { try { $('mcp-token').value = generateMcpToke
 renderMcpConfig();
 for (const id of ['mcp-token', 'mcp-url']) $(id).addEventListener('input', () => { saveMcp(); renderMcpConfig(); });
 $('mcp-lan').addEventListener('change', () => { saveMcp(); renderMcpConfig(); });
-$('mcp-token-show').addEventListener('click', () => { const show = $('mcp-token').type === 'password'; $('mcp-token').type = show ? 'text' : 'password'; $('mcp-token-show').textContent = show ? 'Ocultar' : 'Mostrar'; $('mcp-token-show').setAttribute('aria-pressed', String(show)); renderMcpConfig(); });
+$('mcp-token-show').addEventListener('click', () => { const show = $('mcp-token').type === 'password'; $('mcp-token').type = show ? 'text' : 'password'; $('mcp-token-show').textContent = show ? 'Hide' : 'Show'; $('mcp-token-show').setAttribute('aria-pressed', String(show)); renderMcpConfig(); });
 $('mcp-token-new').addEventListener('click', () => {
   if (mcpLink.connected || mcpLink.state.state === 'conectando') mcpLink.disconnect();
   $('mcp-token').value = generateMcpToken(); saveMcp(); renderMcpConfig();
-  $('mcp-status').textContent = 'Token novo gerado: pare a ponte, rode o comando de novo e atualize o endereço no agente (a ponte recusa o token antigo).'; $('mcp-status').dataset.state = '';
+  $('mcp-status').textContent = 'New token generated: stop the bridge, run the command again and update the address in the agent (the bridge refuses the old token).'; $('mcp-status').dataset.state = '';
 });
 for (const [buttonId, codeId, pick] of [['mcp-copy', 'mcp-config-json', 'serve'], ['mcp-copy-agent', 'mcp-agent-command', 'agent']]) $(buttonId).addEventListener('click', async () => {
   const text = mcpTexts(false)[pick], button = $(buttonId);
   let copied = false; try { await navigator.clipboard.writeText(text); copied = true; } catch { /* no clipboard permission: select the text instead */ }
   if (!copied) { const range = document.createRange(); $(codeId).textContent = text; range.selectNodeContents($(codeId)); const selection = getSelection(); selection.removeAllRanges(); selection.addRange(range); }
-  button.textContent = copied ? 'Copiado' : 'Selecionado: Ctrl+C'; setTimeout(() => { button.textContent = 'Copiar'; }, 1800);
+  button.textContent = copied ? 'Copied' : 'Selected: Ctrl+C'; setTimeout(() => { button.textContent = 'Copy'; }, 1800);
 });
 $('mcp-connect').addEventListener('click', () => {
   if (mcpLink.connected || mcpLink.state.state === 'conectando') { mcpLink.disconnect(); return; }
   saveMcp(); mcpLink.connect({ url: $('mcp-url').value, token: $('mcp-token').value });
 });   // "Plugins" (src/plugins-panel.js): global list, output cards under the device
-// Bottom tool dock (src/tool-dock.js): Log de execução, Logcat, Rede, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
+// Bottom tool dock (src/tool-dock.js): Execution log, Logcat, Network, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
 const toolDock = createToolDock({ root: $('tool-dock'), tools: [
-  { id: 'trace', label: 'Log de execução', icon: '☰', details: $('trace'), count: $('trace-count') },
+  { id: 'trace', label: 'Execution log', icon: '☰', details: $('trace'), count: $('trace-count') },
   { id: 'logcat', label: 'Logcat', icon: '▤', details: $('logcat'), count: $('logcat')?.querySelector?.('.logcat-count') },
-  { id: 'netlog', label: 'Rede', icon: '⇅', details: $('netlog'), count: $('netlog')?.querySelector?.('.netlog-count') },
+  { id: 'netlog', label: 'Network', icon: '⇅', details: $('netlog'), count: $('netlog')?.querySelector?.('.netlog-count') },
   { id: 'terminal', label: 'Terminal', icon: '❯', details: $('adb-terminal'), count: $('adb-terminal')?.querySelector?.('.adb-count') },   // the adb terminal (src/adb-terminal.js): adb command lines typed by the person
-  { id: 'examples', label: 'Exemplos', icon: '▤', details: $('scenario-catalog'), count: $('catalog-count') },   // the bundled test APKs: a dock tab, so the page itself does not scroll
+  { id: 'examples', label: 'Examples', icon: '▤', details: $('scenario-catalog'), count: $('catalog-count') },   // the bundled test APKs: a dock tab, so the page itself does not scroll
   { id: 'compose', label: 'Compose', icon: '◫', details: $('compose-inspector'), count: $('compose-inspector')?.querySelector?.('.ci-count') },
   { id: 'plugins', label: 'Plugins', icon: '⧉', details: $('plugins-output'), count: $('plugins-output')?.querySelector?.('.po-count') },
 ] });
 window.apkLabToolDock = toolDock;   // test and console access
-const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Mock de endpoints" (src/endpoint-mocks.js): per package, applied live
-const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirecionar hosts" (src/host-map.js): device settings, applied live
+const mocksPanel = createEndpointMocksPanel({ $, vm: apkVM });   // "Endpoint mocks" (src/endpoint-mocks.js): per package, applied live
+const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.network.hostMap ?? [], set: rules => applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, network: { ...deviceState.settings.network, hostMap: rules } })) });   // "Redirect hosts" (src/host-map.js): device settings, applied live
 const deviceView = createDeviceView({ $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   cameraSurface(element, info) { cameraLab.bindSurface(element, info); },
   glSurface(element, info) { glSurfaces.bind(element, info); },
   navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; syncReloadButton(); },
   closed() {
     taskSwitcher?.closed();   // the device shows its launcher: the app's icon starts it again
-    if (state.mode === 'apk') { setStatus('Aplicativo encerrado · nenhuma Activity ativa'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENCERRADO'; }
+    if (state.mode === 'apk') { setStatus('App ended · no active Activity'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENDED'; }
   },
   rendered(snapshot, composeReady) {
     syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup); taskSwitcher?.sync(snapshot, state.inventory);
     overridesPanel.hits(snapshot.methodOverrides); microgEntriesPanel.update(snapshot.deviceOptions?.microg?.entryPoints ?? null); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); showCoreUsage(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); if (snapshot.vmHealth) state.lastVmHealth = snapshot.vmHealth; if (snapshot.vmHealth?.renderer) showRendererStatus(snapshot.vmHealth.renderer, true); composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
-    if (snapshot.droppedEvent) appendTrace(`Evento descartado: a View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) já não existe na VM.`);
+    if (snapshot.droppedEvent) appendTrace(`Event dropped: View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) no longer exists in the VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
-    if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} objetos vivos)`); setStatus(`java.lang.OutOfMemoryError na VM (${snapshot.vmHealth.liveObjects} objetos vivos, limite ${snapshot.vmHealth.limit})`, 'error'); }
-    if (state.mode === 'apk') { $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> EM EXECUÇÃO'; $('preview-name').textContent = snapshot.activityName?.split('.').pop() || state.inventory?.packageName || 'APK local'; if (composeReady === false) { $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> INICIALIZADO'; setStatus('Activity iniciada · composição ainda sem conteúdo acessível e desenhado'); } else setStatus('Activity em execução · interaja com a interface', 'ok'); }
+    if ((snapshot.vmHealth?.oomCount ?? 0) > (state.oomSeen ?? 0)) { state.oomSeen = snapshot.vmHealth.oomCount; appendTrace(`OutOfMemoryError: ${snapshot.vmHealth.lastOom?.reason} (${snapshot.vmHealth.liveObjects} live objects)`); setStatus(`java.lang.OutOfMemoryError in the VM (${snapshot.vmHealth.liveObjects} live objects, limit ${snapshot.vmHealth.limit})`, 'error'); }
+    if (state.mode === 'apk') { $('runtime-badge').className = 'runtime-badge running'; $('runtime-badge').innerHTML = '<span></span> RUNNING'; $('preview-name').textContent = snapshot.activityName?.split('.').pop() || state.inventory?.packageName || 'Local APK'; if (composeReady === false) { $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> STARTED'; setStatus('Activity started · composition has no accessible, drawn content yet'); } else setStatus('Activity running · interact with the UI', 'ok'); }
     taskSwitcher?.restate();
   },
 } });
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
 taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item) }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
-  begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Navegação do dispositivo'); else appendTrace(message); },
-  announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'Aplicativo encerrado · toque no ícone para abrir de novo' : 'Aplicativo em segundo plano (onPause, onStop) · toque para voltar'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENCERRADO' : '<span></span> EM PAUSA'; } });
+  begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Device navigation'); else appendTrace(message); },
+  announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'App ended · tap its icon to open it again' : 'App in the background (onPause, onStop) · tap to go back'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENDED' : '<span></span> PAUSED'; } });
 // The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
 // "−  70%  +" over the stage's top right corner (src/device-zoom.js): the device's scale on the stage; the label resets to "fit".
 const refitDevice = () => { sizeBootOverlay(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); else { const d = resolveDevice(deviceState.settings); deviceView.fitDevice(d.widthDp, d.heightDp); } };
 const deviceZoom = createDeviceZoom({ stage: $('preview-stage'), deviceState, refit: refitDevice, shownScale: () => Number($('android-device')?.style?.getPropertyValue?.('--scale')) || 0.7 });
 if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); sizeBootOverlay(); deviceZoom?.sync(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
-createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Tela cheia" (src/device-fullscreen.js): CSS scale only
-const customScreenPanel = createCustomScreenPanel({ $ });   // "Tela" -> "Personalizado" (src/custom-screen-panel.js)
-// ---- Virtual device settings panel ("Dispositivo virtual") ----
-// Idioma and Região of the device: the locale is language-REGION (any ISO 3166 country with any of these languages: en-BR, pt-PT ...). Names come from the browser's Intl.DisplayNames.
+createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Full screen" (src/device-fullscreen.js): CSS scale only
+const customScreenPanel = createCustomScreenPanel({ $ });   // "Screen" -> "Custom" (src/custom-screen-panel.js)
+// ---- Virtual device settings panel ("Virtual device") ----
+// Language and Region of the device: the locale is language-REGION (any ISO 3166 country with any of these languages: en-BR, pt-PT ...). Names come from the browser's Intl.DisplayNames.
 const DEVICE_LANGUAGE_CODES = ['en', 'pt', 'es', 'fr', 'de', 'it', 'nl', 'pl', 'ru', 'tr', 'ar', 'he', 'hi', 'ja', 'ko', 'zh'];
-const displayName = (type, code) => { try { return new Intl.DisplayNames(['pt-BR'], { type }).of(code) ?? code; } catch { return code; } };
-const capital = text => text.charAt(0).toLocaleUpperCase('pt-BR') + text.slice(1);
+const displayName = (type, code) => { try { return new Intl.DisplayNames(['en-US'], { type }).of(code) ?? code; } catch { return code; } };
+const capital = text => text.charAt(0).toLocaleUpperCase('en-US') + text.slice(1);
 const DEVICE_LANGUAGES = DEVICE_LANGUAGE_CODES.map(code => [code, `${capital(displayName('language', code))}${code === 'ar' || code === 'he' ? ' (RTL)' : ''}`]);
-const DEVICE_REGIONS = Object.keys(ISO_COUNTRIES).map(code => [code, `${displayName('region', code)} (${code})`]).sort((a, b) => a[1].localeCompare(b[1], 'pt-BR'));
-const DEVICE_ZONES = [['', 'Seguir o navegador'], ['America/Sao_Paulo', 'São Paulo (UTC−3)'], ['UTC', 'UTC'], ['America/New_York', 'Nova York'], ['Europe/London', 'Londres'], ['Europe/Paris', 'Paris'], ['Asia/Kolkata', 'Índia (UTC+5:30)'], ['Asia/Tokyo', 'Tóquio'], ['Australia/Sydney', 'Sydney']];
-const DEVICE_SCREENS = [['phone', 'Telefone · 411 × 914 dp'], ['compact', 'Compacto · 360 × 800 dp'], ['large', 'Grande · 412 × 892 dp'], ['small', 'Pequeno · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp'], ['custom', 'Personalizado…']];
+const DEVICE_REGIONS = Object.keys(ISO_COUNTRIES).map(code => [code, `${displayName('region', code)} (${code})`]).sort((a, b) => a[1].localeCompare(b[1], 'en-US'));
+const DEVICE_ZONES = [['', 'Follow the browser'], ['America/Sao_Paulo', 'São Paulo (UTC−3)'], ['UTC', 'UTC'], ['America/New_York', 'New York'], ['Europe/London', 'London'], ['Europe/Paris', 'Paris'], ['Asia/Kolkata', 'India (UTC+5:30)'], ['Asia/Tokyo', 'Tokyo'], ['Australia/Sydney', 'Sydney']];
+const DEVICE_SCREENS = [['phone', 'Phone · 411 × 914 dp'], ['compact', 'Compact · 360 × 800 dp'], ['large', 'Large · 412 × 892 dp'], ['small', 'Small · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp'], ['custom', 'Custom…']];
 const fillSelect = (select, entries) => { select.replaceChildren(...entries.map(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; return option; })); };
-// "Internet" in the preview bar: the device's connectivity in one click (Controles › Dispositivo › Conectividade, applied live). Off is "Sem conexão"; on is the mode it had before.
+// "Internet" in the preview bar: the device's connectivity in one click (Controls › Device › Connectivity, applied live). Off is "No connection"; on is the mode it had before.
 let lastOnlineConnectivity = 'online';
 function syncNetworkToggle(settings) {
   const button = $('network-toggle'); if (!button) return; const offline = settings.connectivity === 'offline';
   if (!offline) lastOnlineConnectivity = settings.connectivity;
-  button.setAttribute('aria-pressed', offline ? 'true' : 'false'); button.classList.toggle('offline', offline); button.textContent = offline ? 'Sem internet' : 'Internet';
+  button.setAttribute('aria-pressed', offline ? 'true' : 'false'); button.classList.toggle('offline', offline); button.textContent = offline ? 'No internet' : 'Internet';
 }
 $('network-toggle')?.addEventListener('click', () => {
   const offline = deviceState.settings.connectivity === 'offline';
   applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, connectivity: offline ? lastOnlineConnectivity : 'offline' }));
-  setStatus(offline ? 'Internet do aparelho ligada' : 'Internet do aparelho desligada: o app vê o aparelho sem conexão');
+  setStatus(offline ? 'Device internet on' : 'Device internet off: the app sees the device with no connection');
 });
+/** The line under Dispositivo › Proxy: whether what is typed is in use, off, or refused (and so off). */
+let proxyTyping = false;   // the Proxy field's own input is being applied: writeDevicePanel leaves the field as typed
+function showProxyState() { const note = $('dev-proxy-note'); if (!note) return; const { state, text } = proxyState($('dev-proxy')?.value ?? ''); note.textContent = text; note.dataset.state = state === 'refused' ? 'error' : state === 'on' ? 'ok' : ''; }
 function writeDevicePanel(settings) {
   syncNetworkToggle(settings);
-  $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2).replace('.', ',')}×`;
+  $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2)}×`;
   { const [language, region] = String(settings.locale).split('-'); $('dev-locale').value = language; if ($('dev-region')) $('dev-region').value = region; } $('dev-dark').checked = settings.darkTheme; $('dev-animator').value = String(settings.animatorScale); $('dev-hour24').checked = settings.hour24; $('dev-tz').value = settings.timeZone;
-  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-proxy').value = settings.network.proxyUrl; if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB); writeCoreMemory(settings.coreMemory);
+  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; if (!proxyTyping) $('dev-proxy').value = settings.network.proxyUrl; showProxyState();   /* not from its own typing: a URL half typed (or refused) is not kept, and rewriting the field erased it; the line under it says what is in use */ if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB); writeCoreMemory(settings.coreMemory);
   if ($('vm-event-time')) $('vm-event-time').value = String(settings.eventSeconds ?? 0);
   if ($('vm-renderer')) $('vm-renderer').value = settings.renderer ?? 'gpu'; showEngine(settings);
   if ($('vm-raster-scale')) $('vm-raster-scale').value = String(settings.raster?.motionScale ?? 1); if ($('vm-raster-still')) $('vm-raster-still').value = String(settings.raster?.stillScale ?? 1); if ($('vm-raster-navigation')) $('vm-raster-navigation').checked = settings.raster?.navigation === true;
   customScreenPanel.write(settings);
   if ($('dev-microg')) $('dev-microg').checked = settings.microg === true; updateMicrogHint(settings);
-  const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'paisagem' : 'retrato'}`;
+  const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'landscape' : 'portrait'}`;
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, customScreen: customScreenPanel.read(deviceState.settings.customScreen), orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: `${$('dev-locale').value}-${$('dev-region')?.value || 'US'}`, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
     hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, microg: $('dev-microg')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [] }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
-// "Memória da VM": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
-const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('pt-BR')} objetos`; };
+// "VM memory": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
+const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('en-US')} objects`; };
 function initVmEventTime() {
   const select = $('vm-event-time'); if (!select) return;
-  fillSelect(select, [['0', 'Automático (padrão) · 25 s por evento'], ...EVENT_SECONDS_STEPS.map(value => [String(value), value >= 120 ? `${value / 60} min por evento` : `${value} s por evento`])]);
+  fillSelect(select, [['0', 'Automatic (default) · 25 s per event'], ...EVENT_SECONDS_STEPS.map(value => [String(value), value >= 120 ? `${value / 60} min per event` : `${value} s per event`])]);
 }
 function initVmMemory() {
   const select = $('vm-memory'); if (!select) return;
   const auto = memoryBudget({ deviceMemory: globalThis.navigator?.deviceMemory ?? null });
-  fillSelect(select, [['0', `Automático (padrão) · ${auto.budgetMiB} MiB · ${auto.maxHeapObjects.toLocaleString('pt-BR')} objetos`], ...MEMORY_STEPS_MIB.map(value => [String(value), vmMemoryLabel(value)])]);
-  const device = globalThis.navigator?.deviceMemory; $('vm-memory-device').textContent = device != null ? `Este navegador informa ${device} GiB de memória no dispositivo.` : 'Este navegador não informa a memória do dispositivo.';
+  fillSelect(select, [['0', `Automatic (default) · ${auto.budgetMiB} MiB · ${auto.maxHeapObjects.toLocaleString('en-US')} objects`], ...MEMORY_STEPS_MIB.map(value => [String(value), vmMemoryLabel(value)])]);
+  const device = globalThis.navigator?.deviceMemory; $('vm-memory-device').textContent = device != null ? `This browser reports ${device} GiB of device memory.` : 'This browser does not report the device memory.';
 }
-// "Renderização": the backend in use (the GPU's name when the browser exposes it) and why the GPU is not in use after a fallback.
+// "Rendering": the backend in use (the GPU's name when the browser exposes it) and why the GPU is not in use after a fallback.
 let rendererShown = '';
 function showRendererStatus(status, fromSnapshot = false) {
   const note = $('vm-renderer-status'); if (!note) return;
   const key = status ? `${status.requested}|${status.active}|${status.reason ?? ''}|${status.gpuRenderer ?? ''}` : ''; if (fromSnapshot && key === rendererShown) return;
-  if (status?.reason && status.reason !== rendererShown.split('|')[2] && status.requested === 'gpu') appendTrace(`GPU indisponível: ${status.reason} — usando CPU`);
+  if (status?.reason && status.reason !== rendererShown.split('|')[2] && status.requested === 'gpu') appendTrace(`GPU unavailable: ${status.reason} — using CPU`);
   rendererShown = key;
   const requested = deviceState.settings?.renderer ?? 'gpu';
-  if (!status) { note.textContent = apkVM.worker ? 'Em uso: CPU' : `Em uso: CPU${requested === 'gpu' ? ' · GPU no próximo lançamento' : ''}`; note.dataset.state = ''; return; }
-  if (status.active === 'gpu') { note.textContent = `Em uso: GPU (${status.api ?? 'WebGL'}${status.gpuRenderer ? ` · ${status.gpuRenderer}` : ''})`; note.dataset.state = 'gpu'; }
-  else if (status.requested === 'gpu' || (requested === 'gpu' && status.reason)) { note.textContent = `GPU indisponível: ${status.reason ?? 'motivo desconhecido'} — usando CPU`; note.dataset.state = 'fallback'; }
-  else { note.textContent = 'Em uso: CPU'; note.dataset.state = ''; }
+  if (!status) { note.textContent = apkVM.worker ? 'In use: CPU' : `In use: CPU${requested === 'gpu' ? ' · GPU on the next launch' : ''}`; note.dataset.state = ''; return; }
+  if (status.active === 'gpu') { note.textContent = `In use: GPU (${status.api ?? 'WebGL'}${status.gpuRenderer ? ` · ${status.gpuRenderer}` : ''})`; note.dataset.state = 'gpu'; }
+  else if (status.requested === 'gpu' || (requested === 'gpu' && status.reason)) { note.textContent = `GPU unavailable: ${status.reason ?? 'unknown reason'} — using CPU`; note.dataset.state = 'fallback'; }
+  else { note.textContent = 'In use: CPU'; note.dataset.state = ''; }
   note.title = note.textContent;
 }
-// "Com microG" is read by `load` (the Worker installs the microG packages then): the hint shows while the open APK runs with the other choice.
-function updateMicrogHint(settings = deviceState.settings) { const badge = $('dev-microg-summary'); if (badge) badge.textContent = settings?.microg === true ? 'com microG' : 'sem microG';   // the option's state shows on the section's row, open or closed
+// "With microG" is read by `load` (the Worker installs the microG packages then): the hint shows while the open APK runs with the other choice.
+function updateMicrogHint(settings = deviceState.settings) { const badge = $('dev-microg-summary'); if (badge) badge.textContent = settings?.microg === true ? 'with microG' : 'no microG';   // the option's state shows on the section's row, open or closed
   const hint = $('dev-microg-hint'); if (hint) hint.hidden = !(apkVM.worker && state.loadedMicrog !== undefined && state.loadedMicrog !== (settings?.microg === true)); }
 // The hint shows while a loaded APK was opened with another budget than the one selected now (the budget is read by `load`, never applied live).
 function updateVmMemoryHint() { const hint = $('vm-memory-hint'); if (hint) hint.hidden = !(apkVM.worker && state.loadedMemoryMiB !== undefined && state.loadedMemoryMiB !== deviceState.settings.memoryMiB); const core = $('vm-core-hint'); if (core) core.hidden = !(apkVM.worker && state.loadedCoreMemory && !sameCoreMemory(state.loadedCoreMemory, deviceState.settings.coreMemory)); const engine = $('vm-engine-hint'); if (engine) engine.hidden = !(apkVM.worker && state.loadedEngine && state.loadedEngine !== engineForLoad()); }
-/* "Motor da VM": the WebAssembly core (default) or the JavaScript VM, read by `load`. `?engine=js|wasm` in the address wins over the stored choice and locks the select. */
+/* "VM engine": the WebAssembly core (default) or the JavaScript VM, read by `load`. `?engine=js|wasm` in the address wins over the stored choice and locks the select. */
 const URL_ENGINE = ['js', 'wasm'].includes(params.get('engine')) ? params.get('engine') : null;
 function engineForLoad() { return URL_ENGINE ?? deviceState.settings?.engine ?? DEFAULT_ENGINE; }
 function showEngine(settings) {
   const select = $('vm-engine'), note = $('vm-engine-note'); if (!select) return;
   select.value = URL_ENGINE ?? settings.engine ?? DEFAULT_ENGINE; select.disabled = !!URL_ENGINE;
-  if (note) note.textContent = URL_ENGINE ? `Definido pelo endereço da página (?engine=${URL_ENGINE}); remova o parâmetro para escolher aqui.` : select.value === 'js' ? 'VM JavaScript: a memória é a de "Memória da VM"; os campos do núcleo Wasm não valem.' : 'Núcleo WebAssembly: a memória é a de "Memória do núcleo Wasm"; "Memória da VM" não vale.';
+  if (note) note.textContent = URL_ENGINE ? `Set by the page address (?engine=${URL_ENGINE}); remove the parameter to choose here.` : select.value === 'js' ? 'JavaScript VM: the memory is the one in "VM memory"; the Wasm core fields do not apply.' : 'WebAssembly core: the memory is the one in "Wasm core memory"; "VM memory" does not apply.';
 }
-// "Memória do núcleo Wasm" (src/core-memory.js): heap, metaspace and live threads of the WebAssembly core, read by the next load. A combination that does not fit the core's
+// "Wasm core memory" (src/core-memory.js): heap, metaspace and live threads of the WebAssembly core, read by the next load. A combination that does not fit the core's
 // 2 GiB is shown as an error and not saved (the last valid one stays).
 const CORE_FIELDS = [['vm-core-heap', 'heapMiB'], ['vm-core-meta', 'metaMiB'], ['vm-core-threads', 'threads']];
 /** The form as typed: the mode and the three sizes (in dynamic mode the heap and thread sizes stay in their fields, unused, for when the mode is switched back). */
@@ -1179,16 +1182,16 @@ function showCoreMode(mode) { const box = $('vm-core'); if (box) box.dataset.mod
 function writeCoreMemory(memory) { const mode = $('vm-core-mode'); if (mode) mode.value = memory.mode; showCoreMode(memory.mode); for (const [id, key] of CORE_FIELDS) { const input = $(id); if (input && document.activeElement !== input) input.value = String(memory[key]); } showCoreMemoryTotal(memory); }
 function showCoreMemoryTotal(raw) {
   const note = $('vm-core-total'); if (!note) return null; const checked = checkCoreMemory(raw);
-  note.dataset.state = checked.error ? 'error' : ''; note.textContent = checked.error ? `Não cabe: ${checked.error}. Mantido o último valor válido.` : checked.value.mode === 'dynamic' ? `Heap e threads dividem ${checked.areaMiB} MiB sob demanda (o heap começa em 64 MiB)${sameCoreMemory(checked.value, CORE_MEMORY_DEFAULT) ? ' (padrão)' : ''}.` : `Total fixado: ${checked.totalMiB} de 2048 MiB.`;
+  note.dataset.state = checked.error ? 'error' : ''; note.textContent = checked.error ? `Does not fit: ${checked.error}. The last valid value is kept.` : checked.value.mode === 'dynamic' ? `Heap and threads share ${checked.areaMiB} MiB on demand (the heap starts at 64 MiB)${sameCoreMemory(checked.value, CORE_MEMORY_DEFAULT) ? ' (default)' : ''}.` : `Fixed total: ${checked.totalMiB} of 2048 MiB.`;
   return checked;
 }
 /** What the running core uses of each region (from the frame's vmHealth), under the fields; hidden on the JavaScript VM. */
 let coreUsageShown = '';
 function showCoreUsage(health) {
   const note = $('vm-core-usage'); if (!note) return; const core = health?.core ?? null, mib = bytes => Math.round(bytes / 1048576);
-  const live = core?.liveBytes != null ? ` (${mib(core.liveBytes)} MiB vivos na última coleta)` : '';
-  const text = !core ? '' : core.dynamic ? `Em uso agora: metaspace ${mib(core.metaBytes)} de ${mib(core.metaCapacity)} MiB · ${core.threads} threads · heap de ${mib(core.heapBytes)} MiB${live} · heap e threads ocupam ${mib(core.areaBytes)} de ${mib(core.areaLimit)} MiB.`
-    : `Em uso agora: metaspace ${mib(core.metaBytes)} de ${mib(core.metaCapacity)} MiB · ${core.threads} de ${core.threadCapacity} threads · heap de ${mib(core.heapBytes)} MiB${live}.`;
+  const live = core?.liveBytes != null ? ` (${mib(core.liveBytes)} MiB live at the last collection)` : '';
+  const text = !core ? '' : core.dynamic ? `In use now: metaspace ${mib(core.metaBytes)} of ${mib(core.metaCapacity)} MiB · ${core.threads} threads · heap of ${mib(core.heapBytes)} MiB${live} · heap and threads take ${mib(core.areaBytes)} of ${mib(core.areaLimit)} MiB.`
+    : `In use now: metaspace ${mib(core.metaBytes)} of ${mib(core.metaCapacity)} MiB · ${core.threads} of ${core.threadCapacity} threads · heap of ${mib(core.heapBytes)} MiB${live}.`;
   if (text === coreUsageShown) return; coreUsageShown = text; note.hidden = !text; note.textContent = text;
 }
 function readCoreMemory() {
@@ -1200,12 +1203,12 @@ function applyDeviceSettings(settings) {
   const rendererChanged = (deviceState.settings?.renderer ?? 'cpu') !== (settings.renderer ?? 'cpu');
   const timeChanged = (deviceState.settings?.eventSeconds ?? 0) !== (settings.eventSeconds ?? 0), rasterChanged = JSON.stringify(deviceState.settings?.raster ?? null) !== JSON.stringify(settings.raster ?? null);
   deviceState.settings = settings; updateVmMemoryHint(); saveDeviceSettings(settings);
-  if (rasterChanged && apkVM.worker && params.get('raster') !== 'full') apkVM.setRasterSettings({ scale: settings.raster.motionScale, navigation: settings.raster.navigation, settled: settings.raster.stillScale }).catch(() => {});   // "Resolução no movimento" / "Tela nova em baixa resolução" (src/motion-raster.js)
-  if (rendererChanged) { if (apkVM.worker) apkVM.setRenderer(settings.renderer).then(showRendererStatus, error => showRendererStatus({ requested: settings.renderer, active: 'cpu', reason: String(error?.message ?? error) })); else showRendererStatus(null); }   // "Renderização" applies live (src/gpu-raster.js)
-  if (timeChanged && apkVM.worker) apkVM.setTimeLimits(settings.eventSeconds).catch(() => {});   // "Tempo máximo por evento" applies to the running VM at once (src/time-limits.js)
+  if (rasterChanged && apkVM.worker && params.get('raster') !== 'full') apkVM.setRasterSettings({ scale: settings.raster.motionScale, navigation: settings.raster.navigation, settled: settings.raster.stillScale }).catch(() => {});   // "Resolution while moving" / "New screen starts at low resolution" (src/motion-raster.js)
+  if (rendererChanged) { if (apkVM.worker) apkVM.setRenderer(settings.renderer).then(showRendererStatus, error => showRendererStatus({ requested: settings.renderer, active: 'cpu', reason: String(error?.message ?? error) })); else showRendererStatus(null); }   // "Rendering" applies live (src/gpu-raster.js)
+  if (timeChanged && apkVM.worker) apkVM.setTimeLimits(settings.eventSeconds).catch(() => {});   // "Maximum time per event" applies to the running VM at once (src/time-limits.js)
   writeDevicePanel(settings); updateSystemBarIcons(); redrawLayoutBounds();
   const note = $('device-status');
-  if (state.runtime !== apkVM || !state.apkRunning) { note.textContent = 'Nenhum app em execução: as configurações valem desde o próximo lançamento.'; return deviceApplying; }
+  if (state.runtime !== apkVM || !state.apkRunning) { note.textContent = 'No app is running: the settings apply from the next launch.'; return deviceApplying; }
   // One RPC at a time: wait for a VM operation in flight, then deliver the newest settings through ActivityThread semantics.
   deviceApplying = deviceApplying.then(async () => {
     for (let attempt = 0; attempt < 100 && apkVM.pending; attempt++) await new Promise(resolve => setTimeout(resolve, 50));
@@ -1213,25 +1216,25 @@ function applyDeviceSettings(settings) {
     try {
       const { outcome, snapshot } = await apkVM.setDevice(deviceForVM(latest));
       if (snapshot) renderSnapshot(snapshot);
-      note.textContent = outcome?.changed ? `Aplicado ao vivo: ${outcome.relaunched ? `${outcome.relaunched} Activity recriada(s) com estado salvo` : ''}${outcome.relaunched && outcome.delivered ? ' · ' : ''}${outcome.delivered ? `${outcome.delivered} onConfigurationChanged` : ''}${!outcome.relaunched && !outcome.delivered ? 'sem mudança de Configuration (barra de status, rede/bateria/fuso)' : ''}.` : 'Sem alteração para o app.';
-    } catch (error) { note.textContent = 'O app não aceitou a mudança: ' + (error?.message || error); reportAPKError(error, 'Mudança de configuração do dispositivo interrompida'); }
+      note.textContent = outcome?.changed ? `Applied live: ${outcome.relaunched ? `${outcome.relaunched} Activity(ies) recreated with saved state` : ''}${outcome.relaunched && outcome.delivered ? ' · ' : ''}${outcome.delivered ? `${outcome.delivered} onConfigurationChanged` : ''}${!outcome.relaunched && !outcome.delivered ? 'no Configuration change (status bar, network/battery/time zone)' : ''}.` : 'No change for the app.';
+    } catch (error) { note.textContent = 'The app did not accept the change: ' + (error?.message || error); reportAPKError(error, 'Device configuration change interrupted'); }
   });
   return deviceApplying;
 }
 function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LANGUAGES); if ($('dev-region')) fillSelect($('dev-region'), DEVICE_REGIONS); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); initVmEventTime(); writeDevicePanel(deviceState.settings);
-  for (const id of ['dev-screen', 'dev-custom-w', 'dev-custom-h', 'dev-custom-unit', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-region', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-microg', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-still', 'vm-raster-navigation', 'vm-renderer', 'vm-engine']) $(id).addEventListener('input', () => { applyDeviceSettings(readDevicePanel()); });
+  for (const id of ['dev-screen', 'dev-custom-w', 'dev-custom-h', 'dev-custom-unit', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-region', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-microg', 'dev-hosts', 'dev-proxy', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-still', 'vm-raster-navigation', 'vm-renderer', 'vm-engine']) $(id).addEventListener('input', () => { if (id === 'dev-proxy') { showProxyState(); proxyTyping = true; } try { applyDeviceSettings(readDevicePanel()); } finally { proxyTyping = false; } });
   for (const [id] of CORE_FIELDS) { $(id)?.addEventListener('change', () => { if (showCoreMemoryTotal(rawCoreMemory())?.error) return; applyDeviceSettings(readDevicePanel()); }); /* a combination that does not fit stays on screen with its reason, and is not applied */ $(id)?.addEventListener('input', () => { showCoreMemoryTotal(rawCoreMemory()); }); }
-  $('vm-core-mode')?.addEventListener('change', () => { showCoreMode($('vm-core-mode').value); if (showCoreMemoryTotal(rawCoreMemory())?.error) return; applyDeviceSettings(readDevicePanel()); });   // switching to "Travado" with sizes that do not fit shows why and keeps the mode that was running
+  $('vm-core-mode')?.addEventListener('change', () => { showCoreMode($('vm-core-mode').value); if (showCoreMemoryTotal(rawCoreMemory())?.error) return; applyDeviceSettings(readDevicePanel()); });   // switching to "Fixed" with sizes that do not fit shows why and keeps the mode that was running
   $('vm-core-reset')?.addEventListener('click', () => { $('vm-core-mode').value = CORE_MEMORY_DEFAULT.mode; for (const [id, key] of CORE_FIELDS) $(id).value = String(CORE_MEMORY_DEFAULT[key]); applyDeviceSettings(readDevicePanel()); });
   document.querySelector('#trace .trace-actions')?.addEventListener('click', event => event.preventDefault());   // buttons in the <summary> must not toggle the panel
   $('device-reset').addEventListener('click', () => { applyDeviceSettings(defaultDeviceSettings()); hostMapPanel.refresh(); permissionsPanel.refreshLocation(); if (apkVM.worker) apkVM.setPermissions({ location: deviceState.settings.location }).catch(() => {}); });
 }
-// ---- "Abrir": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
+// ---- "Open": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
 async function runAPK() {
   if (!(state.runtime || (state.needsRestart && state.currentSource)) || state.busy || state.runStarting) return;
-  if (state.inventory?.unsupportedFeatures?.length) { switchMode('apk'); showDeviceHome('installed'); showError(new Error(`Este APK ainda não pode ser executado: ${state.inventory.unsupportedFeatures.join('; ')}`), 'Limite de arquivo'); return; }   // the launcher icon of an APK the lab cannot run says why
-  state.runStarting = true; showBoot('Iniciando o aplicativo…');
+  if (state.inventory?.unsupportedFeatures?.length) { switchMode('apk'); showDeviceHome('installed'); showError(new Error(`This APK cannot be run yet: ${state.inventory.unsupportedFeatures.join('; ')}`), 'File limit'); return; }   // the launcher icon of an APK the lab cannot run says why
+  state.runStarting = true; showBoot('Starting the app…');
   try { await runAPKOnce(); } finally { state.runStarting = false; }
 }
 async function runAPKOnce(retried = false) {
@@ -1246,28 +1249,28 @@ async function runAPKOnce(retried = false) {
   }
   await taskSwitcher?.infoSettled?.();   // the launcher's label and icon request of the load just finished (the VM client takes one request at a time)
   switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false; state.launchAttempted = true;
-  const token = beginOperation('Tentando iniciar a Activity…');
+  const token = beginOperation('Trying to start the Activity…');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
-  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity aberta em ${state.loadTimes.launchMs} ms`); } } }
+  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
   catch (error) {
     // The Worker was still inside an earlier operation (a run that failed while it kept working): start over once in a fresh Worker instead of reporting "already busy".
-    if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando/.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }
+    if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando|processing/i.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }
     if (token === state.operation) reportAPKError(error);
   }
   finally { finishOperation(token); }
 }
 async function reloadActivity(mode = 'recreate') {
   if (!state.runtime || state.busy || !state.apkRunning) return;
-  await flushPendingInputs(); hideError(); state.stickyError = false; const token = beginOperation(mode === 'reopen' ? 'Reabrindo a Activity…' : 'Recriando a Activity…');
+  await flushPendingInputs(); hideError(); state.stickyError = false; const token = beginOperation(mode === 'reopen' ? 'Reopening the Activity…' : 'Recreating the Activity…');
   try { const snapshot = await state.runtime.reloadActivity({ mode, onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
-  catch (error) { if (token === state.operation) reportAPKError(error, 'Não foi possível recarregar a Activity'); }
+  catch (error) { if (token === state.operation) reportAPKError(error, 'Could not reload the Activity'); }
   finally { finishOperation(token); }
 }
 async function backAPK() {
   if (!state.runtime || state.busy || !state.canGoBack) return;
-  await flushPendingInputs(); hideError(); state.stickyError = false; const token = beginOperation('Retornando à Activity anterior…');
+  await flushPendingInputs(); hideError(); state.stickyError = false; const token = beginOperation('Returning to the previous Activity…');
   try { const snapshot = await state.runtime.back({ onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
-  catch (error) { if (token === state.operation) reportAPKError(error, 'Não foi possível voltar'); }
+  catch (error) { if (token === state.operation) reportAPKError(error, 'Could not go back'); }
   finally { finishOperation(token); }
 }
 async function clickView(id) {
@@ -1280,9 +1283,9 @@ async function clickView(id) {
     await flushPendingInputs();
     if (state.busy) { for (let waited = 0; state.busy && waited < 15000; waited += 10) await new Promise(resolve => setTimeout(resolve, 10)); if (state.busy || !state.runtime) return; }
   } finally { state.pendingClicks--; }
-  const token = beginOperation('Executando callback DEX…');
+  const token = beginOperation('Running DEX callback…');
   try { const snapshot = await state.runtime.click(id, { onProgress: onWorkerProgress }); if (token === state.operation) renderSnapshot(snapshot); }
-  catch (error) { if (token === state.operation) reportAPKError(error, 'Callback interrompido'); }
+  catch (error) { if (token === state.operation) reportAPKError(error, 'Callback interrupted'); }
   finally { finishOperation(token); }
 }
 async function runDemo() {
@@ -1290,7 +1293,7 @@ async function runDemo() {
   await importSource({ name: 'kotlin-counter.apk', url: new URL('./fixtures/kotlin-counter.apk', import.meta.url).href }, true);
 }
 async function inspectCatalogAPK(entry) {
-  await importSource({ name: entry.file, url: new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href }, true);   // like a file: installed and opened (the inspection stays in the Pacote panel)
+  await importSource({ name: entry.file, url: new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href }, true);   // like a file: installed and opened (the inspection stays in the Package panel)
 }
 async function loadScenarioCatalog() {
   const list = $('scenario-list');
@@ -1300,17 +1303,17 @@ async function loadScenarioCatalog() {
     if (response.status === 404) { state.noBundledApks = true; $('scenario-catalog').hidden = true; document.querySelector('.demo-row')?.setAttribute('hidden', ''); if (!state.currentSource) $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint(); return; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const catalog = await response.json();
-    if (!Array.isArray(catalog.scenarios)) throw new Error('Formato de catálogo inválido');
+    if (!Array.isArray(catalog.scenarios)) throw new Error('Invalid catalog format');
     if ($('catalog-count')) $('catalog-count').textContent = String(catalog.scenarios.length);
     const cards = catalog.scenarios.map((entry) => {
       // The catalog names packaged fixtures; it never supplies runtime data or behavior.
-      if (!/^[a-z0-9-]+\.apk$/i.test(entry.file)) throw new Error('Nome de APK inválido no catálogo');
+      if (!/^[a-z0-9-]+\.apk$/i.test(entry.file)) throw new Error('Invalid APK name in the catalog');
       const available = entry.available !== false;
       const card = document.createElement('article'); card.className = 'scenario-card';
       const top = document.createElement('div'); top.className = 'scenario-card-top';
       const icon = document.createElement('span'); icon.className = 'scenario-file-icon'; icon.textContent = 'APK';
       const badge = document.createElement('span'); badge.className = `scenario-badge${entry.executionValidated ? ' supported' : ''}`;
-      badge.textContent = available ? entry.executionValidated ? 'Validado' : 'Experimental' : 'Em build';
+      badge.textContent = available ? entry.executionValidated ? 'Validated' : 'Experimental' : 'Building';
       top.append(icon, badge);
       const title = document.createElement('h3'); title.textContent = entry.title;
       const description = document.createElement('p'); description.textContent = entry.description;
@@ -1318,17 +1321,17 @@ async function loadScenarioCatalog() {
       (entry.tags || []).forEach((text) => { const tag = document.createElement('span'); tag.textContent = text; tags.append(tag); });
       const file = document.createElement('div'); file.className = 'scenario-filename'; file.textContent = entry.file; if (entry.sizeBytes) { const size = document.createElement('span'); size.className = 'scenario-size'; size.textContent = formatSize(entry.sizeBytes); file.append(' ', size); }
       const actions = document.createElement('div'); actions.className = 'scenario-actions';
-      const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Abrir'; inspect.setAttribute('aria-label', `Abrir ${entry.title}`);
+      const inspect = document.createElement('button'); inspect.type = 'button'; inspect.textContent = 'Open'; inspect.setAttribute('aria-label', `Open ${entry.title}`);
       inspect.dataset.inspectApk = entry.id; inspect.dataset.available = String(available); inspect.disabled = state.busy || !available;
       inspect.addEventListener('click', () => { if (toolDock.active === 'examples') toolDock.close(); inspectCatalogAPK(entry); });   // the list is a dock tab: it gets out of the way of the device
-      const download = document.createElement('a'); download.textContent = 'Baixar';
+      const download = document.createElement('a'); download.textContent = 'Download';
       if (available) { download.href = new URL(`./fixtures/${encodeURIComponent(entry.file)}`, import.meta.url).href; download.download = entry.file; }
-      else { download.setAttribute('aria-disabled', 'true'); download.title = 'Este APK ainda está em build'; }
+      else { download.setAttribute('aria-disabled', 'true'); download.title = 'This APK is still being built'; }
       actions.append(inspect, download); card.append(top, title, description, tags, file, actions); return card;
     });
     list.replaceChildren(...cards);
   } catch (error) {
-    const message = document.createElement('p'); message.className = 'catalog-loading'; message.textContent = `Catálogo indisponível: ${error.message}. Tente recarregar a página.`; list.replaceChildren(message);
+    const message = document.createElement('p'); message.className = 'catalog-loading'; message.textContent = `Catalog unavailable: ${error.message}. Try reloading the page.`; list.replaceChildren(message);
   }
 }
 // The lab has a single mode (APK); switchMode('apk') resets the preview chrome to the APK's current state.
@@ -1337,13 +1340,13 @@ function switchMode() {
   $('back-button').hidden = !state.canGoBack; syncReloadButton();
   if (!state.apkRunning) showDeviceHome(); else { $('android-device').hidden = false; $('android-device').inert = false; $('empty-preview').hidden = true; }
   hideError();
-  $('execution-engine').textContent = '411 × 840 dp · DENSIDADE 1';
-  $('preview-name').textContent = state.inventory?.packageName || 'Prévia do aplicativo';
+  $('execution-engine').textContent = '411 × 840 dp · DENSITY 1';
+  $('preview-name').textContent = state.inventory?.packageName || 'App preview';
   const running = state.apkRunning;
   $('runtime-badge').className = `runtime-badge${running ? ' running' : ''}`;
-  $('runtime-badge').innerHTML = `<span></span> ${running ? 'EM EXECUÇÃO' : state.inventory?.unsupportedFeatures?.length ? 'BLOQUEADO' : state.runtime ? 'INSPECIONADO' : 'INATIVO'}`;
+  $('runtime-badge').innerHTML = `<span></span> ${running ? 'RUNNING' : state.inventory?.unsupportedFeatures?.length ? 'BLOCKED' : state.runtime ? 'INSPECTED' : 'INACTIVE'}`;
   if (state.lastAPKError) { showError(state.lastAPKError.error, state.lastAPKError.title); return; }
-  setStatus(running ? 'Activity em execução · interaja com a interface' : state.inventory?.unsupportedFeatures?.length ? 'APK identificado · execução bloqueada por recursos não suportados' : state.runtime ? 'Inspecionado · tentativa de execução disponível' : 'Aguardando um aplicativo', running ? 'ok' : state.inventory?.unsupportedFeatures?.length ? 'error' : '');
+  setStatus(running ? 'Activity running · interact with the UI' : state.inventory?.unsupportedFeatures?.length ? 'APK identified · run blocked by unsupported features' : state.runtime ? 'Inspected · run attempt available' : 'Waiting for an app', running ? 'ok' : state.inventory?.unsupportedFeatures?.length ? 'error' : '');
 }
 $('apk-file').addEventListener('change', (event) => { chooseFile(event.target.files?.[0]); event.target.value = ''; });
 $('drop-zone').addEventListener('dragover', (event) => { event.preventDefault(); $('drop-zone').classList.add('dragging'); });

@@ -2,7 +2,7 @@
 // from the embedding page, which is another site, so it must not get the runtime origin (its IndexedDB app data of other embedders, caches, same-origin requests).
 // One hidden sandboxed iframe (sandbox="allow-scripts", no allow-same-origin: an opaque origin) creates each Worker from a Blob URL of its own origin and relays the
 // messages; src/plugin-host.js sees an ordinary { postMessage, onmessage, onerror, terminate } Worker. Nothing is created until the first plugin starts.
-import { pluginWorkerSource } from '../plugin-runtime.js?v=ca92aaad0948';
+import { pluginWorkerSource } from '../plugin-runtime.js?v=d422379a2a38';
 
 export const RELAY_SOURCE = `<!doctype html><meta charset="utf-8"><title>plugins</title><script>
 "use strict";
@@ -13,10 +13,10 @@ addEventListener('message', event => {
   if (d.t === 'create' && typeof d.source === 'string' && !workers.has(d.id)) {
     let url = null, worker = null;
     try { url = URL.createObjectURL(new Blob([d.source], { type: 'text/javascript' })); worker = new Worker(url, { name: String(d.name || 'plugin').slice(0, 60) }); }   // classic: browsers refuse module Workers from a Blob URL of an opaque origin; the runtime has no imports
-    catch (error) { if (url) URL.revokeObjectURL(url); parent.postMessage({ t: 'error', id: d.id, message: 'O Worker do plugin não pôde ser criado neste navegador (origem isolada): ' + String(error && error.message || error) }, '*'); return; }
+    catch (error) { if (url) URL.revokeObjectURL(url); parent.postMessage({ t: 'error', id: d.id, message: 'The plugin Worker could not be created in this browser (isolated origin): ' + String(error && error.message || error) }, '*'); return; }
     let revoked = false; const revoke = () => { if (!revoked) { revoked = true; URL.revokeObjectURL(url); } };
     worker.onmessage = e => { revoke(); parent.postMessage({ t: 'message', id: d.id, data: e.data }, '*'); };
-    worker.onerror = e => { e.preventDefault(); revoke(); parent.postMessage({ t: 'error', id: d.id, message: String(e.message || 'O Worker do plugin falhou.') }, '*'); };
+    worker.onerror = e => { e.preventDefault(); revoke(); parent.postMessage({ t: 'error', id: d.id, message: String(e.message || 'The plugin Worker failed.') }, '*'); };
     worker.onmessageerror = () => parent.postMessage({ t: 'messageerror', id: d.id }, '*');
     workers.set(d.id, worker);
   } else if (d.t === 'post') { const worker = workers.get(d.id); if (worker) worker.postMessage(d.data); }

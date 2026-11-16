@@ -19,8 +19,8 @@ export const AUTHORITY = Object.freeze({ MEDIA: 'media', MEDIA_DOCUMENTS: 'com.a
 export const PICKER_PREFIX = 'content://media/picker/0/com.android.providers.media.photopicker/media/';
 /** The packages that answer the picker Intents on a device: DocumentsUI and the MediaProvider module (photo picker); the gallery role is played by the photo picker's package here. */
 export const SYSTEM_PICKERS = Object.freeze({
-  documents: { packageName: 'com.android.documentsui', className: 'com.android.documentsui.picker.PickActivity', label: 'Arquivos' },
-  photos: { packageName: 'com.android.providers.media.module', className: 'com.android.providers.media.photopicker.PhotoPickerActivity', label: 'Seletor de fotos' },
+  documents: { packageName: 'com.android.documentsui', className: 'com.android.documentsui.picker.PickActivity', label: 'Files' },
+  photos: { packageName: 'com.android.providers.media.module', className: 'com.android.providers.media.photopicker.PhotoPickerActivity', label: 'Photo picker' },
   gallery: { packageName: 'com.android.providers.media.module', className: 'com.android.providers.media.photopicker.PhotoPickerGetContentActivity', label: 'Galeria' },
 });
 
@@ -49,7 +49,7 @@ export const titleOf = name => { const dot = String(name).lastIndexOf('.'); retu
 /** A file name the shared storage can hold: no path separators or control characters, at most 255 UTF-16 units, never empty. */
 export function safeName(name) {
   let out = String(name ?? '').replace(/[\u0000-\u001f\u007f/\\]/g, '_').trim();
-  if (!out || out === '.' || out === '..') out = 'arquivo';
+  if (!out || out === '.' || out === '..') out = 'file';
   return out.length > 255 ? out.slice(0, 255) : out;
 }
 /** `name` made unique among `taken` the way a file manager does: "foto.png", "foto (1).png", ... */
@@ -61,8 +61,8 @@ export function uniqueName(name, taken) {
 const intOrNull = value => Number.isFinite(value) && value > 0 ? Math.round(value) : null;
 /** The metadata of one attached file as both sides keep it (the bytes travel next to it). `mime` may be empty: the VM resolves it from the extension with libcore's MimeMap. */
 export function fileRecord(input) {
-  const id = Number(input?.id); if (!Number.isSafeInteger(id) || id <= 0) throw new RangeError('Arquivo do dispositivo sem identificador válido.');
-  const size = Number(input.size); if (!Number.isSafeInteger(size) || size < 0 || size > MAX_FILE_BYTES) throw new RangeError(`Arquivo do dispositivo fora do limite de ${MAX_FILE_BYTES / 1048576} MiB.`);
+  const id = Number(input?.id); if (!Number.isSafeInteger(id) || id <= 0) throw new RangeError('Device file without a valid identifier.');
+  const size = Number(input.size); if (!Number.isSafeInteger(size) || size < 0 || size > MAX_FILE_BYTES) throw new RangeError(`Device file over the limit of ${MAX_FILE_BYTES / 1048576} MiB.`);
   const mime = typeof input.mime === 'string' && /^[\w.+-]+\/[\w.+-]+$/.test(input.mime) ? input.mime.toLowerCase() : '';
   return { id, name: safeName(input.name), mime, size, modified: Number.isFinite(Number(input.modified)) && Number(input.modified) > 0 ? Math.floor(Number(input.modified)) : 0, added: Number.isFinite(Number(input.added)) && Number(input.added) > 0 ? Math.floor(Number(input.added)) : 0,
     width: intOrNull(input.width), height: intOrNull(input.height), duration: intOrNull(input.duration) };

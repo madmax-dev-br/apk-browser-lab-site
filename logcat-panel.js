@@ -1,6 +1,7 @@
 // The "Logcat" panel of the lab page: the app's log lines (src/logcat.js batches from the Worker) in `logcat -v threadtime` format, coloured by level, with a text filter,
 // a minimum level, autoscroll, "Limpar" and "Salvar". The formatting and filter functions are pure (tested without a DOM); createLogcatPanel() wires them to the page.
-import { LEVELS, MAX_LINES, formatThreadtime, rowToEntry } from './logcat.js?v=ca92aaad0948';
+import { LEVELS, MAX_LINES, formatThreadtime, rowToEntry } from './logcat.js?v=d422379a2a38';
+import { createReadingHold } from './reading-hold.js?v=d422379a2a38';
 
 export const RENDER_MAX = 2000;   // rows kept in the DOM; the whole buffer is still saved by "Salvar"
 export const LEVEL_NAMES = { V: 'Verbose', D: 'Debug', I: 'Info', W: 'Warning', E: 'Error', A: 'Assert' };
@@ -20,7 +21,7 @@ export const exportFileName = (packageName, date = new Date()) => `logcat-${Stri
 
 /** The text "Salvar" writes: one threadtime line per entry, preceded by a note when older lines were discarded. */
 export function buildExport(entries, { dropped = 0 } = {}) {
-  const lines = []; if (dropped > 0) lines.push(`--------- ${dropped} linhas anteriores descartadas (buffer cheio) ---------`);
+  const lines = []; if (dropped > 0) lines.push(`--------- ${dropped} earlier lines dropped (buffer full) ---------`);
   for (const entry of entries) lines.push(formatEntry(entry));
   return lines.join('\n') + (lines.length ? '\n' : '');
 }
@@ -60,8 +61,8 @@ export function createLogcatPanel({ root, getPackage = () => 'app', save = downl
   const filter = () => ({ text: filterInput.value, minLevel: levelSelect.value });
   const row = entry => { const div = document.createElement('div'); div.className = `logcat-row level-${entry.level}`; div.textContent = formatEntry(entry); return div; };
   const updateCount = () => {
-    if (!live()) { count.textContent = `${workerTotal} linhas`; return; }
-    const text = `${store.entries.length} linhas${visibleCount !== store.entries.length ? ` · ${visibleCount} exibidas` : ''}${store.dropped ? ` · ${store.dropped} descartadas` : ''}`;
+    if (!live()) { count.textContent = `${workerTotal} ${workerTotal === 1 ? 'line' : 'lines'}`; return; }
+    const text = `${store.entries.length} ${store.entries.length === 1 ? 'line' : 'lines'}${visibleCount !== store.entries.length ? ` · ${visibleCount} shown` : ''}${store.dropped ? ` · ${store.dropped} dropped` : ''}`;
     count.textContent = text;
   };
   const scroll = () => { if (auto.checked) out.scrollTop = out.scrollHeight; };
@@ -69,9 +70,9 @@ export function createLogcatPanel({ root, getPackage = () => 'app', save = downl
     if (!live()) { out.replaceChildren(); visibleCount = 0; updateCount(); return; }
     const f = filter(), visible = store.entries.filter(entry => matchesFilter(entry, f)); visibleCount = visible.length;
     const rows = visible.slice(-RENDER_MAX).map(row);
-    if (store.dropped > 0) { const note = document.createElement('div'); note.className = 'logcat-dropped'; note.textContent = `${store.dropped} linhas anteriores descartadas`; rows.unshift(note); }
+    if (store.dropped > 0) { const note = document.createElement('div'); note.className = 'logcat-dropped'; note.textContent = `${store.dropped} earlier lines dropped`; rows.unshift(note); }
     out.replaceChildren(...rows); lastSeq = store.entries.at(-1)?.seq ?? -1; updateCount(); scroll();
-    if (!visible.length) { const empty = document.createElement('div'); empty.className = 'logcat-empty'; empty.textContent = waiting ? 'Carregando as linhas recentes…' : store.entries.length ? 'Nenhuma linha passa pelo filtro.' : 'O logcat do app aparecerá aqui (Log.*, System.out/err, exceções).'; out.append(empty); }
+    if (!visible.length) { const empty = document.createElement('div'); empty.className = 'logcat-empty'; empty.textContent = waiting ? 'Loading the recent lines…' : store.entries.length ? 'No line matches the filter.' : 'The app\'s logcat will appear here (Log.*, System.out/err, exceptions).'; out.append(empty); }
   };
   const renderNew = () => {
     timer = null; if (!live()) return;
@@ -82,7 +83,9 @@ export function createLogcatPanel({ root, getPackage = () => 'app', save = downl
     while (out.childElementCount > RENDER_MAX) out.firstElementChild.remove();
     updateCount(); scroll();
   };
-  const schedule = () => { if (timer === null) timer = setTimeout(renderNew, 60); };
+  // while the person selects text in the list, new lines wait (appending and trimming rows and the scroll to the newest would move or drop the selection)
+  const hold = createReadingHold(out);
+  const schedule = () => { if (timer !== null) return; if (hold.busy()) { hold.onRelease(schedule); return; } timer = setTimeout(() => { if (hold.busy()) { timer = null; hold.onRelease(schedule); return; } renderNew(); }, 60); };
   filterInput.addEventListener('input', renderAll); levelSelect.addEventListener('change', renderAll);
   out.addEventListener('scroll', () => { auto.checked = out.scrollHeight - out.scrollTop - out.clientHeight < 24; });   // scrolling up pauses, reaching the bottom resumes
   auto.addEventListener('change', scroll);

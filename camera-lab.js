@@ -5,16 +5,16 @@
 // message per frame (no pixels) and answers with an ack; a new frame is only sent after the previous one was acknowledged. Pixels cross to the Worker only for ImageReader targets:
 // one RGBA buffer per frame at the reader's size (read back from a small 2D canvas, transferred, not copied), and one buffer once for a still capture. A stream that only an encoder
 // consumes (a recording) crosses as a VideoFrame of that canvas: no readback, and the Worker's encoder takes it as it is.
-import { createCameraSource } from './camera-source.js?v=ca92aaad0948';
-import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=ca92aaad0948';
-import { probeWebCodecs } from './media-codec-backend.js?v=ca92aaad0948';
-import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=ca92aaad0948';
+import { createCameraSource } from './camera-source.js?v=d422379a2a38';
+import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=d422379a2a38';
+import { probeWebCodecs } from './media-codec-backend.js?v=d422379a2a38';
+import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=d422379a2a38';
 
 const FRAME_MS = 1000 / 30, MONITOR_MS = 200, ACK_TIMEOUT_MS = 1500;
 const CAPTURE_SIZE = { width: 960, height: 1280 };   // the upright picture the system camera screen takes (3:4)
 const VIDEO_CAPTURE = { width: 720, height: 960, bitrate: 6000000, frameRate: 30 };   // the upright video the system camera screen records (3:4, H.264 in MP4)
 const clock = ms => `${String(Math.floor(ms / 60000)).padStart(2, '0')}:${String(Math.floor(ms / 1000) % 60).padStart(2, '0')}`;
-const facingName = camera => (camera.facing === LENS_FACING_FRONT ? 'frontal' : 'traseira');
+const facingName = camera => (camera.facing === LENS_FACING_FRONT ? 'front' : 'rear');
 
 export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
   const S = { attached: false, codecs: null, opened: new Set(), streams: new Map(), surfaces: new Set(), capture: null, timer: null, lastTick: 0, lastMonitor: 0, seq: 0, readers: new Map(),
@@ -28,22 +28,22 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
   const sectionOpen = () => !!$('cp-sec-camera')?.open;
   function statusText() {
     const parts = [];
-    if (!S.attached) parts.push('Nenhum APK aberto: o dispositivo ganha as câmeras 0 (traseira) e 1 (frontal) quando um APK é aberto.');
-    else if (!S.opened.size) parts.push('Nenhum app com a câmera aberta: nenhum quadro é gerado para a VM.');
+    if (!S.attached) parts.push('No APK is open: the device gets cameras 0 (rear) and 1 (front) when an APK is opened.');
+    else if (!S.opened.size) parts.push('No app has the camera open: no frame is generated for the VM.');
     else for (const id of S.opened) {
-      const camera = cameraById(id), stream = S.streams.get(id), sizes = wanted => (stream?.buffers ?? []).filter(b => !!b.video === wanted).map(b => `${b.width}×${b.height}`).join(' e ');
-      const pixels = `${sizes(false) ? `, ${sizes(false)} em pixels para o app` : ''}${sizes(true) ? `, ${sizes(true)} para o codificador de vídeo (gravação)` : ''}` || ', prévia desenhada pela página (sem pixels para a VM)';
-      parts.push(`Câmera ${id} (${camera ? facingName(camera) : '?'}) aberta pelo app${stream?.active ? `: ${S.stats.fps.toFixed(0)} quadros/s${pixels}` : ', sem pedido de captura ativo'}.`);
+      const camera = cameraById(id), stream = S.streams.get(id), sizes = wanted => (stream?.buffers ?? []).filter(b => !!b.video === wanted).map(b => `${b.width}×${b.height}`).join(' and ');
+      const pixels = `${sizes(false) ? `, ${sizes(false)} in pixels for the app` : ''}${sizes(true) ? `, ${sizes(true)} for the video encoder (recording)` : ''}` || ', preview drawn by the page (no pixels for the VM)';
+      parts.push(`Camera ${id} (${camera ? facingName(camera) : '?'}) opened by the app${stream?.active ? `: ${S.stats.fps.toFixed(0)} frames/s${pixels}` : ', no active capture request'}.`);
     }
-    if (S.stats.pixelFrames) parts.push(`Custo medido na página: ${(S.stats.readbackMs / S.stats.pixelFrames).toFixed(2)} ms por quadro com pixels (${(S.stats.pixelBytes / S.stats.pixelFrames / 1024).toFixed(0)} KiB transferidos sem cópia).`);
+    if (S.stats.pixelFrames) parts.push(`Cost measured on the page: ${(S.stats.readbackMs / S.stats.pixelFrames).toFixed(2)} ms per frame with pixels (${(S.stats.pixelBytes / S.stats.pixelFrames / 1024).toFixed(0)} KiB transferred without a copy).`);
     return parts.join(' ');
   }
   function renderPanel() {
     const select = $('cam-source'); if (!select) return;
     if (documentRef.activeElement !== select) select.value = source.kind;
-    $('cam-summary').textContent = { pattern: 'padrão de teste', webcam: 'webcam', image: 'imagem', video: 'vídeo' }[source.kind];
-    $('cam-label').textContent = source.kind === 'pattern' ? 'Padrão de teste gerado pela página: barras, relógio e contador de quadros.' : `${source.kind === 'webcam' ? 'Webcam' : source.kind === 'image' ? 'Imagem' : 'Vídeo'}: ${source.label}${source.size ? ` (${source.size.width}×${source.size.height})` : ''}`;
-    const error = $('cam-error'); error.textContent = source.error ? `Fonte não trocada: ${source.error}.` : ''; error.hidden = !source.error;
+    $('cam-summary').textContent = { pattern: 'test pattern', webcam: 'webcam', image: 'image', video: 'video' }[source.kind];
+    $('cam-label').textContent = source.kind === 'pattern' ? 'Test pattern generated by the page: bars, clock and frame counter.' : `${source.kind === 'webcam' ? 'Webcam' : source.kind === 'image' ? 'Image' : 'Video'}: ${source.label}${source.size ? ` (${source.size.width}×${source.size.height})` : ''}`;
+    const error = $('cam-error'); error.textContent = source.error ? `Source not changed: ${source.error}.` : ''; error.hidden = !source.error;
     $('cam-status').textContent = statusText();
   }
   function chooseFile(kind) {
@@ -77,7 +77,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     element.style.overflow = 'hidden'; element.style.maxWidth = 'none';   // a TextureView may be larger than its parent and scaled down by View transforms (PreviewView does that): its box is the View's, never clamped
     if (info.kind === 'surface' && info.ready && !element.style.backgroundColor) element.style.backgroundColor = '#000';   // a SurfaceView's surface is opaque black until something is queued to it
     const m = info.transform; canvas.style.transform = m ? `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})` : '';
-    element.setAttribute('aria-label', info.stream ? 'Prévia da câmera' : 'Superfície de câmera (sem imagem)'); element.setAttribute('role', 'img');
+    element.setAttribute('aria-label', info.stream ? 'Camera preview' : 'Camera surface (no image)'); element.setAttribute('role', 'img');
     const first = !element._cameraInfo; element._cameraInfo = info; S.surfaces.add(element);
     if (info.stream && (first || info.shots !== canvas._shots)) { canvas._shots = info.shots; drawSurface(element); }
     wake();
@@ -151,8 +151,8 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
   function captureElements() {
     let root = $('camera-capture');
     if (!root) {
-      root = documentRef.createElement('div'); root.id = 'camera-capture'; root.className = 'cam-ui'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Câmera do dispositivo');
-      root.innerHTML = '<canvas class="cam-ui-view" aria-label="Imagem da câmera"></canvas><p class="cam-ui-note" role="status"></p><div class="cam-ui-bar"><button type="button" class="cam-ui-side cam-ui-cancel">Cancelar</button><button type="button" class="cam-ui-shutter" aria-label="Tirar foto"></button><button type="button" class="cam-ui-side cam-ui-accept" hidden>Usar foto</button></div>';
+      root = documentRef.createElement('div'); root.id = 'camera-capture'; root.className = 'cam-ui'; root.hidden = true; root.setAttribute('role', 'dialog'); root.setAttribute('aria-modal', 'true'); root.setAttribute('aria-label', 'Device camera');
+      root.innerHTML = '<canvas class="cam-ui-view" aria-label="Camera image"></canvas><p class="cam-ui-note" role="status"></p><div class="cam-ui-bar"><button type="button" class="cam-ui-side cam-ui-cancel">Cancel</button><button type="button" class="cam-ui-shutter" aria-label="Take photo"></button><button type="button" class="cam-ui-side cam-ui-accept" hidden>Use photo</button></div>';
       $('android-screen').append(root);
     }
     return { root, view: root.querySelector('.cam-ui-view'), note: root.querySelector('.cam-ui-note'), cancel: root.querySelector('.cam-ui-cancel'), shutter: root.querySelector('.cam-ui-shutter'), accept: root.querySelector('.cam-ui-accept') };
@@ -165,15 +165,15 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     const video = request.mode === 'video', size = video ? VIDEO_CAPTURE : CAPTURE_SIZE;
     S.capture = { id: request.id, stage: 'live', video, limitMs: video && request.durationLimit > 0 ? request.durationLimit * 1000 : 0, recording: null, movie: null, inertBefore: { content: content.inert, layer: layer.inert }, focusBack: documentRef.activeElement };
     ui.view.width = size.width; ui.view.height = size.height; content.inert = true; layer.inert = true;
-    ui.root.setAttribute('aria-label', video ? 'Câmera do dispositivo: gravação de vídeo' : 'Câmera do dispositivo'); ui.accept.textContent = video ? 'Usar vídeo' : 'Usar foto';
+    ui.root.setAttribute('aria-label', video ? 'Device camera: video recording' : 'Device camera'); ui.accept.textContent = video ? 'Use video' : 'Use photo';
     const setStage = (stage, problem = '') => {
       const capture = S.capture; capture.stage = stage; ui.accept.hidden = stage !== 'review'; ui.shutter.classList.toggle('review', stage === 'review'); ui.shutter.disabled = stage === 'finishing'; ui.cancel.disabled = stage === 'finishing';
-      const origin = `Câmera do dispositivo virtual · ${source.kind === 'pattern' ? 'padrão de teste' : source.label}`;
-      if (!video) { ui.shutter.setAttribute('aria-label', stage === 'review' ? 'Tirar outra foto' : 'Tirar foto'); ui.note.textContent = stage === 'review' ? 'Foto tirada. Use esta foto ou tire outra.' : origin; }
+      const origin = `Virtual device camera · ${source.kind === 'pattern' ? 'test pattern' : source.label}`;
+      if (!video) { ui.shutter.setAttribute('aria-label', stage === 'review' ? 'Take another photo' : 'Take photo'); ui.note.textContent = stage === 'review' ? 'Photo taken. Use this photo or take another.' : origin; }
       else {
-        ui.shutter.setAttribute('aria-label', stage === 'recording' ? 'Parar gravação' : stage === 'review' ? 'Gravar outro vídeo' : 'Gravar vídeo');
+        ui.shutter.setAttribute('aria-label', stage === 'recording' ? 'Stop recording' : stage === 'review' ? 'Record another video' : 'Record video');
         ui.shutter.style.backgroundColor = stage === 'review' ? '' : '#e53935'; ui.shutter.style.borderRadius = stage === 'recording' ? '18px' : '';   // a red disc records, a red square stops
-        ui.note.textContent = problem || (stage === 'recording' ? `Gravando · ${clock(0)}` : stage === 'finishing' ? 'Finalizando o vídeo…' : stage === 'review' ? `Vídeo gravado (${(capture.movie.durationMs / 1000).toFixed(1).replace('.', ',')} s, ${Math.round(capture.movie.bytes.length / 1024)} KiB). Use este vídeo ou grave outro.` : `${origin} · vídeo${capture.limitMs ? ` de até ${capture.limitMs / 1000} s` : ''}`);
+        ui.note.textContent = problem || (stage === 'recording' ? `Recording · ${clock(0)}` : stage === 'finishing' ? 'Finishing the video…' : stage === 'review' ? `Video recorded (${(capture.movie.durationMs / 1000).toFixed(1)} s, ${Math.round(capture.movie.bytes.length / 1024)} KiB). Use this video or record another.` : `${origin} · video${capture.limitMs ? ` of up to ${capture.limitMs / 1000} s` : ''}`);
       }
       if (stage === 'live' || stage === 'recording') wake(); if (stage !== 'finishing') (stage === 'review' ? ui.accept : ui.shutter).focus();
     };
@@ -191,14 +191,14 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
   }
   // ---- the camera screen's recorder: the frames of its own canvas through the page's encoder into an MP4 held in memory ------------------------------------------------------
   function startRecording() {
-    const capture = S.capture, ui = captureElements(), codecs = S.codecs; if (!capture || !codecs) { capture?.setStage('live', 'Este navegador não tem um codificador de vídeo H.264 (WebCodecs).'); return; }
+    const capture = S.capture, ui = captureElements(), codecs = S.codecs; if (!capture || !codecs) { capture?.setStage('live', 'This browser has no H.264 video encoder (WebCodecs).'); return; }
     const pieces = [], writer = createMp4Writer({ width: ui.view.width, height: ui.view.height, rotation: 0, write: (data, position) => pieces.push({ data: data.slice(), position }) });
     const recording = capture.recording = { writer, pieces, handle: null, startedAt: null, lastKeyUs: -Infinity, lastUs: -1, error: null };
     try {
       recording.handle = codecs.createVideoEncoder({ width: ui.view.width, height: ui.view.height, bitrate: VIDEO_CAPTURE.bitrate, frameRate: VIDEO_CAPTURE.frameRate, profile: codecs.videoEncoders[0].profiles[0] }, {
         output: chunk => { try { writer.addSample(splitAnnexB(chunk.data), { key: chunk.key, timestampUs: chunk.timestampUs }); } catch (error) { recording.error ??= error; } },
         error: message => { recording.error ??= new Error(message); } });
-    } catch (error) { capture.recording = null; capture.setStage('live', `O codificador de vídeo não iniciou: ${String(error?.message ?? error)}`); return; }
+    } catch (error) { capture.recording = null; capture.setStage('live', `The video encoder did not start: ${String(error?.message ?? error)}`); return; }
     capture.setStage('recording');
   }
   /** One frame of the camera screen into the recording: what is on its canvas now, stamped with the time since the recording began. */
@@ -209,7 +209,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     if (key) recording.lastKeyUs = timestampUs; recording.lastUs = timestampUs;
     const ui = captureElements();
     try { recording.handle.encode({ frame: new VideoFrame(ui.view, { timestamp: timestampUs }), timestampUs, key }); } catch (error) { recording.error ??= error; }
-    ui.note.textContent = `Gravando · ${clock(elapsed)}${capture.limitMs ? ` de ${clock(capture.limitMs)}` : ''}`;
+    ui.note.textContent = `Recording · ${clock(elapsed)}${capture.limitMs ? ` of ${clock(capture.limitMs)}` : ''}`;
     if (capture.limitMs && elapsed >= capture.limitMs) stopRecording();   // MediaStore.EXTRA_DURATION_LIMIT
   }
   async function stopRecording() {
@@ -220,7 +220,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
       recording.writer.finish();
       const bytes = new Uint8Array(recording.writer.size); for (const piece of recording.pieces) bytes.set(piece.data, piece.position);
       capture.movie = { bytes, durationMs: recording.writer.durationUs / 1000 };
-    } catch (error) { problem = `A gravação falhou: ${String(error?.message ?? error)}`; }
+    } catch (error) { problem = `The recording failed: ${String(error?.message ?? error)}`; }
     try { recording.handle.close(); } catch { /* already closed */ }
     if (S.capture !== capture) return;   // cancelled meanwhile
     capture.recording = null; capture.setStage(capture.movie ? 'review' : 'live', problem);
@@ -232,7 +232,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     if (accepted && capture.video) { if (capture.movie) { const video = capture.movie.bytes.buffer; message = { op: 'capture-result', id: capture.id, ok: true, video }; transfer = [video]; } }
     else if (accepted) {
       try {
-        const blob = await new Promise((resolve, reject) => ui.view.toBlob(value => (value ? resolve(value) : reject(new Error('o navegador não codificou o JPEG'))), 'image/jpeg', 0.92));
+        const blob = await new Promise((resolve, reject) => ui.view.toBlob(value => (value ? resolve(value) : reject(new Error('the browser did not encode the JPEG'))), 'image/jpeg', 0.92));
         const jpeg = await blob.arrayBuffer(), size = inlineThumbnailSize(ui.view.width, ui.view.height), small = Object.assign(documentRef.createElement('canvas'), size), ctx = small.getContext('2d', { willReadFrequently: true });
         ctx.drawImage(ui.view, 0, 0, size.width, size.height);
         const thumb = { ...size, data: ctx.getImageData(0, 0, size.width, size.height).data.buffer };

@@ -1,4 +1,4 @@
-// Experimental GPU replay of display rasters ("Renderização: GPU (experimental)" in Controles › Execução, player config `renderer: 'gpu'`).
+// Experimental GPU replay of display rasters ("Rendering: GPU (experimental)" in Controles › Execução, player config `renderer: 'gpu'`).
 //
 // The CPU path (the default) is untouched: with renderer 'cpu' nothing in this module is created and the content rasters keep `{ transport: 'rgba' }`
 // (src/skia-canvas-host.js, src/raster-cache.js). With renderer 'gpu' the Worker creates one WebGL context on an OffscreenCanvas with the pinned CanvasKit
@@ -32,16 +32,16 @@ export class GpuRasterError extends Error {
  * `createCanvas` is injectable (tests); the default needs a real OffscreenCanvas with WebGL (a browser Worker).
  */
 export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
-  if (!CK || typeof CK.GetWebGLContext !== 'function' || typeof CK.MakeWebGLContext !== 'function' || typeof CK.MakeOnScreenGLSurface !== 'function' || typeof CK.MakeRenderTarget !== 'function') throw new GpuRasterError('esta versão do CanvasKit não tem o backend WebGL');
-  if (!createCanvas && typeof OffscreenCanvas === 'undefined') throw new GpuRasterError('OffscreenCanvas indisponível no Worker');
+  if (!CK || typeof CK.GetWebGLContext !== 'function' || typeof CK.MakeWebGLContext !== 'function' || typeof CK.MakeOnScreenGLSurface !== 'function' || typeof CK.MakeRenderTarget !== 'function') throw new GpuRasterError('this CanvasKit version has no WebGL backend');
+  if (!createCanvas && typeof OffscreenCanvas === 'undefined') throw new GpuRasterError('OffscreenCanvas unavailable in the Worker');
   let canvas;
-  try { canvas = createCanvas ? createCanvas(1, 1) : new OffscreenCanvas(1, 1); } catch (error) { throw new GpuRasterError('OffscreenCanvas indisponível no Worker', error); }
-  if (!canvas || typeof canvas.transferToImageBitmap !== 'function') throw new GpuRasterError('OffscreenCanvas sem transferToImageBitmap');
+  try { canvas = createCanvas ? createCanvas(1, 1) : new OffscreenCanvas(1, 1); } catch (error) { throw new GpuRasterError('OffscreenCanvas unavailable in the Worker', error); }
+  if (!canvas || typeof canvas.transferToImageBitmap !== 'function') throw new GpuRasterError('OffscreenCanvas without transferToImageBitmap');
   let lost = false; canvas.addEventListener?.('webglcontextlost', event => { lost = true; event.preventDefault?.(); });
   let handle;
-  try { handle = CK.GetWebGLContext(canvas, { antialias: 0, depth: 0, stencil: 8, alpha: 1, premultipliedAlpha: 1, preserveDrawingBuffer: 0 }); } catch (error) { throw new GpuRasterError('WebGL indisponível no Worker', error); }
-  if (!handle || handle < 0) throw new GpuRasterError('WebGL indisponível no Worker (o contexto não foi criado)');
-  const gr = CK.MakeWebGLContext(handle); if (!gr) throw new GpuRasterError('o Skia não criou o contexto GPU (GrDirectContext)');
+  try { handle = CK.GetWebGLContext(canvas, { antialias: 0, depth: 0, stencil: 8, alpha: 1, premultipliedAlpha: 1, preserveDrawingBuffer: 0 }); } catch (error) { throw new GpuRasterError('WebGL unavailable in the Worker', error); }
+  if (!handle || handle < 0) throw new GpuRasterError('WebGL unavailable in the Worker (the context was not created)');
+  const gr = CK.MakeWebGLContext(handle); if (!gr) throw new GpuRasterError('Skia did not create the GPU context (GrDirectContext)');
   // The GL context CanvasKit created on the canvas (getContext of the same type returns it); used only for the renderer name and the lost check.
   let gl = null; try { gl = canvas.getContext?.('webgl2') ?? null; } catch { gl = null; } if (!gl) { try { gl = canvas.getContext?.('webgl') ?? null; } catch { gl = null; } }
   const info = { api: gl && typeof WebGL2RenderingContext !== 'undefined' && gl instanceof WebGL2RenderingContext ? 'WebGL2' : 'WebGL', renderer: null };
@@ -59,9 +59,9 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
     /** `offscreen`: a GPU render target (a texture Skia recycles through its resource cache) for a raster read back on the Worker (Drawable layer PNGs), so those
      *  never resize the canvas whose drawing buffer the content frames are transferred from. */
     begin(w, h, offscreen = false) {
-      if (disposed) throw new GpuRasterError('o contexto GPU foi descartado');
+      if (disposed) throw new GpuRasterError('the GPU context was disposed');
       if (this.isLost()) throw new GpuRasterError('contexto WebGL perdido');
-      if (offscreen) { const target = CK.MakeRenderTarget(gr, w, h); if (!target) throw new GpuRasterError(`o Skia não criou a textura GPU (${w}×${h})`); return target; }
+      if (offscreen) { const target = CK.MakeRenderTarget(gr, w, h); if (!target) throw new GpuRasterError(`Skia did not create the GPU texture (${w}×${h})`); return target; }
       if (w !== width || h !== height) { canvas.width = w; canvas.height = h; width = w; height = h; dropScreen(); }
       // One Skia surface on the drawing buffer (a wrapper of the default framebuffer) while the size stays: making it again every frame queried the GL state
       // (getParameter, synchronous) each time. The replay draws inside a save of its own, so restoring to the base count gives the next frame the fresh surface's
@@ -72,7 +72,7 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
       }
       if (screen === null) {
         screen = CK.MakeOnScreenGLSurface(gr, w, h, CK.ColorSpace.SRGB);
-        if (!screen) throw new GpuRasterError(`o Skia não criou a superfície GPU (${w}×${h})`);
+        if (!screen) throw new GpuRasterError(`Skia did not create the GPU surface (${w}×${h})`);
         screenBase = screen.getCanvas().getSaveCount();
       }
       screen.getCanvas().save();
@@ -82,8 +82,8 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
     finish(target) {
       target.flush();
       let bitmap;
-      try { bitmap = canvas.transferToImageBitmap(); } catch (error) { throw new GpuRasterError('a transferência do quadro da GPU falhou', error); }
-      if (!bitmap || bitmap.width !== width || bitmap.height !== height) { try { bitmap?.close?.(); } catch { /* closing */ } throw new GpuRasterError('a transferência do quadro da GPU devolveu um bitmap inválido'); }
+      try { bitmap = canvas.transferToImageBitmap(); } catch (error) { throw new GpuRasterError('the transfer of the GPU frame failed', error); }
+      if (!bitmap || bitmap.width !== width || bitmap.height !== height) { try { bitmap?.close?.(); } catch { /* closing */ } throw new GpuRasterError('the transfer of the GPU frame returned an invalid bitmap'); }
       if (this.isLost()) { try { bitmap.close?.(); } catch { /* closing */ } throw new GpuRasterError('contexto WebGL perdido'); }
       frames++; return bitmap;
     },
@@ -122,7 +122,7 @@ export class GpuRasterController {
     else if (this.active !== 'gpu') {
       this.reason = null; this.slowRun = 0;
       try { this.engine = this.createEngine(this.CanvasKit); this.active = 'gpu'; }
-      catch (error) { this.engine = null; this.active = 'cpu'; this.reason = error instanceof GpuRasterError ? error.reason : `falha ao iniciar a GPU: ${String(error?.message ?? error).slice(0, 160)}`; this.stats.fallbacks++; this.onFallback?.(this.reason); }
+      catch (error) { this.engine = null; this.active = 'cpu'; this.reason = error instanceof GpuRasterError ? error.reason : `failed to start the GPU: ${String(error?.message ?? error).slice(0, 160)}`; this.stats.fallbacks++; this.onFallback?.(this.reason); }
     }
     if (runtime) { this.apply(runtime); if (before !== this.active) dropBackendRasters(runtime, before); }
     return this.status();
@@ -130,14 +130,14 @@ export class GpuRasterController {
   /** Switch the session to CPU for good (until the user selects GPU again): the engine is released and the reason is kept for the UI and the report. */
   fallback(reason, runtime = null) {
     if (this.active !== 'gpu') return;
-    this.active = 'cpu'; this.reason = String(reason || 'erro desconhecido').slice(0, 240); this.stats.fallbacks++; this.dispose();
+    this.active = 'cpu'; this.reason = String(reason || 'unknown error').slice(0, 240); this.stats.fallbacks++; this.dispose();
     if (runtime) { this.apply(runtime); dropBackendRasters(runtime, 'gpu'); }
     this.onFallback?.(this.reason);
   }
   /** One GPU frame took `ms` (replay + flush + transfer): SLOW_FRAMES frames in a row slower than SLOW_FRAME_MS mean the GPU path is worse than the CPU. */
   noteFrame(ms, runtime = null) {
     this.stats.frames++; this.stats.ms += ms; if (ms > this.stats.maxMs) this.stats.maxMs = ms;
-    if (ms > this.slowFrameMs) { if (++this.slowRun >= this.slowFrames) this.fallback(`${this.slowFrames} quadros seguidos acima de ${this.slowFrameMs} ms na GPU`, runtime); }
+    if (ms > this.slowFrameMs) { if (++this.slowRun >= this.slowFrames) this.fallback(`${this.slowFrames} consecutive frames above ${this.slowFrameMs} ms on the GPU`, runtime); }
     else this.slowRun = 0;
   }
   dispose() { const engine = this.engine; this.engine = null; try { engine?.dispose(); } catch { /* lost context */ } }

@@ -55,15 +55,15 @@ for (const block of document.querySelectorAll('.code')) {
   const text = code.textContent.replace(/\n$/, ''), name = block.dataset.name ?? '', grammar = grammarOf(text);
   try { colour(code, grammar); } catch { /* the block stays plain */ }
   const bar = document.createElement('div'), label = document.createElement('span'), copy = document.createElement('button');
-  bar.className = 'code-bar'; label.className = 'code-name'; label.textContent = name || LABELS[grammar] || 'Código';
-  copy.type = 'button'; copy.className = 'copy'; copy.textContent = 'Copiar'; copy.setAttribute('aria-label', `Copiar o código${name ? ': ' + name : ''}`);
+  bar.className = 'code-bar'; label.className = 'code-name'; label.textContent = name || LABELS[grammar] || 'Code';
+  copy.type = 'button'; copy.className = 'copy'; copy.textContent = 'Copy'; copy.setAttribute('aria-label', `Copy the code${name ? ': ' + name : ''}`);
   copy.addEventListener('click', async () => {
     const done = await copyText(text);
-    copy.textContent = done ? 'Copiado' : 'Selecione e copie'; if (done) copy.dataset.done = '';
-    setTimeout(() => { copy.textContent = 'Copiar'; delete copy.dataset.done; }, 1800);
+    copy.textContent = done ? 'Copied' : 'Select and copy'; if (done) copy.dataset.done = '';
+    setTimeout(() => { copy.textContent = 'Copy'; delete copy.dataset.done; }, 1800);
   });
   bar.append(label, copy); block.prepend(bar); block.classList.add('has-bar');
-  if (pre.scrollWidth > pre.clientWidth + 1 || pre.scrollHeight > pre.clientHeight + 1) { pre.tabIndex = 0; pre.setAttribute('role', 'region'); pre.setAttribute('aria-label', name ? `Código: ${name}` : 'Código'); }   // a scrollable region must be reachable by keyboard
+  if (pre.scrollWidth > pre.clientWidth + 1 || pre.scrollHeight > pre.clientHeight + 1) { pre.tabIndex = 0; pre.setAttribute('role', 'region'); pre.setAttribute('aria-label', name ? `Code: ${name}` : 'Code'); }   // a scrollable region must be reachable by keyboard
   if (pre.scrollHeight > pre.clientHeight + 24) {
     const expand = document.createElement('button'); expand.type = 'button'; expand.className = 'expand'; expand.textContent = 'Expandir'; expand.setAttribute('aria-expanded', 'false');
     expand.addEventListener('click', () => {
@@ -74,7 +74,7 @@ for (const block of document.querySelectorAll('.code')) {
     block.classList.add('is-long'); bar.insertBefore(expand, copy);
   }
 }
-for (const box of document.querySelectorAll('.table-scroll, .table-wrap, .diagram-box')) if (box.scrollWidth > box.clientWidth + 1) { box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', box.classList.contains('diagram-box') ? 'Diagrama (rolável)' : 'Tabela (rolável)'); }
+for (const box of document.querySelectorAll('.table-scroll, .table-wrap, .diagram-box')) if (box.scrollWidth > box.clientWidth + 1) { box.tabIndex = 0; box.setAttribute('role', 'region'); box.setAttribute('aria-label', box.classList.contains('diagram-box') ? 'Diagram (scrollable)' : 'Table (scrollable)'); }
 
 // --- Diagrams ------------------------------------------------------------------------------------------------------------------------------------------------
 const figures = [...document.querySelectorAll('figure.diagram')];
@@ -87,7 +87,7 @@ for (const button of document.querySelectorAll('.motion-control')) {
   if (!anim) continue;
   button.addEventListener('click', () => {
     const paused = anim.classList.toggle('paused');
-    button.textContent = paused ? 'Retomar animação' : 'Pausar animação';
+    button.textContent = paused ? 'Resume animation' : 'Pause animation';
     button.setAttribute('aria-pressed', String(paused));
   });
 }
@@ -96,7 +96,7 @@ for (const button of document.querySelectorAll('.motion-control')) {
 for (const heading of document.querySelectorAll('.doc h2, .doc h3:not(.api-sig), .doc .api-sig')) {
   const id = heading.classList.contains('api-sig') ? heading.parentElement.id : (heading.matches('h2') && heading.closest('section')?.id) || heading.id;
   if (!id || heading.closest('.lane')) continue;
-  const link = document.createElement('a'); link.className = 'heading-link'; link.href = '#' + id; link.textContent = '#'; link.setAttribute('aria-label', 'Link para esta seção');
+  const link = document.createElement('a'); link.className = 'heading-link'; link.href = '#' + id; link.textContent = '#'; link.setAttribute('aria-label', 'Link to this section');
   heading.append(link);
 }
 
@@ -105,7 +105,7 @@ const toc = document.querySelector('.toc');
 if (toc) {
   const links = [...toc.querySelectorAll('a[href^="#"]')], entries = links.map(link => ({ link, target: document.getElementById(decodeURIComponent(link.hash.slice(1))) })).filter(entry => entry.target);
   const body = toc.querySelector('.toc-body') ?? toc, toggle = document.createElement('button'), now = document.createElement('span');
-  toggle.type = 'button'; toggle.className = 'toc-toggle'; toggle.setAttribute('aria-expanded', 'false'); toggle.append('Nesta página', now); now.className = 'toc-now';
+  toggle.type = 'button'; toggle.className = 'toc-toggle'; toggle.setAttribute('aria-expanded', 'false'); toggle.append('On this page', now); now.className = 'toc-now';
   if (!body.id) body.id = 'toc-body'; toggle.setAttribute('aria-controls', body.id);
   toc.insertBefore(toggle, body);
   const setExpanded = open => { toc.classList.toggle('is-expanded', open); toggle.setAttribute('aria-expanded', String(open)); };

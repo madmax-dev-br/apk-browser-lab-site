@@ -1,155 +1,155 @@
 # APK Browser Lab
 
-**Rode um APK Android dentro de uma aba do navegador.** Sem emulador, sem instalar nada, sem enviar o arquivo para lugar nenhum: o `.apk` é aberto na própria página, o código dele roda numa máquina virtual feita para a web, e a tela do app aparece ali, respondendo ao seu toque.
+**Run an Android APK inside a browser tab.** No emulator, nothing to install, and the file is never sent anywhere: the `.apk` is opened in the page itself, its code runs in a virtual machine built for the web, and the app's screen appears right there, responding to your touch.
 
-### [▶ Abrir o laboratório](https://madmax-dev-br.github.io/apk-browser-lab-site/)
+### [▶ Open the lab](https://madmax-dev-br.github.io/apk-browser-lab-site/)
 
-[![O laboratório abrindo um app Compose: o app inicia, os filtros respondem ao toque e a busca filtra a lista](readme/demo.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
+[![The lab opening a Compose app: the app starts, the filters respond to touch and the search filters the list](readme/demo.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
 
-<sub>Um app Jetpack Compose (Material 3) rodando na página: toques de verdade, teclado de verdade, nada pré-gravado pelo app.</sub>
+<sub>A Jetpack Compose (Material 3) app running in the page: real touches, real keyboard, nothing pre-recorded by the app.</sub>
 
-## Por que isso é interessante
+## Why this is interesting
 
-- **O APK roda como está.** Não é recompilado e não precisa do código-fonte. O bytecode DEX que está no arquivo é o que executa.
-- **O Android por baixo é o original.** O framework é o código do AOSP 13 compilado da fonte; Skia, ICU e SQLite rodam em WebAssembly. A meta é o comportamento de um aparelho, não uma imitação.
-- **Tudo acontece no seu navegador.** Não há servidor de execução. O arquivo não sai da sua máquina.
-- **Quando falta algo, o lab diz o quê.** Uma API do Android que ainda não existe aqui falha com o nome exato dela, em vez de fingir que funcionou.
-- **Dá para automatizar.** Plugins em JavaScript leem o app por dentro, e um agente de IA (Claude Code, Cursor, Codex) dirige a página por MCP, inclusive com os comandos `adb` que você já usa num emulador.
+- **The APK runs as is.** It is not recompiled and does not need the source code. The DEX bytecode in the file is what executes.
+- **The Android underneath is the original.** The framework is the AOSP 13 code compiled from source; Skia, ICU and SQLite run in WebAssembly. The goal is the behavior of a device, not an imitation.
+- **Everything happens in your browser.** There is no execution server. The file never leaves your machine.
+- **When something is missing, the lab tells you what.** An Android API that does not exist here yet fails with its exact name, instead of pretending it worked.
+- **You can automate it.** JavaScript plugins read the app from the inside, and an AI agent (Claude Code, Cursor, Codex) drives the page over MCP, including with the `adb` commands you already use with an emulator.
 
-## Experimente em um minuto
+## Try it in one minute
 
-1. Abra **<https://madmax-dev-br.github.io/apk-browser-lab-site/>** num navegador recente.
-2. Arraste um `.apk` para a página (até 1 GiB).
-3. O app é instalado na tela inicial do aparelho virtual e abre. Toque, digite, role, volte.
+1. Open **<https://madmax-dev-br.github.io/apk-browser-lab-site/>** in a recent browser.
+2. Drag an `.apk` onto the page (up to 1 GiB).
+3. The app is installed on the virtual device's home screen and opens. Tap, type, scroll, go back.
 
-O site não traz APKs prontos: você usa o seu. Os apps das imagens desta página são os de exemplo do próprio projeto, feitos para testar o laboratório.
+The site does not ship ready-made APKs: you use your own. The apps in the images on this page are the project's own sample apps, made to test the lab.
 
-![A página do laboratório: à esquerda o APK aberto, o pacote e os controles do aparelho; à direita o app rodando no aparelho virtual](readme/lab.png)
+![The lab page: on the left the opened APK, the package and the device controls; on the right the app running on the virtual device](readme/lab.png)
 
-## O que já roda
+## What already runs
 
-Interfaces em Jetpack Compose e em Views/XML, Fragments, navegação entre telas e entre Activities, listas longas com imagens, formulários, diálogos, SharedPreferences, SQLite, rede sobre `fetch`, threads, `Handler`/`Looper` e corrotinas.
+UIs in Jetpack Compose and in Views/XML, Fragments, navigation between screens and between Activities, long lists with images, forms, dialogs, SharedPreferences, SQLite, networking over `fetch`, threads, `Handler`/`Looper` and coroutines.
 
-![Quatro apps de exemplo do projeto rodando no laboratório: dois em Compose Material 3, um em Views com Fragments e um com listas pesadas de imagens](readme/exemplos.png)
+![Four of the project's sample apps running in the lab: two in Compose Material 3, one in Views with Fragments and one with heavy image lists](readme/exemplos.png)
 
-<sub>Apps de exemplo do projeto: Compose com estado, Navigation Compose, Views com Fragments e uma lista pesada com imagens.</sub>
+<sub>The project's sample apps: Compose with state, Navigation Compose, Views with Fragments and a heavy list with images.</sub>
 
-### Um app do tamanho de um app de produção
+### An app the size of a production app
 
-[![O app de exemplo grande rodando no laboratório: abre, rola a tela inicial e passa pelas abas Feed, Grade, Chat, Painel, Views e Diagnóstico](readme/app-grande.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
+[![The large sample app running in the lab: it opens, scrolls the home screen and goes through the Feed, Grade, Chat, Painel, Views and Diagnóstico tabs](readme/app-grande.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
 
-<sub>O exemplo "App grande" na página, em tempo real: toques e rolagens de verdade, do arquivo até a última aba.</sub>
+<sub>The "App grande" ("Large app") example in the page, in real time: real touches and scrolls, from the file to the last tab.</sub>
 
-O maior exemplo do projeto tem o porte de um app Compose de produção: **17 arquivos DEX com cerca de 250 mil métodos**, com Compose e Material 3, Navigation, Room, Koin, kotlinx.serialization, DataStore, WorkManager, Coil, Lottie e Views clássicas. Na abertura, o próprio código do app monta um grafo Koin de 1,7 mil definições, lê catálogos JSON e cria um banco Room com 6,6 mil linhas. Depois disso, tudo continua rodando ao mesmo tempo:
+The project's largest example is the size of a production Compose app: **17 DEX files with about 250 thousand methods**, with Compose and Material 3, Navigation, Room, Koin, kotlinx.serialization, DataStore, WorkManager, Coil, Lottie and classic Views. At startup, the app's own code builds a Koin graph of 1.7 thousand definitions, reads JSON catalogs and creates a Room database with 6.6 thousand rows. After that, everything keeps running at the same time:
 
-- **Início**: carrossel, chips, histórias e uma lista com 20 tipos de item.
-- **Feed**: 1500 publicações com colagens de fotos e reações.
-- **Grade**: 3000 fotos em grade escalonada.
-- **Chat**: 3600 mensagens em ordem inversa.
-- **Painel**: gráficos animados desenhados com `Canvas`.
-- **Views**: `RecyclerView` com nove tipos de linha, `ViewPager2` e `DiffUtil` atualizando a cada segundo.
-- **Diagnóstico**: o tempo de cada etapa da inicialização e a memória do app.
+- **Início** (Home): carousel, chips, stories and a list with 20 item types.
+- **Feed**: 1500 posts with photo collages and reactions.
+- **Grade** (Grid): 3000 photos in a staggered grid.
+- **Chat**: 3600 messages in reverse order.
+- **Painel** (Dashboard): animated charts drawn with `Canvas`.
+- **Views**: `RecyclerView` with nine row types, `ViewPager2` and `DiffUtil` updating every second.
+- **Diagnóstico** (Diagnostics): the time of each startup step and the app's memory.
 
-A faixa no alto da tela é do app: quadros por segundo, quadros perdidos e o heap Java. Embaixo do aparelho, a página mostra o que o laboratório está usando. Todo o conteúdo (textos, fotos, fontes e animações) é gerado por script, sem dados de ninguém.
+The strip at the top of the screen belongs to the app: frames per second, dropped frames and the Java heap. Below the device, the page shows what the lab is using. All the content (texts, photos, fonts and animations) is generated by a script, with nobody's data.
 
-## O que dá para fazer com ele
+## What you can do with it
 
-### Um aparelho que você controla
+### A device you control
 
-Tamanho de tela, orientação, tema claro ou escuro, idioma e região, fuso, escala de fonte, bateria e rede (online, dados móveis, offline). As permissões de execução do app são suas para conceder ou negar. Um **terminal de adb** na própria página aceita os comandos que você usa num emulador, e um link profundo aberto com `am start` vai para o app instalado que o atende.
+Screen size, orientation, light or dark theme, language and region, time zone, font scale, battery and network (online, mobile data, offline). The app's runtime permissions are yours to grant or deny. An **adb terminal** in the page itself accepts the commands you use with an emulator, and a deep link opened with `am start` goes to the installed app that handles it.
 
-### Ver o app por dentro
+### See the app from the inside
 
-- **Logcat** e **log de rede** ao vivo, com cada requisição do app.
-- **Mock de endpoints**: faça `/v1/perfil` devolver o que você quiser, sem tocar no servidor.
-- **Redirecionar hosts**: aponte a API do app para o seu `localhost`.
-- **Dados do app**: SharedPreferences e bancos SQLite, para ler e editar.
-- **Limites de layout** e a **árvore do Compose**, com os CompositionLocals de cada composable.
-- **Diagnóstico** quando algo para: a causa, a pilha Java e as APIs que faltaram.
+- Live **Logcat** and **network log**, with every request the app makes.
+- **Endpoint mocks**: make `/v1/perfil` return whatever you want, without touching the server.
+- **Host redirects**: point the app's API at your `localhost`.
+- **App data**: SharedPreferences and SQLite databases, to read and edit.
+- **Layout bounds** and the **Compose tree**, with the CompositionLocals of each composable.
+- **Diagnostics** when something stops: the cause, the Java stack and the APIs that were missing.
 
 ### Plugins
 
-Pequenos scripts em JavaScript que rodam ao lado do app e leem a tela, a árvore do Compose, os ViewModels e o estado estático, tiram prints de um componente, rolam listas e desenham por cima do aparelho. Há [exemplos prontos para copiar](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#exemplos).
+Small JavaScript scripts that run next to the app and read the screen, the Compose tree, the ViewModels and static state, take screenshots of a component, scroll lists and draw over the device. There are [ready-to-copy examples](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#exemplos).
 
-![Um plugin mostrando a árvore do Compose do app em forma de tabela, abaixo do aparelho](plugin-examples/ex-arvore-compose.webp)
+![A plugin showing the app's Compose tree as a table, below the device](plugin-examples/ex-arvore-compose.webp)
 
-### Agentes de IA, por MCP
+### AI agents, over MCP
 
-Uma ponte pequena em Node.js liga a página aberta a um cliente MCP. O agente tira prints, toca, digita, lê o Logcat e a rede, instala e abre apps, grava a tela em vídeo, e aceita linhas de comando do `adb`:
+A small Node.js bridge connects the open page to an MCP client. The agent takes screenshots, taps, types, reads Logcat and the network, installs and opens apps, records the screen to video, and accepts `adb` command lines:
 
 ```sh
 adb install -r app-debug.apk
-adb shell am start -W -n com.exemplo.app/.MainActivity
-adb shell input tap 200 400 && adb shell input text ola%smundo
-adb exec-out screencap -p > tela.png
+adb shell am start -W -n com.example.app/.MainActivity
+adb shell input tap 200 400 && adb shell input text hello%sworld
+adb exec-out screencap -p > screen.png
 adb exec-out uiautomator dump /dev/tty
 adb logcat -d *:E | grep -i timeout
 ```
 
-Não é o adb: é um interpretador que faz na página o que cada comando faz num aparelho, e que recusa pelo nome o que a página não alcança. A página mostra o comando para iniciar a ponte e o endereço para o agente em **Controles › MCP**. Detalhes em [MCP: o agente usando a página](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
+It is not adb: it is an interpreter that does in the page what each command does on a device, and that refuses by name what the page cannot reach. The page shows the command to start the bridge and the address for the agent under **Controls › MCP**. Details in [MCP: the agent using the page](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
 
-### Incorporar em outra página
+### Embed in another page
 
-O aparelho virtual também funciona como um player dentro de um `iframe`, comandado por mensagens. Veja a [página de integração](https://madmax-dev-br.github.io/apk-browser-lab-site/player/example.html).
+The virtual device also works as a player inside an `iframe`, driven by messages. See the [integration page](https://madmax-dev-br.github.io/apk-browser-lab-site/player/example.html).
 
-## Como funciona
+## How it works
 
 ```mermaid
 flowchart LR
-  apk([arquivo .apk]) --> worker
-  subgraph worker [Web Worker, isolado da página]
+  apk([.apk file]) --> worker
+  subgraph worker [Web Worker, isolated from the page]
     direction TB
-    leitor[ZIP, manifesto binário, resources.arsc, DEX]
-    vm[VM Dalvik: núcleo em WebAssembly]
-    fw[framework do AOSP 13, compilado da fonte]
-    host[pontes para a web: Activity, rede, arquivos, SQLite]
-    wasm[Skia, ICU, SQLite em WebAssembly]
-    leitor --> vm --> fw --> host
+    reader[ZIP, binary manifest, resources.arsc, DEX]
+    vm[Dalvik VM: WebAssembly core]
+    fw[AOSP 13 framework, compiled from source]
+    host[bridges to the web: Activity, network, files, SQLite]
+    wasm[Skia, ICU, SQLite in WebAssembly]
+    reader --> vm --> fw --> host
     fw --> wasm
   end
-  worker -- "quadros: Views, imagens, semântica do Compose" --> pagina
-  pagina -- "toques, teclado, voltar, ajustes do aparelho" --> worker
-  subgraph pagina [Página]
+  worker -- "frames: Views, images, Compose semantics" --> page
+  page -- "touches, keyboard, back, device settings" --> worker
+  subgraph page [Page]
     direction TB
-    tela[aparelho virtual]
-    paineis[Controles, Logcat, rede, plugins]
+    screen[virtual device]
+    panels[Controls, Logcat, network, plugins]
   end
-  pagina <--> ponte[ponte MCP em Node.js] <--> agente([agente de IA])
+  page <--> bridge[MCP bridge in Node.js] <--> agent([AI agent])
 ```
 
-- O APK é lido num **Web Worker**: ZIP, manifesto, recursos e DEX, sem passar pela página.
-- O bytecode roda numa **VM Dalvik** cujo núcleo é WebAssembly. Threads, relógio, coletor de lixo e limite de memória são modelados.
-- As classes `android.*` vêm do **AOSP 13 compilado da fonte**, com as adaptações registradas. As fronteiras com o mundo (janela, rede, arquivos, banco) são pontes para APIs da web.
-- O **Compose** desenha com o Skia de verdade, em WebAssembly, e recebe toques como eventos `MotionEvent` reais.
-- A página só mostra os quadros e envia a entrada. O que o app faz é decidido pelo código do app.
+- The APK is read in a **Web Worker**: ZIP, manifest, resources and DEX, without going through the page.
+- The bytecode runs in a **Dalvik VM** whose core is WebAssembly. Threads, clock, garbage collector and memory limit are modeled.
+- The `android.*` classes come from **AOSP 13 compiled from source**, with the adaptations recorded. The boundaries with the world (window, network, files, database) are bridges to web APIs.
+- **Compose** draws with the real Skia, in WebAssembly, and receives touches as real `MotionEvent` events.
+- The page only shows the frames and sends the input. What the app does is decided by the app's code.
 
-A explicação completa, passo a passo, está na página [Arquitetura](https://madmax-dev-br.github.io/apk-browser-lab-site/arquitetura.html).
+The full step-by-step explanation is on the [Architecture](https://madmax-dev-br.github.io/apk-browser-lab-site/arquitetura.html) page.
 
-## Limites, sem enfeite
+## Limits, without embellishment
 
-Isto não é um emulador Android. Não há kernel, hardware nem Play Store.
+This is not an Android emulator. There is no kernel, no hardware and no Play Store.
 
-- **Bibliotecas nativas** (`.so`) só rodam quando existe uma versão em WebAssembly compilada de fonte pública. As demais viram falha explícita. Bibliotecas de proteção do app nunca são substituídas nem contornadas.
-- **Serviços do Google**: por padrão o aparelho não tem. Há uma opção de dispositivo com microG, sem login de conta, sem push e sem Play Integrity.
-- **Apps grandes** exercitam muito mais do Android do que os exemplos. Cada um revela APIs que ainda faltam, e o lab mostra quais.
-- **Desempenho** é menor que o de um aparelho.
-- O selo do topo da página é honesto: **Experimental**.
+- **Native libraries** (`.so`) only run when there is a WebAssembly version compiled from public source. The rest become an explicit failure. The app's protection libraries are never replaced or bypassed.
+- **Google services**: by default the device has none. There is a device option with microG, without account login, without push and without Play Integrity.
+- **Large apps** exercise much more of Android than the examples. Each one reveals APIs that are still missing, and the lab shows which.
+- **Performance** is lower than a device's.
+- The badge at the top of the page is honest: **Experimental**.
 
-## Privacidade
+## Privacy
 
-O APK é lido e executado no seu navegador. Nada é enviado a um servidor do laboratório, porque não existe um. A rede do app sai pelo próprio navegador, só para os hosts que você permitir. Os apps que você abre ficam guardados neste navegador (IndexedDB), para reabrir pelo ícone, e você pode removê-los.
+The APK is read and executed in your browser. Nothing is sent to a lab server, because there is none. The app's network traffic goes out through the browser itself, only to the hosts you allow. The apps you open are stored in this browser (IndexedDB), to reopen from the icon, and you can remove them.
 
 ## Links
 
 | | |
 |---|---|
-| [Laboratório](https://madmax-dev-br.github.io/apk-browser-lab-site/) | Abrir e rodar um APK |
-| [Arquitetura](https://madmax-dev-br.github.io/apk-browser-lab-site/arquitetura.html) | Do arquivo à tela, por dentro |
-| [Plugins](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html) | A API `lab.*` e exemplos prontos |
-| [MCP](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp) | Ligar um agente de IA, comandos `adb`, gravar a tela |
-| [Integração](https://madmax-dev-br.github.io/apk-browser-lab-site/player/example.html) | O aparelho virtual dentro da sua página |
-| [Licenças de terceiros](THIRD_PARTY.md) | Avisos e licenças de bibliotecas incluídas no build (textos em [`licenses/`](licenses)) |
+| [Lab](https://madmax-dev-br.github.io/apk-browser-lab-site/) | Open and run an APK |
+| [Architecture](https://madmax-dev-br.github.io/apk-browser-lab-site/arquitetura.html) | From the file to the screen, inside |
+| [Plugins](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html) | The `lab.*` API and ready-made examples |
+| [MCP](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp) | Connect an AI agent, `adb` commands, record the screen |
+| [Integration](https://madmax-dev-br.github.io/apk-browser-lab-site/player/example.html) | The virtual device inside your page |
+| [Third-party licenses](THIRD_PARTY.md) | Notices and licenses of libraries included in the build (texts in [`licenses/`](licenses)) |
 
-## Sobre este repositório
+## About this repository
 
-Este repositório guarda o build publicado, que é o que o GitHub Pages serve. Achou um app que não abre, ou uma API que falta? [Abra uma issue](https://github.com/madmax-dev-br/apk-browser-lab-site/issues) com o texto de **Copiar diagnóstico** da página. Ele traz a causa e as APIs que faltaram, e é o que mais ajuda a fechar a lacuna.
+This repository holds the published build, which is what GitHub Pages serves. Found an app that does not open, or a missing API? [Open an issue](https://github.com/madmax-dev-br/apk-browser-lab-site/issues) with the text from **Copy diagnostics** on the page. It includes the cause and the APIs that were missing, and it is what helps most to close the gap.
