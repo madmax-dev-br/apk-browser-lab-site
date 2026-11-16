@@ -1,0 +1,14 @@
+Android resource configuration selection
+Copyright The Android Open Source Project. Apache License 2.0.
+
+Original ResTable_config selection methods and LocaleData/LocaleDataTables from
+android-13.0.0_r1 are compiled to standalone WebAssembly. Original function
+bodies and data are retained; the wrapper supplies only fixed memory slots and
+exports. Source excerpts are generated deterministically from the pinned complete
+upstream files. No Linux, Android process, filesystem or network imports exist
+in the resulting Wasm module. This is resource selection, not a full Android OS.
+
+Emscripten 3.1.74 supplies compiler support, libc (musl), and libc++ runtime.
+Respective license notices are in licenses/. ICU-derived locale tables are
+retained from AOSP LocaleDataTables.cpp; corresponding Unicode/ICU notice is
+provided alongside the AOSP source archive.

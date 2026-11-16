@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "implementation": "Unmodified ICU4C 70.1 ucnv converters compiled to WebAssembly, behind the NativeConverter callback/offset logic of external/icu android-13.0.0_r1",
+  "upstream": {
+    "version": "70.1",
+    "unicodeVersion": "14.0",
+    "releaseTag": "release-70-1",
+    "url": "https://github.com/unicode-org/icu/releases/download/release-70-1/icu4c-70_1-src.tgz",
+    "sha256": "8d205428c17bf13bb535300669ed28b338a157b1c01ae66d31d0d3e2d47c3fd5",
+    "bytes": 25449582
+  },
+  "data": {
+    "file": "icudt70l.dat",
+    "sha256": "a261e18e579c7a5e0697f44d628c5713fbec8e2ec9ea43956cb98ee5af094937",
+    "note": "shared with icu-break.wasm; contains cnvalias.icu"
+  },
+  "wasm": {
+    "file": "icu-converter.wasm",
+    "bytes": 166751,
+    "sha256": "2249584a5e6791b8e6d090fc5b5238a40285727e523ae3631e2c9e8dbdc7d01f"
+  },
+  "adapter": {
+    "file": "icu-converter-wrapper.cpp",
+    "sha256": "b3693706272845569b24997cc0ecf9bd1223266f5142eea3cdcdff2f6168caae"
+  },
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "buildScript": "scripts/build-icu-converter.sh",
+  "nativeReference": "https://android.googlesource.com/platform/external/icu/+/android-13.0.0_r1/android_icu4j/libcore_bridge/src/native/com_android_icu_charset_NativeConverter.cpp",
+  "capabilities": [
+    "UTF-8",
+    "US-ASCII",
+    "ISO-8859-1",
+    "UTF-16",
+    "UTF-16BE",
+    "UTF-16LE"
+  ],
+  "limits": "Only converters whose tables are algorithmic or present in the vendored common data can be opened; others fail ucnv_open with U_FILE_ACCESS_ERROR"
+}

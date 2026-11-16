@@ -1,0 +1,102 @@
+{
+  "package": "canvaskit-wasm",
+  "version": "0.42.0",
+  "source": "https://registry.npmjs.org/canvaskit-wasm/-/canvaskit-wasm-0.42.0.tgz",
+  "npmIntegrity": "sha512-N3ikotmzYwDVAcpQKDMptBT2P5pIEWS9ywdmrQA2awwaMF9cxKEFuxZZHv9ay1Em9kDjxDsPtwUzDm1uNj136g==",
+  "license": "BSD-3-Clause",
+  "font": {
+    "name": "Roboto Regular",
+    "source": "https://raw.githubusercontent.com/google/skia/main/resources/fonts/Roboto-Regular.ttf",
+    "license": "Apache-2.0",
+    "copyright": "Copyright 2011 Google Inc. All Rights Reserved.",
+    "extraSourceCommit": "38062f4b4a0be4346d07a928408da21602545e9e",
+    "extraRepository": "https://github.com/googlefonts/roboto-2",
+    "extraLicense": "Apache-2.0"
+  },
+  "packagingAdapter": [
+    "NodeESM require/__dirname setup when Node only",
+    "Append ESM default export; original UMD algorithm bytes unmodified"
+  ],
+  "backend": "CanvasKit.MakeSurface CPU raster; noDOM/WebGL required",
+  "limits": [
+    "Newer official Skia revision than Android13; no claim of identical Skia raster across versions",
+    "Default Wasm heap128MiB",
+    "Android Java lifecycle/layout/text shaping integrations remain explicit"
+  ],
+  "files": {
+    "canvaskit.js": {
+      "bytes": 120877,
+      "sha256": "443777592179808354031cf411d8d43cac9f6b98d1227123c5c22d401b0fbf7f"
+    },
+    "canvaskit.mjs": {
+      "bytes": 121329,
+      "sha256": "fd1eb0a5666b4e375eda708f4b3356c21b07dc905ad10d74ee2ec2b2cf6ee860"
+    },
+    "canvaskit.wasm": {
+      "bytes": 7317345,
+      "sha256": "25ebed8e60158c5854f8dc807b936daca21354f8bfb6a2231266b0a93812f301"
+    },
+    "Roboto-Regular.ttf": {
+      "bytes": 35408,
+      "sha256": "466989fd178ca6ed13641893b7003e5d6ec36e42c2a816dee71f87b775ea097f"
+    },
+    "Roboto-Bold.ttf": {
+      "bytes": 514260,
+      "sha256": "61f89f8db49261c2f6106e8dccc35df7b2f7ed909020db40a3fc905e95f99334"
+    },
+    "Roboto-Italic.ttf": {
+      "bytes": 533388,
+      "sha256": "fa0b17bb4aaac4a1b2ee149dd4ca3b55e97d3077aa6ba9bb02541b316e7c46ce"
+    },
+    "Roboto-BoldItalic.ttf": {
+      "bytes": 532860,
+      "sha256": "40083ed54338397cf49d2c49f59eddcd963a30fdb301813d4bd3abbb37a13d12"
+    },
+    "Roboto-Medium.ttf": {
+      "bytes": 511592,
+      "sha256": "2879a5ecb7fbfa13a7fc3e2cdd7fecbf73aa45e91b541dfdfa2c442eed0aac21"
+    }
+  },
+  "fonts": [
+    {
+      "file": "Roboto-Regular.ttf",
+      "family": "Roboto",
+      "style": 0,
+      "weight": 400,
+      "italic": false,
+      "source": "https://raw.githubusercontent.com/google/skia/main/resources/fonts/Roboto-Regular.ttf"
+    },
+    {
+      "file": "Roboto-Bold.ttf",
+      "family": "Roboto",
+      "style": 1,
+      "weight": 700,
+      "italic": false,
+      "source": "https://raw.githubusercontent.com/googlefonts/roboto-2/38062f4b4a0be4346d07a928408da21602545e9e/src/hinted/Roboto-Bold.ttf"
+    },
+    {
+      "file": "Roboto-Italic.ttf",
+      "family": "Roboto",
+      "style": 2,
+      "weight": 400,
+      "italic": true,
+      "source": "https://raw.githubusercontent.com/googlefonts/roboto-2/38062f4b4a0be4346d07a928408da21602545e9e/src/hinted/Roboto-Italic.ttf"
+    },
+    {
+      "file": "Roboto-BoldItalic.ttf",
+      "family": "Roboto",
+      "style": 3,
+      "weight": 700,
+      "italic": true,
+      "source": "https://raw.githubusercontent.com/googlefonts/roboto-2/38062f4b4a0be4346d07a928408da21602545e9e/src/hinted/Roboto-BoldItalic.ttf"
+    },
+    {
+      "file": "Roboto-Medium.ttf",
+      "family": "Roboto",
+      "style": 0,
+      "weight": 500,
+      "italic": false,
+      "source": "https://raw.githubusercontent.com/googlefonts/roboto-2/38062f4b4a0be4346d07a928408da21602545e9e/src/hinted/Roboto-Medium.ttf"
+    }
+  ]
+}

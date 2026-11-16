@@ -1,0 +1,91 @@
+{
+  "package": "lab-codecs",
+  "version": 1,
+  "purpose": "JPEG and WebP encode and decode (lab-codecs) and AVIF decode (lab-avif) for Bitmap.compress, BitmapFactory and ImageDecoder: CanvasKit 0.42 has no JPEG/WebP encoder, applies EXIF orientation on decode and has no libjpeg DCT scaling",
+  "sources": [
+    {
+      "name": "libjpeg-turbo",
+      "version": "2.1.0",
+      "url": "https://github.com/libjpeg-turbo/libjpeg-turbo/archive/refs/tags/2.1.0.tar.gz",
+      "sha256": "d6b7790927d658108dfd3bee2f0c66a2924c51ee7f9dc930f62c452f4a638c52",
+      "license": "BSD-3-Clause AND IJG AND Zlib",
+      "androidTracks": "external/libjpeg-turbo at android-13.0.0_r1 (chromium libjpeg_turbo, 2.1.0 base)",
+      "notes": "built without SIMD (WITH_SIMD=0), 8-bit only, no TurboJPEG"
+    },
+    {
+      "name": "dav1d",
+      "version": "1.4.3",
+      "url": "https://downloads.videolan.org/pub/videolan/dav1d/1.4.3/dav1d-1.4.3.tar.xz",
+      "sha256": "42fe524bcc82ea3a830057178faace22923a79bad3d819a4962d8cfc54c36f19",
+      "license": "BSD-2-Clause",
+      "androidTracks": "the AV1 decoder of Android's AVIF support (external/dav1d)",
+      "notes": "built with meson for wasm32, 8 and 16 bit pixel formats, no assembly, no logging, one thread",
+      "module": "lab-avif"
+    },
+    {
+      "name": "libavif",
+      "version": "1.0.4",
+      "url": "https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.0.4.tar.gz",
+      "sha256": "dc56708c83a4b934a8af2b78f67f866ba2fb568605c7cf94312acf51ee57d146",
+      "license": "BSD-2-Clause (see licenses/libavif-LICENSE for the notices of the other files it carries)",
+      "androidTracks": "the AVIF container decoder of Android's AVIF support (libavif with dav1d)",
+      "notes": "decode sources only (no write.c), no libyuv, no libsharpyuv",
+      "module": "lab-avif"
+    },
+    {
+      "name": "libwebp",
+      "version": "1.2.2",
+      "url": "https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.2.2.tar.gz",
+      "sha256": "7656532f837af5f4cec3ff6bafe552c044dc39bf453587bd5b77450802f4aee6",
+      "license": "BSD-3-Clause (patent grant: licenses/libwebp-PATENTS)",
+      "androidTracks": "external/webp at android-13.0.0_r1 (README.android: Version 1.2.2)",
+      "notes": "encoder and decoder, no SIMD, no mux/demux/anim utilities"
+    }
+  ],
+  "avifGlue": {
+    "file": "scripts/wasm/codecs/lab-avif.c",
+    "sha256": "f97aaa18b2309504d761432be5b4e30512225c401611d269fb2dc39fa3c460f8",
+    "written": "for the APK Web Lab: avifDecoderParse/NextImage and avifImageYUVToRGB to RGBA8888, one thread; irot/imir/clap are reported (transform flags), not applied"
+  },
+  "glue": {
+    "file": "scripts/wasm/codecs/lab-codecs.c",
+    "sha256": "a37ff8d945444ed081f69d991ca07c0f6d4738fd1acb1245a6f0332e6e4f1fc1",
+    "written": "for the APK Web Lab; encoder settings follow android-13.0.0_r1 external/skia src/images/SkJpegEncoder.cpp (jpeg_set_defaults, 4:2:0, optimize_coding, jpeg_set_quality force_baseline) and SkWebpEncoder.cpp (WebPConfigPreset DEFAULT; lossy method 3 YUV input, lossless method 0 ARGB input)"
+  },
+  "build": {
+    "script": "scripts/wasm/build-codecs.sh",
+    "toolchain": "Emscripten 3.1.74 (work/emsdk), -O2, MODULARIZE ES6, ALLOW_MEMORY_GROWTH, SUPPORT_LONGJMP=emscripten (libjpeg error recovery)"
+  },
+  "limits": [
+    "ICC profiles are not written (Android 13 Skia embeds an sRGB profile in JPEG and WebP output)",
+    "CMYK/YCCK JPEG decode uses the Adobe-inverted convention only",
+    "animated WebP is not decoded here (CanvasKit decodes the first frame)",
+    "AVIF: 8-bit RGBA output only (10/12-bit sources are converted), irot/imir/clap not applied, first image only, no HDR/gain map; HEIF/HEIC is not available (HEVC decoders are LGPL or hardware)"
+  ],
+  "files": {
+    "lab-codecs.mjs": {
+      "bytes": 15787,
+      "sha256": "c0252eabdefb7f5b38248b8e80253bab3ad182a67d0af12f649882cfbf431a9a"
+    },
+    "lab-codecs.wasm": {
+      "bytes": 730005,
+      "sha256": "5a5294dba5cf78bb38f16f17e7b27c91f59496b17223a447f3d80ac2b3ee888b"
+    },
+    "lab-avif.mjs": {
+      "bytes": 10464,
+      "sha256": "ff585fb6d64fcfc04c4141688658fc50b61f55e553b61cdc16cc8d8269caa30a"
+    },
+    "lab-avif.wasm": {
+      "bytes": 529899,
+      "sha256": "a64a759de4e7471c3918e35830fa673e34aa5476f3a46444b77981f2818c4a1f"
+    }
+  },
+  "licenses": [
+    "licenses/libjpeg-turbo-LICENSE.md",
+    "licenses/libjpeg-turbo-README.ijg",
+    "licenses/libwebp-COPYING",
+    "licenses/libwebp-PATENTS",
+    "licenses/dav1d-COPYING",
+    "licenses/libavif-LICENSE"
+  ]
+}

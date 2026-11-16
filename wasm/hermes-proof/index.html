@@ -1,0 +1,14 @@
+<!doctype html><html lang="pt-BR"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Prova Hermes HBC96 → Wasm</title>
+<style>body{font:16px/1.55 system-ui;max-width:850px;margin:48px auto;padding:0 20px;background:#f4f6fa;color:#172238}button{font:inherit;background:#155dd6;color:white;padding:12px 20px;border:0;border-radius:8px;cursor:pointer}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:white;border:1px solid #cdd6e3;padding:20px;border-radius:8px}a{color:#155dd6}</style>
+<h1>Hermes HBC96 → WebAssembly</h1><p>VM C++ oficial Hermes 0.13.0 compilada para Wasm. O programa público testa arrays, closures e exceções, em um Worker do navegador.</p>
+<p>Este experimento não executa um APK Android completo. Nenhum módulo nativo React Native, JNI, sistema de arquivos do computador ou acesso de rede do programa é fornecido. A porta Unicode desta versão upstream é parcial.</p>
+<button id="run">Executar programa público</button><pre id="result" aria-live="polite">Pronto.</pre>
+<p><a href="public-proof.js">Programa fonte</a> · <a href="provenance.json">Versões e hashes</a> · <a href="official-source.zip">Fonte oficial inalterada</a> · <a href="LICENSE">Licença</a></p>
+<script type="module">
+const button=document.querySelector('#run'),result=document.querySelector('#result');
+button.onclick=()=>{button.disabled=true;result.textContent='Inicializando Worker…';const worker=new Worker(new URL('./hermes-worker.js',import.meta.url));
+const finish=()=>{clearTimeout(timeout);worker.terminate();button.disabled=false;};
+const timeout=setTimeout(()=>{result.textContent='Limite de 30s: Worker encerrado.';finish();},30000);
+worker.onmessage=({data})=>{if(data.type==='progress'){result.textContent=data.message;return;}result.textContent=JSON.stringify(data.result??data.error,null,2);finish();};
+worker.onerror=event=>{result.textContent=event.message;finish();};worker.postMessage({type:'run-public-proof'});};
+</script></html>

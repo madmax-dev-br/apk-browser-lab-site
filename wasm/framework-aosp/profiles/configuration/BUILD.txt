@@ -1,0 +1,46 @@
+Usage-selected original Android13 configuration profile
+
+    scripts/build-aosp-configuration-profile.sh
+    node --test framework-aosp/profiles/configuration/proof.mjs
+
+Includes Configuration, WindowConfiguration, LocaleList and their original nested
+classes. Shared original Optional and selected TextUtils methods are in the base
+framework DEX and are not duplicated in this profile. No source method is edited. The default boot must be built first and its
+exact hash is recorded in framework-provenance.json. The base DEX excludes this profile. The configured loader selects it generically
+when actual APK DEX references android.content.res.Configuration; callers can
+explicitly enable/disable selection. The host must initialize actual virtual-device configuration fields
+on objects whose constructors run original DEX.
+
+Compiler metadata is excluded from D8. Proto field IDs are generated from pinned
+original .proto schemas and original ProtoStream field/count flags; the generator
+and hashes are in proto-metadata-provenance.json. Numeric field IDs are data, not
+placeholder values. Proto serialization services are not implemented by these
+metadata declarations; invoking an unavailable boundary must still fail.
+
+Integration contracts:
+- Preserve Configuration.windowConfiguration created by the original constructor.
+  Set its actual bounds via original setBounds(Rect), not the newer overload
+  setBounds(IIII), which Android13 does not declare. setMaxBounds accepts Rect or
+  four ints. Default virtual resource fields are411x840dp/density160; actual window bounds
+  are populated separately from the current virtual viewport.
+- LocaleList must run its actual ctor([Locale]) and retain original mList fields.
+  Locale clone/equals/hashCode must have consistent value semantics, since the
+  original constructor drops duplicates with a HashSet of cloned locales.
+- ActivityThread.isSystem reflects the virtual application process (false).
+  System process/activity type restrictions remain original WindowConfiguration.
+- Resource qualification, process identity, device metrics and locale native data
+  are explicit platform inputs. Extended locale matching calls ICU ULocale and
+  remains unsupported unless its backend exists; no matching result is invented.
+- TextUtils locale-direction Java executes the exact original method. Its
+  ULocale.forLocale/isRightToLeft boundary uses Intl.Locale.getTextInfo/textInfo
+  from the engine ICU/CLDR data, including explicit scripts. Missing engine data
+  fails specifically, rather than falling back to a guessed language list.
+- DisplayProperties.debug_force_rtl is an explicit generated-sysprop API boundary.
+  An absent virtual debug.force_rtl property returns original Optional.empty();
+  the original TextUtils method applies orElse(false). This is not claimed as a
+  compiled upstream DisplayProperties Java file. XML/proto serialization remain
+  separate service boundaries and are not implemented by metadata declarations.
+
+Validated: Resources.getConfiguration original ctor and real fields/LocaleList,
+Configuration copy/setTo/diff/updateFrom, preserved final WindowConfiguration,
+locale clone/deduplication, LTR/RTL source method via declared Intl/CLDR boundary.

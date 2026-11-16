@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "file": "tzdb.dat",
+  "bytes": 102792,
+  "sha256": "13dc70ccb9f5253d19a67dd4b3b8326a782326f8d81825ae7c572e29de4ba86a",
+  "tzdataVersion": "2022a",
+  "format": "OpenJDK tzdb.dat (TZDB group, version 1): serialized java.time.zone.ZoneRules per region, read by the lab IcuZoneRulesProvider",
+  "source": {
+    "archive": "https://android.googlesource.com/platform/system/timezone/+/refs/tags/android-13.0.0_r1/input_data/iana/tzdata2022a.tar.gz",
+    "sha256": "717845634acb80cda7374c5b7c83966d1505ac33425e290e5cfbe20411be0e96",
+    "note": "IANA tz database 2022a as vendored by AOSP android-13.0.0_r1; public domain"
+  },
+  "compiler": {
+    "project": "https://github.com/openjdk/jdk",
+    "tag": "jdk-21+35",
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0 (JSR-310 BSD notices in the files)",
+    "files": {
+      "Ser.java": "fac24dc1794a277eba659d74bbd0442f999d205e9d8080fdfd1547b47dabeaef",
+      "TzdbZoneRulesCompiler.java": "62a5a5be49881e242d9832f5324ae5f5a7ea936cafbaf0a31966ec9698d8c29b",
+      "TzdbZoneRulesProvider.java": "96e97b0d945f34e5dd91fb968b7b7a1f9ed80db028f48539686f6d97f912827a",
+      "ZoneOffsetTransition.java": "50c200784b6b51a479dd689f060d971f793826e241134f94893482258f510627",
+      "ZoneOffsetTransitionRule.java": "ab387ffb3342606b5f3418a2019905224b55aa2ba2f913b866e5069d9e89fe44",
+      "ZoneRules.java": "877f2203d29d38904058eca0a9473c89fa373d91a092cd2910933caeb8544a2a"
+    },
+    "javaVersion": "openjdk version \"21.0.12.1\" 2026-08-18 LTS",
+    "note": "Classes ZoneRules, ZoneOffsetTransition, ZoneOffsetTransitionRule and Ser are renamed to package build.tools.tzdb by sed, as make/CopyInterimTZDB.gmk does"
+  },
+  "tzFilesCompiled": [
+    "africa",
+    "antarctica",
+    "asia",
+    "australasia",
+    "europe",
+    "northamerica",
+    "southamerica",
+    "backward",
+    "etcetera"
+  ],
+  "build": "scripts/build-tzdb.sh",
+  "scope": "Real IANA rules (transitions and recurring last-rules). Android 13 itself derives its java.time rules from ICU4J/ICU tz data of the same IANA release lineage; zone display names are not part of this file."
+}

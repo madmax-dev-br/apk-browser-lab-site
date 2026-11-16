@@ -1,0 +1,1 @@
+Path approximation: original Android13 Path.cpp (Copyright 2006 Android Open Source Project, Apache 2.0); Skia SkPoint helpers (Copyright 2011 Google Inc., BSD 3-Clause). Emscripten 3.1.74 libc++/stdlib. Complete sources, function hashes and safety adaptations are listed in provenance.json. Conic conversion is not implemented.
