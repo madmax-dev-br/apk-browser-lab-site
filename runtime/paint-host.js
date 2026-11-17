@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=bfc5e8fffad5';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=bfc5e8fffad5';
-import { colorLongToArgb } from './color-long.js?v=bfc5e8fffad5';
+import { APKError } from './apk-error.js?v=a8e6c1332674';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=a8e6c1332674';
+import { colorLongToArgb } from './color-long.js?v=a8e6c1332674';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -80,6 +80,29 @@ for (const key of [`${MASK_FILTER}-><init>()V`, `${BLUR_FILTER}-><init>(F${BLUR_
 const floatOf = bits => { const view = new DataView(new ArrayBuffer(4)); view.setInt32(0, bits | 0, true); return view.getFloat32(0, true); };
 for (const effect of referenceEffects) { const type = `Landroid/graphics/${effect};`; keys.add(`${PAINT}->get${effect}()${type}`); keys.add(`${PAINT}->set${effect}(${type})${type}`); }
 
+// On the WebAssembly core a Paint record carries the color, the flags, the hyphen edits, the color long and the native-instance token in its payload (vmcore/graphics.h), where
+// the core's Paint natives read and write them: the paint state's `color`, `flags` and `hyphenEdit` (enumerable, so copies of the state carry them as they did) and `colorLong`
+// (not enumerable: a copy that needs it is given it, bindPaint) are accessors over that memory. On the JavaScript VM the state stays a plain object.
+const PAYLOAD = { state: 8, color: 12, flags: 16, hyphenEdit: 20, colorLongSet: 24, colorLong: 32, handle: 40 };
+function bindPaint(runtime, ref, state, colorLong) {
+  const graphics = runtime.wasm?.graphics, at = graphics ? graphics.paintPayload(ref) : 0;
+  if (!at) { if (colorLong !== undefined) state.colorLong = colorLong; return state; }
+  const i32 = graphics.i32, view = runtime.wasm.view;
+  for (const [key, offset] of [['color', PAYLOAD.color], ['flags', PAYLOAD.flags], ['hyphenEdit', PAYLOAD.hyphenEdit]]) {
+    const word = (at + offset) >>> 2; i32[word] = state[key] | 0;
+    Object.defineProperty(state, key, { get: () => i32[word], set: value => { i32[word] = value | 0; }, enumerable: true, configurable: true });
+  }
+  const set = (at + PAYLOAD.colorLongSet) >>> 2, long = at + PAYLOAD.colorLong;
+  const write = value => { if (value == null) i32[set] = 0; else { view.setBigInt64(long, BigInt.asIntN(64, BigInt(value)), true); i32[set] = 1; } };
+  write(colorLong ?? state.colorLong); delete state.colorLong;
+  Object.defineProperty(state, 'colorLong', { get: () => i32[set] ? view.getBigInt64(long, true) : null, set: write, enumerable: false, configurable: true });
+  view.setBigUint64(at + PAYLOAD.handle, BigInt.asUintN(64, BigInt(runtime.object(ref).paintHandle ?? 0n)), true);
+  i32[(at + PAYLOAD.state) >>> 2] = 1;
+  return state;
+}
+/** A copy of paint state `source` for another Paint (Paint(Paint), Paint.set): its own fields, the color long included. */
+const copyOf = (runtime, ref, source) => bindPaint(runtime, ref, { ...source }, source.colorLong);
+
 export function getPaintState(runtime, receiver) {
   if (nullish(receiver)) runtime.throwJava('Ljava/lang/NullPointerException;', 'Paint is null');
   const state = runtime.object(receiver).webPaint;
@@ -123,7 +146,7 @@ export function createPaintHost() {
         runtime.storeField(object.fields, `${XFERMODE}->porterDuffMode:I`, runtime.object(args[1]).fields.get('Landroid/graphics/PorterDuff$Mode;->nativeInt:I')); return;
       }
       if (name === '<init>') {
-        object.webPaint = method.parameters[0] === PAINT ? { ...getPaintState(runtime, args[1]) } : initial(method.parameters.length ? args[1] : 1);
+        object.webPaint = method.parameters[0] === PAINT ? copyOf(runtime, args[0], getPaintState(runtime, args[1])) : bindPaint(runtime, args[0], initial(method.parameters.length ? args[1] : 1));
         runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,method.parameters[0]===PAINT?(runtime.object(args[1]).fields.get(`${PAINT}->mBidiFlags:I`)??2):2);
         if(method.parameters[0]!==PAINT)initializeTextLocales(runtime,object.webPaint);
         return;
@@ -142,7 +165,7 @@ export function createPaintHost() {
       if(name==='getNativeInstance'){
         // The token goes with its Java owner, as Paint's NativeAllocationRegistry frees the native Paint: a screen that makes Paints on every frame (text measured and drawn anew) must
         // not use the table up. A full table collects first, so the cleaners of unreachable Paints release theirs.
-        const registry=handleRegistry(runtime);if(!object.paintHandle){if(registry.values.size>=65536)runtime.collectForNativeHandles?.('android.graphics.Paint');if(registry.values.size>=65536)fail('VM Paint token limit exceeded');const handle=object.paintHandle=registry.next++,previous=object.onFree;registry.values.set(handle,args[0]);object.onFree=()=>{if(typeof previous==='function')previous();registry.values.delete(handle);};}
+        const registry=handleRegistry(runtime);if(!object.paintHandle){if(registry.values.size>=65536)runtime.collectForNativeHandles?.('android.graphics.Paint');if(registry.values.size>=65536)fail('VM Paint token limit exceeded');const handle=object.paintHandle=registry.next++,previous=object.onFree;registry.values.set(handle,args[0]);object.onFree=()=>{if(typeof previous==='function')previous();registry.values.delete(handle);};const at=runtime.wasm?.graphics?.paintPayload(args[0]);if(at)runtime.wasm.view.setBigUint64(at+PAYLOAD.handle,BigInt.asUintN(64,BigInt(handle)),true);}
         runtime.record('HOST Paint.getNativeInstance [opaque VM Paint token; not native memory]');return object.paintHandle;
       }
       if(name==='getStartHyphenEdit')return paint.hyphenEdit>>>3;
@@ -210,8 +233,8 @@ export function createPaintHost() {
         if((isRtl||start!==contextStart||end!==contextEnd)&&!isRtl)fail('Run advance requires a complete LTR shaping run; partial non-Latin context/bidi items need the Android Minikin boundary');
         const value=runtime.skiaHost.measureRun(content,{offset:offset-contextStart,start:start-contextStart,isRtl},paint);runtime.record('HOST Paint.getRunAdvance [original SkParagraph/SkShaper; complete LTR run]');return rawFloat(value);
       }
-      if (name === 'reset') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,2); object.webPaint = initial(1); initializeTextLocales(runtime,object.webPaint); return; }
-      if (name === 'set') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,runtime.object(args[1]).fields.get(`${PAINT}->mBidiFlags:I`)??2); object.webPaint = { ...getPaintState(runtime, args[1]) }; return; }
+      if (name === 'reset') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,2); object.webPaint = bindPaint(runtime, args[0], initial(1)); initializeTextLocales(runtime,object.webPaint); return; }
+      if (name === 'set') { runtime.storeField(object.fields,`${PAINT}->mBidiFlags:I`,runtime.object(args[1]).fields.get(`${PAINT}->mBidiFlags:I`)??2); object.webPaint = copyOf(runtime, args[0], getPaintState(runtime, args[1])); return; }
       if (name === 'getFontMetricsInt' && method.parameters.length === 7) {
         // Paint.getFontMetricsInt(text, start, count, contextStart, contextCount, isRtl, outMetrics) (API 29, android-13.0.0_r1 Paint.java argument checks; Paint.cpp
         // getFontMetricsIntForText): ascent/descent are the extent of every font the run uses (MinikinUtils::getFontExtent), top/bottom are the primary font's widened to them.

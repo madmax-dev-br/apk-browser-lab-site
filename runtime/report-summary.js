@@ -1,12 +1,12 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=bfc5e8fffad5';
-import { staticRetentionLines } from './heap-gc.js?v=bfc5e8fffad5';
-import { overrideSummaryLines } from './method-overrides.js?v=bfc5e8fffad5';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=bfc5e8fffad5';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=bfc5e8fffad5';
-import { hostMapSummaryLines } from './host-map.js?v=bfc5e8fffad5';
-import { attributeGap } from './worker-task-log.js?v=bfc5e8fffad5';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=a8e6c1332674';
+import { staticRetentionLines } from './heap-gc.js?v=a8e6c1332674';
+import { overrideSummaryLines } from './method-overrides.js?v=a8e6c1332674';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=a8e6c1332674';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=a8e6c1332674';
+import { hostMapSummaryLines } from './host-map.js?v=a8e6c1332674';
+import { attributeGap } from './worker-task-log.js?v=a8e6c1332674';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 

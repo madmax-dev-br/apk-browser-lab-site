@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=bfc5e8fffad5';
-import {getVectorGraphics} from './vector-native.js?v=bfc5e8fffad5';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=bfc5e8fffad5';
-import { gcRoot } from './heap-gc.js?v=bfc5e8fffad5';
+import {APKError} from './apk-error.js?v=a8e6c1332674';
+import {getVectorGraphics} from './vector-native.js?v=a8e6c1332674';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=a8e6c1332674';
+import { gcRoot } from './heap-gc.js?v=a8e6c1332674';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -41,7 +41,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
  const storage=b=>b.hardware?b.backing??'ARGB_8888':configName(b);
  const bytesPerPixel=b=>CONFIG_INFO[storage(b)].bytes;
  const canvasOf=b=>getVectorGraphics(runtime).get(b.handle,'canvas');
- const holderOf=b=>{const holder=b.canvasObject??=runtime.allocate(CANVAS);if(!runtime.object(holder).nativeCanvasHandle)runtime.object(holder).nativeCanvasHandle=b.handle;return holder;};
+ const holderOf=b=>{const holder=b.canvasObject??=runtime.allocate(CANVAS);if(!runtime.object(holder).nativeCanvasHandle){runtime.object(holder).nativeCanvasHandle=b.handle;getVectorGraphics(runtime).bindCanvasObject(holder,b.handle);}return holder;};
  /**
   * The raster of a bitmap whose pixels are one opaque 8-bit sRGB PNG the lab encoded itself from N32 pixels (BitmapFactory's decode: `opaqueN32`), recorded at the origin over its whole
   * extent with no paint: replaying it on a fresh N32 surface and encoding the snapshot gives that PNG's pixels again (opaque, so no premultiplication round trip), so the decoded
@@ -196,11 +196,11 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
      const object=vm.object(args[0]);let handle;
      if(args[1]===null||args[1]===0){handle=getVectorGraphics(vm).createCanvas();getVectorGraphics(vm).releaseWithOwner(args[0],handle);object.canvasBitmap=null;}
      else{const b=state(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;',null);if(b.recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');handle=b.handle;object.canvasBitmap=args[1];}
-     object.nativeCanvasHandle=handle;vm.storeField(object.fields,`${CANVAS}->mNativeCanvasWrapper:J`,handle);return;
+     object.nativeCanvasHandle=handle;getVectorGraphics(vm).bindCanvasObject(args[0],handle);vm.storeField(object.fields,`${CANVAS}->mNativeCanvasWrapper:J`,handle);return;
     }
     if(name==='<init>'){
      const b=state(args[1]);if(b.mutable===false)vm.throwJava('Ljava/lang/IllegalStateException;','Immutable bitmap passed to Canvas constructor');if(b.recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');
-     const object=vm.object(args[0]);object.nativeCanvasHandle=b.handle;object.canvasBitmap=args[1];
+     const object=vm.object(args[0]);object.nativeCanvasHandle=b.handle;getVectorGraphics(vm).bindCanvasObject(args[0],b.handle);object.canvasBitmap=args[1];
      for(const[field,type,value]of[['mNativeCanvasWrapper','J',b.handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);
      object.canvasDensity=0;return;
     }

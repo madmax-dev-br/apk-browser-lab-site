@@ -5,7 +5,9 @@
 // instance methods the JavaScript VM bridges for them (src/apk-runtime.js addBridge lists): a virtual call then resolves as it does there, to the C native when there is one
 // and to an unbound method otherwise, and a DEX class that overrides hashCode/equals/toString takes the slot of Object's.
 const STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
-export const ATOMIC_INTEGER = 'Ljava/util/concurrent/atomic/AtomicInteger;', ATOMIC_REFERENCE = 'Ljava/util/concurrent/atomic/AtomicReference;';
+const ATOMIC = 'Ljava/util/concurrent/atomic/';
+export const ATOMIC_INTEGER = `${ATOMIC}AtomicInteger;`, ATOMIC_REFERENCE = `${ATOMIC}AtomicReference;`, ATOMIC_LONG = `${ATOMIC}AtomicLong;`, ATOMIC_BOOLEAN = `${ATOMIC}AtomicBoolean;`,
+  ATOMIC_ARRAY = `${ATOMIC}AtomicReferenceArray;`, UPDATER_REF = `${ATOMIC}AtomicReferenceFieldUpdater;`, UPDATER_INT = `${ATOMIC}AtomicIntegerFieldUpdater;`, UPDATER_LONG = `${ATOMIC}AtomicLongFieldUpdater;`;
 export const NATIVE_KEYS = [
   null,
   'Ljava/lang/Float;->floatToIntBits(F)I', 'Ljava/lang/Double;->doubleToLongBits(D)J', `${OBJECT}-><init>()V`,
@@ -32,9 +34,47 @@ export const NATIVE_KEYS = [
   null, null, null, null,
   null,   // bound by bridge: AtomicReference.get over its reference payload
   'Ljava/lang/Float;->compare(FF)I', 'Ljava/lang/Double;->compare(DD)I',   // pure statics a Compose frame calls about 150 times
+  // leaf natives bound by the bridge (BRIDGE_NATIVES below, from LEAF_FIRST): the atomics
+  ...Array(50).fill(null),
+  // the atomics' constructors, bound by key (natives.c): AtomicInteger, AtomicBoolean, AtomicLong, AtomicReference
+  `${ATOMIC_INTEGER}-><init>()V`, `${ATOMIC_INTEGER}-><init>(I)V`, `${ATOMIC_BOOLEAN}-><init>()V`, `${ATOMIC_BOOLEAN}-><init>(Z)V`, `${ATOMIC_LONG}-><init>()V`, `${ATOMIC_LONG}-><init>(J)V`,
+  `${ATOMIC_REFERENCE}-><init>()V`, `${ATOMIC_REFERENCE}-><init>(Ljava/lang/Object;)V`,
+  // bound by the bridge (OBJECT_FIRST): System.identityHashCode, Boolean.valueOf(Z), Enum.ordinal, name / toString, compareTo
+  null, null, null, null, null,
+  'Ljava/lang/Enum;-><init>(Ljava/lang/String;I)V',
+  // bound by the bridge (ARRAYS_FIRST): Arrays.fill, fill of a range, fill of a boolean[], of a range of one, copyOf, copyOfRange
+  null, null, null, null, null, null,
+  'Ljava/lang/reflect/Array;->newInstance(Ljava/lang/Class;I)Ljava/lang/Object;', 'Ljava/lang/reflect/Array;->getLength(Ljava/lang/Object;)I',
+  // pure statics (natives.c): floorDiv / floorMod of int and long, ceil, floor, sqrt, rint, round(double), toRadians, toDegrees, Integer.lowestOneBit / highestOneBit
+  'Ljava/lang/Math;->floorDiv(II)I', 'Ljava/lang/Math;->floorMod(II)I', 'Ljava/lang/Math;->floorDiv(JJ)J', 'Ljava/lang/Math;->floorMod(JJ)J', 'Ljava/lang/Math;->ceil(D)D',
+  'Ljava/lang/Math;->floor(D)D', 'Ljava/lang/Math;->sqrt(D)D', 'Ljava/lang/Math;->rint(D)D', 'Ljava/lang/Math;->round(D)J', 'Ljava/lang/Math;->toRadians(D)D',
+  'Ljava/lang/Math;->toDegrees(D)D', 'Ljava/lang/Integer;->lowestOneBit(I)I', 'Ljava/lang/Integer;->highestOneBit(I)I',
+  // bound by the bridge (THREAD_LOCAL_FIRST): ThreadLocal.get and set
+  null, null,
+  // bound by bridge (BRIDGE_NATIVES): android.graphics.Canvas's save stack and translate, Paint's fields in memory (vmcore/graphics.h, GRAPHICS_NATIVES below)
+  null, null, null, null, null,
+  null, null, null, null, null, null, null, null, null, null,
 ];
 const BRIDGE_FIRST = NATIVE_KEYS.indexOf(`${STRING}-><init>([CII)V`) + 1;   // natives.h NATIVE_BOX_VALUE_OF_B
 const IDENTITY_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->hashCode(I)I') + 1;   // natives.h NATIVE_THREAD_CURRENT
+const OBJECT_FIRST = NATIVE_KEYS.indexOf(`${ATOMIC_REFERENCE}-><init>(Ljava/lang/Object;)V`) + 1;   // natives.h NATIVE_IDENTITY_HASH_CODE
+const ARRAYS_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Enum;-><init>(Ljava/lang/String;I)V') + 1;   // natives.h NATIVE_ARRAYS_FILL
+const THREAD_LOCAL_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->highestOneBit(I)I') + 1;   // natives.h NATIVE_THREAD_LOCAL_GET
+const LEAF_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Double;->compare(DD)I') + 1;   // natives.h NATIVE_ATOMIC_INTEGER_SET
+export const THREAD_LOCAL = 'Ljava/lang/ThreadLocal;', THREAD_LOCAL_GET_KEY = 'Ljava/lang/ThreadLocal;->get()Ljava/lang/Object;', THREAD_LOCAL_SET_KEY = 'Ljava/lang/ThreadLocal;->set(Ljava/lang/Object;)V',
+  THREAD_LOCAL_REMOVE_KEY = 'Ljava/lang/ThreadLocal;->remove()V';
+export const ARRAY_NEW_INSTANCE_KEY = 'Ljava/lang/reflect/Array;->newInstance(Ljava/lang/Class;I)Ljava/lang/Object;', ENUM = 'Ljava/lang/Enum;', IDENTITY_HASH_KEY = 'Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I', BOOLEAN_VALUE_OF_KEY = 'Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;';
+const GRAPHICS_FIRST = THREAD_LOCAL_FIRST + 2;   // natives.h NATIVE_CANVAS_TRANSLATE: right after NATIVE_THREAD_LOCAL_SET
+export const CANVAS = 'Landroid/graphics/Canvas;', PAINT = 'Landroid/graphics/Paint;';
+/**
+ * The graphics natives (vmcore/graphics.h) by group, in natives.h's order: the host class whose bridges they reproduce and the methods (name + signature). A class below the host
+ * class gets the group's Class flag only when its DEX code declares none of these methods (vmcore/js/host-linking.js), and the natives answer only for such receivers.
+ */
+export const GRAPHICS_NATIVES = [
+  { owner: CANVAS, flag: 1 << 16, methods: ['translate(FF)V', 'save()I', 'restore()V', 'restoreToCount(I)V', 'getSaveCount()I'] },
+  { owner: PAINT, flag: 1 << 17, methods: ['getNativeInstance()J', 'setColor(I)V', 'getColor()I', 'getAlpha()I', 'setAlpha(I)V', 'isFilterBitmap()Z', 'getStartHyphenEdit()I',
+    'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V'] },
+];
 export const THREAD = 'Ljava/lang/Thread;', CURRENT_THREAD_KEY = `${THREAD}->currentThread()${THREAD}`, THREAD_GET_ID_KEY = `${THREAD}->getId()J`;
 /** The java.lang box classes by kind (natives.h BOX_*: Z B S C I J F D). */
 export const BOX_CLASSES = ['Ljava/lang/Boolean;', 'Ljava/lang/Byte;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Float;', 'Ljava/lang/Double;'];
@@ -60,7 +100,63 @@ export const BRIDGE_NATIVES = new Map([
   ['Ljava/lang/Class;->isInstance(Ljava/lang/Object;)Z', { id: IDENTITY_FIRST + 2, anyReceiver: true }], ['Ljava/lang/Class;->getComponentType()Ljava/lang/Class;', { id: IDENTITY_FIRST + 3, anyReceiver: true }],
   // the atomics bridge's AtomicReference.get over `atomicValue`, a reference payload (host-linking.js); the native checks the receiver's class itself
   [`${ATOMIC_REFERENCE}->get()Ljava/lang/Object;`, { id: IDENTITY_FIRST + 4, anyReceiver: true }],
+  ...leafEntries(),
+  // Object identity of the receivers of host classes (a Class object, a host object) the JavaScript VM serves with Object's own methods; the hash is the record's address / 8
+  // (host-bridge.js makes the bridge answer the same). System.identityHashCode, Boolean.valueOf(boolean) (the Boolean.TRUE / FALSE records the bridge told HostState), java.lang.Enum
+  [`${OBJECT}->hashCode()I`, { id: NATIVE_KEYS.indexOf(`${OBJECT}->hashCode()I`), anyReceiver: true }], [`${OBJECT}->equals(Ljava/lang/Object;)Z`, { id: NATIVE_KEYS.indexOf(`${OBJECT}->equals(Ljava/lang/Object;)Z`), anyReceiver: true }],
+  ['Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I', { id: OBJECT_FIRST }], ['Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;', { id: OBJECT_FIRST + 1 }],
+  ['Ljava/lang/Enum;->ordinal()I', { id: OBJECT_FIRST + 2, anyReceiver: true }], ['Ljava/lang/Enum;->name()Ljava/lang/String;', { id: OBJECT_FIRST + 3, anyReceiver: true }],
+  ['Ljava/lang/Enum;->toString()Ljava/lang/String;', { id: OBJECT_FIRST + 3, anyReceiver: true }], ['Ljava/lang/Enum;->compareTo(Ljava/lang/Enum;)I', { id: OBJECT_FIRST + 4, anyReceiver: true }],
+  ['Ljava/lang/Enum;->compareTo(Ljava/lang/Object;)I', { id: OBJECT_FIRST + 4, anyReceiver: true }],
+  ...arraysEntries(),
+  [`${THREAD_LOCAL}->get()Ljava/lang/Object;`, { id: THREAD_LOCAL_FIRST, anyReceiver: true }], [`${THREAD_LOCAL}->set(Ljava/lang/Object;)V`, { id: THREAD_LOCAL_FIRST + 1, anyReceiver: true }],
+  // Canvas's and Paint's own bridges (src/vector-native.js, src/skia-canvas-host.js, src/paint-host.js); the natives check the receiver's class flag themselves (graphics.h)
+  ...GRAPHICS_NATIVES.flatMap(group => group.methods.map(method => `${group.owner}->${method}`)).map((key, i) => [key, { id: GRAPHICS_FIRST + i, anyReceiver: true }]),
 ]);
+/**
+ * The atomics' bridge keys (src/apk-runtime.js addBridge lists) and the C native of each (natives.h, LEAF_FIRST on: one id per operation, shared by the weak and lazy forms and,
+ * for an AtomicBoolean, by the AtomicInteger's, whose payload it shares). All answer any receiver: the natives check the receiver's class themselves and defer to the bridge.
+ */
+function leafEntries() {
+  const entries = [], at = n => ({ id: LEAF_FIRST + n, anyReceiver: true }), add = (owner, signature, entry) => entries.push([`${owner}->${signature}`, entry]);
+  const GET = { id: BRIDGE_FIRST + 10, anyReceiver: true }, CAS = { id: BRIDGE_FIRST + 11, anyReceiver: true };
+  // AtomicInteger (I) and AtomicBoolean (Z): NATIVE_ATOMIC_INTEGER_SET ... _DEC_AND_GET are LEAF_FIRST + 0..7
+  for (const [owner, type] of [[ATOMIC_INTEGER, 'I'], [ATOMIC_BOOLEAN, 'Z']]) {
+    add(owner, `get()${type}`, GET); add(owner, `set(${type})V`, at(0)); add(owner, `lazySet(${type})V`, at(0)); add(owner, `getAndSet(${type})${type}`, at(1));
+    add(owner, `compareAndSet(${type}${type})Z`, CAS); add(owner, `weakCompareAndSet(${type}${type})Z`, CAS);
+  }
+  [['getAndAdd(I)I', 2], ['addAndGet(I)I', 3], ['getAndIncrement()I', 4], ['incrementAndGet()I', 5], ['getAndDecrement()I', 6], ['decrementAndGet()I', 7], ['intValue()I', null]]
+    .forEach(([signature, n]) => add(ATOMIC_INTEGER, signature, n === null ? GET : at(n)));
+  // AtomicLong: LEAF_FIRST + 8..17
+  [['get()J', 8], ['set(J)V', 9], ['lazySet(J)V', 9], ['getAndSet(J)J', 10], ['compareAndSet(JJ)Z', 11], ['weakCompareAndSet(JJ)Z', 11], ['getAndAdd(J)J', 12], ['addAndGet(J)J', 13],
+    ['getAndIncrement()J', 14], ['incrementAndGet()J', 15], ['getAndDecrement()J', 16], ['decrementAndGet()J', 17]].forEach(([signature, n]) => add(ATOMIC_LONG, signature, at(n)));
+  // AtomicReference: set / getAndSet / compareAndSet (get is IDENTITY_FIRST + 4); LEAF_FIRST + 18..20
+  const OBJECT_TYPE = 'Ljava/lang/Object;';
+  [[`set(${OBJECT_TYPE})V`, 18], [`lazySet(${OBJECT_TYPE})V`, 18], [`getAndSet(${OBJECT_TYPE})${OBJECT_TYPE}`, 19], [`compareAndSet(${OBJECT_TYPE}${OBJECT_TYPE})Z`, 20],
+    [`weakCompareAndSet(${OBJECT_TYPE}${OBJECT_TYPE})Z`, 20]].forEach(([signature, n]) => add(ATOMIC_REFERENCE, signature, at(n)));
+  // AtomicReferenceArray: LEAF_FIRST + 21..25
+  [['length()I', 21], ['get(I)Ljava/lang/Object;', 22], ['set(ILjava/lang/Object;)V', 23], ['lazySet(ILjava/lang/Object;)V', 23], ['getAndSet(ILjava/lang/Object;)Ljava/lang/Object;', 24],
+    ['compareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z', 25], ['weakCompareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z', 25]].forEach(([signature, n]) => add(ATOMIC_ARRAY, signature, at(n)));
+  // field updaters: reference LEAF_FIRST + 26..29, integer 30..39, long 40..49
+  const O = 'Ljava/lang/Object;';
+  [[`get(${O})${O}`, 26], [`set(${O}${O})V`, 27], [`lazySet(${O}${O})V`, 27], [`getAndSet(${O}${O})${O}`, 28], [`compareAndSet(${O}${O}${O})Z`, 29], [`weakCompareAndSet(${O}${O}${O})Z`, 29]]
+    .forEach(([signature, n]) => add(UPDATER_REF, signature, at(n)));
+  for (const [owner, type, first] of [[UPDATER_INT, 'I', 30], [UPDATER_LONG, 'J', 40]]) {
+    [[`get(${O})${type}`, 0], [`set(${O}${type})V`, 1], [`lazySet(${O}${type})V`, 1], [`getAndSet(${O}${type})${type}`, 2], [`compareAndSet(${O}${type}${type})Z`, 3], [`weakCompareAndSet(${O}${type}${type})Z`, 3],
+      [`getAndAdd(${O}${type})${type}`, 4], [`addAndGet(${O}${type})${type}`, 5], [`getAndIncrement(${O})${type}`, 6], [`incrementAndGet(${O})${type}`, 7], [`getAndDecrement(${O})${type}`, 8],
+      [`decrementAndGet(${O})${type}`, 9]].forEach(([signature, n]) => add(owner, signature, at(first + n)));
+  }
+  return entries;
+}
+/** java.util.Arrays' fill / copyOf / copyOfRange of every array type (the bridge's keys, src/apk-runtime.js addBridge): static calls of a class whose DEX lacks the methods. */
+function arraysEntries() {
+  const ARRAYS = 'Ljava/util/Arrays;', entries = [];
+  for (const c of ['Z', 'B', 'S', 'C', 'I', 'J', 'F', 'D', 'Ljava/lang/Object;']) {
+    entries.push([`${ARRAYS}->fill([${c}${c})V`, { id: ARRAYS_FIRST + (c === 'Z' ? 2 : 0) }], [`${ARRAYS}->fill([${c}II${c})V`, { id: ARRAYS_FIRST + (c === 'Z' ? 3 : 1) }],
+      [`${ARRAYS}->copyOf([${c}I)[${c}`, { id: ARRAYS_FIRST + 4 }], [`${ARRAYS}->copyOfRange([${c}II)[${c}`, { id: ARRAYS_FIRST + 5 }]);
+  }
+  return entries;
+}
 /** The String constructors the core serves (the linker rewrites calls of them to INVOKE_STRING_INIT, classes.h). */
 export const STRING_CONSTRUCTORS = new Set(NATIVE_KEYS.filter(key => key?.startsWith(`${STRING}-><init>`)));
 /** Method key -> native id: every C native. */

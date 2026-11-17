@@ -7,18 +7,39 @@ export class TimeBreakdown {
   reset() {
     // what the breakdown of each operation drops is kept in the lifetime totals (src/warmup.js reads them)
     this.lifeMs ??= new Float64Array(6); this.lifeCounts ??= new Float64Array(6); if (this.ms) for (let i = 0; i < 6; i++) { this.lifeMs[i] += this.ms[i]; this.lifeCounts[i] += this.counts[i]; }
+    // a survey (worker-task-log.js hostTotals) keeps every operation's host table too: which host calls cost the most over a whole session
+    if (this.keepHosts && this.host) { this.lifeHost ??= new Map(); for (const [key, value] of this.host) { const total = this.lifeHost.get(key); if (total) { total.n += value.n; total.ms += value.ms; total.ex += value.ex; total.runs += value.runs; } else this.lifeHost.set(key, { n: value.n, ms: value.ms, ex: value.ex, runs: value.runs }); } }
+    // the survey's exclusive-time spans (enter/leave while keepHosts is on): a stack of open spans, and what the span that just closed contained (read by hostCall)
+    this.sp = 0; this.spanAt ??= []; this.spanChild ??= []; this.spanRuns ??= []; this.spanBucket ??= []; this.lastChild = 0; this.lastRuns = 0;
     this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = this.startedAt = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main'); this.host = new Map();
   }
   accumulatorFor(name) { let acc = this.threads.get(name); if (acc === undefined) this.threads.set(name, acc = { name, ms: 0, calls: 0, hosts: new Map() }); return acc; }
   /** The running thread changed (scheduler): interpreter time from now on counts for `name`. */
   thread(name) { this.charge(performance.now()); this.acc = this.accumulatorFor(name); }
   charge(now) { const d = now - this.last; this.last = now; this.ms[this.cur] += d; if (this.cur === 0) this.acc.ms += d; }
-  enter(bucket) { const now = performance.now(); this.charge(now); const previous = this.cur; this.cur = bucket; this.counts[bucket]++; return previous; }
-  leave(previous) { this.charge(performance.now()); this.cur = previous; }
-  /** One bridged host call finished: its key, and its inclusive time (host code that runs Java inside counts that Java). */
-  hostCall(key, ms) {
-    let entry = this.host.get(key); if (entry === undefined) { if (this.host.size >= 4000) return; this.host.set(key, entry = { n: 0, ms: 0 }); }
+  enter(bucket) {
+    const now = performance.now(); this.charge(now); const previous = this.cur; this.cur = bucket; this.counts[bucket]++;
+    if (this.keepHosts === true) { const sp = ++this.sp; this.spanAt[sp] = now; this.spanChild[sp] = 0; this.spanRuns[sp] = 0; this.spanBucket[sp] = bucket; }   // survey only: an open span
+    return previous;
+  }
+  leave(previous) {
+    const now = performance.now(); this.charge(now); this.cur = previous;
+    if (this.keepHosts === true && this.sp > 0) {   // survey only: the span closes; its whole time is nested time of the span below it (a nested VM run, a nested host call)
+      const sp = this.sp--; this.lastChild = this.spanChild[sp]; this.lastRuns = this.spanRuns[sp];
+      if (this.sp > 0) { this.spanChild[this.sp] += now - this.spanAt[sp]; if (this.spanBucket[sp] === BUCKET.INTERP) this.spanRuns[this.sp]++; }
+    }
+  }
+  /** Survey only: `ms` of unsampled leaf calls were charged to the host bucket by extrapolation (host-bridge.js bridgeBody) inside the host span now on top: they are nested time of it. */
+  nestedLeaves(ms, previous) { if (this.keepHosts === true && previous === BUCKET.HOST && this.sp > 0) this.spanChild[this.sp] += ms; }
+  /**
+   * One bridged host call finished (its span just closed with leave()): its key, and its inclusive time (host code that runs Java inside counts that Java). With the survey on, also
+   * its exclusive time (`ex`: the inclusive time minus the nested VM runs and nested host calls the span held) and the number of nested VM runs it made (`runs`). `scale` is the number
+   * of calls a sampled leaf call stands for (host-bridge.js bridgeBody): what it held is scaled the same.
+   */
+  hostCall(key, ms, scale = 1) {
+    let entry = this.host.get(key); if (entry === undefined) { if (this.host.size >= 4000) return; this.host.set(key, entry = { n: 0, ms: 0, ex: 0, runs: 0 }); }
     entry.n++; entry.ms += ms;
+    if (this.keepHosts === true) { entry.ex += ms - this.lastChild * scale; entry.runs += this.lastRuns * scale; this.lastChild = 0; this.lastRuns = 0; }
     const acc = this.acc; acc.calls++; acc.hosts.set(key, (acc.hosts.get(key) ?? 0) + 1);   // per thread: a loop that issues the same one or two calls over and over is polling
   }
   snapshot() {

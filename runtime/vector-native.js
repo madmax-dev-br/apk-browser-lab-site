@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=bfc5e8fffad5';
-import { getSolidPaint } from './paint-host.js?v=bfc5e8fffad5';
-import { getMatrixValues } from './matrix-native.js?v=bfc5e8fffad5';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=bfc5e8fffad5';
+import { APKError } from './apk-error.js?v=a8e6c1332674';
+import { getSolidPaint } from './paint-host.js?v=a8e6c1332674';
+import { getMatrixValues } from './matrix-native.js?v=a8e6c1332674';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=a8e6c1332674';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -36,6 +36,11 @@ const states=new WeakMap();
 /** Graphics handles (Canvas, vector trees and nodes, path data) created since the last collection before they ask for one (VectorGraphics.create). */
 export const VECTOR_PACE_MIN=4096;
 
+// The Canvas natives of the WebAssembly core (vmcore/graphics.h) keep, per canvas, the save stack's depth and a log of translate / save / restore calls they answered in memory;
+// get() replays that log onto the canvas state with the hosts' own arithmetic before any host reads or changes it, and canvasChanged() tells the core about every change the hosts
+// make to the save stack. A level only the host may restore: a saveLayer (its restore records the layer's end) or a save of the matrix or the clips alone.
+const CANVAS_OP_TRANSLATE=1,CANVAS_OP_SAVE=2;
+const needsHost=entry=>entry.layer===true||entry.saveMatrix===false||entry.saveClips===false;
 export class VectorGraphics {
  // No ceiling on the handles (Android has none on Canvas, VectorDrawable trees and path data): they are freed by their owners' finalizers, i.e. by collections. So, as ART paces
  // collections by native growth (NativeAllocationRegistry), handles that doubled since the last collection (at least VECTOR_PACE_MIN more) ask for one, once per collection.
@@ -44,9 +49,29 @@ export class VectorGraphics {
  create(kind,props={}){const handle=this.next++;this.handles.set(handle,{kind,refs:0,...props});
   if(!this.collectionAsked&&this.handles.size-this.atCollection>Math.max(VECTOR_PACE_MIN,this.atCollection)){this.collectionAsked=true;this.runtime.requestNativeCollection?.('vector');}
   return handle;}
- release(handle){this.get(handle);const pending=[handle],seen=new Set();while(pending.length){const h=pending.pop();if(seen.has(h)||!this.handles.has(h))continue;seen.add(h);const object=this.get(h);if(object.kind==='tree')pending.push(object.root);else if(object.kind==='group')pending.push(...object.children);this.pathChars-=(object.path||'').length;this.handles.delete(h);}}
- get(handle,kind=null){const value=this.handles.get(handle);if(!value||kind&&value.kind!==kind)problem(`Invalid ${kind||'graphics'} VM handle ${handle}`,'invalid-vector-handle');return value;}
+ release(handle){this.get(handle);const pending=[handle],seen=new Set();while(pending.length){const h=pending.pop();if(seen.has(h)||!this.handles.has(h))continue;seen.add(h);const object=this.get(h);if(object.kind==='tree')pending.push(object.root);else if(object.kind==='group')pending.push(...object.children);this.pathChars-=(object.path||'').length;this.dropCoreBlock(object);this.handles.delete(h);}}
+ get(handle,kind=null){const value=this.handles.get(handle);if(!value||kind&&value.kind!==kind)problem(`Invalid ${kind||'graphics'} VM handle ${handle}`,'invalid-vector-handle');if(value.coreBlock)this.fromCore(value);return value;}
  copy(handle,kind){const value=clone(this.get(handle,kind));value.refs=0;return this.create(kind,value);}
+ /** Replays what the core's Canvas natives did on canvas `value` (translate as the vector canvas host computes it, save and restore as the Skia canvas host keeps its stack). */
+ fromCore(value){
+  const blocks=this.runtime.wasm.graphics,at=value.coreBlock,u32=blocks.u32,count=u32[(at+12)>>>2];
+  if(count!==0){
+   const f32=blocks.f32;
+   for(let i=0,e=(at+272)>>>2;i<count;i++,e+=3){
+    const op=u32[e];
+    if(op===CANVAS_OP_TRANSLATE){const x=f32[e+1],y=f32[e+2],matrix=value.matrix,[ma,mb,mc,md,me,mf]=matrix;matrix[4]=ma*x+mc*y+me;matrix[5]=mb*x+md*y+mf;}
+    else if(op===CANVAS_OP_SAVE)value.stack.push({matrix:value.matrix.slice(),clips:(value.clips??[]).slice(),saveMatrix:true,saveClips:true,layer:false});
+    else{const to=u32[e+1];while(value.stack.length+1>to){const previous=value.stack.pop();value.matrix=previous.matrix??previous;value.clips=previous.clips??[];}}
+   }
+   u32[(at+12)>>>2]=0;
+  }
+  if(value.stack.length!==u32[(at+8)>>>2])problem(`Canvas save stack (${value.stack.length}) out of step with the core's (${u32[(at+8)>>>2]})`);
+ }
+ /** A host changed the save stack of canvas `value`: the core's depth and levels follow. */
+ canvasChanged(value){if(value.coreBlock)this.runtime.wasm.graphics.setStack(value.coreBlock,value.stack,needsHost);}
+ /** Java Canvas record `ref` draws on native canvas `handle`: the core's natives answer for it from that canvas's block. */
+ bindCanvasObject(ref,handle){const blocks=this.runtime.wasm?.graphics;if(blocks)blocks.bindCanvas(ref,this.handles.get(handle)?.coreBlock??0);}
+ dropCoreBlock(object){if(object.coreBlock){this.runtime.wasm.graphics.releaseCanvas(object.coreBlock);object.coreBlock=0;}}
  setPath(handle,text){const value=this.get(handle);const commands=parsePath(text);this.pathChars+=text.length-(value.path||'').length;if(this.pathChars>8*1024*1024)problem('Aggregate vector path storage limit exceeded');value.commands=commands;value.path=pathString(commands);}
  snapshot(handle,{width=null,height=null,mirrored=false}={}){
   const tree=this.get(handle,'tree');width??=tree.viewportWidth;height??=tree.viewportHeight;
@@ -80,10 +105,10 @@ export class VectorGraphics {
   const handle=vm.object(tree).fields.get('Lcom/android/internal/util/VirtualRefBasePtr;->mNativePtr:J');
   return this.snapshot(handle,{width:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseWidth:I'),height:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseHeight:I')});
  }
- createCanvas(){return this.create('canvas',{draws:[],matrix:[1,0,0,1,0,0],stack:[]});}
+ createCanvas(){const handle=this.create('canvas',{draws:[],matrix:[1,0,0,1,0,0],stack:[]}),blocks=this.runtime.wasm?.graphics,at=blocks?blocks.allocateCanvas():0;if(at)Object.defineProperty(this.handles.get(handle),'coreBlock',{value:at,writable:true,enumerable:false,configurable:true});return handle;}
  /** The native canvas of a Java object (a Canvas, a Bitmap, a Picture's recording) goes with it: a cleaner on the owner's record releases the handle when the collector frees the owner,
   *  as Android's NativeAllocationRegistry frees an SkCanvas / SkBitmap. Without it every Canvas ever created kept its recorded draws (and their rasters) for the life of the VM. */
- releaseWithOwner(owner,handle){const record=this.runtime.object(owner),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const object=this.handles.get(handle);if(object?.kind==='canvas')this.handles.delete(handle);};}
+ releaseWithOwner(owner,handle){const record=this.runtime.object(owner),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const object=this.handles.get(handle);if(object?.kind==='canvas'){this.dropCoreBlock(object);this.handles.delete(handle);}};}
  canvasDraws(handle){return this.get(handle,'canvas').draws.slice();}
  captureVector(handle){const tree=this.get(handle,'tree'),active=new Set();let count=0;const capture=(pointer,depth=0)=>{if(depth>128||active.has(pointer)||++count>20000)problem('Cyclic/excessive vector draw snapshot');active.add(pointer);const node=this.get(pointer),copy={kind:node.kind,props:{...node.props},path:node.path??''};if(node.kind==='group')copy.children=node.children.map(child=>capture(child,depth+1));active.delete(pointer);return copy;};return {...tree,root:capture(tree.root)};}
  /** Every recorded command checks the storage of all live canvases' draws plus `extra` against the limit. Each canvas's sum is kept and extended by the draws appended since
@@ -98,7 +123,7 @@ export class VectorGraphics {
    if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');
   }
  }
- resetCanvas(receiver,width=null,height=null){const canvas=this.get(this.runtime.object(receiver).nativeCanvasHandle,'canvas');canvas.draws.length=0;canvas.matrix=[1,0,0,1,0,0];canvas.stack.length=0;canvas.clips=[];if(width!==null)canvas.width=width;if(height!==null)canvas.height=height;}
+ resetCanvas(receiver,width=null,height=null){const canvas=this.get(this.runtime.object(receiver).nativeCanvasHandle,'canvas');canvas.draws.length=0;canvas.matrix=[1,0,0,1,0,0];canvas.stack.length=0;canvas.clips=[];this.canvasChanged(canvas);if(width!==null)canvas.width=width;if(height!==null)canvas.height=height;}
  snapshotCanvas(receiver,width,height,options){
   if(!(width>0&&height>0&&width*height<=16*1024*1024))problem('Invalid canvas snapshot extent');
   if(this.runtime.skia?.rasterizeCanvas)return this.runtime.skia.rasterizeCanvas(this.runtime,this,receiver,width,height,options);
@@ -175,7 +200,7 @@ export function createVectorCanvasHost(){
   supports:key=>keys.has(key),canAllocate:type=>type===owner,parent:type=>type===owner?'Ljava/lang/Object;':null,
   invoke(runtime,method,args){
    const object=runtime.object(args[0]),graphics=getVectorGraphics(runtime),name=method.name;
-   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();graphics.releaseWithOwner(args[0],object.nativeCanvasHandle);object.canvasDensity=160;return;}
+   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();graphics.bindCanvasObject(args[0],object.nativeCanvasHandle);graphics.releaseWithOwner(args[0],object.nativeCanvasHandle);object.canvasDensity=160;return;}
    runtime.skiaHost?.bitmaps?.flattenFullCanvas(object.nativeCanvasHandle);   // a Bitmap's command list is folded into one pixel command before it reaches the command limit
    const canvas=graphics.get(object.nativeCanvasHandle,'canvas');
    if(name==='getNativeCanvasWrapper')return object.nativeCanvasHandle;
@@ -196,10 +221,10 @@ export function createVectorCanvasHost(){
     const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible">${blurFilter}<rect width="${width}" height="${height}" fill="${fill}" fill-opacity="${solid.alpha}"${stroke}${solid.flags&1?'':' shape-rendering="crispEdges"'}${blur?' filter="url(#blur)"':''}/></svg>`;graphics.reserveDrawStorage(svg.length);canvas.draws.push({kind:'svg',svg,x:left,y:top,width,height,matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice(),argb:solid.argb,paint:solid,source:'original-Drawable.draw/web-Paint/Canvas'});return;
    }
    if(name==='getSaveCount')return canvas.stack.length+1;
-   if(name==='save'){if(canvas.stack.length>=256)problem('Canvas save stack limit exceeded');const count=canvas.stack.length+1;canvas.stack.push({matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice()});return count;}
+   if(name==='save'){if(canvas.stack.length>=256)problem('Canvas save stack limit exceeded');const count=canvas.stack.length+1;canvas.stack.push({matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice()});graphics.canvasChanged(canvas);return count;}
    if(name==='restore'||name==='restoreToCount'){
     const count=name==='restore'?canvas.stack.length:args[1];if(count<1||count>canvas.stack.length+1)runtime.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
-    while(canvas.stack.length+1>count){const state=canvas.stack.pop();canvas.matrix=state.matrix??state;canvas.clips=state.clips??[];}return;
+    while(canvas.stack.length+1>count){const state=canvas.stack.pop();canvas.matrix=state.matrix??state;canvas.clips=state.clips??[];}graphics.canvasChanged(canvas);return;
    }
    if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix needs a projective canvas-state backend
     if(args[1]===null||args[1]===0){canvas.matrix[0]=1;canvas.matrix[1]=0;canvas.matrix[2]=0;canvas.matrix[3]=1;canvas.matrix[4]=0;canvas.matrix[5]=0;return;}

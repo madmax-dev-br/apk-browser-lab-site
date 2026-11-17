@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=bfc5e8fffad5';
-import {getVectorGraphics} from './vector-native.js?v=bfc5e8fffad5';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=bfc5e8fffad5';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=bfc5e8fffad5';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=bfc5e8fffad5';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=bfc5e8fffad5';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=bfc5e8fffad5';
-import {createBitmapHost} from './bitmap-host.js?v=bfc5e8fffad5';
-import { gcRoot } from './heap-gc.js?v=bfc5e8fffad5';
-import {sha256Hex} from './sha256-sync.js?v=bfc5e8fffad5';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=bfc5e8fffad5';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=bfc5e8fffad5';
+import {APKError} from './apk-runtime.js?v=a8e6c1332674';
+import {getVectorGraphics} from './vector-native.js?v=a8e6c1332674';
+import {getSolidPaint,getPaintState} from './paint-host.js?v=a8e6c1332674';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=a8e6c1332674';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=a8e6c1332674';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=a8e6c1332674';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=a8e6c1332674';
+import {createBitmapHost} from './bitmap-host.js?v=a8e6c1332674';
+import { gcRoot } from './heap-gc.js?v=a8e6c1332674';
+import {sha256Hex} from './sha256-sync.js?v=a8e6c1332674';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=a8e6c1332674';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=a8e6c1332674';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -620,7 +620,7 @@ export function createSkiaCanvasHost(runtime,backend){
     return filled;
    }
    if(method.owner===PAINT){const state=getPaintState(vm,receiver);if(name==='getTypeface')return state.typefaceRef??null;const value=args[1]==null||args[1]===0?null:args[1];if(value)resolveTypeface(value);state.typefaceRef=value;return value;}
-   if(method.owner===CANVAS&&name==='<init>'){const handle=args[1];getVectorGraphics(vm).get(handle,'canvas');const object=vm.object(receiver);object.nativeCanvasHandle=handle;for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);object.canvasDensity=0;return;}
+   if(method.owner===CANVAS&&name==='<init>'){const handle=args[1];getVectorGraphics(vm).get(handle,'canvas');const object=vm.object(receiver);object.nativeCanvasHandle=handle;getVectorGraphics(vm).bindCanvasObject(receiver,handle);for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);object.canvasDensity=0;return;}
    if(method.owner===PICTURE||(method.owner===CANVAS&&name==='drawPicture')){
     // android.graphics.Picture: a recorded command list (a software Canvas that is frozen by endRecording()) replayed under the target canvas's matrix and clip.
     const graphics=getVectorGraphics(vm);
@@ -648,7 +648,7 @@ export function createSkiaCanvasHost(runtime,backend){
     if(name==='beginRecording'){
      if(picture.recording)vm.throwJava('Ljava/lang/IllegalStateException;','Picture already recording, must call #endRecording()');
      const canvas=vm.allocate(CANVAS),object=vm.object(canvas),handle=graphics.createCanvas();graphics.releaseWithOwner(canvas,handle);
-     object.nativeCanvasHandle=handle;object.canvasDensity=0;object.canvasWidth=args[1];object.canvasHeight=args[2];
+     object.nativeCanvasHandle=handle;graphics.bindCanvasObject(canvas,handle);object.canvasDensity=0;object.canvasWidth=args[1];object.canvasHeight=args[2];
      for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);
      picture.width=args[1];picture.height=args[2];picture.recording=canvas;picture.draws=[];return canvas;
     }
@@ -790,11 +790,11 @@ export function createSkiaCanvasHost(runtime,backend){
      record(receiver,{op:'layerBegin',paint,bounds});
     }
     const flags=name==='save'&&method.parameters.length?args[1]:layerFlags;
-    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name!=='save'});return count;
+    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name!=='save'});getVectorGraphics(vm).canvasChanged(state);return count;
    }
    if(name==='restore'||name==='restoreToCount'){
     const count=name==='restore'?state.stack.length:args[1];if(count<1||count>state.stack.length+1)vm.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
-    while(state.stack.length+1>count){const previous=state.stack.pop();if(previous.layer)record(receiver,{op:'layerEnd'});if(previous.saveMatrix!==false)state.matrix=previous.matrix??previous;if(previous.saveClips!==false)state.clips=previous.clips??[];}return;
+    while(state.stack.length+1>count){const previous=state.stack.pop();getVectorGraphics(vm).canvasChanged(state);if(previous.layer)record(receiver,{op:'layerEnd'});if(previous.saveMatrix!==false)state.matrix=previous.matrix??previous;if(previous.saveClips!==false)state.clips=previous.clips??[];}return;
    }
    if(['clipRect','clipPath','clipOutRect','clipOutPath'].includes(name)){
     let operation=name.startsWith('clipOut')?0:1;const hasOp=method.parameters.at(-1)==='Landroid/graphics/Region$Op;';
