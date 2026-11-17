@@ -1,7 +1,7 @@
 // Embeddable APK runner. Usage: <script type="module" src="…/player/apk-player.js"></script> then <apk-player src="app.apk" device="phone" locale="pt-BR" theme="dark">.
 // The APK runs inside an iframe (player/frame.html) served from the runtime's origin; this script only talks to it through versioned postMessage.
 // Reference: docs/PLAYER.md (API) and player/example.html (the same reference, with a live demo).
-import { ATTRIBUTES, configFromAttributes, parseConfig, flattenConfig, envelope, validateFrameMessage, STREAMS } from './protocol.js?v=afec1f76f9dc';
+import { ATTRIBUTES, configFromAttributes, parseConfig, flattenConfig, envelope, validateFrameMessage, STREAMS } from './protocol.js?v=1e6027adbc0f';
 
 const FRAME_TIMEOUT_MS = 20000, CALL_TIMEOUT_MS = 60000, INTENT_TIMEOUT_MS = 120000, CONFIG_TIMEOUT_MS = 60000;
 const DEFAULT_ASSETS_BASE = new URL('../', import.meta.url).href;
@@ -29,6 +29,10 @@ export class ApkPlayer extends EventTarget {
       /** Replace the plugin list ([{ id?, name, code, enabled = true, packageFilter }]). Resolves { plugins: [summary], rejected: [reason] }. */
       set: list => this.call('pluginsSet', { plugins: Array.isArray(list) ? list.map(item => ({ ...item })) : list }),
       stop: id => this.call('pluginsStop', { id }), restart: id => this.call('pluginsRestart', { id }), list: () => this.call('pluginsList'),
+      /** Click a plugin's button (id or label) and get its output as JSON: { ok, handlers, ms, outputs: { [block id]: value }, written: [block id] }. */
+      click: (id, button, { waitMs } = {}) => this.call('pluginsClick', { id, button, ...(waitMs !== undefined ? { waitMs } : {}) }),
+      /** The output of one plugin (id or name) as JSON, from the last plugin-output event: { [block id]: value }, or null. */
+      output: id => { for (const output of this.pluginOutputs.values()) if (output.id === id || output.name === id) return output.outputs ?? {}; return null; },
       /** fn(summary) for every output change of any plugin ({ id, name, status, badge, blocks, console, errors }); returns its unsubscribe function. */
       subscribe: fn => { if (typeof fn !== 'function') throw new TypeError('plugins.subscribe needs a function'); this.pluginListeners.add(fn); for (const output of this.pluginOutputs.values()) fn(output); return () => this.pluginListeners.delete(fn); },
       get outputs() { return outputs(); },
@@ -194,7 +198,7 @@ export class ApkPlayerElement extends HTMLElement {
     this.plugins = {
       set: list => { this.saved.plugins = Array.isArray(list) ? list.map(item => ({ ...item })) : list; return this.player ? this.player.plugins.set(list) : Promise.reject(new Error('The player is not mounted.')); },
       stop: id => this.player?.plugins.stop(id) ?? Promise.reject(new Error('The player is not mounted.')), restart: id => this.player?.plugins.restart(id) ?? Promise.reject(new Error('The player is not mounted.')),
-      list: () => this.player?.plugins.list() ?? Promise.resolve([]), subscribe: fn => { if (typeof fn !== 'function') throw new TypeError('plugins.subscribe needs a function'); const listener = event => fn(event.detail.plugin); this.addEventListener('plugin-output', listener); for (const output of this.player?.plugins.outputs ?? []) fn(output); return () => this.removeEventListener('plugin-output', listener); },
+      list: () => this.player?.plugins.list() ?? Promise.resolve([]), click: (id, button, options) => this.player?.plugins.click(id, button, options) ?? Promise.reject(new Error('The player is not mounted.')), output: id => this.player?.plugins.output(id) ?? null, subscribe: fn => { if (typeof fn !== 'function') throw new TypeError('plugins.subscribe needs a function'); const listener = event => fn(event.detail.plugin); this.addEventListener('plugin-output', listener); for (const output of this.player?.plugins.outputs ?? []) fn(output); return () => this.removeEventListener('plugin-output', listener); },
     };
   }
   connectedCallback() {

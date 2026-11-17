@@ -1,6 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
+import { blockValue, outputsOf } from './plugin-host.js?v=1e6027adbc0f';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -128,12 +129,13 @@ export function createMcpTools({ controls = null, query, plugins = () => [], cli
         const blocks = [];
         for (const block of plugin.output?.blocks ?? []) {
           if (block.kind === 'image') { blocks.push({ id: block.id, kind: 'image', caption: block.caption || undefined }); if (withImages && block.blob) images.push({ plugin: plugin.name, block }); continue; }
-          if (block.kind === 'kv') blocks.push({ id: block.id, kind: 'kv', entries: Object.fromEntries(block.entries) });
-          else if (block.kind === 'table') blocks.push({ id: block.id, kind: 'table', rows: block.rows.map(row => Object.fromEntries(block.columns.map((column, index) => [column, row[index]]))) });
-          else if (block.kind === 'json') { let value; try { value = JSON.parse(block.text); } catch { value = block.text; } blocks.push({ id: block.id, kind: 'json', value }); }
-          else blocks.push({ id: block.id, kind: block.kind, text: block.text });
+          const value = blockValue(block);   // the same conversion as the click answer's outputs and window.apkLabPlugins.outputs (src/plugin-host.js)
+          if (block.kind === 'kv') blocks.push({ id: block.id, kind: 'kv', entries: value });
+          else if (block.kind === 'table') blocks.push({ id: block.id, kind: 'table', rows: value });
+          else if (block.kind === 'json') blocks.push({ id: block.id, kind: 'json', value });
+          else blocks.push({ id: block.id, kind: block.kind, text: value });
         }
-        out.push({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, badge: plugin.output?.badge || undefined, blocks,
+        out.push({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, badge: plugin.output?.badge || undefined, outputs: outputsOf(plugin.output), blocks,
           ...(plugin.buttons?.length ? { buttons: plugin.buttons.map(button => ({ id: button.id, label: button.label, icon: button.icon || undefined, title: button.title || undefined, placement: button.placement, disabled: button.disabled || undefined, busy: button.busy || undefined })) } : {}),
           errors: (plugin.errors ?? []).slice(-5).map(error => `${error.phase}: ${error.message}`), console: (plugin.console ?? []).slice(-20).map(line => `${line.level}: ${line.text}`) });
       }

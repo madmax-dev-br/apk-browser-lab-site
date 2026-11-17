@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=afec1f76f9dc';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=afec1f76f9dc';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=afec1f76f9dc';
-import { parseRule } from '../host-map.js?v=afec1f76f9dc';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=afec1f76f9dc';
-import { isMemoryStep } from '../memory-budget.js?v=afec1f76f9dc';
+import { checkCoreMemory } from '../core-memory.js?v=1e6027adbc0f';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=1e6027adbc0f';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=1e6027adbc0f';
+import { parseRule } from '../host-map.js?v=1e6027adbc0f';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=1e6027adbc0f';
+import { isMemoryStep } from '../memory-budget.js?v=1e6027adbc0f';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -13,7 +13,7 @@ export const VERSION = 1;
 export const REVISION = 2;
 export const CAPABILITIES = Object.freeze(['config-id', 'lab-config', 'call', 'streams', 'plugins', 'permission-dialog', 'screen-events']);
 /** The methods of the `call` message (revision 2). Each one's arguments are validated again in the frame (src/player/frame-controller.js). */
-export const CALL_METHODS = Object.freeze(['reloadActivity', 'openIntent', 'inspectCompose', 'layoutBounds', 'screenshot', 'screenState', 'diagnostic', 'status', 'answerPermission', 'subscribe', 'pluginsSet', 'pluginsStop', 'pluginsRestart', 'pluginsList', 'stop']);
+export const CALL_METHODS = Object.freeze(['reloadActivity', 'openIntent', 'inspectCompose', 'layoutBounds', 'screenshot', 'screenState', 'diagnostic', 'status', 'answerPermission', 'subscribe', 'pluginsSet', 'pluginsStop', 'pluginsRestart', 'pluginsList', 'pluginsClick', 'stop']);
 export const STREAMS = Object.freeze(['logcat', 'network']);
 export const PERMISSION_DIALOG = Object.freeze(['none', 'frame', 'host']);
 export const MAX_OVERRIDES = 200, MAX_IGNORED = 100, MAX_HOST_RULES = 50, MAX_MOCK_ENTRIES = 50, MAX_MOCK_TEXT = 6 * 1024 * 1024, MAX_PERMISSION_ENTRIES = 500;

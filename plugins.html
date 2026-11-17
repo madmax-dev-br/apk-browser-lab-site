@@ -6,8 +6,8 @@
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>Plugins · APK Browser Lab</title>
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=afec1f76f9dc">
-  <link rel="stylesheet" href="./lab-tokens.css?v=afec1f76f9dc">
+  <link rel="stylesheet" href="./site-pages.css?v=1e6027adbc0f">
+  <link rel="stylesheet" href="./lab-tokens.css?v=1e6027adbc0f">
 </head>
 <body>
   <header class="topbar">
@@ -873,6 +873,7 @@
             <tr id="api-ui-json"><td><code>lab.ui.json(value, { id })</code></td><td>Formatted JSON.</td></tr>
             <tr id="api-ui-image"><td><code>lab.ui.image(blob, { id, caption })</code></td><td>An image: an <code>image/*</code> Blob of up to 8 MiB. The result of <code>lab.screenshot</code> works directly.</td></tr>
             <tr id="api-ui-clear"><td><code>lab.ui.clear()</code>, <code>lab.ui.badge(s)</code></td><td>Clears the blocks; puts a short badge on the card.</td></tr>
+            <tr id="api-ui-outputs"><td>Output as JSON</td><td>Every block written with an <code>id</code> is also data: <code>{ [id]: value }</code>. A text is the string, <code>kv</code> an object, <code>table</code> one object per row, <code>json</code> the value with its types, and an image is described (caption, type, size). <code>kv</code> and <code>table</code> cells are text, as the panel shows them. Use <code>lab.ui.json</code> to keep numbers and nesting. It comes back from <code>click_plugin_button</code> and <code>plugins</code> (MCP), from <code>window.apkLabPlugins.outputs(id)</code> and <code>clickButton(id, button)</code> on the lab page, and from <code>player.plugins.click(id, button)</code> and <code>player.plugins.output(id)</code> in the player.</td></tr>
             <tr id="api-sleep"><td><code>lab.sleep(ms)</code>, <code>lab.info</code></td><td>Waits; the plugin's <code>{ id, name, packageName }</code>.</td></tr>
             <tr id="api-console"><td><code>console.log</code> and the like</td><td>Go to the plugin card's console (limited).</td></tr>
           </tbody>
@@ -1035,12 +1036,18 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
 
         <div class="api" id="mcp-plugins">
           <h4 class="api-sig names"><code>plugins</code></h4>
-          <p>The output of each plugin (text, tables, JSON, images), state, errors and its buttons.</p>
+          <p>The output of each plugin (text, tables, JSON, images), state, errors and its buttons. <code>outputs</code> has the blocks written with an <code>id</code> as one JSON object.</p>
         </div>
 
         <div class="api" id="mcp-click-plugin-button">
           <h4 class="api-sig names"><code>click_plugin_button</code></h4>
-          <p>Clicks a plugin's button (<code>plugin</code>: id or name; <code>button</code>: id or text), as you would click it: the plugin's code runs and the response comes when it finishes, with the time and the new errors.</p>
+          <p>Clicks a plugin's button (<code>plugin</code>: id or name; <code>button</code>: id or text), as you would click it: the plugin's code runs and the response comes when it finishes, with the time and the new errors. The response also carries the plugin's output as JSON: <code>outputs</code> (every block with an <code>id</code>, as <code>id → value</code>) and <code>written</code> (the ids this click wrote). A button can work as a function that returns JSON:</p>
+          <div class="code" data-name="Button that returns JSON"><pre><code>lab.button({ id: 'totals', label: 'Totals' }, async () =&gt; {
+  const rows = await lab.layoutBounds();
+  lab.ui.json({ count: rows.length, names: rows.map(r =&gt; r.name) }, { id: 'totals' });
+});
+// click_plugin_button { plugin, button: 'totals' } →
+// { ok: true, ms: 40, outputs: { totals: { count: 12, names: [...] } }, written: ['totals'] }</code></pre></div>
         </div>
 
         <div class="api" id="mcp-logcat">
@@ -1546,6 +1553,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=afec1f76f9dc"></script>
+  <script type="module" src="./site-pages.js?v=1e6027adbc0f"></script>
 </body>
 </html>

@@ -7,11 +7,11 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=afec1f76f9dc';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=afec1f76f9dc';
-import { encodeVariantImages } from './render-variant-image.js?v=afec1f76f9dc';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=afec1f76f9dc';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=afec1f76f9dc';
+import { pluginWorkerSource } from './plugin-runtime.js?v=1e6027adbc0f';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=1e6027adbc0f';
+import { encodeVariantImages } from './render-variant-image.js?v=1e6027adbc0f';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=1e6027adbc0f';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=1e6027adbc0f';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -67,6 +67,32 @@ export function layoutBoundsElementOut(element) {
   return { key: element.key, kind: element.kind, name: element.name, nameSource: element.nameSource, id: element.id, viewId: element.kind === 'view' && Number.isFinite(element.androidId) && element.androidId > 0 ? element.androidId : null, bounds: b, size: b ? { width: b.right - b.left, height: b.bottom - b.top } : null,
     texts: s?.texts ?? (element.text ? [element.text] : []), editableText: s?.editableText ?? null, role: s?.role ?? null, testTag: s?.testTag ?? null, contentDescriptions: s?.contentDescriptions ?? (element.contentDescription ? [element.contentDescription] : []),
     actions: s?.actions ?? [], enabled: s ? s.enabled !== false : true, modifiers: (element.modifiers ?? []).map(m => m.label), measurePolicy: element.measurePolicy ?? null, type: element.type ?? null, hasImage: element.hostId !== null && element.hostId !== undefined };
+}
+/**
+ * A block as plain data, for every caller that reads a plugin's output as data instead of looking at the panel (the MCP tools, window.apkLabPlugins, the embedded player):
+ * text -> the string; kv -> an object; table -> one object per row, keyed by column; json -> the value (the text the panel shows, parsed back; a value cut at MAX_JSON_CHARS
+ * stays that text); image -> { kind: 'image', caption, type, size, width, height } (the Blob itself only where the caller can take one: blockData's `blob`).
+ * kv and table cells are text, as the panel shows them; lab.ui.json keeps numbers, booleans, null and nesting.
+ */
+export function blockValue(block) {
+  switch (block?.kind) {
+    case 'text': return block.text;
+    case 'kv': return Object.fromEntries(block.entries);
+    case 'table': return block.rows.map(row => Object.fromEntries(block.columns.map((column, index) => [column, row[index]])));
+    case 'json': try { return JSON.parse(block.text); } catch { return block.text; }
+    case 'image': return { kind: 'image', caption: block.caption || '', type: block.blob?.type ?? '', size: block.blob?.size ?? 0, width: block.width ?? null, height: block.height ?? null };
+    default: return null;
+  }
+}
+/** A block as { id, kind, value } (and `blob` for an image when `withBlob`). */
+export function blockData(block, { withBlob = false } = {}) {
+  return { id: block.id, kind: block.kind, value: blockValue(block), ...(withBlob && block.kind === 'image' ? { blob: block.blob } : {}) };
+}
+/** A plugin's output as one JSON object: { [block id]: value } for the blocks written with an id (lab.ui.text(s, { id }), kv, table, json, image); blocks without an id are left out. */
+export function outputsOf(model) {
+  const out = {};
+  for (const block of model?.blocks ?? []) if (block.id !== null && block.id !== undefined) out[block.id] = blockValue(block);
+  return out;
 }
 /** Applies ui ops to a plugin's output model { blocks, badge } (bounded). */
 export function applyUiOps(model, ops) {
@@ -375,9 +401,12 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       if (button.disabled) return Promise.resolve({ ok: false, reason: 'disabled' });
       if (button.busy) return Promise.resolve({ ok: false, reason: 'busy' });
       button.busy = true; button.clicks = (button.clicks ?? 0) + 1; plugin.clickStarted.set(button.id, now());
+      const before = new Map(plugin.output.blocks.filter(block => block.id !== null).map(block => [block.id, block]));   // blocks are replaced, never changed in place: a new object = written by this click
       const done = new Promise(resolve => { const list = plugin.clickWaiters.get(button.id) ?? []; list.push(resolve); plugin.clickWaiters.set(button.id, list); });
       send(plugin, { t: 'click', id: button.id, by: by === 'mcp' ? 'mcp' : 'user' }); stats.events++; changed(plugin);
-      return done;
+      // the answer carries the plugin's output as data: every block with an id (outputs) and the ids this click wrote (written); the runtime flushes its ui ops before 'clicked'
+      return done.then(result => typeof result.handlers !== 'number' ? result : {   // a click that ran (not one a stop or a removal cancelled)
+         ...result, outputs: outputsOf(plugin.output), written: plugin.output.blocks.filter(block => block.id !== null && before.get(block.id) !== block).map(block => block.id) });
     },
     /** Reiniciar: a fresh Worker with empty output (also after an error). */
     restart(id) { const plugin = plugins.get(id); if (!plugin) return; stopWorker(plugin); plugin.userStopped = false; plugin.status = 'parado'; plugin.console = []; plugin.errors = []; plugin.errorCount = 0; reconcile(); },
@@ -421,6 +450,8 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     /** Read model for the panel: [{ id, name, enabled, packageFilter, status, reason, output, console, errors, errorCount, subs, stats }]. */
     list() { return [...plugins.values()]; },
     get(id) { return plugins.get(id) ?? null; },
+    /** A plugin's output as JSON ({ [block id]: value }, outputsOf), by id or name; null when there is no such plugin. */
+    outputs(idOrName) { const key = String(idOrName ?? ''), plugin = plugins.get(key) ?? [...plugins.values()].find(item => item.name === key); return plugin ? outputsOf(plugin.output) : null; },
     get runningCount() { return running().length; },
     get stats() { return { ...stats, queued: vmQueue.length, running: running().length }; },
     dispose() { for (const plugin of plugins.values()) stopWorker(plugin); plugins.clear(); if (eventTimer !== null) clearTimer(eventTimer); eventTimer = null; if (vmTimer !== null) clearTimer(vmTimer); vmTimer = null; },

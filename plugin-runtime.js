@@ -139,6 +139,7 @@ export function pluginWorkerMain(scope) {
       try { await fn({ id, by: data.by === 'mcp' ? 'mcp' : 'user', button: entry.handle }); }
       catch (error) { ok = false; message = clip(error?.message ?? String(error)).slice(0, 400); reportError(error, `button('${id}')`); }
     }));
+    if (uiTimer !== null) { clearTimeout(uiTimer); flushUi(); }   // what the handlers wrote reaches the page before the click's answer, which carries it as data (outputs)
     post({ t: 'clicked', id, ok, handlers: handlers.length, ...(ok ? {} : { error: message }) });
   }
   function buttonHandle(id) {

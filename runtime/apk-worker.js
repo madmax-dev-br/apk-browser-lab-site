@@ -1,73 +1,73 @@
-import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=afec1f76f9dc';
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=afec1f76f9dc';
-import { launcherInfo } from './launcher-info.js?v=afec1f76f9dc';
-import { buildScreenState } from './screen-state.js?v=afec1f76f9dc';
-import { createLogcat } from './logcat.js?v=afec1f76f9dc';
-import { createNetlog } from './netlog.js?v=afec1f76f9dc';
-import { reportSummary } from './report-summary.js?v=afec1f76f9dc';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=afec1f76f9dc';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=afec1f76f9dc';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=afec1f76f9dc';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=afec1f76f9dc';
-import { applyMicrogMocks } from './microg-device.js?v=afec1f76f9dc';
-import { describeRedirects } from './host-map.js?v=afec1f76f9dc';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=afec1f76f9dc';
-import { InflatePool } from './zip-inflate-pool.js?v=afec1f76f9dc';
-import { warmCrc32 } from './zip-entry.js?v=afec1f76f9dc';
-import { createAppStorage } from './app-storage.js?v=afec1f76f9dc';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=afec1f76f9dc';
-import { createMessageSink } from './audio-native.js?v=afec1f76f9dc';
-import { loadAPK } from './apk-loader.js?v=afec1f76f9dc';
-import { AndroidPlatform } from './android-platform.js?v=afec1f76f9dc';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=afec1f76f9dc';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=afec1f76f9dc';
-import { createWebViewBackend } from './webview-backend.js?v=afec1f76f9dc';
-import { FrameworkProvider } from './framework-provider.js?v=afec1f76f9dc';
-import { createRasterSender } from './raster-cache.js?v=afec1f76f9dc';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=afec1f76f9dc';
-import { dispatchPointer, pressView } from './pointer-input-host.js?v=afec1f76f9dc';
-import { resolveDevice } from './device-profile.js?v=afec1f76f9dc';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=afec1f76f9dc';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=afec1f76f9dc';
-import { SkiaProvider } from './skia-provider.js?v=afec1f76f9dc';
-import { inspectCompose } from './compose-inspector.js?v=afec1f76f9dc';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=afec1f76f9dc';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=afec1f76f9dc';
-import { readScrollInfo } from './scroll-info.js?v=afec1f76f9dc';
-import { SemanticsPacer } from './semantics-pacing.js?v=afec1f76f9dc';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=afec1f76f9dc';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=afec1f76f9dc';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=afec1f76f9dc';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=afec1f76f9dc';
-import { WorkerTaskLog } from './worker-task-log.js?v=afec1f76f9dc';
-import { holdDelay } from './frame-flow.js?v=afec1f76f9dc';
-import { disposeTextLayout } from './text-layout-native.js?v=afec1f76f9dc';
-import { IcuBreakProvider } from './icu-break-provider.js?v=afec1f76f9dc';
-import { SqliteProvider } from './sqlite-native.js?v=afec1f76f9dc';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=afec1f76f9dc';
-import { TzdataProvider } from './java-time-native.js?v=afec1f76f9dc';
-import { ZlibProvider } from './zip-native.js?v=afec1f76f9dc';
-import { IcuConverterProvider } from './icu-converter-native.js?v=afec1f76f9dc';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=afec1f76f9dc';
-import { JavacryptoProvider } from './javacrypto-native.js?v=afec1f76f9dc';
-import { disposeColorFilters } from './color-filter-native.js?v=afec1f76f9dc';
-import { disposeRegex } from './regex-native.js?v=afec1f76f9dc';
-import { disposeRenderNodes } from './rendernode-native.js?v=afec1f76f9dc';
-import { startDeepLink } from './deep-link-host.js?v=afec1f76f9dc';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=afec1f76f9dc';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=afec1f76f9dc';
-import { probeWebCodecs } from './media-codec-backend.js?v=afec1f76f9dc';
-import { APKError } from './apk-error.js?v=afec1f76f9dc';
-import { MICROG_VERSION, microgFiles } from './microg-device.js?v=afec1f76f9dc';
+import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=1e6027adbc0f';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=1e6027adbc0f';
+import { launcherInfo } from './launcher-info.js?v=1e6027adbc0f';
+import { buildScreenState } from './screen-state.js?v=1e6027adbc0f';
+import { createLogcat } from './logcat.js?v=1e6027adbc0f';
+import { createNetlog } from './netlog.js?v=1e6027adbc0f';
+import { reportSummary } from './report-summary.js?v=1e6027adbc0f';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=1e6027adbc0f';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=1e6027adbc0f';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=1e6027adbc0f';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=1e6027adbc0f';
+import { applyMicrogMocks } from './microg-device.js?v=1e6027adbc0f';
+import { describeRedirects } from './host-map.js?v=1e6027adbc0f';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=1e6027adbc0f';
+import { InflatePool } from './zip-inflate-pool.js?v=1e6027adbc0f';
+import { warmCrc32 } from './zip-entry.js?v=1e6027adbc0f';
+import { createAppStorage } from './app-storage.js?v=1e6027adbc0f';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=1e6027adbc0f';
+import { createMessageSink } from './audio-native.js?v=1e6027adbc0f';
+import { loadAPK } from './apk-loader.js?v=1e6027adbc0f';
+import { AndroidPlatform } from './android-platform.js?v=1e6027adbc0f';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=1e6027adbc0f';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=1e6027adbc0f';
+import { createWebViewBackend } from './webview-backend.js?v=1e6027adbc0f';
+import { FrameworkProvider } from './framework-provider.js?v=1e6027adbc0f';
+import { createRasterSender } from './raster-cache.js?v=1e6027adbc0f';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=1e6027adbc0f';
+import { dispatchPointer, pressView } from './pointer-input-host.js?v=1e6027adbc0f';
+import { resolveDevice } from './device-profile.js?v=1e6027adbc0f';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=1e6027adbc0f';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=1e6027adbc0f';
+import { SkiaProvider } from './skia-provider.js?v=1e6027adbc0f';
+import { inspectCompose } from './compose-inspector.js?v=1e6027adbc0f';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=1e6027adbc0f';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=1e6027adbc0f';
+import { readScrollInfo } from './scroll-info.js?v=1e6027adbc0f';
+import { SemanticsPacer } from './semantics-pacing.js?v=1e6027adbc0f';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=1e6027adbc0f';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=1e6027adbc0f';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=1e6027adbc0f';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=1e6027adbc0f';
+import { WorkerTaskLog } from './worker-task-log.js?v=1e6027adbc0f';
+import { holdDelay } from './frame-flow.js?v=1e6027adbc0f';
+import { disposeTextLayout } from './text-layout-native.js?v=1e6027adbc0f';
+import { IcuBreakProvider } from './icu-break-provider.js?v=1e6027adbc0f';
+import { SqliteProvider } from './sqlite-native.js?v=1e6027adbc0f';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=1e6027adbc0f';
+import { TzdataProvider } from './java-time-native.js?v=1e6027adbc0f';
+import { ZlibProvider } from './zip-native.js?v=1e6027adbc0f';
+import { IcuConverterProvider } from './icu-converter-native.js?v=1e6027adbc0f';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=1e6027adbc0f';
+import { JavacryptoProvider } from './javacrypto-native.js?v=1e6027adbc0f';
+import { disposeColorFilters } from './color-filter-native.js?v=1e6027adbc0f';
+import { disposeRegex } from './regex-native.js?v=1e6027adbc0f';
+import { disposeRenderNodes } from './rendernode-native.js?v=1e6027adbc0f';
+import { startDeepLink } from './deep-link-host.js?v=1e6027adbc0f';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=1e6027adbc0f';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=1e6027adbc0f';
+import { probeWebCodecs } from './media-codec-backend.js?v=1e6027adbc0f';
+import { APKError } from './apk-error.js?v=1e6027adbc0f';
+import { MICROG_VERSION, microgFiles } from './microg-device.js?v=1e6027adbc0f';
 installWasmMemoryMeter();   // before anything is instantiated: every WebAssembly memory of this Worker is counted for the page's memory line (src/wasm-memory-meter.js)
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=afec1f76f9dc';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=afec1f76f9dc';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=1e6027adbc0f';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=1e6027adbc0f';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=afec1f76f9dc';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=afec1f76f9dc';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=afec1f76f9dc';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = 'afec1f76f9dc';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=1e6027adbc0f';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=1e6027adbc0f';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=1e6027adbc0f';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '1e6027adbc0f';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -86,6 +86,19 @@ let inventory = null, archive = null;
 let activeRequestId = null;
 let busy = false;
 let eventTimer = null, lastEventMs = 0;
+// A scheduled pump returns to the Worker's message loop after SCHEDULED_PUMP_MS of work (once the screen has frames): a page request (a tap, a key, a query) waits at most that long
+// before the Worker reads it. Measured with 8 background threads that never stop computing (fixtures/activity-probe.apk BusyProbe): a request waited 287 ms (median, p90 364)
+// while one scheduled pump drained up to its 1.5 s settle window, because background work is always due then and no frame ends the pump on a still screen; with the bound, 42 ms (max 53). The next pump is armed
+// at once through a MessageChannel, not a setTimeout(0), which browsers clamp to 4 ms once nested: the background work keeps its pace and page messages get in between. Only
+// after a pump the bound cut: a pump that ended on its own (a frame made, nothing left due) is re-armed by setTimeout as before. Re-arming those at once too ran a pump per
+// short frame with no pause, and an animating screen's Worker went from 75 % idle to 12 % (ab-scroll, heavy-views), mostly in snapshots.
+const SCHEDULED_PUMP_MS = 50;
+let pendingPump = null, pumpToken = 0;
+const pumpChannel = typeof MessageChannel === 'function' ? new MessageChannel() : null;
+if (pumpChannel) pumpChannel.port1.onmessage = event => { if (event.data !== pumpToken || pendingPump === null) return; const run = pendingPump; pendingPump = null; run(); };
+function cancelPump() { clearTimeout(eventTimer); eventTimer = null; pendingPump = null; pumpToken++; }
+let pumpCut = false;   // the last scheduled pump stopped at SCHEDULED_PUMP_MS with work still due: only then is the next one armed at once
+function armPump(delay, run) { if (delay <= 0 && pumpChannel && pumpCut) { pendingPump = run; pumpChannel.port2.postMessage(++pumpToken); } else eventTimer = setTimeout(run, Math.min(2147483647, Math.max(0, delay))); }
 function errorData(error) { const summary = (() => { try { return runtime ? reportSummary(runtime, { tela: (() => { try { return runtime.runDiagnostic(() => buildScreenState(runtime, { semantics: null }).tela, null); } catch { return null; } })(), error: { message: error.message, details: { jsStack: error.details?.jsStack ?? (!error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? '') ? String(error.stack ?? '') : null) } } }).join('\n') : null; } catch { return null; } })(); const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { summary, uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
 const semanticsPacer = new SemanticsPacer();
@@ -167,15 +180,15 @@ const SETTLE_WINDOW_MS = 1500, FIRST_FRAME_SETTLE_MS = 8000;   // until the firs
 // vsync (a large app's first seconds: new composables, first image decodes) the next Choreographer frame is always due at once, and draining "while something is due" ran four or five
 // frames back to back in one 100-150 ms task with only the last one shown: the page saw a hitch while the VM produced frames at nearly full rate. The work still due runs in the
 // next pump, scheduled at once (scheduleEvents), after the snapshot. The VM's own order of events is unchanged: only where the Worker stops to show a frame.
-function drainReadyEvents(maxMs = SETTLE_WINDOW_MS, { framePaced = false } = {}) {
+function drainReadyEvents(maxMs = SETTLE_WINDOW_MS, { framePaced = false, launchWindow = true } = {}) {   // launchWindow: before the first frame, a page request settles up to FIRST_FRAME_SETTLE_MS; a scheduled pump never does (it keeps maxMs)
   let processed = 0, result; const started = performance.now(), frames = () => runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, framesBefore = framePaced ? frames() : 0;
   for (let round = 0; round < 32; round++) {
     result = runtime.platform.drainEvents(runtime, { untilFrame: framePaced && framesBefore > 0 }); processed += result.processed;
     if (!result.processed || result.nextDelay !== 0) break;
     if (framePaced && framesBefore > 0 && frames() > framesBefore) break;   // a new frame to show: the page gets it first
-    if (performance.now() - started > ((runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 1) > 0 ? maxMs : Math.max(maxMs, FIRST_FRAME_SETTLE_MS))) break;   // the rest is left queued for the next pump
+    if (performance.now() - started > (!launchWindow || (runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 1) > 0 ? maxMs : Math.max(maxMs, FIRST_FRAME_SETTLE_MS))) return {...result, processed, cut: true};   // the rest is left queued for the next pump
   }
-  return {...result, processed};
+  return {...result, processed, cut: false};
 }
 /** The page's keyboard on a Compose text field (src/device-view.js): each key goes to the served view's InputConnection as a soft keyboard sends it (src/input-method-service-host.js
  * imeEdit), and the frame it schedules (recomposition, the field's new state reported back to the connection) runs before the next key, as it does between a person's keystrokes.
@@ -261,7 +274,7 @@ function surfaceThreadFailure() {
   self.postMessage({ type: 'thread-failure', failure: { thread: failure.thread, kind: failure.kind, atMs: failure.atMs, message: failure.full.length > 6000 ? failure.full.slice(0, 1500) + ' ... ' + failure.full.slice(-4000) : failure.full } });
 }
 function scheduleEvents() {
-  clearTimeout(eventTimer); eventTimer = null; surfaceThreadFailure();
+  cancelPump(); surfaceThreadFailure();
   if (!runtime?.platform?.nextEventDelay) return;
   const eventDelay = runtime.platform.nextEventDelay(), threadDelay = runtime.multiThreaded ? runtime.scheduler.threadDelay() : null;   // parked and sleeping threads wake by timer too: an idle pool costs nothing between deadlines
   let delay = eventDelay === null ? threadDelay : threadDelay === null ? eventDelay : Math.min(eventDelay, threadDelay);
@@ -277,14 +290,14 @@ function scheduleEvents() {
   if (refine !== null) delay = delay == null ? refine : Math.min(delay, refine);
   if (delay == null) return;
   const dueAt = performance.now() + Math.max(0, delay);
-  eventTimer = setTimeout(() => {
+  armPump(delay, () => {
     if (busy) { scheduleEvents(); return; }
     pace('timerLate', performance.now() - dueAt);
     busy = true; let succeeded = false;
     self.postMessage({ type: 'runtime-busy' });   // the page must not treat the screen as settled while a scheduled VM event is being processed
     try {
       taskLog.begin('events', runtime);
-      const started = performance.now(), drained = monitored('scheduled event', () => drainReadyEvents(SETTLE_WINDOW_MS, { framePaced: true })); lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
+      const started = performance.now(), drained = monitored('scheduled event', () => drainReadyEvents(SCHEDULED_PUMP_MS, { framePaced: true, launchWindow: false })); pumpCut = drained.cut === true; lastEventMs = Math.round(performance.now() - started); if (drained.processed) { workerTiming.scheduledBatches++; workerTiming.scheduledMs += performance.now() - started; pace('batch', performance.now() - started); if (lastBatchAt) pace('gap', started - lastBatchAt); lastBatchAt = started; }
       logcat.flush(); netlog.flush();
       const refining = !drained.processed && !snapshotOwed && motionRaster.refinementDue(motionSignal()); if (refining) motionRaster.noteRefinement();   // the quiet period passed with the screen still: replay the last frame at full density
       const readyFlip = !drained.processed && readyTracker.flipDue(performance.now());   // nothing ran and the quiet period passed: a fresh snapshot carries screenReady.ready = true
@@ -293,7 +306,7 @@ function scheduleEvents() {
       succeeded = true;
     } catch (error) { self.postMessage({ type: 'runtime-error', error: errorData(error) }); }
     finally { taskLog.end(runtime); busy = false; surfaceThreadFailure(); if (succeeded) scheduleEvents(); }
-  }, Math.min(2147483647, Math.max(0, delay)));
+  });
 }
 // The static API-gap estimate (src/api-gap-scan.js) runs once per opened APK, after its first launch attempt (successful or not), in slices that yield to the event loop so
 // VM events and page requests are served in between. Read-only on the VM; its result only feeds "Copiar diagnóstico". A failure here never reaches the run.
@@ -435,7 +448,7 @@ async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } 
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=afec1f76f9dc').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  import('../vmcore/js/attach.js?v=1e6027adbc0f').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
   try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
   sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
   warmLoadCode();
@@ -622,7 +635,7 @@ async function handleMessage({ data }) {
     return;
   }
   if (busy) { send({ type: 'error', error: { name: 'ProtocolError', message: 'The VM is already processing another operation.' } }); return; }
-  busy = true; activeRequestId = requestId; let succeeded = false; clearTimeout(eventTimer); if (type === 'load' || type === 'launch') operationSpans[type] = { start: epochNow(), end: null }; taskLog.begin('request:' + type, runtime);
+  busy = true; activeRequestId = requestId; let succeeded = false; cancelPump(); pumpCut = false; if (type === 'load' || type === 'launch') operationSpans[type] = { start: epochNow(), end: null }; taskLog.begin('request:' + type, runtime);
   try {
     if (type === 'load') {
       const loadTiming = createLoadTiming();   // where the time of this load went, by progress phase (the diagnostic summary and debug-exec report it)
@@ -652,7 +665,7 @@ async function handleMessage({ data }) {
       runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
       loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=afec1f76f9dc')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=1e6027adbc0f')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */

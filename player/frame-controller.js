@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=afec1f76f9dc';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=afec1f76f9dc';
-import { formatApiGapReport } from '../api-gap-scan.js?v=afec1f76f9dc';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=afec1f76f9dc';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=afec1f76f9dc';
-import { parseMethodSpec } from '../method-overrides.js?v=afec1f76f9dc';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=afec1f76f9dc';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=afec1f76f9dc';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=afec1f76f9dc';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=afec1f76f9dc';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, MAX_LOG_BATCH } from '../plugin-host.js?v=afec1f76f9dc';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=afec1f76f9dc';
-import { rowToEntry } from '../logcat.js?v=afec1f76f9dc';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=afec1f76f9dc';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=1e6027adbc0f';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=1e6027adbc0f';
+import { formatApiGapReport } from '../api-gap-scan.js?v=1e6027adbc0f';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=1e6027adbc0f';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=1e6027adbc0f';
+import { parseMethodSpec } from '../method-overrides.js?v=1e6027adbc0f';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=1e6027adbc0f';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=1e6027adbc0f';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=1e6027adbc0f';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=1e6027adbc0f';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, outputsOf, MAX_LOG_BATCH } from '../plugin-host.js?v=1e6027adbc0f';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=1e6027adbc0f';
+import { rowToEntry } from '../logcat.js?v=1e6027adbc0f';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=1e6027adbc0f';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -89,7 +89,8 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     if (!subscribed.network) return;
     chunks(Array.isArray(message?.rows) ? message.rows : []).forEach((rows, index) => send('network', { entries: rows, reset: index === 0 && !!message.reset, dropped: message.dropped | 0, total: message.total | 0 }));
   };
-  const pluginSummary = plugin => ({ id: plugin.id, name: plugin.name, enabled: plugin.enabled, packageFilter: plugin.packageFilter, status: plugin.status, reason: plugin.reason ?? '', badge: plugin.output.badge, blocks: plugin.output.blocks.slice(),
+  const pluginSummary = plugin => ({ id: plugin.id, name: plugin.name, enabled: plugin.enabled, packageFilter: plugin.packageFilter, status: plugin.status, reason: plugin.reason ?? '', badge: plugin.output.badge, blocks: plugin.output.blocks.slice(), outputs: outputsOf(plugin.output),
+    buttons: (plugin.buttons ?? []).map(button => ({ id: button.id, label: button.label, disabled: !!button.disabled, busy: !!button.busy })),
     console: plugin.console.slice(-50).map(line => ({ ...line })), errors: plugin.errors.slice(-20).map(error => ({ ...error })), errorCount: plugin.errorCount });
   const flushPlugins = () => { pluginTimer = null; for (const id of pluginChanged) { const plugin = pluginHost?.get(id); send('plugin-output', { plugin: plugin ? pluginSummary(plugin) : { id, removed: true, blocks: [] } }); } pluginChanged.clear(); };
   function ensurePluginHost() {
@@ -350,6 +351,19 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     pluginsStop(args) { const id = shortText(args.id, 64, 'id'); const host = ensurePluginHost(); if (!host.get(id)) throw callError('not-found', `No plugin ${id}.`); host.stop(id); return pluginSummary(host.get(id)); },
     pluginsRestart(args) { const id = shortText(args.id, 64, 'id'); const host = ensurePluginHost(); if (!host.get(id)) throw callError('not-found', `No plugin ${id}.`); host.restart(id); return pluginSummary(host.get(id)); },
     pluginsList() { return pluginHost ? pluginHost.list().map(pluginSummary) : []; },
+    /** A click on a plugin's button (lab.button, by id or label), as the user's: resolves when its handlers finished, with the plugin's output as JSON (outputs: id -> value) and the
+     *  ids the click wrote (written); { ok: null, reason: 'still-running' } after waitMs (default 10 s, at most 50 s: the call itself times out at 60 s). */
+    async pluginsClick(args) {
+      const id = shortText(args.id, 64, 'id'); if (!id) throw callError('bad-args', 'id must name a plugin (its id or name)');
+      const host = ensurePluginHost(), plugin = host.get(id) ?? host.list().find(item => item.name === id); if (!plugin) throw callError('not-found', `No plugin ${id}.`);
+      const key = shortText(args.button, 80, 'button'); if (!key) throw callError('bad-args', 'button must name a button (its id or label)');
+      const button = plugin.buttons.find(item => item.id === key) ?? plugin.buttons.find(item => item.label === key);
+      if (!button) throw callError('not-found', `Plugin ${plugin.name} has no button ${key}.`);
+      const waitMs = Number.isFinite(args.waitMs) ? Math.min(50000, Math.max(0, args.waitMs)) : 10000;
+      let timer = null;
+      try { return await Promise.race([host.clickButton(plugin.id, button.id, { by: 'mcp' }), new Promise(resolve => { timer = setTimeout(() => resolve({ ok: null, reason: 'still-running' }), waitMs); })]); }
+      finally { clearTimeout(timer); }
+    },
     /** "Parar VM": terminate the Worker now (a wedged app); restart() starts it again from the retained bytes. */
     stop() {
       state.operation++; state.busy = false; try { vm.cancel(); } catch { /* already gone */ } setTimeout(() => { if (!destroyed) vm.prewarm?.(); }, 0);   // restart() then finds a Worker already warming

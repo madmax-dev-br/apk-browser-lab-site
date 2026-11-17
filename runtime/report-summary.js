@@ -1,11 +1,11 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=afec1f76f9dc';
-import { staticRetentionLines } from './heap-gc.js?v=afec1f76f9dc';
-import { overrideSummaryLines } from './method-overrides.js?v=afec1f76f9dc';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=afec1f76f9dc';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=afec1f76f9dc';
-import { hostMapSummaryLines } from './host-map.js?v=afec1f76f9dc';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=1e6027adbc0f';
+import { staticRetentionLines } from './heap-gc.js?v=1e6027adbc0f';
+import { overrideSummaryLines } from './method-overrides.js?v=1e6027adbc0f';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=1e6027adbc0f';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=1e6027adbc0f';
+import { hostMapSummaryLines } from './host-map.js?v=1e6027adbc0f';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -134,6 +134,11 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
         const oldest = Math.max(...overdue.map(event => now - event.when)), top = frames[0] ?? (runtime.lastHostCall ? `host call ${runtime.lastHostCall}` : 'the looper (idle)');
         out.push(`${overdue.length} overdue main Looper messages, the oldest for ${(oldest / 1000).toFixed(1)} s, waiting for the main thread to leave: ${top}`);
       } }
+  });
+  // the last interaction (a tap, a drag, typing): how long the main thread ran, how much background work ran in between and why (android-platform.js drainEvents), the longest of each
+  part(() => { const it = runtime.platform?.interactionStats?.(); if (!it) return;
+    const ms = v => `${Math.round(v)} ms`, span = Math.max(0, it.endedAt - it.startedAt), background = it.floorMs + it.sliceMs + it.creditMs;
+    out.push(`Last interaction (${it.inputs} input${it.inputs === 1 ? '' : 's'}, ${(it.sinceLastInputMs / 1000).toFixed(1)} s ago; measured over ${ms(span)}): main thread ${ms(it.mainMs)} in ${it.mainEvents} events${it.longestMain ? ` (longest ${ms(it.longestMain.ms)}: ${it.longestMain.event})` : ''}; background threads ${ms(background)} (floor ${ms(it.floorMs)}, slices ${ms(it.sliceMs)} in ${it.slices}, parallel credit ${ms(it.creditMs)}${it.creditHeld ? `, ${it.creditHeld} held back for the input` : ''})${it.longestSlice ? `; longest background slice ${ms(it.longestSlice.ms)} on ${it.longestSlice.thread ?? '?'}${it.longestSlice.hostCall ? ` (host call ${it.longestSlice.hostCall})` : ''}` : ''}${it.overruns ? `; ${it.overruns} slices could not be preempted for more than 50 ms` : ''}`);
   });
   part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) {
       out.push(`thread ${p.thread} is polling (${p.perSecond} host calls/s): ${p.calls.map(([key, n]) => `${key} ${n}×`).join(', ')}`);
