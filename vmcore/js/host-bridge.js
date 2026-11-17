@@ -59,22 +59,21 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=f6b6991c82b7';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY, IDENTITY_HASH_KEY, BOOLEAN_VALUE_OF_KEY, ARRAY_NEW_INSTANCE_KEY, THREAD_LOCAL_GET_KEY, THREAD_LOCAL_SET_KEY, THREAD_LOCAL_REMOVE_KEY } from './natives.js?v=f6b6991c82b7';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=f6b6991c82b7';
-import { HandleTable } from './handles.js?v=f6b6991c82b7';
-import { Exceptions } from './exceptions.js?v=f6b6991c82b7';
-import { coreImports } from './boundary-imports.js?v=f6b6991c82b7';
-import { installHostLinking, methodReference, HOST_STATE_THREAD, HOST_STATE_LEAF } from './host-linking.js?v=f6b6991c82b7';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=f6b6991c82b7';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=f6b6991c82b7';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=f6b6991c82b7';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=f6b6991c82b7';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=f6b6991c82b7';
-import { Blocked } from '../../runtime/scheduler.js?v=f6b6991c82b7';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=f6b6991c82b7';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=f6b6991c82b7';
-import { GraphicsBlocks } from './graphics-blocks.js?v=f6b6991c82b7';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=05e32cf081ba';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=05e32cf081ba';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=05e32cf081ba';
+import { HandleTable } from './handles.js?v=05e32cf081ba';
+import { Exceptions } from './exceptions.js?v=05e32cf081ba';
+import { coreImports } from './boundary-imports.js?v=05e32cf081ba';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=05e32cf081ba';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=05e32cf081ba';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=05e32cf081ba';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=05e32cf081ba';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=05e32cf081ba';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=05e32cf081ba';
+import { Blocked } from '../../runtime/scheduler.js?v=05e32cf081ba';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=05e32cf081ba';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=05e32cf081ba';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -222,7 +221,6 @@ export class WasmEngine {
     this.threads = new CoreThreads(this, { main: this.mainRecord, guestBase: LAYOUT.GUESTS, guestSpan: LAYOUT.GUEST_SPAN, guestCount: LAYOUT.GUEST_COUNT, javaStack: THREAD.javaStack, take: this.dynamic ? () => this.takeGuestRecord() : null });
     this.threads.setup();
     this.stackScratch = linker.alloc(8 * 1024);
-    this.graphics = new GraphicsBlocks(this);   // the memory side of the Canvas and Paint natives (vmcore/graphics.h) for src/vector-native.js and src/paint-host.js
     // handles: every record that gets an id is exported (the sweep reports its death); every handle made while host code runs is pinned (see the header)
     const engine = this, handles = this.handles = new HandleTable();
     handles.collectAfter = HANDLE_PACE_MIN; handles.onCollectDue = () => this.requestCollection('handles');
@@ -610,12 +608,10 @@ export class WasmEngine {
       const mi = this.linker.methodsAt.get(caller), entry = mi?.pool?.[constant];
       if (!entry) throw new APKError(`vmcore: no call site at method ${mi?.key ?? caller} constant ${constant}`);
       const reference = mi.def.method.dex.method(entry.index), mode = MODE(op);
-      const site_key = `${reference.owner}->${reference.name}${reference.signature}`;
       site = { reference, mode, callerOwner: mi.owner.type, kinds: reference.parameters.map(kindOf), result: reference.result, resultKind: kindOf(reference.result), isStatic: mode === 'static', key: `${reference.owner}->${reference.name}${reference.signature}`,
         bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null, native: null, nativeEpoch: -1, nativeType: null, stringInit: reference.owner === STRING && reference.name === '<init>',
         plumbing: LOOPER_PLUMBING.test(mi.owner.type),   // the caller is Looper/MessageQueue/Handler plumbing: its bridged calls leave no trace entry (APKRuntime.record)
-        identity: reference.owner === 'Ljava/lang/Thread;' && (reference.name === 'currentThread' || reference.name === 'getId'),   // its bridge's answer fills the thread identity
-        updater: reference.name === 'newUpdater' && reference.owner.endsWith('FieldUpdater;'), arrayOf: site_key === ARRAY_NEW_INSTANCE_KEY };   // its answer gets the field's offset in memory (fillUpdater)
+        identity: reference.owner === 'Ljava/lang/Thread;' && (reference.name === 'currentThread' || reference.name === 'getId') };   // its bridge's answer fills the thread identity
       this.sites.set(key, site);
     }
     return site;
@@ -641,13 +637,7 @@ export class WasmEngine {
       if (site.stringInit) return this.constructString(site, args, t);
       this.usedBridge = null;
       let outcome = this.call(site, args);
-      if (site.updater && outcome !== null && typeof outcome === 'object') this.fillUpdater(outcome);
-      else if (site.arrayOf) this.learnArrayClass(args[0], outcome);
-      if (this.usedBridge !== null) {
-        const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); if (site.identity) this.noteIdentity(used, args, outcome);
-        if (used.key === BOOLEAN_VALUE_OF_KEY) this.noteBoolean(args[0], outcome);
-        else if (used.key === THREAD_LOCAL_GET_KEY || used.key === THREAD_LOCAL_SET_KEY || used.key === THREAD_LOCAL_REMOVE_KEY) this.noteThreadLocal(used.key, args[0]);
-      }
+      if (this.usedBridge !== null) { const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); if (site.identity) this.noteIdentity(used, args, outcome); }
       if (outcome instanceof PendingCall) {
         const mi = this.bodyInfo(outcome.method);
         if (mi && (outcome.args === args || sameWords(outcome.args, args))) { this.stats.frames++; this.w32(t + THREAD.detail, mi.address); return Status.HOST_FRAME; }
@@ -790,61 +780,23 @@ export class WasmEngine {
       if (this.stats.nested === nested) {   // a leaf call: its time stands for the TIME_SAMPLE calls of this bridge since the last sample
         const others = (TIME_SAMPLE - 1) * (tb.ms[BUCKET.HOST] - hostBefore);
         tb.ms[BUCKET.HOST] += others; tb.ms[previous] -= others; if (previous === BUCKET.INTERP) tb.acc.ms -= others;
-        tb.nestedLeaves(others, previous);   // survey only: the unsampled leaf calls are nested host time of the host that is running them, if one is
-        tb.hostCall(bridge.key, TIME_SAMPLE * ms, TIME_SAMPLE);
+        tb.hostCall(bridge.key, TIME_SAMPLE * ms);
       } else { bridge.vmNests = true; tb.hostCall(bridge.key, ms); }
       if (bridge.vmPending > 0) this.flushHost(tb, bridge);
     }
   }
   runBridge(rt, bridge, args, mode) {
-    if (bridge.key === OBJECT_HASH_KEY || bridge.key === IDENTITY_HASH_KEY) { const hash = this.identityHash(args[0]); if (hash !== undefined) return hash; }
     if (rt.fastCallPaths !== false) {
       let direct = bridge.direct; if (direct === undefined) direct = bridge.direct = rt.directBridge(bridge.key);
       if (direct !== null && args.length === (bridge.wordCount ??= wordCount(bridge.selected.parameters) + (mode === 'static' ? 0 : 1))) return direct(rt, args);
     }
     return rt.bridgeCore(bridge.selected, args, mode, bridge.key, bridge);
   }
-  /**
-   * The identity hash of a record, the one natives.c object_hash_code and identity_hash_code answer (its address / 8; the collector never moves a record), so that one object has
-   * one hash whichever path serves the call: the bridge (the JavaScript VM answers its object id, which no other engine can reproduce) or the native. A String and null are left
-   * to the bridge's own answer (a String's hash is its text's; identityHashCode(null) is 0).
-   */
-  identityHash(receiver) {
-    if (receiver === null || typeof receiver !== 'object') return undefined;
-    const address = this.handles.addressById.get(receiver.ref); return address === undefined ? undefined : address >>> 3;
-  }
-  /**
-   * The ThreadLocal bridge served a get, set or remove for the running thread: the record's one-entry copy (natives.c thread_local_*) becomes that thread's value (a null, an
-   * object or a String; a number or a host's own value stays in the Map alone and clears the copy), or is cleared by a remove. The bridge found the thread as Thread.currentThread() does, so
-   * the thread identity of HostState is filled with it, as noteIdentity fills it for that bridge.
-   */
-  noteThreadLocal(key, receiver) {
-    if (receiver === null || typeof receiver !== 'object') return;
-    const address = this.refWord(receiver), rt = this.runtime, state = address + 16; if (!address) return;
-    if (key === THREAD_LOCAL_REMOVE_KEY) { this.w32(state, 0); return; }
-    const thread = rt.platform?.concurrency?.currentThread(rt), threadWord = thread !== null && typeof thread === 'object' ? this.refWord(thread) : 0;
-    if (!threadWord) { this.w32(state, 0); return; }
-    const base = this.linker.hostState;
-    if (this.r32(base + HOST_STATE_THREAD.valid) !== 1 || this.r32(base + HOST_STATE_THREAD.object) !== threadWord) {
-      this.w32(base + HOST_STATE_THREAD.object, threadWord); this.w32(base + HOST_STATE_THREAD.idValid, 0); this.w32(base + HOST_STATE_THREAD.valid, 1);
-    }
-    const values = rt.object(receiver).threadLocalValues;
-    if (!(values instanceof Map) || !values.has(thread.ref)) { this.w32(state, 0); return; }
-    const value = values.get(thread.ref);
-    if (value !== null && typeof value !== 'string' && !(typeof value === 'object' && typeof value.ref === 'number')) { this.w32(state, 0); return; }   // a number or a host's own value stays in the Map
-    this.w32(address + 8, threadWord); this.w32(address + 12, value === null ? 0 : this.refWord(value)); this.w32(state, 1);   // a String: its record, the one the bridge's answer encodes (the text -> record cache)
-    this.space.markCard?.(address + 8);
-  }
-  /** Boolean.valueOf(boolean)'s bridge answered the Boolean.TRUE or FALSE record: HostState keeps its address, for the native that answers without the bridge from then on. */
-  noteBoolean(value, outcome) {
-    if (outcome === null || typeof outcome !== 'object') return;
-    const address = this.refWord(outcome); if (address) this.w32(this.linker.hostState + (value ? HOST_STATE_LEAF.booleanTrue : HOST_STATE_LEAF.booleanFalse), address);
-  }
   /** Adds the pending (unsampled) calls of `bridge` to the breakdown's key and thread counts, as TimeBreakdown.hostCall would have one by one. */
   flushHost(tb, bridge) {
     const n = bridge.vmPending; bridge.vmPending = 0; if (!n) return;
     let entry = tb.host.get(bridge.key);
-    if (entry === undefined) { if (tb.host.size < 4000) tb.host.set(bridge.key, entry = { n: 0, ms: 0, ex: 0, runs: 0 }); }
+    if (entry === undefined) { if (tb.host.size < 4000) tb.host.set(bridge.key, entry = { n: 0, ms: 0 }); }
     if (entry !== undefined) entry.n += n;
     const acc = tb.acc; acc.calls += n; acc.hosts.set(bridge.key, (acc.hosts.get(bridge.key) ?? 0) + n);
   }
@@ -882,32 +834,6 @@ export class WasmEngine {
     } else if (used.key === THREAD_GET_ID_KEY && args.length === 1 && this.r32(base + HOST_STATE_THREAD.valid) === 1 && (typeof outcome === 'bigint' || typeof outcome === 'number')) {
       if (args[0] === null || typeof args[0] !== 'object' || this.refWord(args[0]) !== this.r32(base + HOST_STATE_THREAD.object)) return;
       this.view.setBigUint64(base + HOST_STATE_THREAD.id, BigInt.asUintN(64, BigInt(outcome)), true); this.w32(base + HOST_STATE_THREAD.idValid, 1);
-    }
-  }
-  /**
-   * A field updater APKRuntime's newUpdater made (the field on its companion, `updaterField`): its payload in memory gets the field's byte offset in the target's record and the
-   * Class record of the field's owner (natives.h, natives.c updater_field), so the updater natives read and write the target's field there. A field the core does not lay out
-   * (a host class's) leaves the state 0: the natives defer to the bridge.
-   */
-  fillUpdater(updater) {
-    const field = this.runtime.object(updater).updaterField, address = this.refWord(updater); if (!field || !address) return;
-    let owner; try { owner = this.linker.classOf(field.owner); } catch { return; }
-    let offset; for (let c = owner; c && offset === undefined; c = c.superInfo) for (const f of c.fields?.values?.() ?? []) if (f.key === field.key) { offset = f.offset; break; }
-    if (offset === undefined || !(owner.cls ?? false)) return;
-    this.w32(address + 8, offset); this.w32(address + 12, owner.address); this.w32(address + 16, 1);
-  }
-  /**
-   * reflect.Array.newInstance(Class, int) answered an array of class A for the component Class record C: HostState.arrayClassTable keeps (C, A) (natives.c array_class_for, the same
-   * probe), so later calls for C are made in C. A call that failed or answered anything else teaches nothing.
-   */
-  learnArrayClass(componentClass, outcome) {
-    if (componentClass === null || typeof componentClass !== 'object' || outcome === null || typeof outcome !== 'object') return;
-    const object = this.refWord(componentClass), array = this.refWord(outcome); if (!object || !array) return;
-    const component = this.r32(object + CLASS_OBJECT_CLASS), arrayClass = this.r32(array), table = this.r32(this.linker.hostState + HOST_STATE_LEAF.arrayClassTable);
-    if (!component || !arrayClass || !table) return;
-    for (let i = 0, slot = Math.imul(component >>> 3, 2654435761 | 0) >>> 24; i < 8; i++, slot = (slot + 1) & 255) {
-      const at = table + 8 * slot, known = this.r32(at); if (known === component) return;
-      if (known === 0) { this.w32(at + 4, arrayClass); this.w32(at, component); return; }
     }
   }
   /** The bound natives go back to the trampoline (the routing may answer differently now). */
@@ -1122,7 +1048,6 @@ export class WasmEngine {
   verify() { this.x.gc_retire_buffers(this.h); return this.x.gc_verify(this.h); }
 }
 
-const OBJECT_HASH_KEY = 'Ljava/lang/Object;->hashCode()I';
 const sameWords = (a, b) => a.length === b.length && a.every((v, i) => v === b[i] || (v !== null && b[i] !== null && typeof v === 'object' && typeof b[i] === 'object' && v.ref === b[i].ref));
 
 /**
@@ -1185,64 +1110,6 @@ function referenceFacade(property) {
   referenceFacades.set(property, facade); return facade;
 }
 
-/**
- * The facade of a java.lang.Enum record (natives.h, natives.c enum_*): `enumOrdinal` (an int at +8) and `enumName` (a reference at +12) with a state word at +16, bit 0 and bit 1
- * for what is in memory. What a host stores that memory cannot hold as the JavaScript VM holds it (a JavaScript string as the name, a non-int ordinal) stays on the facade with
- * its bit clear: the natives defer to the bridge then, which reads the facade. Never written: undefined.
- */
-let enumFacadeClass;
-function enumFacade() {
-  if (enumFacadeClass !== undefined) return enumFacadeClass;
-  enumFacadeClass = class EnumFacade extends ObjectFacade {
-    #ordinal = undefined; #name = undefined;
-    static {
-      Object.defineProperty(this.prototype, 'enumOrdinal', {
-        get() { const space = this.space, at = this.address; return (space.u32[(at + 16) >> 2] & 1) !== 0 ? space.i32[(at + 8) >> 2] : this.#ordinal; },
-        set(value) {
-          const space = this.space, at = this.address, state = space.u32[(at + 16) >> 2];
-          if (typeof value === 'number' && (value | 0) === value && !Object.is(value, -0)) { space.i32[(at + 8) >> 2] = value; space.u32[(at + 16) >> 2] = state | 1; this.#ordinal = undefined; }
-          else { space.u32[(at + 16) >> 2] = state & ~1; this.#ordinal = value; }
-        }, configurable: true });
-      Object.defineProperty(this.prototype, 'enumName', {
-        get() { const space = this.space, at = this.address; return (space.u32[(at + 16) >> 2] & 2) !== 0 ? space.refValue(space.u32[(at + 12) >> 2]) : this.#name; },
-        set(value) {
-          const space = this.space, at = this.address, state = space.u32[(at + 16) >> 2];
-          if (value === null || (typeof value === 'object' && typeof value.ref === 'number')) {
-            const target = value === null ? 0 : space.refWord(value); space.u32[(at + 12) >> 2] = target; space.u32[(at + 16) >> 2] = state | 2; this.#name = undefined;
-            if (target !== 0) { space.markCard?.(at + 12); if (space.onReferenceStore !== null) space.onReferenceStore(at, target); }
-          } else { space.u32[(at + 12) >> 2] = 0; space.u32[(at + 16) >> 2] = state & ~2; this.#name = value; }
-        }, configurable: true });
-    }
-  };
-  return enumFacadeClass;
-}
-
-/**
- * The facade of a java.lang.ThreadLocal record: `threadLocalValues`, the Map of the JavaScript VM's bridge (by thread), is where the values live; the one-entry copy in memory is
- * written back to it before a host reads the Map, when a native set the copy's value since (state bit 1).
- */
-let threadLocalFacadeClass;
-function threadLocalFacade() {
-  if (threadLocalFacadeClass !== undefined) return threadLocalFacadeClass;
-  threadLocalFacadeClass = class ThreadLocalFacade extends ObjectFacade {
-    // The Map is an ordinary own property (`threadLocalMap`), not a private field: the collector's companion walk scans own properties only, and the objects this Map holds for
-    // the threads other than the copy's are reachable through nothing else.
-    static {
-      Object.defineProperty(this.prototype, 'threadLocalValues', {
-        get() {
-          const space = this.space, at = this.address, map = this.threadLocalMap;
-          if ((space.u32[(at + 16) >> 2] & 2) !== 0 && map instanceof Map) {
-            space.u32[(at + 16) >> 2] &= ~2;
-            const thread = space.refValue(space.u32[(at + 8) >> 2]); map.set(thread.ref, space.refValue(space.u32[(at + 12) >> 2]));
-          }
-          return map;
-        },
-        set(value) { this.threadLocalMap = value; }, configurable: true });
-    }
-  };
-  return threadLocalFacadeClass;
-}
-
 /** Class layouts for the record facades, made from the linker's records on first use (a Map whose get() lays the layout out). */
 export class LazyLayouts extends Map {
   constructor(engine) { super(); this.engine = engine; this.byAddress = new Map(); }
@@ -1253,15 +1120,9 @@ export class LazyLayouts extends Map {
     for (let c = info; c; c = c.superInfo) if (!c.isInterface) for (const field of c.fields.values()) fields.push({ key: field.key, offset: field.offset, type: field.type });
     const layout = this.engine.space.registerClass(address, { type: info.facadeType ?? info.type, fields });
     if (info.type === CLASS_TYPE) layout.onCreate = facade => { facade.classType = this.typeAt(this.engine.r32(facade.address + CLASS_OBJECT_CLASS)); };
-    // a payload is inherited: an instance of an app class below AtomicInteger (or AtomicReference...) has the same words, which the natives read
-    let property = info.memoryProperty; for (let c = info.superInfo; property === undefined && c; c = c.superInfo) property = c.memoryProperty;
     if (info.boxKind !== undefined) layout.facadeClass = boxFacade(BOX_LETTERS[info.boxKind]);
-    else if (property === 'atomicValue') layout.facadeClass = boxFacade('I', 'atomicValue');
-    else if (property === 'atomicLong') layout.facadeClass = boxFacade('J', 'atomicValue');
-    else if (property === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
-    else if (property === 'atomicArray') layout.facadeClass = referenceFacade('atomicArray');
-    else if (property === 'enum') layout.facadeClass = enumFacade();
-    else if (property === 'threadLocal') layout.facadeClass = threadLocalFacade();
+    else if (info.memoryProperty === 'atomicValue') layout.facadeClass = boxFacade('I', 'atomicValue');
+    else if (info.memoryProperty === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
     return layout;
   }
   /** The descriptor of the class whose Class record is at `address`. */

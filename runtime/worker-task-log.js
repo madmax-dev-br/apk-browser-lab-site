@@ -29,7 +29,6 @@ export class WorkerTaskLog {
   /** A task starts (`kind`: 'events', 'snapshot', 'request:<type>', 'api-gap-scan', ...). Tasks do not nest: a task begun while another is open ends that one first. */
   begin(kind, runtime) {
     if (this.open) this.end(runtime);
-    if (this.survey && runtime?.tb) { runtime.tb.keepHosts = true; this.surveyed = runtime; }   // a measurement tool asked for the session's host-call totals (hostTotals)
     if (this.traceSlices && runtime && runtime.sliceLog !== this) runtime.sliceLog = this;   // a measurement tool asked for the background slices (sliceBegin / sliceEnd)
     const ms = bucketTotals(runtime, new Float64Array(BUCKETS)), counts = counterTotals(runtime, new Float64Array(BUCKETS));
     this.open = { kind, at: performance.now(), ms, counts, raster: rasterMs(runtime), gcCollections: runtime?.gcStats?.collections ?? 0, frames: runtime?.platform?.viewWindowHost?.frameState?.().framesRun ?? 0,
@@ -64,14 +63,6 @@ export class WorkerTaskLog {
     if (entry.ms < 0.5 && entry.frames === 0 && entry.decodes === 0 && entry.inits === 0) { this.skipped = (this.skipped ?? 0) + 1; return entry; }   // a wake that found nothing due: not a cause of anything
     if (this.ring.length < this.capacity) this.ring.push(entry); else { this.ring[this.next] = entry; this.next = (this.next + 1) % this.capacity; }
     return entry;
-  }
-  /** With `survey` on since before the work of interest: every bridged host call of the session, [{ key, n, ms, exclusiveMs, nested }] by inclusive time (a host call that runs Java inside
-   *  counts that Java; `exclusiveMs` is that minus the nested VM runs and the nested host calls it made, `nested` the number of nested VM runs it started), the frames the frame clock produced, and the bucket totals { interp, host, decode, compile, init, gc } in ms. scripts/validation/host-survey.mjs reads it. */
-  hostTotals() {
-    const tb = this.surveyed?.tb; if (!tb) return null;
-    const all = new Map(); for (const table of [tb.lifeHost, tb.host]) if (table) for (const [key, value] of table) { const total = all.get(key); if (total) { total.n += value.n; total.ms += value.ms; total.ex += value.ex; total.runs += value.runs; } else all.set(key, { n: value.n, ms: value.ms, ex: value.ex, runs: value.runs }); }
-    const ms = bucketTotals(this.surveyed, new Float64Array(BUCKETS)), counts = counterTotals(this.surveyed, new Float64Array(BUCKETS));
-    return { buckets: { interp: ms[0], host: ms[1], decode: ms[2], compile: ms[3], init: ms[4], gc: ms[5] }, hostCalls: counts[1], frames: this.surveyed?.platform?.viewWindowHost?.frameState?.().framesRun ?? 0, hosts: [...all].map(([key, value]) => ({ key: String(key), n: value.n, ms: Math.round(value.ms * 100) / 100, exclusiveMs: Math.round(value.ex * 100) / 100, nested: Math.round(value.runs) })).sort((a, b) => b.ms - a.ms) };
   }
   /** Runs `fn` as one task of `kind` (the previous open task, if any, is ended first and not resumed). */
   run(kind, runtime, fn) { this.begin(kind, runtime); try { return fn(); } finally { this.end(runtime); } }

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=f6b6991c82b7';
+import { APKError } from './apk-error.js?v=05e32cf081ba';
 const MATRIX = 'Landroid/graphics/Matrix;', RECT = 'Landroid/graphics/RectF;';
 const REGISTRY = 'Llibcore/util/NativeAllocationRegistry;', CLEANER = 'Lapkweb/bridge/MatrixCleaner;';
 const FINALIZER = 0x4d415452n;

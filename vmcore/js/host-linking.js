@@ -26,28 +26,19 @@
 //     payload for its `atomicValue` (its get native).
 //  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
 //     the nearest host superclass, selected by APKRuntime.dispatch.
-//  9. android.graphics.Canvas and Paint (host classes) get the payload of the graphics natives (vmcore/graphics.h: a Canvas record's block and generation, a Paint record's fields)
-//     and their group's Class flag; a class below them gets the flag only when its DEX code declares none of the methods the group's natives stand for (natives.js
-//     GRAPHICS_NATIVES), so the natives answer only where the JavaScript VM's routing would select the host's own bridge. `graphicsOwner` on the linker's record of every class
-//     with the payload names its group (vmcore/js/graphics-blocks.js binds records by it).
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, ATOMIC_LONG, ATOMIC_BOOLEAN, ATOMIC_ARRAY, UPDATER_REF, UPDATER_INT, UPDATER_LONG, ENUM, THREAD_LOCAL, GRAPHICS_NATIVES } from './natives.js?v=f6b6991c82b7';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE } from './natives.js?v=05e32cf081ba';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
 export const HOST_STATE_THREAD = { valid: 72, object: 76, idValid: 80, id: 88 };
-// natives.h HostState, the leaf natives' classes: the atomics' payloads (AtomicLong like a Long box, AtomicBoolean like an Integer box, AtomicReferenceArray like AtomicReference's reference
-// payload; a field updater's { field offset, owner Class, state } of 24 bytes, filled by host-bridge.js when newUpdater answers)
-export const HOST_STATE_LEAF = { atomicLong: 104, atomicBoolean: 108, atomicArray: 112, refUpdater: 116, intUpdater: 120, longUpdater: 124, booleanTrue: 128, booleanFalse: 132, enumClass: 136, threadLocalClass: 140, arrayClassTable: 144 };
-const VM_HOST_STATE = 44, HOST_STATE_BYTES = 152, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, ARRAY_OF_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
+const VM_HOST_STATE = 44, HOST_STATE_BYTES = 104, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
 const CLASS_VTABLE = 24, CLASS_ITABLE = 32, METHOD_KIND = 12, METHOD_FLAGS = 20, METHOD_VTABLE_INDEX = 24;
 const METHOD_UNBOUND = 0x7fff0003, METHOD_THROWABLE_INIT = 0x7fff0004, METHOD_HOST_DISPATCH = 64, M_INTERFACE = 32, M_ABSTRACT = 16, NO_SLOT = 0xffffffff;
 const K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, RESOLVE_CODE = 0xffffffff, RESOLVE_WELL_KNOWN = 0xffffff00, UNRESOLVED = 34;
-const M_STATIC = 1, M_CONSTRUCTOR = 2, CLASS_FLAGS = 12, OBJECT_HEADER = 8;
-// (9) graphics.h: the instance size of a Canvas record (its block and generation after the header) and of a Paint record (its fields)
-const GRAPHICS_PAYLOAD = new Map([['Landroid/graphics/Canvas;', 16], ['Landroid/graphics/Paint;', 48]]), GRAPHICS_GROUP = new Map(GRAPHICS_NATIVES.map(group => [group.owner, group]));
+const M_STATIC = 1, M_CONSTRUCTOR = 2;
 
 // Code units of each instruction (DEX formats, as linker.js), and of the payload pseudo-instructions.
 const UNITS = new Uint8Array(256).fill(1);
@@ -95,7 +86,6 @@ export function installHostLinking(linker, runtime, { staticValue }) {
 
   // (7) the host state: box classes and caches
   const hostState = linker.hostState = linker.alloc(HOST_STATE_BYTES); linker.w32(linker.vm + VM_HOST_STATE, hostState);
-  linker.w32(hostState + HOST_STATE_LEAF.arrayClassTable, linker.alloc(8 * ARRAY_OF_SLOTS));   // reflect.Array.newInstance: { component Class, array Class } entries host-bridge.js learns
   for (const kind of CACHED_KINDS) { const cache = linker.alloc(4 * BOX_CACHE_SLOTS); linker.w32(hostState + 32 + 4 * kind, cache); linker.extraRoots.push([cache, BOX_CACHE_SLOTS]); }
 
   // (1) host classes: every slot a host-dispatch record of the class
@@ -110,28 +100,7 @@ export function installHostLinking(linker, runtime, { staticValue }) {
     } else if (type === ATOMIC_REFERENCE) {   // (7): `atomicValue` as a reference at +8 (in the refMap: the collector traces it, subclasses inherit it) with a state word at +12
       info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
       this.w32(hostState + HOST_STATE_ATOMIC_REFERENCE, info.address); info.memoryProperty = 'atomicReference';
-    } else if (type === ATOMIC_LONG) {   // (7): `atomicValue` as a Long's payload
-      info.instanceSize = 24; this.w32(info.address + CLASS_INSTANCE_SIZE, 24); this.w32(hostState + HOST_STATE_LEAF.atomicLong, info.address); info.memoryProperty = 'atomicLong';
-    } else if (type === ATOMIC_BOOLEAN) {   // (7): `atomicValue` as an Integer's payload (0 or 1)
-      info.instanceSize = 16; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(hostState + HOST_STATE_LEAF.atomicBoolean, info.address); info.memoryProperty = 'atomicValue';
-    } else if (type === ATOMIC_ARRAY) {   // (7): `atomicArray` as AtomicReference's reference payload
-      info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
-      this.w32(hostState + HOST_STATE_LEAF.atomicArray, info.address); info.memoryProperty = 'atomicArray';
-    } else if (type === ENUM) {   // (7): `enumOrdinal` at +8, `enumName` (a reference, traced and inherited by every enum class) at +12, a state word at +16 (natives.c enum_*)
-      info.instanceSize = 24; info.refs = [12]; this.w32(info.address + CLASS_INSTANCE_SIZE, 24); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
-      this.w32(hostState + HOST_STATE_LEAF.enumClass, info.address); info.memoryProperty = 'enum';
-    } else if (type === THREAD_LOCAL) {   // (7): a one-entry copy of the value of the last thread the bridge served, { thread, value } traced, a state word (natives.c thread_local_*)
-      info.instanceSize = 24; info.refs = [8, 12]; this.w32(info.address + CLASS_INSTANCE_SIZE, 24); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
-      this.w32(hostState + HOST_STATE_LEAF.threadLocalClass, info.address); info.memoryProperty = 'threadLocal';
-    } else if (type === UPDATER_REF || type === UPDATER_INT || type === UPDATER_LONG) {   // (7): the field a newUpdater call names, as { offset, owner Class, state } (no references: the owner is a metaspace record)
-      info.instanceSize = 24; this.w32(info.address + CLASS_INSTANCE_SIZE, 24);
-      this.w32(hostState + (type === UPDATER_REF ? HOST_STATE_LEAF.refUpdater : type === UPDATER_INT ? HOST_STATE_LEAF.intUpdater : HOST_STATE_LEAF.longUpdater), info.address);
     }
-    const group = GRAPHICS_GROUP.get(type);
-    if (group !== undefined && !info.isInterface && info.instanceSize === OBJECT_HEADER) {   // (9)
-      info.instanceSize = GRAPHICS_PAYLOAD.get(type); this.w32(info.address + CLASS_INSTANCE_SIZE, info.instanceSize);
-      info.graphicsOwner = type; this.w32(info.address + CLASS_FLAGS, this.r32(info.address + CLASS_FLAGS) | group.flag);
-    } else if (info.superInfo?.graphicsOwner !== undefined) info.graphicsOwner = info.superInfo.graphicsOwner;   // a host class below them: the payload, not the flag
     if (type === OBJECT || type === STRING || info.isInterface) return info;
     let changed = false;
     info.vtable = info.vtable.map((mi, slot) => {
@@ -143,18 +112,6 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       this.w32(info.address + CLASS_VTABLE, info.vtable.length ? this.words(info.vtable.map(mi => mi.address)) : 0);
       const itable = info.allInterfaces.map(it => [it, this.words(it.interfaceMethods.map(im => info.vtable[info.vmap.get(im.nameSig)].address))]);
       this.w32(info.address + CLASS_ITABLE, itable.length ? this.words(itable.flatMap(([it, map]) => [it.address, map])) : 0);
-    }
-    return info;
-  };
-
-  // (9) a class with DEX code below Canvas or Paint: the payload (its fields follow it), the flag when it declares none of the group's methods
-  const dexClass = linker.dexClass;
-  linker.dexClass = function (type, cls) {
-    const info = dexClass.call(this, type, cls), owner = info.superInfo?.graphicsOwner;
-    if (owner !== undefined && !info.isInterface) {
-      info.graphicsOwner = owner;
-      const group = GRAPHICS_GROUP.get(owner), superFlags = this.r32(info.superInfo.address + CLASS_FLAGS);
-      if (superFlags & group.flag && !group.methods.some(nameSig => info.methods.has(nameSig))) this.w32(info.address + CLASS_FLAGS, this.r32(info.address + CLASS_FLAGS) | group.flag);
     }
     return info;
   };
