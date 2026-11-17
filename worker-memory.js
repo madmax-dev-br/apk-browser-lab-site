@@ -26,3 +26,34 @@ export function workerMemoryText(health) {
   return { short: `~${mib(parts.used)} in use (limit ${mib(parts.reserved)})`,
     detail: `Worker memory (${parts.memories} ${parts.memories === 1 ? 'WebAssembly memory' : 'WebAssembly memories'}): ${pieces.join('; ')}. The limit (${mib(parts.reserved)}) is reserved address space, not RAM: only pages already written take memory, so usage grows on demand up to that ceiling${parts.core ? ' (the core sizes are the ones in Controls › Execution)' : ''}.${parts.heap === null ? ' The Worker JavaScript heap is not exposed by the browser and is not in the sum' + (parts.core ? '.' : '; without the WebAssembly core, the Java objects live in it.') : ` Worker JS heap: ${mib(parts.heap)}.`} "In use" is an estimate: Java objects created after the last collection are not included.` };
 }
+/**
+ * The memory readout of the status bar as one total and its details (src/app.js updateMemoryMeter, the hover panel). `pageBytes`: the page's JS heap where the browser gives
+ * it (performance.memory, Chrome), else null. The total adds what is in use: the Worker's measured memory (workerMemoryParts.used) and the page's heap. The Java heap's estimate is
+ * a part of the Worker's figure, never added to it. -> { text, total, ratio, limited, level, rows: [{ label, value, sub?, indent? }], notes: [string] }
+ */
+export function memorySummary(health, pageBytes = null) {
+  const finite = Number.isFinite, parts = workerMemoryParts(health), page = finite(pageBytes) && pageBytes > 0 ? pageBytes : null;
+  // the WebAssembly core counts no objects against a fixed budget (its limit is Number.MAX_SAFE_INTEGER): the Java heap is bounded by the core's memory instead
+  const live = finite(health?.liveObjects) ? health.liveObjects : null, limit = health?.limit && health.limit < 2 ** 40 ? health.limit : null, ratio = live !== null && limit ? Math.min(1, live / limit) : 0;
+  const pct = ratio < 0.1 ? (ratio * 100).toFixed(1) : String(Math.round(ratio * 100)), estimate = live !== null ? live * (health.bytesPerObject || 1600) : null;
+  const total = (parts?.used ?? 0) + (page ?? 0), count = value => value >= 10000 ? `${Math.round(value / 1000)}k` : String(value);
+  const rows = [];
+  rows.push({ label: 'Total in use', value: total > 0 ? `~${mib(total)}` : 'unavailable', sub: [parts ? 'Worker' : null, page ? 'page' : null].filter(Boolean).join(' + ') || null });
+  if (parts) {
+    rows.push({ label: 'Worker', value: `~${mib(parts.used)}`, sub: parts.reserved !== null ? `limit ${mib(parts.reserved)} reserved` : 'JS heap' });
+    if (parts.core) {
+      rows.push({ indent: true, label: 'Classes and methods', value: mib(parts.core.meta) });
+      rows.push({ indent: true, label: 'Live Java heap', value: parts.core.live === null ? 'not known yet' : mib(parts.core.live), sub: parts.core.live === null ? 'no collection yet' : 'at the last collection' });
+    }
+    if (parts.skia) rows.push({ indent: true, label: 'Skia', value: mib(parts.skia) });
+    if (parts.other > 0) rows.push({ indent: true, label: 'Other modules', value: mib(parts.other) });
+    if (parts.heap !== null && parts.reserved !== null) rows.push({ indent: true, label: 'JS heap', value: mib(parts.heap) });
+  } else rows.push({ label: 'Worker', value: 'unavailable', sub: 'nothing measured yet' });
+  rows.push({ label: 'Page', value: page ? mib(page) : 'unavailable', sub: page ? 'JS heap' : 'this browser does not report it' });
+  if (live !== null) rows.push({ label: 'Java objects', value: limit ? `${count(live)} of ${count(limit)}` : count(live), sub: `${limit ? `${pct} % of the limit` : 'no fixed object limit (bounded by the core\'s memory)'}${estimate !== null ? ` · ~${mib(estimate)} estimated` : ''}` });
+  if (finite(health?.collections)) rows.push({ label: 'Collections', value: String(health.collections), sub: `${count(health.freedObjects ?? 0)} objects freed · ${Math.round(health.gcMs ?? 0)} ms` });
+  const notes = [`${limit ? 'Above the Java object limit' : 'When the core\'s memory is full'} the VM throws java.lang.OutOfMemoryError. The Java heap estimate is part of the Worker figure, not added to it.`];
+  if (parts?.reserved) notes.push('The Worker limit is reserved address space, not RAM: only pages already written take memory.');
+  if (health?.oomCount) notes.push(`OutOfMemoryError already thrown ${health.oomCount} time(s).`);
+  return { text: total > 0 ? `Memory ~${mib(total)}` : 'Memory', total, ratio, limited: limit !== null, level: ratio >= 0.9 ? 'high' : ratio >= 0.7 ? 'warn' : 'ok', rows, notes };
+}

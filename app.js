@@ -1,52 +1,52 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=8b5ba65b966f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=8b5ba65b966f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=8b5ba65b966f';
-import { initCollapsibleSections } from './panel-sections.js?v=8b5ba65b966f';
-import { warmupLabel } from './warmup.js?v=8b5ba65b966f';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=8b5ba65b966f';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=8b5ba65b966f';
-import { initHelpTips } from './help-tips.js?v=8b5ba65b966f';
-import { createToolDock } from './tool-dock.js?v=8b5ba65b966f';
-import { createPermissionsPanel } from './permissions-panel.js?v=8b5ba65b966f';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=8b5ba65b966f';
-import { createAppDataPanel } from './app-data-panel.js?v=8b5ba65b966f';
-import { createCameraLab } from './camera-lab.js?v=8b5ba65b966f';
-import { createOverridesPanel } from './overrides-panel.js?v=8b5ba65b966f';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=8b5ba65b966f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=8b5ba65b966f';
-import { createHostMapPanel } from './host-map-panel.js?v=8b5ba65b966f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=8b5ba65b966f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=8b5ba65b966f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=8b5ba65b966f';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=8b5ba65b966f';
-import { createDeviceView, createViewState } from './device-view.js?v=8b5ba65b966f';
-import { createTaskSwitcher } from './task-switcher.js?v=8b5ba65b966f';
-import { createDeviceZoom } from './device-zoom.js?v=8b5ba65b966f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=8b5ba65b966f';
-import { formatApiGapReport } from './api-gap-scan.js?v=8b5ba65b966f';
-import { createLogcatPanel } from './logcat-panel.js?v=8b5ba65b966f';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=8b5ba65b966f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=8b5ba65b966f';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=8b5ba65b966f';
-import { captureImage, paintScreen } from './screen-capture.js?v=8b5ba65b966f';
-import { createScreenRecorder } from './screen-recorder.js?v=8b5ba65b966f';
-import { createPluginsPanel } from './plugins-panel.js?v=8b5ba65b966f';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=8b5ba65b966f';
-import { createAdb } from './adb-commands.js?v=8b5ba65b966f';
-import { createAdbTerminal } from './adb-terminal.js?v=8b5ba65b966f';
-import { workerMemoryText } from './worker-memory.js?v=8b5ba65b966f';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=8b5ba65b966f';
-import { createModalHost } from './lab-modal.js?v=8b5ba65b966f';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=8b5ba65b966f';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=8b5ba65b966f';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=8b5ba65b966f';
-import { createDragLayer } from './lab-drag.js?v=8b5ba65b966f';
-import { createLabScroll } from './lab-scroll.js?v=8b5ba65b966f';
-import { createGlSurfaces } from './gl-surfaces.js?v=8b5ba65b966f';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=8b5ba65b966f';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=8b5ba65b966f';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=8b5ba65b966f';
-import { resolveIntentFields } from './intent-resolver.js?v=8b5ba65b966f';
+import { APKWorkerClient } from './apk-worker-client.js?v=1f35348e43db';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=1f35348e43db';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=1f35348e43db';
+import { initCollapsibleSections } from './panel-sections.js?v=1f35348e43db';
+import { warmupLabel } from './warmup.js?v=1f35348e43db';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=1f35348e43db';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=1f35348e43db';
+import { initHelpTips } from './help-tips.js?v=1f35348e43db';
+import { createToolDock } from './tool-dock.js?v=1f35348e43db';
+import { createPermissionsPanel } from './permissions-panel.js?v=1f35348e43db';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=1f35348e43db';
+import { createAppDataPanel } from './app-data-panel.js?v=1f35348e43db';
+import { createCameraLab } from './camera-lab.js?v=1f35348e43db';
+import { createOverridesPanel } from './overrides-panel.js?v=1f35348e43db';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=1f35348e43db';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=1f35348e43db';
+import { createHostMapPanel } from './host-map-panel.js?v=1f35348e43db';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=1f35348e43db';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=1f35348e43db';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=1f35348e43db';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=1f35348e43db';
+import { createDeviceView, createViewState } from './device-view.js?v=1f35348e43db';
+import { createTaskSwitcher } from './task-switcher.js?v=1f35348e43db';
+import { createDeviceZoom } from './device-zoom.js?v=1f35348e43db';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=1f35348e43db';
+import { formatApiGapReport } from './api-gap-scan.js?v=1f35348e43db';
+import { createLogcatPanel } from './logcat-panel.js?v=1f35348e43db';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=1f35348e43db';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=1f35348e43db';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=1f35348e43db';
+import { captureImage, paintScreen } from './screen-capture.js?v=1f35348e43db';
+import { createScreenRecorder } from './screen-recorder.js?v=1f35348e43db';
+import { createPluginsPanel } from './plugins-panel.js?v=1f35348e43db';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=1f35348e43db';
+import { createAdb } from './adb-commands.js?v=1f35348e43db';
+import { createAdbTerminal } from './adb-terminal.js?v=1f35348e43db';
+import { memorySummary } from './worker-memory.js?v=1f35348e43db';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=1f35348e43db';
+import { createModalHost } from './lab-modal.js?v=1f35348e43db';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=1f35348e43db';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=1f35348e43db';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=1f35348e43db';
+import { createDragLayer } from './lab-drag.js?v=1f35348e43db';
+import { createLabScroll } from './lab-scroll.js?v=1f35348e43db';
+import { createGlSurfaces } from './gl-surfaces.js?v=1f35348e43db';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=1f35348e43db';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=1f35348e43db';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=1f35348e43db';
+import { resolveIntentFields } from './intent-resolver.js?v=1f35348e43db';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -433,6 +433,7 @@ const labScrollCall = (method, args) => { if (!state.runtime || !state.apkRunnin
 Object.assign(pluginActions, { tab: createTabAction({ tabs: sideTabs, emit: (id, event) => pluginHost.emit(id, 'tab', event) }), scrollTo: (plugin, args) => labScrollCall('scrollTo', args), scrollInfo: (plugin, args) => labScrollCall('info', args) });
 const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); labHighlights.closeOwner(id); labOverlays.closeOwner(id); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); }, onFrameWatch: on => labOverlays.setFrameWatch(on) });
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
+window.apkLabVM = apkVM;   // test and console access: await apkLabVM.screenState() is the text Copy diagnostics copies
 window.apkLabOpen = (url, name = String(url).split('/').pop()) => importSource({ name, url: new URL(url, location.href).href }, true);   // test and console access: open and run an APK by URL (scripts/capture-plugin-examples.mjs)
 // The Worker streams Logcat lines while the Logcat panel is open or a running plugin listens to 'log'; opening the panel always asks again (it shows the ring's recent lines).
 let logcatPanelOpen = false, logcatStreamingSent = false;
@@ -657,18 +658,59 @@ async function chooseFile(file, handle = null) {   // handle: a FileSystemFileHa
   let fileHandle = null; try { fileHandle = await handle; if (fileHandle?.kind !== 'file') fileHandle = null; } catch { fileHandle = null; }
   await importSource({ file, name: file.name, handle: fileHandle }, true);   // installed and opened at once; the launcher keeps its icon to open it again
 }
-// Memory readout in the status bar: live VM objects against the object budget (the OutOfMemoryError threshold), an estimate of what they cost (bytesPerObject, sent by the Worker, is the measured
-// all-in cost used to derive the budget, src/memory-budget.js) and, where the browser exposes it (Chrome), the JS heap of this page; the Worker's own heap is not part of that number.
-const MIB = 1048576, mib = bytes => `${(bytes / MIB).toFixed(bytes < 10 * MIB ? 1 : 0)} MiB`, count = value => value >= 10000 ? `${Math.round(value / 1000)}k` : String(value);
+// Memory readout in the status bar: the memory in use (the Worker's measured memory plus, where the browser exposes it, the page's JS heap) and a bar of live VM objects against the
+// object budget (the OutOfMemoryError threshold); the parts are in the hover panel (src/worker-memory.js memorySummary).
+// One line with the total in use (Worker + page) and the Java heap bar; the details are a panel shown while the pointer is over the line (or it has the keyboard focus), redrawn
+// with every new reading and every second while open, so the page heap moves live (src/worker-memory.js memorySummary).
+const memoryView = { health: null, timer: null };
+const pageHeap = () => globalThis.performance?.memory?.usedJSHeapSize ?? null;
 function updateMemoryMeter(health) {
   const meter = $('memory-meter'); if (!meter || !health || !Number.isFinite(health.liveObjects) || !health.limit) return;
-  const ratio = Math.min(1, health.liveObjects / health.limit), page = globalThis.performance?.memory?.usedJSHeapSize, bytesPerObject = health.bytesPerObject || 1600, estimate = health.liveObjects * bytesPerObject;
-  meter.hidden = false; meter.dataset.level = ratio >= 0.9 ? 'high' : ratio >= 0.7 ? 'warn' : 'ok'; meter.style.setProperty('--fill', `${Math.round(ratio * 100)}%`);
-  const pct = ratio < 0.1 ? (ratio * 100).toFixed(1) : String(Math.round(ratio * 100)), worker = workerMemoryText(health), browser = `Browser memory: Worker ${worker.short} · page ${page ? mib(page) : 'unavailable'}`;
-  const lines = meter.lastElementChild.children; if (lines.length !== 2) meter.lastElementChild.replaceChildren(document.createElement('span'), document.createElement('span'));
-  meter.lastElementChild.children[0].textContent = `Java heap: ${count(health.liveObjects)} objects (${pct} % of the limit) · ~${mib(estimate)} estimated`; meter.lastElementChild.children[1].textContent = browser;
-  meter.title = ['The Java heap counts only the VM objects; the browser spends more on top of that with the DEX tables, CanvasKit, rasters and each Java object as a JavaScript object.', `Live VM objects: ${health.liveObjects} of ${health.limit} (above that the VM throws java.lang.OutOfMemoryError).`, `Estimated cost: ${bytesPerObject} bytes per object (measured on real examples), ≈ ${mib(estimate)}.`,
-    worker.detail, page ? `Page JS heap (without the Web Worker): ${mib(page)}.` : 'Page JS heap: unavailable in this browser.', `Garbage collections: ${health.collections ?? 0} (${health.freedObjects ?? 0} objects freed, ${health.gcMs ?? 0} ms); last event ${health.lastEventMs ?? 0} ms.`, health.oomCount ? `OutOfMemoryError already thrown ${health.oomCount} time(s).` : ''].filter(Boolean).join('\n');
+  memoryView.health = health;
+  const summary = memorySummary(health, pageHeap());
+  meter.hidden = false; meter.dataset.level = summary.level; meter.style.setProperty('--fill', `${Math.round(summary.ratio * 100)}%`);
+  const bar = meter.querySelector('i'); if (bar) bar.hidden = !summary.limited;   // the bar is the Java objects against a fixed budget: the WebAssembly core has none
+  const text = meter.querySelector('.memory-text'); if (text) text.textContent = summary.text;
+  meter.setAttribute('aria-label', `${summary.text}. Details on hover or focus.`);
+  if (!$('memory-detail')?.hidden) renderMemoryDetail(summary);
+}
+function renderMemoryDetail(summary = memoryView.health ? memorySummary(memoryView.health, pageHeap()) : null) {
+  const panel = $('memory-detail'); if (!panel || !summary) return;
+  const rows = summary.rows.map(row => {
+    const line = document.createElement('div'); line.className = row.indent ? 'md-row md-sub' : 'md-row';
+    const label = document.createElement('span'); label.textContent = row.label;
+    const value = document.createElement('strong'); value.textContent = row.value;
+    line.append(label, value);
+    if (row.sub) { const sub = document.createElement('small'); sub.textContent = row.sub; line.append(sub); }
+    return line;
+  });
+  const notes = summary.notes.map(note => { const p = document.createElement('p'); p.textContent = note; return p; });
+  const live = document.createElement('p'); live.className = 'md-live'; live.textContent = `Live · ${new Date().toLocaleTimeString()}`;
+  panel.replaceChildren(...rows, ...notes, live);
+}
+function placeMemoryDetail() {
+  const meter = $('memory-meter'), panel = $('memory-detail'); if (!meter || !panel || panel.hidden) return;
+  const box = meter.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight, margin = 8;
+  const left = Math.max(margin, Math.min(innerWidth - width - margin, box.right - width)), above = box.top - height - 6;
+  panel.style.left = `${Math.round(left)}px`; panel.style.top = `${Math.round(above >= margin ? above : box.bottom + 6)}px`;
+}
+function showMemoryDetail(on) {
+  const panel = $('memory-detail'); if (!panel || !memoryView.health) return;
+  clearInterval(memoryView.timer); memoryView.timer = null;
+  panel.hidden = !on; if (!on) return;
+  renderMemoryDetail(); placeMemoryDetail();
+  memoryView.timer = setInterval(() => { if (panel.hidden) { clearInterval(memoryView.timer); memoryView.timer = null; return; } renderMemoryDetail(); placeMemoryDetail(); }, 1000);
+}
+{
+  const meter = $('memory-meter'), panel = $('memory-detail');
+  if (meter && panel) {
+    let leaving = null;
+    const enter = () => { clearTimeout(leaving); showMemoryDetail(true); }, leave = () => { clearTimeout(leaving); leaving = setTimeout(() => showMemoryDetail(false), 150); };
+    meter.addEventListener('mouseenter', enter); meter.addEventListener('mouseleave', leave); panel.addEventListener('mouseenter', enter); panel.addEventListener('mouseleave', leave);   // the panel can be reached to select its text
+    meter.addEventListener('focus', enter); meter.addEventListener('blur', leave);
+    meter.addEventListener('keydown', event => { if (event.key === 'Escape') showMemoryDetail(false); });
+    window.addEventListener?.('resize', placeMemoryDetail); window.addEventListener?.('scroll', placeMemoryDetail, true);
+  }
 }
 // "Show layout bounds": page overlay over the device screen, redrawn only when a snapshot is drawn or the option changes.
 function redrawLayoutBounds() {

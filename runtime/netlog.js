@@ -119,6 +119,10 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     /** Forgets everything and tells the page to do the same (a new APK / a restart). */
     clear() { buffer = []; pending = new Set(); dropped = 0; total = 0; seq = 0; reset = true; send(); },
     get size() { trim(); return buffer.length; },
+    /** The seq the next entry gets: entries with seq >= a value read earlier came after that moment (the diagnostics' last interaction). */
+    get nextSeq() { return seq; },
+    /** How many entries from `fromSeq` on have no outcome yet (a request still waiting for its answer). */
+    pendingSince(fromSeq) { let n = 0; for (const entry of buffer) if (entry.seq >= fromSeq && !entry.complete) n++; return n; },
     get dropped() { trim(); return dropped; },
     /** Routes the runtime's network reports here (runtime.netLog). */
     attach(runtime) {

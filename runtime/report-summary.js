@@ -1,12 +1,12 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=8b5ba65b966f';
-import { staticRetentionLines } from './heap-gc.js?v=8b5ba65b966f';
-import { overrideSummaryLines } from './method-overrides.js?v=8b5ba65b966f';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=8b5ba65b966f';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=8b5ba65b966f';
-import { hostMapSummaryLines } from './host-map.js?v=8b5ba65b966f';
-import { attributeGap } from './worker-task-log.js?v=8b5ba65b966f';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=1f35348e43db';
+import { staticRetentionLines } from './heap-gc.js?v=1f35348e43db';
+import { overrideSummaryLines } from './method-overrides.js?v=1f35348e43db';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=1f35348e43db';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=1f35348e43db';
+import { hostMapSummaryLines } from './host-map.js?v=1f35348e43db';
+import { attributeGap } from './worker-task-log.js?v=1f35348e43db';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -147,6 +147,21 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
       const parts = Object.entries(gap.share).filter(([, value]) => value >= 1).sort((a, b) => b[1] - a[1]).map(([key, value]) => `${key} ${ms(value)}`);
       const firstTime = sum('inits') || sum('decodes') ? ` (${sum('inits')} classes initialized, ${sum('decodes')} methods prepared, ${sum('collections')} collections)` : '';
       out.push(`  Worker time over that interaction (${gap.tasks.length} tasks): ${parts.join(', ') || 'nothing measured'}${gap.idle >= 1 ? `, idle ${ms(gap.idle)}` : ''}${firstTime}`);
+      const kinds = {}; for (const task of gap.tasks) { const entry = kinds[task.kind] ??= { n: 0, ms: 0, max: 0 }; entry.n++; entry.ms += task.ms; entry.max = Math.max(entry.max, task.ms); }
+      const byKind = Object.entries(kinds).sort((a, b) => b[1].ms - a[1].ms).slice(0, 6).map(([kind, k]) => `${kind} ${k.n}× ${ms(k.ms)} (longest ${ms(k.max)})`);
+      if (byKind.length) out.push(`  Worker tasks over that interaction: ${byKind.join(', ')}`);
+    }
+    // which background threads ran, what the Worker waited for while idle, and the app's network requests since the input
+    const threads = Object.entries(it.threads ?? {}).sort((a, b) => b[1].ms - a[1].ms).slice(0, 8);
+    if (threads.length) out.push(`  Threads that ran in the background: ${threads.map(([name, t]) => `${name} ${ms(t.ms)} (${t.slices} slices)`).join(', ')}`);
+    const idle = Object.entries(it.idle ?? {}).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    if (idle.length) out.push(`  Worker idle ${ms(it.idleMs)}, waiting for: ${idle.map(([reason, value]) => `${ms(value)} ${reason}`).join(' | ')}`);
+    const net = runtime.netLog?.snapshot && it.netSeq !== null && it.netSeq !== undefined ? runtime.netLog.snapshot().rows.filter(row => row.seq >= it.netSeq) : [];
+    if (net.length) {
+      const describe = row => `${row.method} ${row.host ?? ''}${String(row.path ?? '').slice(0, 60)} ${row.complete ? `${row.status ?? row.outcome} in ${Math.round(row.durationMs ?? 0)} ms${row.failure ? ` (${String(row.failure.type || row.failure.message || '').slice(0, 60)})` : ''}` : 'still pending'} [${row.thread}]`;
+      const pending = net.filter(row => !row.complete), failed = net.filter(row => row.complete && (row.failure || row.outcome !== 'response'));
+      const slowest = [...pending, ...net.filter(row => row.complete).sort((a, b) => (b.durationMs ?? 0) - (a.durationMs ?? 0))].slice(0, 4);
+      out.push(`  Network since the input: ${net.length} requests (${pending.length} pending, ${failed.length} failed); ${slowest.map(describe).join(' | ')}`);
     }
   });
   part(() => { const tb = runtime.tb?.snapshot(); if (tb) { for (const p of tb.pollers ?? []) {

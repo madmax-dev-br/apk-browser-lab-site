@@ -1,4 +1,4 @@
-import { bitsFloat, createHostRegistry, floatBits } from './host-contract.js?v=8b5ba65b966f';
+import { bitsFloat, createHostRegistry, floatBits } from './host-contract.js?v=1f35348e43db';
 
 // android.hardware.SensorManager beyond the "device without sensors" answers of hardware-services-host.js, following android-13.0.0_r1 SensorManager.java:
 //  - the sensor lists: the device panel models no sensor, so every list is empty and no Sensor object ever exists (android.hardware.Sensor is the original class in the framework DEX);

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=8b5ba65b966f';
-import { BUCKET } from './time-breakdown.js?v=8b5ba65b966f';
-import { Blocked, QUANTUM } from './scheduler.js?v=8b5ba65b966f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=8b5ba65b966f';
+import { APKError } from './apk-error.js?v=1f35348e43db';
+import { BUCKET } from './time-breakdown.js?v=1f35348e43db';
+import { Blocked, QUANTUM } from './scheduler.js?v=1f35348e43db';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=1f35348e43db';
 
 // Frame-based DEX interpreter.
 //
@@ -545,7 +545,7 @@ function pump(rt, thread, input) {
       }
       case 'result': {
         const R = input.R;
-        if (R instanceof Blocked) { thread.blocked = R; thread.blockKind = input.fresh ? 'site' : 'step'; thread.state = 'blocked'; return OUT_BLOCKED; }
+        if (R instanceof Blocked) { thread.blocked = R; thread.waitSite = rt.lastHostCall ?? null; thread.blockKind = input.fresh ? 'site' : 'step'; thread.state = 'blocked'; return OUT_BLOCKED; }
         if (R instanceof PendingCall) { frames.push(makeFrame(rt, R.method, R.code, R.args)); return OUT_FRAME; }
         if (R instanceof Invoke) {
           if (input.fresh) frames.push(new ContFrame(R)); else frames[frames.length - 1].cont = R;

@@ -1,16 +1,16 @@
-import { APKError } from './apk-error.js?v=8b5ba65b966f';
-import { throwNew } from './java-throw.js?v=8b5ba65b966f';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=8b5ba65b966f';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=8b5ba65b966f';
-import { Blocked } from './scheduler.js?v=8b5ba65b966f';
-import { captureBody } from './network-capture.js?v=8b5ba65b966f';
-import { OS_CONSTANTS } from './os-constants-data.js?v=8b5ba65b966f';
-import { openExchange, describeFailure } from './network-transport.js?v=8b5ba65b966f';
-import { WorkerExecutor } from './network-worker-executor.js?v=8b5ba65b966f';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=8b5ba65b966f';
-import { TransportAuthority } from './transport-ca.js?v=8b5ba65b966f';
-import { openWebSocketSession } from './websocket-bridge.js?v=8b5ba65b966f';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=8b5ba65b966f';
+import { APKError } from './apk-error.js?v=1f35348e43db';
+import { throwNew } from './java-throw.js?v=1f35348e43db';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=1f35348e43db';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=1f35348e43db';
+import { Blocked } from './scheduler.js?v=1f35348e43db';
+import { captureBody } from './network-capture.js?v=1f35348e43db';
+import { OS_CONSTANTS } from './os-constants-data.js?v=1f35348e43db';
+import { openExchange, describeFailure } from './network-transport.js?v=1f35348e43db';
+import { WorkerExecutor } from './network-worker-executor.js?v=1f35348e43db';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=1f35348e43db';
+import { TransportAuthority } from './transport-ca.js?v=1f35348e43db';
+import { openWebSocketSession } from './websocket-bridge.js?v=1f35348e43db';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=1f35348e43db';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.

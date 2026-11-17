@@ -17,7 +17,7 @@
 :root{background:var(--bg);color:var(--ink)}
 :root[data-theme=dark]{color-scheme:dark}
 /* light: styles.css leaves the root colour scheme to the browser and the device inherits it; only the page regions are pinned to light */
-:root[data-theme=light] :is(.topbar,.controls-column,.preview-bar,.status-bar,.trace,.scenario-catalog,.tool-dock,.em-scrim,.error-panel,.lab-modal-scrim,.netlog-menu,.lab-tabs){color-scheme:light}
+:root[data-theme=light] :is(.topbar,.controls-column,.preview-bar,.status-bar,.memory-detail,.trace,.scenario-catalog,.tool-dock,.em-scrim,.error-panel,.lab-modal-scrim,.netlog-menu,.lab-tabs){color-scheme:light}
 
 /* ---- 1. Chrome reset: inside the page's own regions the old type sizes, colours, fills and shadows are dropped, then rebuilt below ---------------------------- */
 :where(.topbar,.controls-column,.preview-bar,.status-bar,.trace,.scenario-catalog,main>footer,.tool-dock,.em-scrim,.empty-preview,.error-panel,.lab-modal-scrim,.netlog-menu,.lab-tabs,.crash-notice) :where(*){
@@ -298,6 +298,18 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .memory-meter[data-level=warn] i::after{background:var(--amber)}
 .memory-meter[data-level=high] i::after{background:var(--warn)}
 .memory-meter[data-level=high]{color:var(--warn)}
+.memory-meter i[hidden]{display:none}
+.memory-meter{cursor:default;border-radius:var(--r-control);padding:0 4px}
+.memory-meter:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.memory-detail{position:fixed;z-index:60;width:min(340px,calc(100vw - 16px));padding:10px 12px;border:1px solid var(--line-strong);border-radius:var(--r-control);background-color:var(--surface);color:var(--ink);font:400 12px/18px var(--sans);font-variant-numeric:tabular-nums;box-shadow:0 8px 24px rgba(19,26,43,.16)}
+.memory-detail[hidden]{display:none}
+.memory-detail .md-row{display:grid;grid-template-columns:1fr auto;column-gap:12px;padding:2px 0}
+.memory-detail .md-row>strong{font-weight:600;text-align:right}
+.memory-detail .md-row>small{grid-column:1 / -1;color:var(--muted);font-size:11px;line-height:15px}
+.memory-detail .md-row:first-child{padding-bottom:6px;margin-bottom:4px;border-bottom:1px solid var(--line);font-size:13px}
+.memory-detail .md-sub{padding-left:12px;color:var(--soft)}
+.memory-detail p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:15px}
+.memory-detail .md-live{color:var(--accent)}
 .crash-notice{padding:10px 20px;gap:12px;border-bottom:1px solid var(--amber);background-color:var(--amber-soft);color:var(--ink);font-size:14px}
 
 /* ---- 6. Exemplos: the catalog as a list ---------------------------------------------------------------------------------------------------------------------- */

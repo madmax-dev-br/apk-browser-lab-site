@@ -6,10 +6,10 @@
   <meta name="color-scheme" content="dark light">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
   <title>APK Browser Lab</title>
-  <style>@import url("./styles.css?v=8b5ba65b966f") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=8b5ba65b966f">
-  <link rel="stylesheet" href="./lab-theme.css?v=8b5ba65b966f">
-  <meta name="apk-browser-build" content="8b5ba65b966f">
+  <style>@import url("./styles.css?v=1f35348e43db") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=1f35348e43db">
+  <link rel="stylesheet" href="./lab-theme.css?v=1f35348e43db">
+  <meta name="apk-browser-build" content="1f35348e43db">
 </head>
 <body>
   <header class="topbar">
@@ -229,7 +229,7 @@
           </div>
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Could not run</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Technical details of the run</summary><pre id="error-detail" hidden></pre></details><button id="error-close" type="button" title="Closes this window; the app stays on the device home screen to open again (Esc)">Close</button> <button id="error-copy" type="button">Copy diagnostics</button> <button id="error-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Show summary</button></div>
         </div>
-        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" role="status" hidden><i></i><span></span></span><span id="execution-engine">411 × 914 dp · density 1</span></div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" tabindex="0" aria-describedby="memory-detail" hidden><i></i><span class="memory-text" role="status"></span></span><div id="memory-detail" class="memory-detail" role="tooltip" hidden></div><span id="execution-engine">411 × 914 dp · density 1</span></div>
         <details id="trace" class="trace"><summary><span>Execution log</span><span id="trace-count">0 events</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Summary</button><button id="screen-state-copy" type="button" title="Copies a summary of what the VM shows (Activities, view tree, Compose, frames, queue, threads, memory) even without an error">State</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">The log will appear after the run.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 lines</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filter by tag or text" aria-label="Filter logcat by tag or text"><select class="logcat-level" aria-label="Minimum level"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Scroll</label><button class="logcat-clear" type="button">Clear</button><select class="logcat-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><button class="logcat-save" type="button">Save</button></div>
@@ -267,7 +267,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=8b5ba65b966f"></script>
+  <script type="module" src="./app.js?v=1f35348e43db"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
