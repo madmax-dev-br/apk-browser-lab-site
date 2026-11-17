@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=a8e6c1332674">
-  <link rel="stylesheet" href="./lab-tokens.css?v=a8e6c1332674">
+  <link rel="stylesheet" href="./site-pages.css?v=f6b6991c82b7">
+  <link rel="stylesheet" href="./lab-tokens.css?v=f6b6991c82b7">
 </head>
 <body>
   <header class="topbar">
@@ -1052,6 +1052,19 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
 // { ok: true, ms: 40, outputs: { totals: { count: 12, names: [...] } }, written: ['totals'] }</code></pre></div>
         </div>
 
+        <div class="api" id="mcp-save-plugin">
+          <h4 class="api-sig names"><code>get_plugin</code><code>save_plugin</code></h4>
+          <p><code>get_plugin</code> returns one plugin with its code (<code>plugin</code>: id or name). <code>save_plugin</code> creates a plugin (pass <code>name</code> and <code>code</code>) or edits one (pass <code>plugin</code>): it is stored in the browser like a plugin written in Controls › Plugins, starts at once when it is on, and the response has its status, its errors and its buttons.</p>
+          <dl class="facts">
+            <div><dt>Edit</dt><dd><code>code</code> replaces the whole code. <code>edits</code> changes parts of it: a list of <code>{ old_text, new_text }</code>, each <code>old_text</code> found exactly once in the current code, applied in order. If one does not match, nothing changes.</dd></div>
+            <div><dt>Other fields</dt><dd><code>name</code>, <code>enabled</code> (a new plugin starts on), <code>package_filter</code> and <code>wait_ms</code> (how long to wait for the plugin to start, default 2000).</dd></div>
+          </dl>
+          <div class="code" data-name="A plugin written by an agent"><pre><code>// save_plugin { name: 'Screen name', code: "lab.button({ id: 'now', label: 'Now' }, async () =&gt; lab.ui.json(await lab.screen(), { id: 'screen' }));" }
+// → { id: 'pl-…', created: true, status: 'rodando' (running), errors: [], buttons: ['now'] }
+// click_plugin_button { plugin: 'Screen name', button: 'now' } → { ok: true, outputs: { screen: { activity: '…' } } }
+// save_plugin { plugin: 'Screen name', edits: [{ old_text: "label: 'Now'", new_text: "label: 'Read screen'" }] }</code></pre></div>
+        </div>
+
         <div class="api" id="mcp-logcat">
           <h4 class="api-sig names"><code>logcat</code><code>network</code></h4>
           <p>Logcat (collected while the MCP is connected) and the network log, with filters (<code>level</code>, <code>contains</code>, <code>limit</code>).</p>
@@ -1555,6 +1568,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=a8e6c1332674"></script>
+  <script type="module" src="./site-pages.js?v=f6b6991c82b7"></script>
 </body>
 </html>

@@ -2,9 +2,9 @@
 // Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=a8e6c1332674';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=a8e6c1332674';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=a8e6c1332674';
+import { RENDER_MS } from './plugin-host.js?v=f6b6991c82b7';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=f6b6991c82b7';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=f6b6991c82b7';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };
@@ -301,5 +301,24 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     refresh() { updateMeta(); schedule(); },
     open: openDialog,
     get state() { return S; },
+    /** The stored plugins, with their code (the MCP tools read them: src/mcp-tools.js). */
+    list: () => S.plugins.map(plugin => ({ ...plugin })),
+    /**
+     * Creates a plugin (no id) or changes one (`id`): only the fields given change. The same path as Save in the dialog: validated, stored, and the host restarts it when its
+     * code, filter or switch changed. -> { plugin, created } or throws an Error with `errors` ([{ field, message }]).
+     */
+    save(spec = {}) {
+      const at = spec.id === undefined || spec.id === null ? -1 : S.plugins.findIndex(plugin => plugin.id === String(spec.id));
+      if (spec.id !== undefined && spec.id !== null && at < 0) throw Object.assign(new Error(`No plugin with id ${spec.id}.`), { code: 'not-found' });
+      const base = at >= 0 ? S.plugins[at] : { enabled: true, packageFilter: '' }, fields = {};
+      for (const key of ['name', 'code', 'enabled', 'packageFilter', 'updates', 'height']) if (spec[key] !== undefined) fields[key] = spec[key];
+      const draft = { ...base, ...fields }, { errors } = validatePlugin(draft);
+      if (errors.length) throw Object.assign(new Error(errors.map(error => error.message).join(' ')), { code: 'bad-args', errors });
+      if (at < 0 && S.plugins.length >= MAX_PLUGINS) throw Object.assign(new Error(`At most ${MAX_PLUGINS} plugins.`), { code: 'bad-args' });
+      const plugin = normalizePlugin(at >= 0 ? draft : { ...draft, id: undefined });
+      if (at >= 0) S.plugins[at] = plugin; else S.plugins.push(plugin);
+      changed();
+      return { plugin: { ...plugin }, created: at < 0 };
+    },
   };
 }

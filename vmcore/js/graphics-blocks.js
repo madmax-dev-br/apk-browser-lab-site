@@ -1,7 +1,7 @@
 // The memory side of the graphics natives (vmcore/graphics.h) for the JavaScript hosts: the CanvasBlock of each native canvas (allocated from metaspace, recycled with a new
 // generation when its canvas is released), the Canvas records bound to them, the log the natives wrote, and the Paint payload's offsets. src/vector-native.js and
 // src/paint-host.js reach it as `runtime.wasm.graphics` (absent on the JavaScript VM, where nothing changes).
-import { CANVAS, PAINT } from './natives.js?v=a8e6c1332674';
+import { CANVAS, PAINT } from './natives.js?v=f6b6991c82b7';
 
 // graphics.h: the Canvas record's payload, the CanvasBlock, the Paint record's payload
 export const CANVAS_RECORD = Object.freeze({ block: 8, generation: 12, end: 16 });
