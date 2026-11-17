@@ -32158,5 +32158,15 @@
     "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
     "bytes": 712,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/widget/ImageButton.java",
+    "localPath": "framework-aosp/upstream/android/widget/ImageButton.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ImageButton.java?format=TEXT",
+    "sha256": "d197c95ad31367fcb014c40b1852ce3688efea26ba00e4f09d561c76c4953e06",
+    "bytes": 4317,
+    "license": "Apache-2.0"
   }
 ]

@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8417048,
-  "sha256": "ad2b6e00b30be3643eccd1c44232bf88ef7a76c2e0eae3dc6e9c5bb8682eea2d",
-  "classCount": 6474,
+  "bytes": 8417968,
+  "sha256": "59c7cd3c77018c7d96b37e7d7e9f7e30d2b9b48fb81b6580e59601d5a8cfd69f",
+  "classCount": 6475,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accounts/Account$1;",
@@ -2513,6 +2513,7 @@
     "Landroid/widget/CompoundButton$SavedState;",
     "Landroid/widget/EdgeEffect$EdgeEffectType;",
     "Landroid/widget/EdgeEffect;",
+    "Landroid/widget/ImageButton;",
     "Landroid/widget/OverScroller$SplineOverScroller;",
     "Landroid/widget/OverScroller;",
     "Landroid/widget/ProgressBar$SavedState$1;",
@@ -38887,6 +38888,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
       "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
       "bytes": 712,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/widget/ImageButton.java",
+      "localPath": "framework-aosp/upstream/android/widget/ImageButton.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/widget/ImageButton.java?format=TEXT",
+      "sha256": "d197c95ad31367fcb014c40b1852ce3688efea26ba00e4f09d561c76c4953e06",
+      "bytes": 4317,
       "license": "Apache-2.0"
     }
   ],
