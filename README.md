@@ -1,3 +1,5 @@
+<img src="icons/apk-lab-icon-512.png" alt="APK Browser Lab icon" width="96" height="96">
+
 # APK Browser Lab
 
 **Run an Android APK inside a browser tab.** No emulator, nothing to install, and the file is never sent anywhere: the `.apk` is opened in the page itself, its code runs in a virtual machine built for the web, and the app's screen appears right there, responding to your touch.

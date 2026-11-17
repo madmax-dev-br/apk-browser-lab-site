@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=1f35348e43db';
-import { bitsFloat, floatBits } from './host-contract.js?v=1f35348e43db';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=1f35348e43db';
+import { Blocked } from './scheduler.js?v=f738ca901a5c';
+import { bitsFloat, floatBits } from './host-contract.js?v=f738ca901a5c';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=f738ca901a5c';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md). These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
