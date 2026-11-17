@@ -1,4 +1,4 @@
-import { currentThread } from './interpreter.js?v=1e6027adbc0f';
+import { currentThread } from './interpreter.js?v=8b5ba65b966f';
 
 /**
  * Host fast paths for three small framework methods that sit on every file read and write (FileInputStream/FileOutputStream/RandomAccessFile -> IoBridge -> BlockGuardOs): a tiny libcore
