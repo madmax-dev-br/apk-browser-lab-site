@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=9546195269e2';
+import { APKError } from './apk-runtime.js?v=afec1f76f9dc';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -208,7 +208,8 @@ function shapeRun(backend,CK,text,state,isRtl,start,end,size,weight,italic,decor
  let builder,paragraph,shapedLines,kept=null;const itemized=itemizeFonts(backend,text,weight,italic);
  try{builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:state.hinting===0,textStyle:style}),itemized,!!state.families);if(itemized)addParagraphText(backend,builder,text,style,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,size*(text.length+1)*4+Math.abs((state.letterSpacing??0)*size+(state.wordSpacing??0))*(text.length+1)));
   const missing=unresolved(paragraph);if(missing.length)fail('Recorded text font lacks glyphs: '+missing.slice(0,8).map(c=>'U+'+c.toString(16)).join(','));
-  const lines=shapedLines=paragraph.getShapedLines();if(lines.length!==1)fail('Recorded shaping item unexpectedly wraps');const line=lines[0],encoder=new TextEncoder(),from=encoder.encode(text.slice(0,start)).length,to=encoder.encode(text.slice(0,end)).length,clusters=new Set([0,encoder.encode(text).length]);for(const run of line.runs)for(const offset of run.offsets)clusters.add(offset);
+  const lines=shapedLines=paragraph.getShapedLines();if(lines.length===0&&/^[\s\u200B\u2060\uFEFF]*$/u.test(text))return {selected:[],glyphCount:0,advance:decorated?0:undefined,fonts:new Map()};   // only whitespace (a run of spaces between words): SkParagraph gives no shaped line, and there is nothing to draw, as for a glyphless range below
+  if(lines.length!==1)fail(`Recorded shaping item unexpectedly wraps (${lines.length} shaped lines)`);const line=lines[0],encoder=new TextEncoder(),from=encoder.encode(text.slice(0,start)).length,to=encoder.encode(text.slice(0,end)).length,clusters=new Set([0,encoder.encode(text).length]);for(const run of line.runs)for(const offset of run.offsets)clusters.add(offset);
   if(!clusters.has(from)||!clusters.has(to))fail('Draw range splits a shaped glyph cluster; native Minikin cluster slicing is required');
   const selected=line.runs.map(run=>{const glyphs=[],positions=[];for(let i=0;i<run.glyphs.length;i++)if(run.offsets[i]>=from&&run.offsets[i]<to){glyphs.push(run.glyphs[i]);positions.push(run.positions[i*2],run.positions[i*2+1]-line.baseline);}return{run,glyphs,positions};}).filter(v=>v.glyphs.length);
   if(!selected.length)return {selected:[],glyphCount:0,advance:decorated?0:undefined,fonts:new Map()};
