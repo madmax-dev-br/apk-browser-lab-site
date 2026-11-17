@@ -155,3 +155,7 @@ The APK is read and executed in your browser. Nothing is sent to a lab server, b
 ## About this repository
 
 This repository holds the published build, which is what GitHub Pages serves. Found an app that does not open, or a missing API? [Open an issue](https://github.com/madmax-dev-br/apk-browser-lab-site/issues) with the text from **Copy diagnostics** on the page. It includes the cause and the APIs that were missing, and it is what helps most to close the gap.
+
+## License
+
+APK Browser Lab is free software under the [MIT License](LICENSE): use it, copy it, change it, share it or sell it, for any purpose, keeping the copyright notice. The MIT License covers this project's own code. The third-party components in the build (the AOSP framework, libcore, Skia, ICU, SQLite, fonts, microG and the others) keep their own licenses, listed in [`THIRD_PARTY.md`](THIRD_PARTY.md).

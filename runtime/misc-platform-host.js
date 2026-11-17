@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=f738ca901a5c';
-import { APKError } from './apk-error.js?v=f738ca901a5c';
-import { cleartextPermitted } from './network-native.js?v=f738ca901a5c';
-import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=f738ca901a5c';
-import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=f738ca901a5c';
-import { rotateRGBA } from './camera-frames.js?v=f738ca901a5c';
-import { Blocked } from './scheduler.js?v=f738ca901a5c';
-import { IntCells } from './java-arrays.js?v=f738ca901a5c';
-import { state as ioState } from './libcore-io-native.js?v=f738ca901a5c';
+import { createHostRegistry } from './host-contract.js?v=bfc5e8fffad5';
+import { APKError } from './apk-error.js?v=bfc5e8fffad5';
+import { cleartextPermitted } from './network-native.js?v=bfc5e8fffad5';
+import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=bfc5e8fffad5';
+import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=bfc5e8fffad5';
+import { rotateRGBA } from './camera-frames.js?v=bfc5e8fffad5';
+import { Blocked } from './scheduler.js?v=bfc5e8fffad5';
+import { IntCells } from './java-arrays.js?v=bfc5e8fffad5';
+import { state as ioState } from './libcore-io-native.js?v=bfc5e8fffad5';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
