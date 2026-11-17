@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=05e32cf081ba';
-import { GC_ROOTS } from './heap-gc.js?v=05e32cf081ba';
-import { LooperYield } from './message-queue-native.js?v=05e32cf081ba';
-import { APKError } from './apk-error.js?v=05e32cf081ba';
+import { createHostRegistry } from './host-contract.js?v=5570d9119353';
+import { GC_ROOTS } from './heap-gc.js?v=5570d9119353';
+import { LooperYield } from './message-queue-native.js?v=5570d9119353';
+import { APKError } from './apk-error.js?v=5570d9119353';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -154,6 +154,23 @@ export function createLooperHost(platform) {
       const event = host.view(runtime, message);
       if (!event.ui && when < now - behindMs) for (const candidate of host.snapshot(runtime)) if (candidate.ui && candidate.messageWhen <= limit) return { event: candidate, direct: true };
       return { event, direct: false };
+    },
+    /**
+     * The next event that may run while the main thread is parked in a Java wait (a monitor, a class another thread initializes, Future.get, a latch): only a due host task that
+     * is not UI work ({ event, direct: true }). On a device a blocked main thread runs nothing: its Handler messages, its frames and its traversals wait for it to return to the
+     * Looper. The lab keeps its own host tasks flowing (they stand for what other processes and threads do on a device: a network result, a service answer, a timer), because
+     * the thread main waits for may need one; app work queued for the main thread is not among them.
+     */
+    nextDueWhileParked(runtime, now) {
+      const limit = uptime(now);
+      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (candidate.platformTask && !candidate.ui) return { event: candidate, direct: true }; }
+      return null;
+    },
+    /** Milliseconds until the first host task that may run while main is parked (see nextDueWhileParked): 0 when one is due, null when none is queued. */
+    nextDelayWhileParked(runtime, now) {
+      const limit = uptime(now);
+      for (const candidate of host.snapshot(runtime)) { if (!candidate.platformTask || candidate.ui) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
+      return null;
     },
     // ---- running ----
     /** One iteration of Looper.loop(): MessageQueue.next() (which runs the IdleHandlers and, with nothing due, ends the call with a LooperYield), dispatchMessage, recycleUnchecked. */

@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=05e32cf081ba';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=05e32cf081ba';
-import { formatApiGapReport } from '../api-gap-scan.js?v=05e32cf081ba';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=05e32cf081ba';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=05e32cf081ba';
-import { parseMethodSpec } from '../method-overrides.js?v=05e32cf081ba';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=05e32cf081ba';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=05e32cf081ba';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=05e32cf081ba';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=05e32cf081ba';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, outputsOf, MAX_LOG_BATCH } from '../plugin-host.js?v=05e32cf081ba';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=05e32cf081ba';
-import { rowToEntry } from '../logcat.js?v=05e32cf081ba';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=05e32cf081ba';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=5570d9119353';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=5570d9119353';
+import { formatApiGapReport } from '../api-gap-scan.js?v=5570d9119353';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=5570d9119353';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=5570d9119353';
+import { parseMethodSpec } from '../method-overrides.js?v=5570d9119353';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=5570d9119353';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=5570d9119353';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=5570d9119353';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=5570d9119353';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, outputsOf, MAX_LOG_BATCH } from '../plugin-host.js?v=5570d9119353';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=5570d9119353';
+import { rowToEntry } from '../logcat.js?v=5570d9119353';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=5570d9119353';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -42,6 +42,14 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   const subscribed = { logcat: false, network: false, screen: false }; let logcatSent = false;
   let pluginHost = null, pluginTimer = null; const pluginChanged = new Set();
   const pendingPermissions = new Map();
+  let lastFreshenAt = -Infinity;
+  /** The tree of the last frame was paced behind the screen (snapshot.composeSemanticsStale, src/semantics-pacing.js): the Worker answers a fresh snapshot, drawn like any other. */
+  async function freshenSemantics() {
+    if (!state.runtime || !state.apkRunning || typeof vm.refreshSemantics !== 'function') return;
+    const token = state.operation; if (state.inputPromise) await state.inputPromise.catch(() => {});
+    if (state.busy || token !== state.operation) return;
+    const snapshot = await vm.refreshSemantics(); if (snapshot && token === state.operation) view.renderSnapshot(snapshot);
+  }
   const send = (type, payload) => post(envelope(type, payload));
   const tolerate = () => config.tolerateMissing ?? 'off';
   const fail = (error, phase) => {
@@ -50,8 +58,10 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     if (!error?.stubLists && lastStubs.void.length + lastStubs.returns.length + lastStubs.classes.length) { info.stubs = lastStubs; }   // errors raised outside the Worker (OOM, dropped events) still carry the stubs of the live run
     hooks.error?.(info); send('error', info);
   };
-  const diagnostics = id => {
-    const { text } = buildDiagnosticReport({ error: { message: 'diagnostics requested (no error)' }, product: 'APK Player', packageName: packageName || 'APK', tolerateMissing: tolerateRunning, stubs: [...lastStubs.void, ...lastStubs.returns, ...lastStubs.classes], apiGaps: vm.apiGaps ? formatApiGapReport(vm.apiGaps) : '' });
+  // The static API estimate is computed by the Worker when asked (not after every launch): the diagnostics ask for it and wait a little; when it is not there, they say so.
+  const apiGapsText = async () => { if (!vm.apiGaps && vm.worker) { try { await vm.requestApiGaps?.(3500); } catch { /* reported below */ } } return vm.apiGaps ? formatApiGapReport(vm.apiGaps) : '(The static API estimate was not computed: no APK is loaded or its scan did not finish in time. Ask again, or run scripts/report-apk-api-gaps.mjs on the APK.)'; };
+  const diagnostics = async id => {
+    const gapsText = await apiGapsText(); const { text } = buildDiagnosticReport({ error: { message: 'diagnostics requested (no error)' }, product: 'APK Player', packageName: packageName || 'APK', tolerateMissing: tolerateRunning, stubs: [...lastStubs.void, ...lastStubs.returns, ...lastStubs.classes], apiGaps: gapsText });
     return { id, stubs: lastStubs, tolerateMissing: tolerateRunning, packageName, report: text.slice(0, 65000) };
   };
   const clearPending = () => { state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); };
@@ -96,7 +106,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
   function ensurePluginHost() {
     if (pluginHost) return pluginHost;
     if (typeof createPluginHost !== 'function') throw callError('unsupported', 'Plugins are not available in this frame.');
-    pluginHost = createPluginHost({ vm, getPackage: () => packageName || null, onChange: id => { pluginChanged.add(id); if (pluginTimer === null) pluginTimer = setTimeout(flushPlugins, PLUGIN_OUTPUT_MS); }, onLogStreaming: () => { syncLogcat(); } });
+    pluginHost = createPluginHost({ vm, freshen: freshenSemantics, getPackage: () => packageName || null, onChange: id => { pluginChanged.add(id); if (pluginTimer === null) pluginTimer = setTimeout(flushPlugins, PLUGIN_OUTPUT_MS); }, onLogStreaming: () => { syncLogcat(); } });
     if (lastSnapshot) pluginHost.snapshot(lastSnapshot);
     return pluginHost;
   }
@@ -289,6 +299,8 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     async layoutBounds(args) {
       if (args.names !== undefined && typeof args.names !== 'boolean') throw callError('bad-args', 'names must be a boolean');
       if (!lastSnapshot) return [];
+      if (lastSnapshot.composeSemanticsStale && performance.now() - lastFreshenAt >= 150) { lastFreshenAt = performance.now(); try { await freshenSemantics(); } catch { /* the paced tree stays */ } }   // a reader aiming at a node reads a tree walked now
+      if (!lastSnapshot) return [];
       let inspection = null; if (args.names !== false && vm.worker && typeof vm.inspectCompose === 'function') { try { inspection = await vm.inspectCompose({ maxNodes: 2000 }); } catch { inspection = null; } }
       return buildLayoutBoundsElements(inspection, lastSnapshot).map(layoutBoundsElementOut);
     },
@@ -311,7 +323,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       const { text } = buildDiagnosticReport({ error: lastError ?? { message: 'diagnostics requested (no error)' }, product: 'APK Player', packageName: packageName || 'APK', tolerateMissing: tolerateRunning, stubs: lastError ? null : [...lastStubs.void, ...lastStubs.returns, ...lastStubs.classes],
         methodOverrides: statuses.methodOverrides.filter(item => item.state === 'active').length, ignoredActivities: statuses.ignoredActivities.filter(item => item.state === 'active').length, endpointMocks: statuses.endpointMocks.filter(item => item.state === 'active').length, hostRedirects: hostRedirectLines() });
       let screen = null; if (vm.worker) { try { screen = await vm.screenState(); } catch { screen = null; } }
-      return { text: [text, screen?.text ?? '', vm.apiGaps ? formatApiGapReport(vm.apiGaps) : ''].filter(Boolean).join('\n\n').slice(0, 400000) };
+      return { text: [text, screen?.text ?? '', await apiGapsText()].filter(Boolean).join('\n\n').slice(0, 400000) };
     },
     /** The live state of the debugging features: the statuses the VM gave and the hit counters of the last frame. */
     status() {
@@ -409,7 +421,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
       const method = calls[message.method], args = message.args ?? {};
       Promise.resolve().then(() => method(args)).then(value => send('reply', { id: message.id, ok: true, value }), error => send('reply', { id: message.id, ok: false, error: { code: String(error?.code ?? 'failed').slice(0, 64), message: String(error?.message ?? error).slice(0, 4000) } }));
     },
-    diagnostics: message => send('diagnostics', diagnostics(message.id)),
+    diagnostics: message => { diagnostics(message.id).then(value => send('diagnostics', value), error => fail(error, 'diagnostics')); },
     back: () => enqueue(async () => {
       if (!state.runtime || !state.canGoBack) return;
       await view.flushPendingInputs(); const token = operations.beginOperation();

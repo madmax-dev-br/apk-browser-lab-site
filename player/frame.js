@@ -1,15 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=05e32cf081ba';
-import { createDeviceView, createViewState } from '../device-view.js?v=05e32cf081ba';
-import { createGlSurfaces } from '../gl-surfaces.js?v=05e32cf081ba';
-import { sanitizeSettings } from '../device-settings.js?v=05e32cf081ba';
-import { createFrameController } from './frame-controller.js?v=05e32cf081ba';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=05e32cf081ba';
-import { createPluginHost } from '../plugin-host.js?v=05e32cf081ba';
-import { captureImage } from '../screen-capture.js?v=05e32cf081ba';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=05e32cf081ba';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=05e32cf081ba';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=05e32cf081ba';
+import { APKWorkerClient } from '../apk-worker-client.js?v=5570d9119353';
+import { createDeviceView, createViewState } from '../device-view.js?v=5570d9119353';
+import { createGlSurfaces } from '../gl-surfaces.js?v=5570d9119353';
+import { sanitizeSettings } from '../device-settings.js?v=5570d9119353';
+import { createFrameController } from './frame-controller.js?v=5570d9119353';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=5570d9119353';
+import { createPluginHost } from '../plugin-host.js?v=5570d9119353';
+import { captureImage } from '../screen-capture.js?v=5570d9119353';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=5570d9119353';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=5570d9119353';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=5570d9119353';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -111,4 +111,4 @@ if (!parentOrigin || parentOrigin === 'null') status('Missing or opaque ?parent=
 else post(envelope('hello', { revision: REVISION, capabilities: [...CAPABILITIES] }));
 
 // Read-only introspection for automated checks (scripts/validation/browser-driver.mjs): true when no VM request, queued input or frame is in flight. idle() also waits for the full-density replay of a frame shown at reduced scale.
-window.__apkPlayer = { debugRequest: (type, payload) => vm.request(type, payload, { timeoutMs: 300000 }), inputsDrained: () => !state.busy && !controller.inflight && !state.pendingClicks && !state.inputPromise && !state.inputInFlight && !state.composeInFlight && !state.pointerInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size, idle: () => !lastReduced && (lastPendingDelay === null || performance.now() - lastRenderAt >= Math.min(lastPendingDelay + 40, 120)) && !view.runtimeFrames.vmBusy && !state.busy && !controller.inflight && !state.pendingClicks && !state.inputPromise && !state.inputInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size && !state.composeInFlight && !view.runtimeFrames.requested && !view.runtimeFrames.pending, running: () => state.apkRunning, debug: () => ({ pendingClicks: state.pendingClicks ?? 0, rasterReduced: lastReduced, reducedDrawn: view.runtimeFrames.reducedDrawn, droppedCount: controller.dropped.length, dropped: controller.dropped.slice(-3), health: lastHealth, vmBusy: view.runtimeFrames.vmBusy, sinceRender: Math.round(performance.now() - lastRenderAt), rendered: view.runtimeFrames.rendered, coalesced: view.runtimeFrames.coalesced, drawMs: view.runtimeFrames.drawMs, putMs: view.runtimeFrames.putMs, frameLog: view.runtimeFrames.log, drawLog: view.runtimeFrames.drawn, pendingDelay: lastPendingDelay, frames: { requested: view.runtimeFrames.requested, pending: !!view.runtimeFrames.pending }, pendingPointers: state.pendingPointers.length, pointerInFlight: state.pointerInFlight ?? null, pointerLog: state.pointerLog ?? [], busy: state.busy, lastError: state.lastAPKError ? String(state.lastAPKError.error?.message).slice(0, 300) : null }) };
+window.__apkPlayer = { debugRequest: (type, payload) => vm.request(type, payload, { timeoutMs: 300000 }), inputsDrained: () => !state.busy && !controller.inflight && !state.pendingClicks && !state.inputPromise && !state.inputInFlight && !state.composeInFlight && !state.pointerInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size, idle: () => !lastReduced && (lastPendingDelay === null || performance.now() - lastRenderAt >= Math.min(lastPendingDelay + 40, 120)) && !view.runtimeFrames.vmBusy && !state.busy && !controller.inflight && !state.pendingClicks && !state.inputPromise && !state.inputInFlight && !state.pendingInputs.size && !state.pendingFocus.length && !state.pendingComposeActions.length && !state.pendingScrolls.size && !state.pendingPointers.length && !state.pendingScrollBys.size && !state.composeInFlight && !view.runtimeFrames.requested && !view.runtimeFrames.pending, running: () => state.apkRunning, debug: () => ({ pendingClicks: state.pendingClicks ?? 0, rasterReduced: lastReduced, reducedDrawn: view.runtimeFrames.reducedDrawn, droppedCount: controller.dropped.length, dropped: controller.dropped.slice(-3), health: lastHealth, vmBusy: view.runtimeFrames.vmBusy, sinceRender: Math.round(performance.now() - lastRenderAt), rendered: view.runtimeFrames.rendered, coalesced: view.runtimeFrames.coalesced, drawMs: view.runtimeFrames.drawMs, semanticsMs: view.runtimeFrames.semanticsMs, putMs: view.runtimeFrames.putMs, frameLog: view.runtimeFrames.log, drawLog: view.runtimeFrames.drawn, pendingDelay: lastPendingDelay, frames: { requested: view.runtimeFrames.requested, pending: !!view.runtimeFrames.pending }, pendingPointers: state.pendingPointers.length, pointerInFlight: state.pointerInFlight ?? null, pointerLog: state.pointerLog ?? [], busy: state.busy, lastError: state.lastAPKError ? String(state.lastAPKError.error?.message).slice(0, 300) : null }) };

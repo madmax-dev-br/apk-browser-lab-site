@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=05e32cf081ba';
-import { createRasterReceiver } from './raster-cache.js?v=05e32cf081ba';
+import { createWebAudioPlayer } from './web-audio-player.js?v=5570d9119353';
+import { createRasterReceiver } from './raster-cache.js?v=5570d9119353';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=05e32cf081ba', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=5570d9119353', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -39,7 +39,7 @@ export class APKWorkerClient {
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
       if (data?.type === 'webview') { this.onWebView?.(data); return; }
       if (data?.type === 'gl-frame') { this.onGlFrame?.(data.frame); return; }   // a frame of an OpenGL ES window surface (src/gles-native.js, drawn by src/gl-surfaces.js)   // a WebView command for the page's iframes (src/webview-frame.js)
-      if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); return; }   // static estimate, posted once after a launch; never part of a request
+      if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); const waiting = this.apiGapWaiters; this.apiGapWaiters = null; for (const resolve of waiting ?? []) resolve(this.apiGaps); return; }   // static estimate, posted once per `requestApiGaps()`; never part of a request
       if (data?.type === 'audio') { (this.audioPlayer ??= createWebAudioPlayer()).handle(data); return; }   // PCM from android.media.AudioTrack for the page's Web Audio output
       if (data?.type === 'runtime-busy') { this.onRuntimeBusy?.(true); return; }
       if (data?.type === 'runtime-idle') { this.onRuntimeBusy?.(false); return; }
@@ -97,7 +97,7 @@ export class APKWorkerClient {
     });
   }
   async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false } = {}) {
-    this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
+    this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.apiGapWaiters = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
     const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
@@ -115,6 +115,15 @@ export class APKWorkerClient {
     return { text: `${last.text}\n(captured ${Math.round((Date.now() - last.receivedAt) / 100) / 10} s ago during a VM operation: the Worker does not respond while it runs VM code; the Compose semantics are not included)`, blank: false, reasons: [], stale: true };
   }
   /** Tells the Worker that the page has drawn the scheduled-event snapshot `seq` (back-pressure: the Worker does not take the next one while one is undrawn, src/apk-worker.js). */
+  /** The static API-gap estimate (src/api-gap-scan.js) of the loaded APK, for the diagnostics: the Worker scans on this request, in its idle time. Resolves with the report, or null when there is none (no APK, a scan that failed) or after `timeoutMs`. */
+  requestApiGaps(timeoutMs = 8000) {
+    if (this.apiGaps) return Promise.resolve(this.apiGaps);
+    if (!this.worker) return Promise.resolve(null);
+    return new Promise(resolve => {
+      const timer = setTimeout(() => resolve(this.apiGaps ?? null), timeoutMs); const first = !this.apiGapWaiters; (this.apiGapWaiters ??= []).push(report => { clearTimeout(timer); resolve(report); });
+      if (first) { try { this.worker.postMessage({ type: 'api-gaps-request' }); } catch { /* the Worker is gone */ } }
+    });
+  }
   ackFrame(seq) { try { this.worker?.postMessage({ type: 'frame-ack', seq }); } catch { /* the Worker is gone */ } }
   /** A request answered from the Worker's message loop between two VM events, outside the one-operation slot (method overrides, permission state): resolves with the reply, rejects when there is no Worker or it stays silent. */
   sideCall(type, payload = {}, timeoutMs = 8000) {
@@ -181,6 +190,8 @@ export class APKWorkerClient {
   /** One pointer sample for a Compose view: { ownerViewId, action (0 down,1 up,2 move,3 cancel), x, y (dp inside the view), t (ms, page clock) }. */
   async pointer(sample) { return (await this.request('pointer', sample, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   /** Wheel/trackpad scrolling of a RecyclerView (View.scrollBy, dispatched to the original RecyclerView code), in dp. */
+  /** A snapshot of the screen as it is now with a freshly walked Compose semantics tree (the one the page holds may be paced behind the screen: src/semantics-pacing.js); null without a running Activity. */
+  async refreshSemantics() { return (await this.request('semantics-refresh', {}, { timeoutMs: this.eventTimeoutMs })).snapshot ?? null; }
   async scrollBy(id, dx, dy) { return (await this.request('scrollby', { id, dx, dy }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async press(id, pressed, x, y) { return (await this.request('press', { id, pressed, x, y }, { timeoutMs: this.eventTimeoutMs })).snapshot; }
   async focus(id, focused) { return (await this.request('focus', { id, focused }, { timeoutMs: this.eventTimeoutMs })).snapshot; }

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=05e32cf081ba';
-import { networkOf } from './network-native.js?v=05e32cf081ba';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=05e32cf081ba';
-import { buildCsp } from './webview-bridge.js?v=05e32cf081ba';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=05e32cf081ba';
+import { APKError } from './apk-error.js?v=5570d9119353';
+import { networkOf } from './network-native.js?v=5570d9119353';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=5570d9119353';
+import { buildCsp } from './webview-bridge.js?v=5570d9119353';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=5570d9119353';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and

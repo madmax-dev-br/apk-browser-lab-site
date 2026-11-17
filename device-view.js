@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=05e32cf081ba';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=05e32cf081ba';
-import { isTrustedRasterURL } from './raster-cache.js?v=05e32cf081ba';
+import { updateWebViewSlot } from './webview-slot.js?v=5570d9119353';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=5570d9119353';
+import { isTrustedRasterURL } from './raster-cache.js?v=5570d9119353';
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -70,7 +70,7 @@ const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKErr
 // VM timer events (animations, handlers) can arrive faster than the display refreshes: only the newest is rendered, once per frame. An RPC result
 // (renderSnapshot called directly) is always newer than a queued event, so renderSnapshot clears the queue.
 let webviews = null;   // the page side of the WebViews of the bound VM (src/webview-frame.js); null when the host disables WebView
-const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, putMs: 0, reducedDrawn: 0, log: [], drawn: [] };   // reducedDrawn: reduced-scale rasters put on a canvas (src/motion-raster.js)   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
+const runtimeFrames = { pending: null, requested: false, vmBusy: false, coalesced: 0, rendered: 0, seq: 0, drawMs: 0, semanticsMs: 0, putMs: 0, reducedDrawn: 0, log: [], drawn: [] };   // reducedDrawn: reduced-scale rasters put on a canvas (src/motion-raster.js)   // log: arrival of each runtime snapshot (page clock, frames the Worker had produced, snapshots drawn so far) for the produced-vs-displayed measurement
 // The next display frame, or FRAME_FALLBACK_MS later when the browser is not painting this page: a background tab, a covered window or a hidden pane runs no animation frames,
 // and the VM's newest snapshot would wait for one forever. The page then held a stale screen (the last frame it drew, "Screen ready" never arriving), which is what an MCP client or
 // a plugin reads while nobody is looking at the tab. With the timer the state stays current; a visible page still draws on the display's own frame.
@@ -83,9 +83,9 @@ const nextFrame = globalThis.requestAnimationFrame ? callback => {
 function flushRuntimeSnapshot(vm) {
   runtimeFrames.requested = false; const snapshot = runtimeFrames.pending; runtimeFrames.pending = null;
   if (!snapshot || state.runtime !== vm) return;
-  const drawStarted = Date.now();
+  const drawStarted = nowMs();
   try { renderSnapshot(snapshot); } catch (error) { reportAPKError(error, 'Failed to render a VM callback'); }
-  runtimeFrames.drawMs += Date.now() - drawStarted;
+  runtimeFrames.drawMs += nowMs() - drawStarted;
   vm.ackFrame?.(runtimeFrames.seq);   // drawn (or failed): the Worker may take the next snapshot
 }
 /** Route the Worker client's asynchronous snapshots/errors (timers, animations) into this view. */
@@ -541,6 +541,9 @@ function renderComposeSemantics(snapshot) {
   for (const owner of owners) {
     const id = String(owner.ownerViewId), view = views.get(id), host = state.viewElements.get(id);
     if (!owner.attached || !view?.contentRaster || !view.canvasChildrenCaptured || !host || !inAndroidWindow(host)) continue;
+    // The Worker reuses a tree between walks (src/semantics-pacing.js) and stamps every walk with a `version`: the controls of the same tree on the same elements need no DOM work (a frame of a
+    // scrolling list used to rewrite every control's style and attributes for a tree that had not changed). Text fields and sliders are always rendered: their DOM state (focus, caret, value) follows the page.
+    const treeVersion = snapshot.composeSemantics?.version, memo = host._semanticsMemo, unchanged = !!memo && treeVersion !== undefined && memo.version === treeVersion && memo.session === state.viewSession && memo.layer === host._semanticsLayer;
     const nodes = owner.nodes || [];
     if (nodes.length > 4096) throw new Error('Compose accessibility tree too large.');
     const byId = new Map(nodes.map(node => [node.nodeId, node]));
@@ -548,7 +551,7 @@ function renderComposeSemantics(snapshot) {
     bindPointerInput(host, owner);
     const layer = host._semanticsLayer ||= document.createElement('div');
     layer.className = 'compose-semantics-layer'; layer.style.cssText = 'position:absolute;inset:0;padding:0;margin:0;pointer-events:none;overflow:hidden;z-index:2';
-    layers.add(layer); const controls = []; let hasPlacedContent = false;
+    layers.add(layer); const controls = [], controlKeys = []; let hasPlacedContent = false;
     for (const node of nodes) {
       const b = node.boundsInRoot;
       if (!visible(node) || !node.placed || !b || ![b.left,b.top,b.right,b.bottom].every(Number.isFinite) || b.right <= 0 || b.bottom <= 0 || b.left >= owner.width || b.top >= owner.height) continue;
@@ -560,6 +563,7 @@ function renderComposeSemantics(snapshot) {
       const key = `${owner.ownerViewId}:${node.nodeId}`, kind = editable ? 'input' : slider ? 'slider' : clickable ? 'button' : 'text';
       let control = state.composeElements.get(key);
       if (control?.dataset.controlKind !== kind) control = null;
+      if (control && unchanged && !editable && !slider && memo.controls.get(key) === control) { active.add(key); controls.push(control); controlKeys.push(key); continue; }
       if (!control) {
         control = document.createElement(editable ? 'textarea' : slider ? 'input' : clickable ? 'button' : 'div');
         control.dataset.controlKind = kind; control.className = 'compose-semantic-control';
@@ -661,10 +665,11 @@ function renderComposeSemantics(snapshot) {
       else if (slider) control.removeAttribute('aria-checked');
       else { control.removeAttribute('aria-checked'); if (clickable) control.setAttribute('role', 'button'); else if (!editable) control.removeAttribute('role'); }
       if (node.selected !== null && node.selected !== undefined) control.setAttribute('aria-selected', String(node.selected)); else control.removeAttribute('aria-selected');
-      controls.push(control);
+      controls.push(control); controlKeys.push(key);
     }
     reconcileChildren(layer, controls);
     if (layer.parentNode !== host) host.append(layer);
+    host._semanticsMemo = treeVersion === undefined ? null : { version: treeVersion, session: state.viewSession, layer, controls: new Map(controlKeys.map((key, i) => [key, controls[i]])) };
     if (hasPlacedContent && view.contentRaster.drawCalls > 0) readyOwners++;
   }
   for (const element of state.viewElements.values()) if (element._semanticsLayer && !layers.has(element._semanticsLayer)) element._semanticsLayer.remove();
@@ -889,7 +894,7 @@ function renderSnapshot(snapshot) {
   for (const key of [...state.shadowElements.keys()]) if (!liveShadowKeys.has(key)) state.shadowElements.delete(key);
   renderNativeCanvasOverlays(snapshot.views);
   syncNativeScroll(snapshot.views);
-  const composeReady = renderComposeSemantics(snapshot);
+  const semanticsStarted = nowMs(), composeReady = renderComposeSemantics(snapshot); runtimeFrames.semanticsMs += nowMs() - semanticsStarted;
   renderActionModes(snapshot.actionModes);
   $('android-content').inert = surfaces.some(view => view.windowSurface.modal && view.windowSurface.visible !== false); $('android-window-layer').inert = false;
   $('android-content').style.padding = '0';

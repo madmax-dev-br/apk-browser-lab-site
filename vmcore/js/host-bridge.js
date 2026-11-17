@@ -40,7 +40,10 @@
 // record, or its result, which the core holds); a handle made by top-level host code (tests, a host driving the runtime outside any run) stays pinned until unpinTopLevel().
 // Companions are ephemerons: every record with an id is exported (gc_export); marking reports the exported records it reached, their companions (the facade's own
 // properties and out-of-layout fields) are scanned with the same walker and what they hold is marked, to a fixed point; records that die are reported by the sweep and their
-// id, handle, facade and cached string are dropped.
+// id, handle, facade and cached string are dropped. The companions of primitives only are read in place (heap-gc.js scanCompanion) and the native linker is declared free
+// of Java references. Audit mode (`auditHostScan`, APKWEB_GC_AUDIT=1, or globalThis.__apkwebGcAudit in a page's Worker: page-nav-check.mjs --audit) checks every
+// collection against the generic, unpruned walk of the same roots and of every marked record's companion: an id that walk reaches and the collection did not mark is a
+// missed reference, reported as an error after the sweep.
 //
 // ---- Redirected runtime entry points (instance properties over APKRuntime.prototype; everything else the hosts call is the prototype's and reaches these):
 //   object, vmObject           a handle -> the record facade (null -> NullPointerException, a stale or unknown id -> APKError, as the JavaScript VM's vmObject)
@@ -59,21 +62,21 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=05e32cf081ba';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=05e32cf081ba';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=05e32cf081ba';
-import { HandleTable } from './handles.js?v=05e32cf081ba';
-import { Exceptions } from './exceptions.js?v=05e32cf081ba';
-import { coreImports } from './boundary-imports.js?v=05e32cf081ba';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=05e32cf081ba';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=05e32cf081ba';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=05e32cf081ba';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=05e32cf081ba';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=05e32cf081ba';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=05e32cf081ba';
-import { Blocked } from '../../runtime/scheduler.js?v=05e32cf081ba';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=05e32cf081ba';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=05e32cf081ba';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=5570d9119353';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=5570d9119353';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=5570d9119353';
+import { HandleTable } from './handles.js?v=5570d9119353';
+import { Exceptions } from './exceptions.js?v=5570d9119353';
+import { coreImports } from './boundary-imports.js?v=5570d9119353';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=5570d9119353';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=5570d9119353';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=5570d9119353';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=5570d9119353';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=5570d9119353';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=5570d9119353';
+import { Blocked } from '../../runtime/scheduler.js?v=5570d9119353';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=5570d9119353';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=5570d9119353';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -943,6 +946,7 @@ export class WasmEngine {
     const addresses = new Set(), visit = id => { const address = handles.addressById.get(id); if (address !== undefined) addresses.add(address); };
     let phase = 'roots';
     const scanner = scanHostRoots(this.runtime, id => { if (phase === 'roots') visit(id); else { const address = handles.addressById.get(id); if (address !== undefined) x.gc_mark_root(h, address); } });
+    const rootsMs = performance.now() - t0, rootNodes = scanner.nodes(); let companions = 0;
     for (const address of this.pins) addresses.add(address);
     this.stats.pinsAtCollection = Math.max(this.stats.pinsAtCollection, this.pins.length); this.stats.rootIds = addresses.size;
     const ranges = linker.rootRanges(), cap = this.r32(h + GC.rootCap), at = this.r32(h + GC.roots) >>> 2, u32 = this.u32;
@@ -978,11 +982,13 @@ export class WasmEngine {
       for (const address of marked) {
         const id = handles.idByAddress.get(address), f = id === undefined ? undefined : space.facades.get(id);
         if (f === undefined) continue;
-        this.stats.companionScans++; scanner.scan(f); if (f.fieldExtra) scanner.scan(f.fieldExtra);
+        this.stats.companionScans++; companions++; scanner.scanCompanion(f); if (f.fieldExtra) scanner.scan(f.fieldExtra);   // a companion of primitives only is read in place (heap-gc.js scanCompanion)
       }
       x.gc_drain(h);
     }
     const t1 = performance.now();
+    const missed = (this.auditHostScan ?? (globalThis.__apkwebGcAudit === true || globalThis.process?.env?.APKWEB_GC_AUDIT === '1')) ? this.auditMarks(ephemeronMaps) : null;
+    const tw = performance.now();   // the audit's walk is in neither the mark nor the sweep time
     x.gc_weak(h);
     const release = () => { const freed = this.r32(h + GC.freed) >>> 2, count = this.r32(h + GC.freedCount); for (let i = 0; i < count; i++) { const address = this.u32[freed + i]; space.release(address); this.exceptions.records.delete(address); } };
     while (x.gc_sweep(h)) { release(); x.gc_freed_clear(h); }
@@ -993,9 +999,33 @@ export class WasmEngine {
     const t2 = performance.now();
     handles.issuedSinceCollection = 0; handles.collectAfter = Math.max(HANDLE_PACE_MIN, handles.size);   // the next one after as many new ids as survived (at least HANDLE_PACE_MIN)
     this.runtime.nativeCollected?.();
-    this.stats.collections++; if (reason !== 'run') this.stats.hostCollections++; this.stats.markMs += t1 - t0; this.stats.sweepMs += t2 - t1;
-    this.lastCollection = { reason, live: this.r32(h + GC.liveObjects), freed: this.r32(h + GC.freedObjects), badRefs: this.r32(h + GC.badRefs), roots: addresses.size, markMs: t1 - t0, sweepMs: t2 - t1 };
+    this.stats.collections++; if (reason !== 'run') this.stats.hostCollections++; this.stats.markMs += t1 - t0; this.stats.sweepMs += t2 - tw;
+    this.lastCollection = { reason, live: this.r32(h + GC.liveObjects), freed: this.r32(h + GC.freedObjects), badRefs: this.r32(h + GC.badRefs), roots: addresses.size, markMs: t1 - t0, sweepMs: t2 - tw,
+      rootsMs, rootNodes, companions, companionsFlat: scanner.companionsFlat(), companionNodes: scanner.nodes() - rootNodes, ...(missed !== null ? { audited: true, auditMs: tw - t1 } : {}) };   // the host scan: the root walk, and the companions of the marked records (flat: read in place)
+    { const ring = globalThis.__apkwebCollections ??= []; ring.push({ at: Math.round(t0), handles: handles.size, ...this.lastCollection }); if (ring.length > 256) ring.shift(); }   // measurement aid (scripts/validation/giant-flow.mjs, profile-launch.mjs): the last collections of this Worker
+    if (missed?.length) {
+      const text = `GC audit: the core's collection did not mark ${missed.length} object(s) the full host walk reaches: ${missed.slice(0, 12).map(([id, type]) => `#${id} ${type}`).join(', ')} (freed by this collection)`;
+      globalThis.__gcAuditViolations?.push(text);
+      throw new APKError(text);
+    }
     return this.lastCollection;
+  }
+  /**
+   * Audit (see the header): after marking, before the sweep, walk the JavaScript side as the unoptimized collector would -- every root source with no pruning and no
+   * reference-free declarations, the companion of every marked record and its out-of-layout fields, the values of the ephemeron maps whose key is marked -- and return the
+   * [id, type] of every record it reaches that the collection left unmarked. The marked set must be closed under that walk; nothing is marked here.
+   */
+  auditMarks(ephemeronMaps) {
+    const x = this.x, h = this.h, handles = this.handles, space = this.space, missed = [], seen = new Set();
+    const check = id => { const address = handles.addressById.get(id); if (address !== undefined && !seen.has(id) && !x.gc_is_marked(h, address)) { seen.add(id); missed.push(id); } };
+    const walker = scanHostRoots(this.runtime, check, { full: true });
+    for (const [address, id] of handles.idByAddress) {
+      if (!x.gc_is_marked(h, address)) continue;
+      const f = space.facades.get(id); if (f === undefined) continue;
+      walker.scan(f); if (f.fieldExtra) walker.scan(f.fieldExtra);
+    }
+    for (const map of ephemeronMaps) for (const [key, value] of map) { if (typeof key !== 'number') continue; const address = handles.addressById.get(key); if (address !== undefined && x.gc_is_marked(h, address)) walker.scan(value); }
+    return missed.map(id => { let type = '?'; try { type = space.objectById(id).type; } catch { /* named by id only */ } return [id, type]; });   // after the walk: a facade made here is not one the walk could meet
   }
   // ---- inspection (src/plugin-queries.js): what the JavaScript VM's tables answer for a read-only query -- the state of a class, a static without running <clinit>, every reference
   //      static, and a walk of the heap -- read from the core's memory. Nothing here runs bytecode or initializes a class.

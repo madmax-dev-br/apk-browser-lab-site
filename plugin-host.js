@@ -7,11 +7,11 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=05e32cf081ba';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=05e32cf081ba';
-import { encodeVariantImages } from './render-variant-image.js?v=05e32cf081ba';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=05e32cf081ba';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=05e32cf081ba';
+import { pluginWorkerSource } from './plugin-runtime.js?v=5570d9119353';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5570d9119353';
+import { encodeVariantImages } from './render-variant-image.js?v=5570d9119353';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=5570d9119353';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=5570d9119353';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -120,10 +120,11 @@ function defaultCreateWorker(name) {
  * @param onLogStreaming (wanted: boolean) -> void: some running plugin listens to 'log' (the page then keeps the Worker's Logcat streaming)
  * @param onChange       (pluginId) -> void: a plugin's status or output changed (the panel coalesces renders)
  */
+const FRESHEN_MIN_MS = 150;   // a reader of the screen's components forces a fresh semantics walk at most this often (a plugin polling every frame must not undo the pacing)
 export function createPluginHost({ vm = null, createWorker = defaultCreateWorker, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id),
-  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null } = {}) {
+  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null, freshen = null } = {}) {
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
-  let lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
+  let lastFreshenAt = -Infinity, lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
   let logBuffer = [], logDropped = 0, netPending = new Map(), eventTimer = null;
   const cache = new Map(); let cacheFrame = -1;   // VM answers of the current frame: key -> Promise
   const vmQueue = []; let vmBusy = false, vmLastAt = -Infinity, vmTimer = null;
@@ -166,6 +167,10 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   const EMPTY = { viewModels: () => [], fragments: () => [], activity: () => null, composeTree: () => ({ owners: [], totalNodes: 0, truncated: false, notes: ['no APK is running'] }) };
   /** "Mostrar limites de layout" as data: the boxes the overlay draws (Views and Compose semantics nodes), named from the Compose tree (one composeTree, rate-limited) unless names: false. */
   async function layoutBoundsFor(plugin, { names = true } = {}) {
+    if (!lastSnapshot) return [];
+    // The tree of a frame the Worker paced (src/semantics-pacing.js) is up to a few hundred ms behind the screen while it moves: whoever aims at a component (a tap by testTag, lab.find,
+    // a drag) reads a tree walked now. `freshen` (the page) renders the Worker's fresh snapshot, which comes back here as a new frame; at most one walk per FRESHEN_MIN_MS.
+    if (freshen && lastSnapshot.composeSemanticsStale && now() - lastFreshenAt >= FRESHEN_MIN_MS) { lastFreshenAt = now(); try { await freshen(); } catch { /* the paced tree stays */ } }
     if (!lastSnapshot) return [];
     let tree = null; if (names) { try { tree = await ask(plugin, 'composeTree', {}); } catch { tree = null; } }
     return buildLayoutBoundsElements(tree, lastSnapshot);

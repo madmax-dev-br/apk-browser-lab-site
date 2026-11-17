@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=05e32cf081ba';
-import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=05e32cf081ba';
-import { hostFunction, indirectStub } from './wasm-host-function.js?v=05e32cf081ba';
+import { APKError } from './apk-error.js?v=5570d9119353';
+import { parseWasm, WASM_SYMBOL_BINDING_WEAK } from './wasm-dylink.js?v=5570d9119353';
+import { hostFunction, indirectStub } from './wasm-host-function.js?v=5570d9119353';
+import { markNoJavaRefs } from './heap-gc.js?v=5570d9119353';
 
 // The lab's dynamic linker for wasm32 native libraries: one linear memory, one function table, one stack pointer and one C++ exception tag per
 // process, shared by every library -- the same arrangement Android's linker gives a process, which is what lets libreactnative, libfbjni, libjsi
@@ -48,6 +49,7 @@ export class NativeLinker {
     this.linkerSymbols = new Map(); // symbols the linker itself defines (__heap_base, __stack_high, __stack_low)
     this.stackBase = 4096; this.stackTop = this.stackBase + this.stackBytes; this.nextStatic = align(this.stackTop, 64);
     this.malloc = null; this.free = null;
+    markNoJavaRefs(this);   // native code and its tables: no Java reference lives here (JNI references are jni-host.js's locals and globals), so the collector's host walk skips it
   }
 
   /** Makes a library available under `soname`. `wasm` is the module (compiled) and `bytes` its binary (for the dylink.0 section). */
@@ -118,6 +120,7 @@ export class NativeLinker {
     const { soname, module, parsed } = entry, isBase = soname === this.baseSoname;
     if (!isBase && !this.malloc) throw new LinkError('the base module did not export malloc', { soname });
     const lib = { soname, deps, scope: this.#scopeOf(deps), symbols: new Map(), instance: null, exports: null, memoryBase: 0, tableBase: 0, jniDone: false, via: null, parsed };
+    markNoJavaRefs(lib);   // also held by jni-host.js's own table of loaded libraries: its module, exports and parsed sections hold no Java reference
     const { memoryBase, tableBase } = this.#allocateData(entry, isBase);
     Object.assign(lib, { memoryBase, tableBase });
     if (isBase) for (const [name, address] of [['__heap_base', align(this.nextStatic, 16)], ['__stack_high', this.stackTop], ['__stack_low', this.stackBase]]) this.linkerSymbols.set(name, { kind: 'data', address });

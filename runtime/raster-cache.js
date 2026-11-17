@@ -14,8 +14,10 @@ export function hashRaster(text) {
   h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909); h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
   return `${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}-${text.length.toString(36)}`;
 }
+// Top-level parts of a snapshot that hold no raster (the semantics tree is the largest of them, and the Worker sends the same one for many frames): neither side walks them.
+const RASTER_FREE = ['composeSemantics', 'vmHealth'];
 const rasterObjects = (root, visit) => {
-  const stack = [root];
+  const stack = []; if (root && typeof root === 'object' && !Array.isArray(root)) { const keys = Object.keys(root); for (let i = keys.length - 1; i >= 0; i--) if (!RASTER_FREE.includes(keys[i])) { const child = root[keys[i]]; if (child && typeof child === 'object') stack.push(child); } if (typeof root.dataURL === 'string' || typeof root.rasterId === 'string' || root.kind === 'rgba-raster' || root.kind === 'bitmap-raster') visit(root); } else stack.push(root);
   while (stack.length) {
     const value = stack.pop(); if (!value || typeof value !== 'object' || ArrayBuffer.isView(value) || value instanceof ArrayBuffer) continue;   // typed data (pixel buffers, Java array storage) holds no rasters
     if (Array.isArray(value)) { for (let i = value.length - 1; i >= 0; i--) stack.push(value[i]); continue; }

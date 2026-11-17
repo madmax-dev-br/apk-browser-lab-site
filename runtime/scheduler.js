@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=05e32cf081ba';
+import { APKError } from './apk-error.js?v=5570d9119353';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,6 +29,7 @@ export class VMThread {
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
+const IMPLICIT_WAIT = /^(?:monitor|class initialization|Object\.wait \(reacquire\))/;
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
   constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
@@ -124,7 +125,7 @@ export class Scheduler {
     // Asked once per scheduling quantum (20000 loop iterations or calls: microseconds to milliseconds), so the O(threads) scan is cheap. It used to be sampled every 4th call, which
     // multiplied the time a thread woken at its deadline waited for the processor by four; a woken thread must get it within one quantum.
     this.wake();                                   // timers and conditions that came due while `current` ran
-    if (owner && owner.state === 'blocked' && this.rt.platform.nextEventDelay?.() === 0) return true;   // host events are due while the run owner waits: switch so that they run
+    if (owner && owner.state === 'blocked' && this.servableEventDelay() === 0) return true;   // host events are due while the run owner waits: switch so that they run
     // A slice with no owner (runThreads, called from a nested host wait or the event pump) is not a thread of its own: the thread whose host wait this slice serves is parked on the JavaScript stack
     // below it. When its wait is over (woken by its deadline, notify or unpark) the slice must end so that it can continue, however many other threads are runnable -- or whether `current` is the only one.
     if (owner === null && this.waitingNested.size && this.innermostNestedReady()) return true;
@@ -141,7 +142,7 @@ export class Scheduler {
    */
   hostEventsStarved(owner) {
     if (owner === null ? this.waitingNested.size === 0 : (owner === this.main || owner.state === 'blocked')) return false;
-    const delay = this.rt.platform.nextEventDelay?.();
+    const delay = this.servableEventDelay();
     if (delay !== 0) { this.dueSince = 0; return false; }
     const now = performance.now();
     if (!this.dueSince) { this.dueSince = now; return false; }
@@ -157,7 +158,7 @@ export class Scheduler {
    */
   serviceEvents() {
     this.starved = false; this.dueSince = 0;
-    const platform = this.rt.platform, delay = platform.nextEventDelay?.();
+    const platform = this.rt.platform, delay = this.servableEventDelay();
     if (delay === null || delay === undefined || delay > 0) return;
     if (!this.mayServeEvents()) return;
     const previous = this.rt.thread; this.rt.thread = this.mainThread();
@@ -170,6 +171,15 @@ export class Scheduler {
    * the stack and main is parked again, the queue waits; it runs when main is back in its Looper.
    */
   mainParked() { const main = this.main; return main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); }
+  /**
+   * Main is in a wait its own code did not ask for: entering a contended monitor (also reacquiring one after Object.wait) or using a class another thread is initializing. Code
+   * between two statements can never expect main-thread work to run there, so nothing of the app's main thread runs: not a Handler message, not a frame (a frame served during
+   * such a wait re-entered a Compose composition in progress: ComposeRuntimeError "pending composition has not been applied"). Explicit waits (Object.wait, park, sleep, join,
+   * Future.get) keep the allowance described at mainParked.
+   */
+  mainImplicitWait() { const main = this.main, reason = main !== null && (main.state === 'blocked' || this.waitingNested.has(main)) ? main.blocked?.reason : null; return typeof reason === 'string' && IMPLICIT_WAIT.test(reason); }
+  /** The delay until an event that may be served now: during an implicit wait of main only the lab's host tasks count. */
+  servableEventDelay() { const platform = this.rt.platform; return this.mainImplicitWait() && platform.nextParkedEventDelay ? platform.nextParkedEventDelay() : platform.nextEventDelay?.(); }
   mayServeEvents() { return !(this.parkedServing > 0 && this.mainParked()); }
   serveEvents(platform) {
     const parked = this.mainParked(); if (parked) this.parkedServing = (this.parkedServing ?? 0) + 1;
@@ -192,7 +202,7 @@ export class Scheduler {
       throw new APKError(`Network wait in a frame that cannot suspend: ${why}. ${network.pending} exchange(s) are in flight and the VM is inside a nested host call, so it cannot yield to the browser event loop (threads: ${this.describe()})`, { kind: 'network-would-block' });
     }
     this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
-    const delay = serve ? (platform.nextEventDelay?.() ?? null) : null, now = this.clock.now();   // queued messages that may not run now (see mayServeEvents) are no wake-up for this wait
+    const delay = serve ? (this.servableEventDelay() ?? null) : null, now = this.clock.now();   // queued messages that may not run now (see mayServeEvents) are no wake-up for this wait
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
     if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending${serve ? '' : ' (main-Looper messages are queued, but the main thread is blocked inside a message that ran during its own wait: they run only when main is back in its Looper)'} (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
     // Time may only be skipped to a wake-up that can lead somewhere. Threads that merely re-park on a timer (an idle pool worker's keep-alive) wake, find nothing and sleep again

@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=05e32cf081ba';
-import { cellBytes } from './java-arrays.js?v=05e32cf081ba';
-import { storedFieldCount } from './object-shapes.js?v=05e32cf081ba';
+import { BUCKET } from './time-breakdown.js?v=5570d9119353';
+import { cellBytes } from './java-arrays.js?v=5570d9119353';
+import { storedFieldCount } from './object-shapes.js?v=5570d9119353';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -254,6 +254,29 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
       }
     }
   };
+  /**
+   * The companion of a record (vmcore/js/host-bridge.js: a facade the core reported marked), with the same outcome as scan(value): most companions carry only primitives (their id,
+   * type, a Class's classType), so their own enumerable properties are read in place -- an id-like number is marked as scan marks it -- and only a companion that holds an object
+   * (host state hung on the record) goes through scan. An object scan would not enter (already walked in this collection, skipped by identity or declared reference-free: an
+   * array's shared NO_FIELDS) does not count as one. A record's companion is reached once per collection (the core reports a record once), so skipping the visited set loses
+   * nothing; for-in sees exactly the own enumerable properties here (the facades' prototypes define none), and an inherited one would only be marked in addition (conservative).
+   */
+  let companionsFlat = 0;
+  const scanCompanion = value => {
+    if (value === null || typeof value !== 'object' || value[GC_ROOTS] !== undefined || value instanceof Map || value instanceof Set) { scan(value); return; }   // what for-in would not see
+    for (const key in value) {
+      const item = value[key];
+      if (item !== null && typeof item === 'object') {
+        // the first steps of scan, in its order: a collected record holds nothing, a { ref } is a pointer, and scan does not enter what it walked or skips
+        if (item.freed === true) continue;
+        if (typeof item.ref === 'number' && Number.isSafeInteger(item.ref) && Object.keys(item).length === 1) { markId(item.ref, true); continue; }
+        if (visited.has(item) || skip.has(item) || (!full && noRefs.has(item))) continue;
+        scan(value); return;
+      }
+      if (typeof item === 'number' && idLike(key, item)) markId(item);
+    }
+    companionsFlat++;
+  };
   let count = 0;
   let sincePulse = 0;
   const drain = (cap = Infinity) => {
@@ -296,17 +319,18 @@ export function createMarker(runtime, { full = false, clearSoft = false, private
   const reset = () => { epochValue++; worklist.length = 0; stack.length = 0; count = 0; visited = new WeakSet(); };
   /** Minor collections: queue an old record (a remembered or host-stateful one) to be traced again; old records are never marked. */
   const rescan = id => { const record = heap.get(id); if (record !== undefined && record.freed !== true) worklist.push(id); };
-  return { limit, bound, rescan, hostfulIds, rememberIds, marked, markedHas: isMarked, setCategory, markId, scan, drain, ephemerons, violations, stack, idLike, weakIds, softIds, phantomIds, reset, order: markOrder, count: () => count, nodes: () => nodes, pruned: () => pruned, get visited() { return visited; } };
+  return { limit, bound, rescan, hostfulIds, rememberIds, marked, markedHas: isMarked, setCategory, markId, scan, scanCompanion, companionsFlat: () => companionsFlat, drain, ephemerons, violations, stack, idLike, weakIds, softIds, phantomIds, reset, order: markOrder, count: () => count, nodes: () => nodes, pruned: () => pruned, get visited() { return visited; } };
 }
 
 /**
  * The JavaScript side's roots for another engine's collector (the WebAssembly core: vmcore/js/host-bridge.js), read-only: every object id that the root sources of markRoots below
  * hold -- static fields, the scheduler's threads, the Handler/event queues, the host allocations in flight and their grace ring, the gcRoot containers, `extraRoots`, and the
  * runtime's and the platform's own tables -- is reported to visitId(id) (repeats included; the caller dedupes). Nothing is marked or freed here. Returns the scanner, whose
- * `scan(value)` the caller reuses for values it finds later (the companions of the records it marks: the ephemeron fixpoint).
+ * `scan(value)` the caller reuses for values it finds later (the companions of the records it marks: the ephemeron fixpoint). `full`: the audit's walk (no pruning, no
+ * reference-free declarations, threads walked generically), which the caller compares with what its collection marked.
  */
-export function scanHostRoots(runtime, visitId, { extraRoots = null } = {}) {
-  const marker = createMarker(runtime, { visitId }), { scan, markId, idLike } = marker;
+export function scanHostRoots(runtime, visitId, { extraRoots = null, full = false } = {}) {
+  const marker = createMarker(runtime, { visitId, full }), { scan, markId, idLike } = marker;
   if (runtime.staticFields && typeof runtime.staticFields === 'object') scan(runtime.staticFields);
   const threads = runtime.scheduler?.threads ?? [];
   if (runtime.scheduler) for (const thread of [...threads, ...(runtime.thread && !threads.includes(runtime.thread) && Array.isArray(runtime.thread.frames) ? [runtime.thread] : [])]) { const view = Object.create(runtime.scheduler); view.threads = [thread]; runtime.scheduler.enumerateRoots.call(view, item => scan(item)); }

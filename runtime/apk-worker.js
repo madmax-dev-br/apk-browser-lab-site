@@ -1,74 +1,74 @@
-import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=05e32cf081ba';
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=05e32cf081ba';
-import { launcherInfo } from './launcher-info.js?v=05e32cf081ba';
-import { buildScreenState } from './screen-state.js?v=05e32cf081ba';
-import { createLogcat } from './logcat.js?v=05e32cf081ba';
-import { createNetlog } from './netlog.js?v=05e32cf081ba';
-import { reportSummary } from './report-summary.js?v=05e32cf081ba';
-import { nameSilentError } from './error-naming.js?v=05e32cf081ba';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=05e32cf081ba';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=05e32cf081ba';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=05e32cf081ba';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=05e32cf081ba';
-import { applyMicrogMocks } from './microg-device.js?v=05e32cf081ba';
-import { describeRedirects } from './host-map.js?v=05e32cf081ba';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=05e32cf081ba';
-import { InflatePool } from './zip-inflate-pool.js?v=05e32cf081ba';
-import { warmCrc32 } from './zip-entry.js?v=05e32cf081ba';
-import { createAppStorage } from './app-storage.js?v=05e32cf081ba';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=05e32cf081ba';
-import { createMessageSink } from './audio-native.js?v=05e32cf081ba';
-import { loadAPK } from './apk-loader.js?v=05e32cf081ba';
-import { AndroidPlatform } from './android-platform.js?v=05e32cf081ba';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=05e32cf081ba';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=05e32cf081ba';
-import { createWebViewBackend } from './webview-backend.js?v=05e32cf081ba';
-import { FrameworkProvider } from './framework-provider.js?v=05e32cf081ba';
-import { createRasterSender } from './raster-cache.js?v=05e32cf081ba';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=05e32cf081ba';
-import { dispatchPointer, pressView } from './pointer-input-host.js?v=05e32cf081ba';
-import { resolveDevice } from './device-profile.js?v=05e32cf081ba';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=05e32cf081ba';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=05e32cf081ba';
-import { SkiaProvider } from './skia-provider.js?v=05e32cf081ba';
-import { inspectCompose } from './compose-inspector.js?v=05e32cf081ba';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=05e32cf081ba';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=05e32cf081ba';
-import { readScrollInfo } from './scroll-info.js?v=05e32cf081ba';
-import { SemanticsPacer } from './semantics-pacing.js?v=05e32cf081ba';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=05e32cf081ba';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=05e32cf081ba';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=05e32cf081ba';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=05e32cf081ba';
-import { WorkerTaskLog } from './worker-task-log.js?v=05e32cf081ba';
-import { holdDelay } from './frame-flow.js?v=05e32cf081ba';
-import { disposeTextLayout } from './text-layout-native.js?v=05e32cf081ba';
-import { IcuBreakProvider } from './icu-break-provider.js?v=05e32cf081ba';
-import { SqliteProvider } from './sqlite-native.js?v=05e32cf081ba';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=05e32cf081ba';
-import { TzdataProvider } from './java-time-native.js?v=05e32cf081ba';
-import { ZlibProvider } from './zip-native.js?v=05e32cf081ba';
-import { IcuConverterProvider } from './icu-converter-native.js?v=05e32cf081ba';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=05e32cf081ba';
-import { JavacryptoProvider } from './javacrypto-native.js?v=05e32cf081ba';
-import { disposeColorFilters } from './color-filter-native.js?v=05e32cf081ba';
-import { disposeRegex } from './regex-native.js?v=05e32cf081ba';
-import { disposeRenderNodes } from './rendernode-native.js?v=05e32cf081ba';
-import { startDeepLink } from './deep-link-host.js?v=05e32cf081ba';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=05e32cf081ba';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=05e32cf081ba';
-import { probeWebCodecs } from './media-codec-backend.js?v=05e32cf081ba';
-import { APKError } from './apk-error.js?v=05e32cf081ba';
-import { MICROG_VERSION, microgFiles } from './microg-device.js?v=05e32cf081ba';
+import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=5570d9119353';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=5570d9119353';
+import { launcherInfo } from './launcher-info.js?v=5570d9119353';
+import { buildScreenState } from './screen-state.js?v=5570d9119353';
+import { createLogcat } from './logcat.js?v=5570d9119353';
+import { createNetlog } from './netlog.js?v=5570d9119353';
+import { reportSummary } from './report-summary.js?v=5570d9119353';
+import { nameSilentError } from './error-naming.js?v=5570d9119353';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=5570d9119353';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=5570d9119353';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=5570d9119353';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=5570d9119353';
+import { applyMicrogMocks } from './microg-device.js?v=5570d9119353';
+import { describeRedirects } from './host-map.js?v=5570d9119353';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=5570d9119353';
+import { InflatePool } from './zip-inflate-pool.js?v=5570d9119353';
+import { warmCrc32 } from './zip-entry.js?v=5570d9119353';
+import { createAppStorage } from './app-storage.js?v=5570d9119353';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=5570d9119353';
+import { createMessageSink } from './audio-native.js?v=5570d9119353';
+import { loadAPK } from './apk-loader.js?v=5570d9119353';
+import { AndroidPlatform } from './android-platform.js?v=5570d9119353';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=5570d9119353';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=5570d9119353';
+import { createWebViewBackend } from './webview-backend.js?v=5570d9119353';
+import { FrameworkProvider } from './framework-provider.js?v=5570d9119353';
+import { createRasterSender } from './raster-cache.js?v=5570d9119353';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=5570d9119353';
+import { dispatchPointer, pressView } from './pointer-input-host.js?v=5570d9119353';
+import { resolveDevice } from './device-profile.js?v=5570d9119353';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=5570d9119353';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=5570d9119353';
+import { SkiaProvider } from './skia-provider.js?v=5570d9119353';
+import { inspectCompose } from './compose-inspector.js?v=5570d9119353';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=5570d9119353';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=5570d9119353';
+import { readScrollInfo } from './scroll-info.js?v=5570d9119353';
+import { SemanticsPacer } from './semantics-pacing.js?v=5570d9119353';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=5570d9119353';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=5570d9119353';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=5570d9119353';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=5570d9119353';
+import { WorkerTaskLog } from './worker-task-log.js?v=5570d9119353';
+import { holdDelay } from './frame-flow.js?v=5570d9119353';
+import { disposeTextLayout } from './text-layout-native.js?v=5570d9119353';
+import { IcuBreakProvider } from './icu-break-provider.js?v=5570d9119353';
+import { SqliteProvider } from './sqlite-native.js?v=5570d9119353';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=5570d9119353';
+import { TzdataProvider } from './java-time-native.js?v=5570d9119353';
+import { ZlibProvider } from './zip-native.js?v=5570d9119353';
+import { IcuConverterProvider } from './icu-converter-native.js?v=5570d9119353';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=5570d9119353';
+import { JavacryptoProvider } from './javacrypto-native.js?v=5570d9119353';
+import { disposeColorFilters } from './color-filter-native.js?v=5570d9119353';
+import { disposeRegex } from './regex-native.js?v=5570d9119353';
+import { disposeRenderNodes } from './rendernode-native.js?v=5570d9119353';
+import { startDeepLink } from './deep-link-host.js?v=5570d9119353';
+import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=5570d9119353';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=5570d9119353';
+import { probeWebCodecs } from './media-codec-backend.js?v=5570d9119353';
+import { APKError } from './apk-error.js?v=5570d9119353';
+import { MICROG_VERSION, microgFiles } from './microg-device.js?v=5570d9119353';
 installWasmMemoryMeter();   // before anything is instantiated: every WebAssembly memory of this Worker is counted for the page's memory line (src/wasm-memory-meter.js)
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=05e32cf081ba';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=05e32cf081ba';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=5570d9119353';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=5570d9119353';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=05e32cf081ba';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=05e32cf081ba';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=05e32cf081ba';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '05e32cf081ba';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=5570d9119353';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=5570d9119353';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=5570d9119353';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '5570d9119353';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -94,10 +94,10 @@ function armPump(delay, run) { eventTimer = setTimeout(run, Math.min(2147483647,
 function errorData(rawError) { const error = nameSilentError(rawError, runtime); const summary = (() => { try { return runtime ? reportSummary(runtime, { tela: (() => { try { return runtime.runDiagnostic(() => buildScreenState(runtime, { semantics: null }).tela, null); } catch { return null; } })(), error: { message: error.message, details: { jsStack: error.details?.jsStack ?? (!error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? '') ? String(error.stack ?? '') : null) } } }).join('\n') : null; } catch { return null; } })(); const uncaught = (() => { try { return runtime?.uncaughtText?.() || null; } catch { return null; } })(); const internal = !error.details && /^(TypeError|RangeError|ReferenceError|SyntaxError|EvalError)$/.test(error.name ?? ''); return { summary, uncaught, name: error.name || 'Error', message: error.message || String(error), stack: error.stack, details: internal ? { kind: 'internal-js-error', jsStack: String(error.stack ?? '').split('\n').slice(0, 13).join('\n'), vmContext: runtime?.monitor?.context?.() ?? null } : error.details, navigation: runtime?.platform?.navigationState?.(runtime), trace: Array.isArray(runtime?.trace) ? runtime.trace.slice(-512) : [], stubs: runtime ? [...[...(runtime.missingLibraries ?? [])].map(([key, count]) => [`lib${key}.so`, count]), ...(runtime.missingClasses ?? []), ...(runtime.missingReturns ?? []), ...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`) : [], stubLists: runtime ? { void: [...(runtime.missingVoid ?? [])].map(([key, count]) => `${key} x${count}`), returns: [...(runtime.missingReturns ?? [])].map(([key, count]) => `${key} x${count}`), classes: [...(runtime.missingClasses ?? [])].map(([key, count]) => `${key} x${count}`) } : null }; }
 const rasterSender = createRasterSender();
 const semanticsPacer = new SemanticsPacer();
-const workerTiming = { snapshots: 0, snapshotMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0, pacing: { edges: [2, 4, 8, 12, 17, 25, 34, 50], timerLate: new Array(9).fill(0), batch: new Array(9).fill(0), snapshot: new Array(9).fill(0), gap: new Array(9).fill(0) } };
+const workerTiming = { snapshots: 0, snapshotMs: 0, viewsMs: 0, internMs: 0, postMs: 0, semanticsWalks: 0, semanticsReused: 0, semanticsMs: 0, scheduledBatches: 0, scheduledMs: 0, pacing: { edges: [2, 4, 8, 12, 17, 25, 34, 50], timerLate: new Array(9).fill(0), batch: new Array(9).fill(0), snapshot: new Array(9).fill(0), gap: new Array(9).fill(0) } };
 // Histograms of the frame loop (ms, upper edges in pacing.edges, last bucket = the rest): how late a timer fired, how long a batch of events and a snapshot took, and the time between two batches that ran events.
 const pace = (name, ms) => { const { edges } = workerTiming.pacing; let i = 0; while (i < edges.length && ms >= edges[i]) i++; workerTiming.pacing[name][i]++; }; let lastBatchAt = 0;   // cumulative host time of the Worker's own work per snapshot, reported in vmHealth for the page and the benchmarks
-let lastComposeSemantics = null;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
+let lastComposeSemantics = null, semanticsVersion = 0;   // the tree of the last walk, reused by scheduled events inside the pacing gap (src/semantics-pacing.js)
 // Progressive raster (src/motion-raster.js): display rasters are replayed at a reduced scale while the screen is moving and at full density once it is still. `load { motionRaster: false }` turns it off.
 let motionRaster = new MotionRasterPolicy(), lastPointerAt = 0;
 // What the Worker did task by task (src/worker-task-log.js): a measurement aid read over the DevTools protocol (scripts/validation/profile-smoothness.mjs --hitches) to attribute a gap between frames
@@ -134,14 +134,14 @@ function currentSnapshot({ paced = false, pacedSemantics = paced, request = null
   try { motionRaster.noteScreen(`${runtime.activity?.ref ?? 0}:${runtime.platform.viewRoots?.(runtime)?.length ?? 0}`); } catch { /* no screen yet */ }   // "new screen": a new Activity instance or window
   const signal = motionSignal(request); runtime.displayRasterScale = motionRaster.scaleFor(signal); runtime.displayRasterSettledScale = motionRaster.settledScale(); runtime.displayRasterReducedServed = [];
   const rasterizedBefore = runtime.rasterStats?.rasterized ?? 0;
-  let snapshot; try { snapshot = runtime.snapshot(); } finally { runtime.displayRasterScale = 1; }   // only the page's snapshot is ever replayed reduced
+  const viewsStarted = performance.now(); let snapshot; try { snapshot = runtime.snapshot(); } finally { runtime.displayRasterScale = 1; workerTiming.viewsMs += performance.now() - viewsStarted; }   // only the page's snapshot is ever replayed reduced
   motionRaster.noteContent((runtime.rasterStats?.rasterized ?? 0) > rasterizedBefore);   // new content (not a cache hit): the cadence of the motion signal
   const reducedIds = runtime.displayRasterReducedServed; runtime.displayRasterReducedServed = null;
   const rasterReduced = reducedIds.length > 0; motionRaster.noteSnapshot(reducedIds); snapshot.rasterReduced = rasterReduced;   // the page's idle rule waits for the full-density refinement
   if (!snapshot.closed && composeSemantics) {
     const reuse = pacedSemantics && lastComposeSemantics && !semanticsPacer.take(signal.pendingFrames > 0 || signal.gestureActive || signal.inputMotion);
-    if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; taskLog.note('semantics', performance.now() - startedAt); } } else workerTiming.semanticsReused++;
-    snapshot.composeSemantics = lastComposeSemantics;
+    if (!reuse) { const startedAt = performance.now(); try { lastComposeSemantics = composeSemantics.snapshot(); lastComposeSemantics.version = ++semanticsVersion; } finally { semanticsPacer.taken(startedAt); workerTiming.semanticsWalks++; workerTiming.semanticsMs += performance.now() - startedAt; taskLog.note('semantics', performance.now() - startedAt); } } else workerTiming.semanticsReused++;
+    snapshot.composeSemantics = lastComposeSemantics; if (reuse) snapshot.composeSemanticsStale = true;   // an earlier walk's tree (src/semantics-pacing.js): a reader that aims at a node asks for a fresh one ('semantics-refresh')
   }
   if (!snapshot.closed) try { snapshot.ime = runtime.platform.inputMethodService?.imeState?.(runtime) ?? null; } catch { snapshot.ime = null; }   // where the page's keyboard types: the served view and whether it has an InputConnection
   Object.assign(snapshot, runtime.executionSnapshot());
@@ -156,7 +156,7 @@ function currentSnapshot({ paced = false, pacedSemantics = paced, request = null
   if (rasterReduced) snapshot.pendingEventDelay = Math.min(snapshot.pendingEventDelay ?? Infinity, motionRaster.quietMs);   // the refinement is due within the quiet period
   snapshot.vmHealth = { engine: runtime.engine, core: runtime.wasm ? (m => ({ metaBytes: m.metaBytes, metaCapacity: m.metaCapacity, threads: m.threadRecords - m.threadRecordsFree, threadCapacity: m.threadCapacity, heapBytes: m.heapBytes, liveBytes: m.liveBytes, dynamic: m.dynamic, areaBytes: m.areaBytes, areaLimit: m.areaLimit }))(runtime.wasm.memoryInfo()) : null, framesSkipped: runtime.platform.framesSkipped ?? 0, framesConsecutive: runtime.platform.framesConsecutive ?? 0, workerHeapBytes: self.performance?.memory?.usedJSHeapSize ?? null, workerWasm: wasmMemoryUsage(), coreMemoryBytes: runtime.wasm?.memory?.buffer?.byteLength ?? null, skiaHeapBytes: runtime.skia?.CanvasKit?.HEAPU8?.buffer?.byteLength ?? null, raster: runtime.rasterStats ? { ...runtime.rasterStats, keyMs: Math.round(runtime.rasterStats.keyMs), replayMs: Math.round(runtime.rasterStats.replayMs), encodeMs: Math.round(runtime.rasterStats.encodeMs), reducedMs: Math.round(runtime.rasterStats.reducedMs ?? 0), refinedMs: Math.round(runtime.rasterStats.refinedMs ?? 0) } : null, motionRaster: { enabled: motionRaster.enabled, scale: motionRaster.scale, ...motionRaster.stats }, renderer: rendererStatus(), framesProduced: runtime.platform.viewWindowHost?.frameState?.().framesRun ?? 0, liveObjects: runtime.heap.size, limit: runtime.maxHeapObjects, bytesPerObject: BYTES_PER_OBJECT, lastEventMs, workerTiming: { ...workerTiming, snapshotMs: Math.round(workerTiming.snapshotMs), semanticsMs: Math.round(workerTiming.semanticsMs), scheduledMs: Math.round(workerTiming.scheduledMs) }, collections: runtime.gcStats?.collections ?? 0, freedObjects: runtime.gcStats?.freed ?? 0, gcMs: Math.round(runtime.gcStats?.totalMs ?? 0), oomCount: runtime.oomCount ?? 0, lastOom: runtime.lastOom ? { ...runtime.lastOom, census: undefined } : null, heapCensus: runtime.lastOom?.census && runtime.lastOom.count !== reportedCensus ? (reportedCensus = runtime.lastOom.count, runtime.lastOom.census) : undefined };
   workerTiming.snapshots++; workerTiming.snapshotMs += performance.now() - snapshotStarted; pace('snapshot', performance.now() - snapshotStarted);
-  return rasterSender.intern(snapshot); // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
+  const internStarted = performance.now(); try { return rasterSender.intern(snapshot); } finally { workerTiming.internMs += performance.now() - internStarted; } // repeated PNGs travel once; the page resolves rasterId to a cached Blob URL
 }
 // Host-time limit of one VM event in the Worker. The instruction fuse (100M per thread: a React Native startup needs ~3.4M-85M in one dispatch, see the comment at
 // APKRuntime.maxInstructionsPerEvent) bounds work, this bounds time: a hot loop that is cheap per instruction can never freeze the page for more than this.
@@ -237,7 +237,7 @@ function postRuntimeEvent() {
   try {
     const snapshot = currentSnapshot({ paced: true }); snapshot.vmHealth.frames = { ...frameStats };
     lastEventPostAt = performance.now(); frameStats.sent++;
-    self.postMessage({ type: 'runtime-event', snapshot, seq: ++eventSeq }, rasterSender.takeTransfers());
+    const postStarted = performance.now(); self.postMessage({ type: 'runtime-event', snapshot, seq: ++eventSeq }, rasterSender.takeTransfers()); workerTiming.postMs += performance.now() - postStarted;
   } finally { taskLog.end(runtime); }
 }
 function holdSnapshot() {
@@ -323,15 +323,16 @@ function scheduleEvents() {
     finally { taskLog.end(runtime); busy = false; surfaceThreadFailure(); if (succeeded) scheduleEvents(); }
   });
 }
-// The static API-gap estimate (src/api-gap-scan.js) runs once per opened APK, after its first launch attempt (successful or not), in slices that yield to the event loop so
-// VM events and page requests are served in between. Read-only on the VM; its result only feeds "Copiar diagnóstico". A failure here never reaches the run.
-// It started right after the first frame and took the Worker for ~130 ms in the first second of a large app, when the user starts scrolling the screen that just appeared:
-// now every slice waits for a quiet moment (no input and no frame for SCAN_QUIET_MS), so the scan fills the pauses instead of the first scroll.
+// The static API-gap estimate (src/api-gap-scan.js) runs when the page asks for it (an error was shown: it is the last section of "Copy diagnostics"), not after every launch: nothing
+// else reads it, and a scan nobody asked for took Worker time in the seconds after a launch (about 80 ms in the first 8 s of a large app, with forced slices every 250 ms for an app that
+// never stops animating). It runs once per opened APK, in slices that yield to the event loop so VM events and page requests are served in between. Read-only on the VM. A failure here
+// never reaches the run. Every slice waits for a quiet moment (no input and no frame for SCAN_QUIET_MS) so the scan fills the pauses instead of a scroll.
 const SCAN_QUIET_MS = 400, SCAN_POLL_MS = 100, SCAN_MAX_WAIT_MS = 250;   // an app that never stops animating still gets its scan: one slice (about 8 ms) at most every SCAN_MAX_WAIT_MS, a few percent of the Worker
 const quietForScan = () => { const now = performance.now(); return now - lastOperationAt >= SCAN_QUIET_MS && now - lastFramePostedAt >= SCAN_QUIET_MS && now - lastPointerAt >= SCAN_QUIET_MS; };
 const waitQuietForScan = cancelled => new Promise(resolve => { const since = performance.now(), check = () => (cancelled() || (!busy && (quietForScan() || performance.now() - since >= SCAN_MAX_WAIT_MS)) ? resolve() : setTimeout(check, SCAN_POLL_MS)); setTimeout(check, 0); });
 function startApiGapScan() {
-  const target = runtime; if (!target || !inventory || target.apiGapScanStarted) return;
+  const target = runtime; if (!target || !inventory) { self.postMessage({ type: 'api-gaps', report: null }); return; }   // nothing to scan: the page stops waiting
+  if (target.apiGapScanStarted) { if (target.apiGapReport) self.postMessage({ type: 'api-gaps', report: target.apiGapReport }); return; }   // running (its message follows) or done (again, for a page that missed it)
   target.apiGapScanStarted = true;
   const cancelled = () => runtime !== target;
   setTimeout(async () => {
@@ -340,8 +341,8 @@ function startApiGapScan() {
       taskLog.begin('api-gap-scan', target);   // each slice between two yields is one task of the log
       const report = await scanApiGaps(target, { archive, nativeLibraries: inventory.nativeByABI, yieldFn: async () => { if (taskLog.open?.kind === 'api-gap-scan') taskLog.end(target); await waitQuietForScan(cancelled); taskLog.begin('api-gap-scan', target); }, cancelled });
       if (taskLog.open?.kind === 'api-gap-scan') taskLog.end(target);
-      if (report && runtime === target) self.postMessage({ type: 'api-gaps', report: compactApiGapReport(report) });
-    } catch { /* an estimate: nothing to report */ }
+      if (runtime === target) self.postMessage({ type: 'api-gaps', report: report ? (target.apiGapReport = compactApiGapReport(report)) : null });
+    } catch { if (runtime === target) self.postMessage({ type: 'api-gaps', report: null }); /* an estimate: nothing to report */ }
   }, 0);
 }
 // A Worker running VM code cannot answer a "screen-state" request until the operation ends. While an operation runs, a heartbeat at most every 4 s also carries a text snapshot of the screen
@@ -463,7 +464,7 @@ async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } 
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=05e32cf081ba').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  import('../vmcore/js/attach.js?v=5570d9119353').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
   try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
   sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
   warmLoadCode();
@@ -488,6 +489,7 @@ self.onmessage = async event => {
 };
 async function handleMessage({ data }) {
   if (data?.type === 'frame-ack') { frameAcked(data.seq); return; }
+  if (data?.type === 'api-gaps-request') { startApiGapScan(); return; }   // the page shows an error and wants the static API estimate for its diagnostics
   if (data?.type === 'camera') { cameraMessage(data.message); return; }   // the page's camera source (src/camera-lab.js): frames and the camera screen's answers only queue VM tasks
   if (data?.type === 'prewarm') { warmAssets().catch(() => {}); return; }   // the page opened: fetch and compile the lab's assets while the user picks an APK
   if (!data || !Number.isSafeInteger(data.requestId)) return;
@@ -680,7 +682,7 @@ async function handleMessage({ data }) {
       runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
       loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=05e32cf081ba')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=5570d9119353')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
@@ -733,6 +735,10 @@ async function handleMessage({ data }) {
       });
       if (changing) drainReadyEvents();
       send({ type: 'result', appData: output, ...(changing && runtime.activity ? { snapshot: currentSnapshot() } : {}) });
+    } else if (type === 'semantics-refresh') {
+      // A page that is about to aim at a node (a tap by test tag, a lab.find, a drag) found the tree it holds paced behind the screen (`composeSemanticsStale`): the answer is a fresh snapshot of
+      // the screen as it is now, whose tree is walked afresh. Nothing is run in the VM besides the read-only walk.
+      send({ type: 'result', snapshot: runtime?.activity ? currentSnapshot() : null });
     } else if (type === 'invoke-method') {
       // lab.invoke (src/app-invoke.js): one of the app's methods, called on the VM's main thread as an operation of the page (like a click). What it schedules and is due
       // (a Handler message, a coroutine resumed on the main dispatcher, a recomposition) runs before the answer, which carries a fresh snapshot.
@@ -838,6 +844,6 @@ async function handleMessage({ data }) {
     // src/motion-raster.js), and the next request would wake it anyway. Only a failed start (load, launch, intent, restart) leaves nothing to resume.
     const resumable = !['load', 'launch', 'intent', 'reload-activity', 'resume-task'].includes(type) && !!runtime?.activity;
     if (operationSpans[type]?.end === null) operationSpans[type].end = epochNow();
-    taskLog.end(runtime); runtime?.monitor?.end(); busy = false; surfaceThreadFailure(); if (succeeded || resumable) scheduleEvents(); if (type === 'launch' || type === 'intent') startApiGapScan();
+    taskLog.end(runtime); runtime?.monitor?.end(); busy = false; surfaceThreadFailure(); if (succeeded || resumable) scheduleEvents();
   }
 }

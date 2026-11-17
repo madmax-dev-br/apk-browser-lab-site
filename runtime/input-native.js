@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=05e32cf081ba';
-import { createHostRegistry } from './host-contract.js?v=05e32cf081ba';
+import { APKError } from './apk-error.js?v=5570d9119353';
+import { createHostRegistry } from './host-contract.js?v=5570d9119353';
 
 // Natives behind the ORIGINAL android.view.MotionEvent, KeyEvent, KeyCharacterMap and VelocityTracker (android-13.0.0_r1 Java in framework.dex):
 //   * MotionEvent  -- android_view_MotionEvent.cpp over libinput's MotionEvent: samples (current + history) of pointer coordinates per axis, pointer properties, an affine
