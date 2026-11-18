@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=8a8392fe0f08';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8a8392fe0f08';
+import { APKError } from './apk-runtime.js?v=79581f96c833';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=79581f96c833';
 const MANAGER = 'Landroid/content/ClipboardManager;', LEGACY = 'Landroid/text/ClipboardManager;';
 const CLIP = 'Landroid/content/ClipData;', ITEM = 'Landroid/content/ClipData$Item;', DESCRIPTION = 'Landroid/content/ClipDescription;';
 const LISTENER = 'Landroid/content/ClipboardManager$OnPrimaryClipChangedListener;';

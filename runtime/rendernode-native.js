@@ -1,8 +1,8 @@
-import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=8a8392fe0f08';
-import {APKError} from './apk-error.js?v=8a8392fe0f08';
-import {getVectorGraphics} from './vector-native.js?v=8a8392fe0f08';
-import {getSolidPaintByHandle} from './paint-host.js?v=8a8392fe0f08';
-import {createMatrixNativeBindings} from './matrix-native.js?v=8a8392fe0f08';
+import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=79581f96c833';
+import {APKError} from './apk-error.js?v=79581f96c833';
+import {getVectorGraphics} from './vector-native.js?v=79581f96c833';
+import {getSolidPaintByHandle} from './paint-host.js?v=79581f96c833';
+import {createMatrixNativeBindings} from './matrix-native.js?v=79581f96c833';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
