@@ -682,5 +682,12 @@
         }
       }
     }
-  }
+  },
+  "reactNativeReleases": [
+    {
+      "version": "0.88.1",
+      "provenance": "rn/0.88.1/provenance.json",
+      "sha256": "aa84373a75edd82e2f307facfe96deede8f1ef830a4d68f1aaadd700dd59c8de"
+    }
+  ]
 }

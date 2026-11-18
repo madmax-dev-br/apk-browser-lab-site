@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=65876789f860';
-import { buildElfDescriptor } from './native-descriptor.js?v=65876789f860';
-import { sha256Hex } from './sha256-sync.js?v=65876789f860';
-import { withVariants } from './native-provider-variants.js?v=65876789f860';
+import { APKError } from './apk-error.js?v=a20604a8ef38';
+import { buildElfDescriptor } from './native-descriptor.js?v=a20604a8ef38';
+import { sha256Hex } from './sha256-sync.js?v=a20604a8ef38';
+import { withVariants } from './native-provider-variants.js?v=a20604a8ef38';
 
 // Browser-side provider of the lab's wasm32 native libraries (vendor/native-libs/wasm32, published next to the page by scripts/build-web.mjs).
 //
@@ -40,15 +40,28 @@ export function definePrefetch(entry, url, sha256, adopt) {
 }
 
 export class LazyNativeLibraryProvider {
-  constructor({ provenance, baseURL, revision = '', fetchSync = xhrFetchSync, abi = 'wasm32' }) {
+  /** `releases`: the provenance of the React Native libraries of the other releases the lab builds ({ provenance, baseURL }: vendor/native-libs/wasm32/rn/<version>/),
+   *  added before the default release's, as variants of the same sonames (src/native-provider-variants.js hands each app the build of its release). */
+  constructor({ provenance, baseURL, revision = '', fetchSync = xhrFetchSync, abi = 'wasm32', releases = [] }) {
     this.abi = abi; this.modules = new Map(); this.fetched = [];
-    for (const lib of Object.values(provenance.libraries)) this.modules.set(lib.soname, withVariants(this.modules.get(lib.soname), this.#entry(lib, baseURL, revision, fetchSync)));
+    for (const release of [...releases, { provenance, baseURL }]) {
+      for (const lib of Object.values(release.provenance.libraries)) this.modules.set(lib.soname, withVariants(this.modules.get(lib.soname), this.#entry(lib, release.baseURL, revision, fetchSync)));
+    }
   }
-  /** Reads provenance.json from `baseURL` (async, once) and returns the provider. */
+  /** Reads provenance.json from `baseURL` (async, once), and the provenance.json of every React Native release it lists (reactNativeReleases, each checked against
+   *  the SHA-256 recorded there), and returns the provider. */
   static async fromURL(baseURL, { revision = '', fetchImpl = globalThis.fetch.bind(globalThis), fetchSync = xhrFetchSync } = {}) {
     const response = await fetchImpl(new URL('provenance.json' + (revision ? `?v=${revision}` : ''), baseURL));
     if (!response.ok) throw new APKError(`Native library provenance not available (${response.status})`, { kind: 'native-library-fetch' });
-    return new LazyNativeLibraryProvider({ provenance: await response.json(), baseURL, revision, fetchSync });
+    const provenance = await response.json();
+    const releases = await Promise.all((provenance.reactNativeReleases ?? []).map(async release => {
+      const url = new URL(release.provenance + (revision ? `?v=${revision}` : ''), baseURL), answer = await fetchImpl(url);
+      if (!answer.ok) throw new APKError(`Native library provenance of React Native ${release.version} not available (${answer.status})`, { kind: 'native-library-fetch' });
+      const bytes = new Uint8Array(await answer.arrayBuffer()), actual = sha256Hex(bytes);
+      if (actual !== release.sha256) throw new APKError(`${release.provenance} does not match the SHA-256 provenance.json pins for React Native ${release.version} (expected ${release.sha256}, got ${actual})`, { kind: 'native-library-hash-mismatch' });
+      return { provenance: JSON.parse(new TextDecoder().decode(bytes)), baseURL: new URL(release.provenance.replace(/provenance\.json$/, ''), baseURL) };
+    }));
+    return new LazyNativeLibraryProvider({ provenance, baseURL, revision, fetchSync, releases });
   }
   #entry(lib, baseURL, revision, fetchSync) {
     if (!/^[0-9a-f]{64}$/.test(lib.sha256 ?? '')) throw new APKError(`Native library ${lib.soname} needs a pinned SHA-256`);
