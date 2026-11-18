@@ -26,10 +26,16 @@
 //     payload for its `atomicValue` (its get native).
 //  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
 //     the nearest host superclass, selected by APKRuntime.dispatch.
+//  9. android.graphics.Paint (a host class) is laid out with the paint payload (vmcore/paint.h: its state, its references in the Class's reference map, and the field mBidiFlags
+//     as a field of its own) and the CLASS_PAINT_RECORD flag; the HostState's paintEnums table (a root range) holds the enum constants its natives answer; a DEX class below
+//     it (TextPaint, an app's Paint) inherits the payload, its own fields after it, and the flag only when neither it nor a superclass declares one of the methods the paint
+//     natives stand for (natives.js PAINT_NATIVES): the natives then answer only where the JavaScript VM's routing selects the paint host's own bridge. `paintRecord` on the
+//     linker's record of every class with the payload (vmcore/js/paint-record.js finds records by it).
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE } from './natives.js?v=9fddc5903fb3';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES } from './natives.js?v=8ff16f6ecda0';
+import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=8ff16f6ecda0';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
@@ -38,7 +44,7 @@ const VM_HOST_STATE = 44, HOST_STATE_BYTES = 104, HOST_STATE_ATOMIC_INTEGER = 64
 const CLASS_VTABLE = 24, CLASS_ITABLE = 32, METHOD_KIND = 12, METHOD_FLAGS = 20, METHOD_VTABLE_INDEX = 24;
 const METHOD_UNBOUND = 0x7fff0003, METHOD_THROWABLE_INIT = 0x7fff0004, METHOD_HOST_DISPATCH = 64, M_INTERFACE = 32, M_ABSTRACT = 16, NO_SLOT = 0xffffffff;
 const K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, RESOLVE_CODE = 0xffffffff, RESOLVE_WELL_KNOWN = 0xffffff00, UNRESOLVED = 34;
-const M_STATIC = 1, M_CONSTRUCTOR = 2;
+const M_STATIC = 1, M_CONSTRUCTOR = 2, CLASS_FLAGS = 12, OBJECT_HEADER = 8;
 
 // Code units of each instruction (DEX formats, as linker.js), and of the payload pseudo-instructions.
 const UNITS = new Uint8Array(256).fill(1);
@@ -87,6 +93,8 @@ export function installHostLinking(linker, runtime, { staticValue }) {
   // (7) the host state: box classes and caches
   const hostState = linker.hostState = linker.alloc(HOST_STATE_BYTES); linker.w32(linker.vm + VM_HOST_STATE, hostState);
   for (const kind of CACHED_KINDS) { const cache = linker.alloc(4 * BOX_CACHE_SLOTS); linker.w32(hostState + 32 + 4 * kind, cache); linker.extraRoots.push([cache, BOX_CACHE_SLOTS]); }
+  // (9) the Paint enum constants the paint natives answer (natives.h HostState.paintEnums, paint.h PAINT_ENUM_*): filled by the paint host as it reads them; a root range
+  { const table = linker.alloc(4 * PAINT_ENUM_SLOTS); linker.w32(hostState + HOST_STATE_PAINT_ENUMS, table); linker.extraRoots.push([table, PAINT_ENUM_SLOTS]); }
 
   // (1) host classes: every slot a host-dispatch record of the class
   const hostClass = linker.hostClass;
@@ -100,7 +108,12 @@ export function installHostLinking(linker, runtime, { staticValue }) {
     } else if (type === ATOMIC_REFERENCE) {   // (7): `atomicValue` as a reference at +8 (in the refMap: the collector traces it, subclasses inherit it) with a state word at +12
       info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
       this.w32(hostState + HOST_STATE_ATOMIC_REFERENCE, info.address); info.memoryProperty = 'atomicReference';
-    }
+    } else if (type === PAINT && !info.isInterface && info.instanceSize === OBJECT_HEADER) {   // (9)
+      info.instanceSize = PAINT_RECORD.end; this.w32(info.address + CLASS_INSTANCE_SIZE, info.instanceSize);
+      this.w32(info.address + CLASS_FLAGS, this.r32(info.address + CLASS_FLAGS) | CLASS_PAINT_RECORD); info.paintRecord = true;
+      info.refs = PAINT_REFERENCES.slice(); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));   // the references a paint holds: traced by the collector
+      info.fields.set('mBidiFlags:I', { owner: info, static: false, offset: PAINT_RECORD.bidiFlags, type: 'I', key: `${PAINT}->mBidiFlags:I` });   // a real field: iget/iput and the facade read memory
+    } else if (info.superInfo?.paintRecord) info.paintRecord = true;   // (9) a host class below Paint: the payload (its instance size counts it), not the flag
     if (type === OBJECT || type === STRING || info.isInterface) return info;
     let changed = false;
     info.vtable = info.vtable.map((mi, slot) => {
@@ -112,6 +125,18 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       this.w32(info.address + CLASS_VTABLE, info.vtable.length ? this.words(info.vtable.map(mi => mi.address)) : 0);
       const itable = info.allInterfaces.map(it => [it, this.words(it.interfaceMethods.map(im => info.vtable[info.vmap.get(im.nameSig)].address))]);
       this.w32(info.address + CLASS_ITABLE, itable.length ? this.words(itable.flatMap(([it, map]) => [it.address, map])) : 0);
+    }
+    return info;
+  };
+
+  // (9) a class with DEX code below Paint: the payload (its fields follow it), the flag when neither it nor a superclass declares one of the paint natives' methods
+  const PAINT_METHODS = new Set(PAINT_NATIVES), dexClass = linker.dexClass;
+  linker.dexClass = function (type, cls) {
+    const info = dexClass.call(this, type, cls), parent = info.superInfo;
+    if (parent?.paintRecord && !info.isInterface) {
+      info.paintRecord = true;
+      let declares = false; for (const nameSig of info.methods.keys()) if (PAINT_METHODS.has(nameSig)) { declares = true; break; }
+      if (!declares && this.r32(parent.address + CLASS_FLAGS) & CLASS_PAINT_RECORD) this.w32(info.address + CLASS_FLAGS, this.r32(info.address + CLASS_FLAGS) | CLASS_PAINT_RECORD);
     }
     return info;
   };

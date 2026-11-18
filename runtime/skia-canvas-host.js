@@ -1,15 +1,15 @@
-import {APKError} from './apk-runtime.js?v=9fddc5903fb3';
-import {getVectorGraphics} from './vector-native.js?v=9fddc5903fb3';
-import {getSolidPaint,getPaintState} from './paint-host.js?v=9fddc5903fb3';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=9fddc5903fb3';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=9fddc5903fb3';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=9fddc5903fb3';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=9fddc5903fb3';
-import {createBitmapHost} from './bitmap-host.js?v=9fddc5903fb3';
-import { gcRoot } from './heap-gc.js?v=9fddc5903fb3';
-import {sha256Hex} from './sha256-sync.js?v=9fddc5903fb3';
-import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=9fddc5903fb3';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=9fddc5903fb3';
+import {APKError} from './apk-runtime.js?v=8ff16f6ecda0';
+import {getVectorGraphics} from './vector-native.js?v=8ff16f6ecda0';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=8ff16f6ecda0';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=8ff16f6ecda0';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=8ff16f6ecda0';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=8ff16f6ecda0';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=8ff16f6ecda0';
+import {createBitmapHost} from './bitmap-host.js?v=8ff16f6ecda0';
+import { gcRoot } from './heap-gc.js?v=8ff16f6ecda0';
+import {sha256Hex} from './sha256-sync.js?v=8ff16f6ecda0';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=8ff16f6ecda0';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=8ff16f6ecda0';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -619,7 +619,7 @@ export function createSkiaCanvasHost(runtime,backend){
     }finally{source.delete();outline?.delete();}
     return filled;
    }
-   if(method.owner===PAINT){const state=getPaintState(vm,receiver);if(name==='getTypeface')return state.typefaceRef??null;const value=args[1]==null||args[1]===0?null:args[1];if(value)resolveTypeface(value);state.typefaceRef=value;return value;}
+   if(method.owner===PAINT){const state=getPaintState(vm,receiver);if(name==='getTypeface')return state.typefaceRef??null;const value=args[1]==null||args[1]===0?null:args[1];if(value)resolveTypeface(value);state.typefaceRef=value;pushPaintState(vm,receiver);return value;}
    if(method.owner===CANVAS&&name==='<init>'){const handle=args[1];getVectorGraphics(vm).get(handle,'canvas');const object=vm.object(receiver);object.nativeCanvasHandle=handle;for(const[field,type,value]of [['mNativeCanvasWrapper','J',handle],['mDensity','I',0],['mScreenDensity','I',0]])vm.storeField(object.fields,`${CANVAS}->${field}:${type}`,value);object.canvasDensity=0;return;}
    if(method.owner===PICTURE||(method.owner===CANVAS&&name==='drawPicture')){
     // android.graphics.Picture: a recorded command list (a software Canvas that is frozen by endRecording()) replayed under the target canvas's matrix and clip.

@@ -62,21 +62,22 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=9fddc5903fb3';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=9fddc5903fb3';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=9fddc5903fb3';
-import { HandleTable } from './handles.js?v=9fddc5903fb3';
-import { Exceptions } from './exceptions.js?v=9fddc5903fb3';
-import { coreImports } from './boundary-imports.js?v=9fddc5903fb3';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=9fddc5903fb3';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=9fddc5903fb3';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=9fddc5903fb3';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=9fddc5903fb3';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=9fddc5903fb3';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=9fddc5903fb3';
-import { Blocked } from '../../runtime/scheduler.js?v=9fddc5903fb3';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=9fddc5903fb3';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=9fddc5903fb3';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=8ff16f6ecda0';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=8ff16f6ecda0';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=8ff16f6ecda0';
+import { HandleTable } from './handles.js?v=8ff16f6ecda0';
+import { Exceptions } from './exceptions.js?v=8ff16f6ecda0';
+import { coreImports } from './boundary-imports.js?v=8ff16f6ecda0';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=8ff16f6ecda0';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=8ff16f6ecda0';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=8ff16f6ecda0';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=8ff16f6ecda0';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=8ff16f6ecda0';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=8ff16f6ecda0';
+import { Blocked } from '../../runtime/scheduler.js?v=8ff16f6ecda0';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=8ff16f6ecda0';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=8ff16f6ecda0';
+import { PaintRecords } from './paint-record.js?v=8ff16f6ecda0';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -235,6 +236,7 @@ export class WasmEngine {
     space.layouts = new LazyLayouts(this);
     space.strings.bind({ classAddress: () => linker.stringClassAddress, allocate: length => this.allocString(length), exportRecord: address => exports.gc_export(h, address) });
     exceptions.decodeString = address => address === 0 ? null : space.strings.get(address);
+    this.paints = new PaintRecords(this);   // android.graphics.Paint's native fields (vmcore/paint.h) for src/paint-host.js
     this.redirect();
     Object.defineProperty(this.runtime, 'wasm', { value: this, enumerable: false, configurable: true });
     return this;
@@ -816,7 +818,10 @@ export class WasmEngine {
     const mi = this.linker.methodList[methodId]; if (mi === undefined || mi.kind !== METHOD_KIND_UNBOUND || mi.def) return;
     if (site.isStatic) { if (mi.hostDispatch || !(mi.flags & 1)) return; }
     else {
-      if (site.mode !== 'virtual' || !mi.hostDispatch || mi.flags & 32) return;   // no interface record: its receivers are of any class
+      // a super call (entry.superCalls: TextPaint.set's super.set(Paint)) through a host-method record: no dispatch record, no static; its target is that method whatever the
+      // receiver (the routing never selects by the receiver's class for a super call), and only static, direct and super sites reach such a record
+      const superCall = site.mode === 'super' && entry.superCalls === true && !mi.hostDispatch && !(mi.flags & 1);
+      if (!superCall && (site.mode !== 'virtual' || !mi.hostDispatch || mi.flags & 32)) return;   // no interface record: its receivers are of any class
       const receiver = args[0]; if (receiver === null || typeof receiver !== 'object') return;
       const address = this.handles.addressById.get(receiver.ref), record = this.space.objectById(receiver.ref);
       if (address === undefined || record === undefined || record.annotationValues !== undefined || record.proxyHandler !== undefined) return;

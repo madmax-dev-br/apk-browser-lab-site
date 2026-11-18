@@ -13,9 +13,9 @@
 // `get(key)` answers the type's default (0, 0n, null) before a store, and iteration, `size` and `clear()` cover the whole layout. Keys outside the layout live in an extra Map on the
 // facade, as `fieldExtra` does today. Host state hung on the record (any own property) lives on the facade object itself, the JavaScript companion of the memory record: the facade is
 // cached per id, so the same properties are seen across reads, and it is dropped when the object is freed (RecordSpace.release).
-import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=9fddc5903fb3';
-import { HandleTable, IdTable } from './handles.js?v=9fddc5903fb3';
-import { stringText, writeStringUnits } from './strings.js?v=9fddc5903fb3';
+import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=8ff16f6ecda0';
+import { HandleTable, IdTable } from './handles.js?v=8ff16f6ecda0';
+import { stringText, writeStringUnits } from './strings.js?v=8ff16f6ecda0';
 
 // Field kinds: the descriptor letters of a field type (Z B S C I J F D), L for a reference.
 const KIND = { Z: 0, B: 1, S: 2, C: 3, I: 4, F: 5, J: 6, D: 7, L: 8 };
@@ -116,7 +116,7 @@ export class RecordSpace {
   rebind() {
     const buffer = this.buffer = this.memory.buffer;
     this.i8 = new Int8Array(buffer); this.u8 = new Uint8Array(buffer); this.i16 = new Int16Array(buffer); this.u16 = new Uint16Array(buffer);
-    this.i32 = new Int32Array(buffer); this.u32 = new Uint32Array(buffer); this.i64 = new BigInt64Array(buffer);
+    this.i32 = new Int32Array(buffer); this.u32 = new Uint32Array(buffer); this.i64 = new BigInt64Array(buffer); this.f32 = new Float32Array(buffer);
   }
   /** Declares the layout of the class whose Class record is at `classAddress`. */
   registerClass(classAddress, { type, fields = [] }) {

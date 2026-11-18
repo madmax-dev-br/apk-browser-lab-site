@@ -32,9 +32,28 @@ export const NATIVE_KEYS = [
   null, null, null, null,
   null,   // bound by bridge: AtomicReference.get over its reference payload
   'Ljava/lang/Float;->compare(FF)I', 'Ljava/lang/Double;->compare(DD)I',   // pure statics a Compose frame calls about 150 times
+  // bound by bridge (BRIDGE_NATIVES): android.graphics.Paint's state in the record (vmcore/paint.h, PAINT_NATIVES below): slice 1, then slice 2
+  null, null, null, null, null, null, null, null, null, null, null, null,
+  ...new Array(34).fill(null),
 ];
 const BRIDGE_FIRST = NATIVE_KEYS.indexOf(`${STRING}-><init>([CII)V`) + 1;   // natives.h NATIVE_BOX_VALUE_OF_B
 const IDENTITY_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->hashCode(I)I') + 1;   // natives.h NATIVE_THREAD_CURRENT
+const PAINT_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Double;->compare(DD)I') + 1;   // natives.h NATIVE_PAINT_GET_NATIVE_INSTANCE
+export const PAINT = 'Landroid/graphics/Paint;';
+/**
+ * The paint natives (vmcore/paint.h), in natives.h's order: the paint host's methods (name + signature) they answer from the Paint record. A DEX class below Paint gets the
+ * record's Class flag only when neither it nor a superclass declares one of these (vmcore/js/host-linking.js), and the natives answer only for receivers with the flag.
+ */
+export const PAINT_NATIVES = ['getNativeInstance()J', 'setColor(I)V', 'getColor()I', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V', 'isFilterBitmap()Z',
+  'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
+  // slice 2: Paint.set, the references, the floats, the enums, hinting and the text flags (natives.h NATIVE_PAINT_SET ..)
+  `set(${PAINT})V`, 'setShader(Landroid/graphics/Shader;)Landroid/graphics/Shader;', 'getShader()Landroid/graphics/Shader;',
+  'setColorFilter(Landroid/graphics/ColorFilter;)Landroid/graphics/ColorFilter;', 'getColorFilter()Landroid/graphics/ColorFilter;', 'getXfermode()Landroid/graphics/Xfermode;',
+  'getMaskFilter()Landroid/graphics/MaskFilter;', 'getTypeface()Landroid/graphics/Typeface;', 'getTextLocales()Landroid/os/LocaleList;',
+  'getStrokeWidth()F', 'setStrokeWidth(F)V', 'getStrokeMiter()F', 'getTextSize()F', 'setTextSize(F)V', 'getTextScaleX()F', 'getTextSkewX()F', 'getLetterSpacing()F',
+  'setLetterSpacing(F)V', 'getWordSpacing()F', 'getStyle()Landroid/graphics/Paint$Style;', 'setStyle(Landroid/graphics/Paint$Style;)V', 'getStrokeCap()Landroid/graphics/Paint$Cap;',
+  'getStrokeJoin()Landroid/graphics/Paint$Join;', 'getTextAlign()Landroid/graphics/Paint$Align;', 'getHinting()I', 'setHinting(I)V', 'isElegantTextHeight()Z',
+  'isAntiAlias()Z', 'setAntiAlias(Z)V', 'setDither(Z)V', 'isUnderlineText()Z', 'setUnderlineText(Z)V', 'isStrikeThruText()Z', 'setStrikeThruText(Z)V'];
 export const THREAD = 'Ljava/lang/Thread;', CURRENT_THREAD_KEY = `${THREAD}->currentThread()${THREAD}`, THREAD_GET_ID_KEY = `${THREAD}->getId()J`;
 /** The java.lang box classes by kind (natives.h BOX_*: Z B S C I J F D). */
 export const BOX_CLASSES = ['Ljava/lang/Boolean;', 'Ljava/lang/Byte;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Float;', 'Ljava/lang/Double;'];
@@ -60,6 +79,9 @@ export const BRIDGE_NATIVES = new Map([
   ['Ljava/lang/Class;->isInstance(Ljava/lang/Object;)Z', { id: IDENTITY_FIRST + 2, anyReceiver: true }], ['Ljava/lang/Class;->getComponentType()Ljava/lang/Class;', { id: IDENTITY_FIRST + 3, anyReceiver: true }],
   // the atomics bridge's AtomicReference.get over `atomicValue`, a reference payload (host-linking.js); the native checks the receiver's class itself
   [`${ATOMIC_REFERENCE}->get()Ljava/lang/Object;`, { id: IDENTITY_FIRST + 4, anyReceiver: true }],
+  // the paint host's own bridges (src/paint-host.js) over the Paint record's payload; the natives check the receiver's class flag and the payload's state themselves (paint.h)
+  // `superCalls`: also a super call's host-method record (TextPaint.set's super.set(Paint)): its target is Paint's own method whatever the receiver (paint.h)
+  ...PAINT_NATIVES.map((method, i) => [`${PAINT}->${method}`, { id: PAINT_FIRST + i, anyReceiver: true, superCalls: true }]),
 ]);
 /** The String constructors the core serves (the linker rewrites calls of them to INVOKE_STRING_INIT, classes.h). */
 export const STRING_CONSTRUCTORS = new Set(NATIVE_KEYS.filter(key => key?.startsWith(`${STRING}-><init>`)));

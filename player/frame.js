@@ -1,15 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=9fddc5903fb3';
-import { createDeviceView, createViewState } from '../device-view.js?v=9fddc5903fb3';
-import { createGlSurfaces } from '../gl-surfaces.js?v=9fddc5903fb3';
-import { sanitizeSettings } from '../device-settings.js?v=9fddc5903fb3';
-import { createFrameController } from './frame-controller.js?v=9fddc5903fb3';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=9fddc5903fb3';
-import { createPluginHost } from '../plugin-host.js?v=9fddc5903fb3';
-import { captureImage } from '../screen-capture.js?v=9fddc5903fb3';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=9fddc5903fb3';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=9fddc5903fb3';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=9fddc5903fb3';
+import { APKWorkerClient } from '../apk-worker-client.js?v=8ff16f6ecda0';
+import { createDeviceView, createViewState } from '../device-view.js?v=8ff16f6ecda0';
+import { createGlSurfaces } from '../gl-surfaces.js?v=8ff16f6ecda0';
+import { sanitizeSettings } from '../device-settings.js?v=8ff16f6ecda0';
+import { createFrameController } from './frame-controller.js?v=8ff16f6ecda0';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=8ff16f6ecda0';
+import { createPluginHost } from '../plugin-host.js?v=8ff16f6ecda0';
+import { captureImage } from '../screen-capture.js?v=8ff16f6ecda0';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=8ff16f6ecda0';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=8ff16f6ecda0';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=8ff16f6ecda0';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
