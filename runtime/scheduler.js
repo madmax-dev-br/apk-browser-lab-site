@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=0eed5c4e54ff';
+import { APKError } from './apk-error.js?v=98402358ed3b';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,7 +29,7 @@ export class VMThread {
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
-const IMPLICIT_WAIT = /^(?:monitor|class initialization|Object\.wait \(reacquire\))/;
+const IMPLICIT_WAIT = /^(?:monitor|class initialization|Object\.wait \(reacquire\)|spin-wait)/;   // spin-wait: OperationMonitor.spinYield (no main-thread message runs inside the event that spins)
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
   constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }

@@ -62,22 +62,22 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=0eed5c4e54ff';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=0eed5c4e54ff';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=0eed5c4e54ff';
-import { HandleTable } from './handles.js?v=0eed5c4e54ff';
-import { Exceptions } from './exceptions.js?v=0eed5c4e54ff';
-import { coreImports } from './boundary-imports.js?v=0eed5c4e54ff';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=0eed5c4e54ff';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=0eed5c4e54ff';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=0eed5c4e54ff';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=0eed5c4e54ff';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=0eed5c4e54ff';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=0eed5c4e54ff';
-import { Blocked } from '../../runtime/scheduler.js?v=0eed5c4e54ff';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=0eed5c4e54ff';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=0eed5c4e54ff';
-import { PaintRecords } from './paint-record.js?v=0eed5c4e54ff';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=98402358ed3b';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=98402358ed3b';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=98402358ed3b';
+import { HandleTable } from './handles.js?v=98402358ed3b';
+import { Exceptions } from './exceptions.js?v=98402358ed3b';
+import { coreImports } from './boundary-imports.js?v=98402358ed3b';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=98402358ed3b';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=98402358ed3b';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=98402358ed3b';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=98402358ed3b';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=98402358ed3b';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=98402358ed3b';
+import { Blocked } from '../../runtime/scheduler.js?v=98402358ed3b';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=98402358ed3b';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=98402358ed3b';
+import { PaintRecords } from './paint-record.js?v=98402358ed3b';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -704,7 +704,7 @@ export class WasmEngine {
     }
     if (bridged) {
       if (rt.profile.active) rt.profile.host(bridge.key);
-      const monitor = rt.monitor; if (monitor.sink === null) rt.hostCall = bridge.key; else monitor.hostEnter(bridge.key, bridge);   // OperationMonitor.hostEnter without a sink
+      rt.monitor.hostEnter(bridge.key, bridge);   // OperationMonitor.hostEnter: the marker, heartbeats with a sink, the main-thread watchdog and spin check every 256th call   // OperationMonitor.hostEnter without a sink
       if (!site.plumbing) {   // APKRuntime.record(bridge.text), as the interpreter's bridged path inlines it past the ring's fixed head
         const ring = rt.traceRing;
         if (ring == null || ring.head.length < 128 || rt.traceMuted) rt.record(bridge.text);

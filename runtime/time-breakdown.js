@@ -7,7 +7,7 @@ export class TimeBreakdown {
   reset() {
     // what the breakdown of each operation drops is kept in the lifetime totals (src/warmup.js reads them)
     this.lifeMs ??= new Float64Array(6); this.lifeCounts ??= new Float64Array(6); if (this.ms) for (let i = 0; i < 6; i++) { this.lifeMs[i] += this.ms[i]; this.lifeCounts[i] += this.counts[i]; }
-    this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = this.startedAt = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main'); this.host = new Map();
+    this.ms = new Float64Array(6); this.counts = new Float64Array(6); this.cur = BUCKET.INTERP; this.last = this.startedAt = performance.now(); this.threads = new Map(); this.acc = this.accumulatorFor('main'); this.host = new Map(); this.event ??= null;
   }
   accumulatorFor(name) { let acc = this.threads.get(name); if (acc === undefined) this.threads.set(name, acc = { name, ms: 0, calls: 0, hosts: new Map() }); return acc; }
   /** The running thread changed (scheduler): interpreter time from now on counts for `name`. */
@@ -17,10 +17,22 @@ export class TimeBreakdown {
   leave(previous) { this.charge(performance.now()); this.cur = previous; }
   /** One bridged host call finished: its key, and its inclusive time (host code that runs Java inside counts that Java). */
   hostCall(key, ms) {
+    const event = this.event; if (event !== null && this.acc.name === 'main') { const own = event.host.get(key); if (own === undefined) { if (event.host.size < 512) event.host.set(key, { n: 1, ms }); } else { own.n++; own.ms += ms; } }
     let entry = this.host.get(key); if (entry === undefined) { if (this.host.size >= 4000) return; this.host.set(key, entry = { n: 0, ms: 0 }); }
     entry.n++; entry.ms += ms;
     const acc = this.acc; acc.calls++; acc.hosts.set(key, (acc.hosts.get(key) ?? 0) + 1);   // per thread: a loop that issues the same one or two calls over and over is polling
   }
+  /** A main-thread event starts (android-platform.js runEvent, while an interaction is measured): its own buckets and host calls are collected until eventEnd. Nested events stack. */
+  eventBegin() { const now = performance.now(); this.charge(now); const event = { parent: this.event, ms: Float64Array.from(this.ms), host: new Map() }; this.event = event; return event; }
+  /** -> { buckets: [[name, ms]], hosts: [[key, n, ms]] } of the event `eventBegin` returned (the host calls the main thread made, inclusive time; WebAssembly host calls are timed by sample). */
+  eventEnd(event) {
+    const now = performance.now(); this.charge(now); this.event = event.parent ?? null;
+    const short = key => String(key).replace(/^L/, '').replace(/;->/, '.').replace(/\(.*$/, '');
+    return { buckets: NAMES.map((name, i) => [name, Math.round(this.ms[i] - event.ms[i])]).filter(row => row[1] > 0),
+      hosts: [...event.host].sort((a, b) => b[1].ms - a[1].ms || b[1].n - a[1].n).slice(0, 6).map(([key, v]) => [short(key), v.n, Math.round(v.ms)]) };
+  }
+  /** The event's work without its details (an event that is not the longest): pops it. */
+  eventDrop(event) { this.event = event.parent ?? null; }
   snapshot() {
     const copy = new Float64Array(this.ms), now = performance.now(); copy[this.cur] += now - this.last;
     const threads = [...this.threads].map(([name, acc]) => [name, acc.ms]).sort((a, b) => b[1] - a[1]).slice(0, 6);

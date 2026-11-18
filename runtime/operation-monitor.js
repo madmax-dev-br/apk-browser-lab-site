@@ -1,6 +1,7 @@
-import { TimeBreakdown } from './time-breakdown.js?v=0eed5c4e54ff';
-import { APKError } from './apk-error.js?v=0eed5c4e54ff';
-import { gcBlockReason } from './heap-gc.js?v=0eed5c4e54ff';
+import { TimeBreakdown } from './time-breakdown.js?v=98402358ed3b';
+import { APKError } from './apk-error.js?v=98402358ed3b';
+import { gcBlockReason } from './heap-gc.js?v=98402358ed3b';
+import { Blocked } from './scheduler.js?v=98402358ed3b';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -8,6 +9,9 @@ import { gcBlockReason } from './heap-gc.js?v=0eed5c4e54ff';
 //  - an operation wall budget (host time of the whole operation, not of one event): a pump that keeps scheduling short events (a self-rescheduling Handler loop, a polling thread, a Timer) restarts
 //    the per-event watchdog every time, so only this budget ends it, with the execution profile and the list of what kept being scheduled.
 const SLOW_HOST = /Inflater|Deflater|java\/util\/zip|ZipFile|ZipEntry|DexFile|DexClassLoader|PathClassLoader|ClassLoader;->(?:loadClass|defineClass|findClass)|regex\/|Pattern;|Matcher;|\/icu\/|Icu|Collator|BreakIterator|Normalizer|Skia|Paragraph|Bitmap|ImageDecoder|sqlite|SQLite|Cipher|MessageDigest|Mac;|Signature;|KeyStore|Crypto|conscrypt|Thread;->sleep|LockSupport|MappedByteBuffer|FileChannel|Linux;|Hermes|NativeLibrary|System;->load|Runtime;->load|AssetManager|XmlBlock|ApkAssets|Resources;->(?:getValue|obtain)|Typeface|FontFamily|Gzip|Zlib|ObjectInputStream|MessageFormat|NumberFormat|DateFormat|URLConnection|HttpURLConnection/;
+// Host calls a busy-wait loop makes and that hold no host state while other threads run (spinCheck): atomic reads and CAS, Thread.yield/onSpinWait, the clocks.
+const SPIN_SAFE = /\/atomic\/Atomic[A-Za-z]*;->(?:get|compareAndSet|weakCompareAndSet)|Thread;->(?:yield|onSpinWait)\(|System;->(?:nanoTime|currentTimeMillis)\(|SystemClock;->(?:uptimeMillis|elapsedRealtime)|Unsafe;->get[A-Za-z]*Volatile/;
+const SPIN_SAMPLES = 4, SPIN_AFTER_MS = 50, SPIN_SLICE_MS = 8;
 const safe = fn => { try { return fn(); } catch { return null; } };   // a heartbeat never fails the VM
 const short = key => String(key ?? '?').replace(/^L/, '').replace(/;->/, '.');
 const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -91,7 +95,7 @@ export class OperationMonitor {
   /** A host call is starting: remember it (the page sees it in the next heartbeat) and, for the calls known to run long, post a heartbeat right away so a hang inside names its culprit. */
   hostEnter(key, holder) {
     this.rt.hostCall = key;
-    if (this.sink === null) return;
+    if (this.sink === null) { if ((++this.hostCount & 255) === 0 && this.mainEvent !== null) this.spinCheck(key, performance.now()); return; }
     let slow = holder.slowHost;
     if (slow === undefined) slow = holder.slowHost = SLOW_HOST.test(key);
     if (slow) { const now = performance.now(); if (now - this.lastBeat >= 50) this.beat(now, 'host'); return; }
@@ -99,8 +103,25 @@ export class OperationMonitor {
     // still be seen. Every 256th one checks the clock: the heartbeat when due, and the main-thread watchdog (report after 10 s, the named error at the hard cap).
     if ((++this.hostCount & 255) !== 0) return;
     const now = performance.now();
-    if (this.mainEvent) this.watchMain(now);
+    if (this.mainEvent) { this.watchMain(now); this.spinCheck(key, now); }
     if (now - this.lastBeat >= this.intervalMs) this.beat(now, 'host');
+  }
+  /**
+   * A main thread that busy-waits for another thread (it re-reads an atomic field, the clock or yields, in a loop, until a background thread changes the value) would never end here:
+   * on a device the other thread runs on another core meanwhile, but the lab's main thread keeps the processor for the whole event. When the same spin-safe host call is the main
+   * thread's every sampled call (every 256th) for SPIN_SAMPLES samples, and the event has run longer than SPIN_AFTER_MS, the other threads get a slice of up to SPIN_SLICE_MS right
+   * there, as a nested wait whose reason (spin-wait) lets no main-thread message run: the parallelism of a device, not a reordering of the main thread's own work.
+   */
+  spinCheck(key, now) {
+    const rt = this.rt, scheduler = rt.scheduler, main = scheduler?.main;
+    if (!main || rt.thread !== main || !SPIN_SAFE.test(key)) { this.spinKey = null; this.spinRun = 0; return; }
+    if (key !== this.spinKey) { this.spinKey = key; this.spinRun = 1; return; }
+    if (++this.spinRun < SPIN_SAMPLES || now - this.mainEvent.start < SPIN_AFTER_MS || this.spinning) return;
+    const others = () => scheduler.threads.some(thread => thread !== main && thread.state === 'runnable' && thread.nestedDepth === 0 && !scheduler.waitingNested.has(thread));
+    scheduler.wake(); if (!others()) return;
+    const until = now + SPIN_SLICE_MS; this.spinning = true; this.spinYields = (this.spinYields ?? 0) + 1;
+    try { scheduler.resolveNested(new Blocked({ reason: `spin-wait (${short(key)})`, ready: () => performance.now() >= until || !others() })); }
+    finally { this.spinning = false; }
   }
   /** A long host-side phase (a collection) reports progress: heartbeat when due, labelled, without the operation-budget check (the phase cannot be abandoned half way). */
   pulse(label) {
