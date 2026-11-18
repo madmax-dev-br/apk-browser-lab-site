@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=4eb00f0fc2b9';
+import { APKError } from './apk-error.js?v=f44ff036c903';
 
 // Green-thread scheduler for the VM.
 //
@@ -190,7 +190,11 @@ export class Scheduler {
     const platform = this.rt.platform;
     if (this.rt.monitor?.active) this.rt.monitor.tick();   // a nested wait that keeps skipping the virtual clock and running events still ends with the operation budget
     // Readiness can change asynchronously now (a network worker thread writes shared memory while this run loop is deciding): look once more before concluding that nothing can run.
-    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
+    // A wake-up seen here returns to the caller's loop, whoever it woke: the loop's own owner (parked in a run loop with an owner, nestedDepth > 0 and not a nested wait) is not
+    // in the checks below, and a network read whose response ended during this wake() (its ready() refreshes the exchange) left network.pending at 0 -- concluding "deadlock"
+    // then was a race the response's timing decided (seen with the synchronous bridge under load).
+    let woken = this.stats.wakeups;
+    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
     const serve = this.mayServeEvents();
     const processed = serve ? this.serveEvents(platform) : 0;
     if (processed) { this.stats.events += processed; this.quietIdles = 0; return; }
@@ -201,7 +205,8 @@ export class Scheduler {
       if (network.syncWait?.(this)) return;
       throw new APKError(`Network wait in a frame that cannot suspend: ${why}. ${network.pending} exchange(s) are in flight and the VM is inside a nested host call, so it cannot yield to the browser event loop (threads: ${this.describe()})`, { kind: 'network-would-block' });
     }
-    this.wake(); if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
+    woken = this.stats.wakeups;
+    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
     const delay = serve ? (this.servableEventDelay() ?? null) : null, now = this.clock.now();   // queued messages that may not run now (see mayServeEvents) are no wake-up for this wait
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
     if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending${serve ? '' : ' (main-Looper messages are queued, but the main thread is blocked inside a message that ran during its own wait: they run only when main is back in its Looper)'} (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });
