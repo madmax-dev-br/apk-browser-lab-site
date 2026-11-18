@@ -1,33 +1,33 @@
-import { VMClock } from './vm-clock.js?v=a20604a8ef38';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=a20604a8ef38';
-import { OperationMonitor } from './operation-monitor.js?v=a20604a8ef38';
-import { ExecutionProfile } from './execution-profile.js?v=a20604a8ef38';
-import { SamplingProfiler } from './sampling-profiler.js?v=a20604a8ef38';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=a20604a8ef38';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=a20604a8ef38';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=a20604a8ef38';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=a20604a8ef38';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=a20604a8ef38';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=a20604a8ef38';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=a20604a8ef38';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=a20604a8ef38';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=a20604a8ef38';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=a20604a8ef38';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=a20604a8ef38';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=a20604a8ef38';
-import { APKError } from './apk-error.js?v=a20604a8ef38';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=a20604a8ef38';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=a20604a8ef38';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=a20604a8ef38';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=a20604a8ef38';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=a20604a8ef38';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=a20604a8ef38';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=a20604a8ef38';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=a20604a8ef38';
+import { VMClock } from './vm-clock.js?v=eb9f345313a7';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=eb9f345313a7';
+import { OperationMonitor } from './operation-monitor.js?v=eb9f345313a7';
+import { ExecutionProfile } from './execution-profile.js?v=eb9f345313a7';
+import { SamplingProfiler } from './sampling-profiler.js?v=eb9f345313a7';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=eb9f345313a7';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=eb9f345313a7';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=eb9f345313a7';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=eb9f345313a7';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=eb9f345313a7';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=eb9f345313a7';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=eb9f345313a7';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=eb9f345313a7';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=eb9f345313a7';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=eb9f345313a7';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=eb9f345313a7';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=eb9f345313a7';
+import { APKError } from './apk-error.js?v=eb9f345313a7';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=eb9f345313a7';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=eb9f345313a7';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=eb9f345313a7';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=eb9f345313a7';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=eb9f345313a7';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=eb9f345313a7';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=eb9f345313a7';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=eb9f345313a7';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=a20604a8ef38';
-import { bootClassLacksMember } from './boot-class-members.js?v=a20604a8ef38';
-export { APKError } from './apk-error.js?v=a20604a8ef38';
+import { Scheduler, Blocked } from './scheduler.js?v=eb9f345313a7';
+import { bootClassLacksMember } from './boot-class-members.js?v=eb9f345313a7';
+export { APKError } from './apk-error.js?v=eb9f345313a7';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -636,7 +636,7 @@ addBridge('java/lang/Class', ['toString()Ljava/lang/String;', 'getPackageName()L
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
   'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
-addBridge('java/lang/Class',['getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
+addBridge('java/lang/Class',['getAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getDeclaredAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
 addBridge('java/lang/Class', ['getCanonicalName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getEnclosingClass()Ljava/lang/Class;',
   'getResource(Ljava/lang/String;)Ljava/net/URL;','getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;','getProtectionDomain()Ljava/security/ProtectionDomain;','getEnclosingMethod()Ljava/lang/reflect/Method;', 'getEnclosingConstructor()Ljava/lang/reflect/Constructor;', 'isAnonymousClass()Z', 'isLocalClass()Z', 'isMemberClass()Z', 'getInterfaces()[Ljava/lang/Class;', 'getModifiers()I', 'getClassLoader()Ljava/lang/ClassLoader;']);
 addBridge('java/lang/Class', ['newInstance()Ljava/lang/Object;', 'getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;',
@@ -656,7 +656,7 @@ EXTERNAL_PARENTS.set('Ljava/lang/reflect/Executable;', 'Ljava/lang/reflect/Acces
 for (const name of ['Method', 'Constructor', 'Field']) {
   EXTERNAL_PARENTS.set(`Ljava/lang/reflect/${name};`, name === 'Field' ? 'Ljava/lang/reflect/AccessibleObject;' : 'Ljava/lang/reflect/Executable;');
   addBridge(`java/lang/reflect/${name}`, ['getName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getModifiers()I']);
-  addBridge(`java/lang/reflect/${name}`, ['equals(Ljava/lang/Object;)Z', 'hashCode()I','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z']);
+  addBridge(`java/lang/reflect/${name}`, ['equals(Ljava/lang/Object;)Z', 'hashCode()I','getAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getDeclaredAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z']);
 }
 // java.lang.reflect.Member (interface of Method/Constructor/Field); AccessibleObject implements AnnotatedElement.
 EXTERNAL_PARENTS.set('Ljava/lang/reflect/Member;', 'Ljava/lang/Object;');
@@ -1536,6 +1536,19 @@ export class APKRuntime {
   bumpModCount(object){
     object.modCount=((object.modCount??0)+1)|0;
     if(this.isSubtype(object.type,'Ljava/util/AbstractList;'))this.storeField(object.fields,'Ljava/util/AbstractList;->modCount:I',object.modCount);
+  }
+  /** Member.getAnnotationsByType (AnnotatedElements.getDirectOrIndirectAnnotationsByType over the member's declared annotations, @Repeatable containers unfolded). */
+  annotationsByType(definition, member, classArg) {
+    const target = classArg === null || classArg === 0 ? null : this.object(classArg).classType; if (!target) this.throwJava('Ljava/lang/NullPointerException;', 'annotationClass');
+    const annotations = definition.dex ? definition.dex.memberAnnotations(member) : [];
+    const repeatable = this.classAnnotations(target).find(marker => marker.type === 'Ljava/lang/annotation/Repeatable;');
+    const container = repeatable ? this.object(this.dispatch({ owner: 'Ljava/lang/annotation/Repeatable;', name: 'value', parameters: [], result: 'Ljava/lang/Class;', signature: '()Ljava/lang/Class;' }, [this.annotationObject(repeatable)], 'virtual'))?.classType ?? null : null;
+    const found = [];
+    for (const a of annotations) {
+      if (a.type === target) found.push(this.annotationObject(a));
+      else if (container && a.type === container) { const members = this.dispatch({ owner: container, name: 'value', parameters: [], result: `[${target}`, signature: `()[${target}` }, [this.annotationObject(a)], 'virtual'); if (members !== null && members !== 0) found.push(...this.object(members).elements); }
+    }
+    const value = this.newArray(`[${target}`, found.length); this.object(value).elements = found; return value;
   }
   storeField(storage, key, value) {
     if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('fields'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
@@ -3801,6 +3814,7 @@ export class APKRuntime {
     if (['Ljava/lang/reflect/Method;', 'Ljava/lang/reflect/Constructor;', 'Ljava/lang/reflect/Field;', 'Ljava/lang/reflect/Member;'].includes(method.owner)) {
       const member = obj.member; if (!member) fail('Missing reflected member metadata');
       const owner = member.field?.owner ?? member.method.owner;
+      if (name === 'getAnnotationsByType' || name === 'getDeclaredAnnotationsByType') return this.annotationsByType(member.field ?? member.method, member, args[1]);   // a member inherits nothing: both are the declared ones
       if(['getAnnotations','getDeclaredAnnotations','getAnnotation','getDeclaredAnnotation','isAnnotationPresent'].includes(name)){
         const definition=member.field??member.method;
         // Platform members registered as bridges/hosts carry no run-time-visible annotation metadata in this VM (documented gap: @Deprecated and friends on JDK members).
@@ -4181,6 +4195,27 @@ export class APKRuntime {
         }
         if(all){const value=this.newArray('[Ljava/lang/annotation/Annotation;',annotations.size);this.object(value).elements=[...annotations.values()].map(a=>this.annotationObject(a));return value;}
         const annotation=annotations.get(target);return name==='isAnnotationPresent'?(annotation?1:0):annotation?this.annotationObject(annotation):null;
+      }
+      // Class.getDeclaredAnnotationsByType / getAnnotationsByType (Java 8, Android 24+; libcore AnnotatedElements.getDirectOrIndirectAnnotationsByType): the annotations of that
+      // type present on the class itself, in declaration order, with the members of a @Repeatable container unfolded in place; getAnnotationsByType then looks at the superclass
+      // when none is present and the annotation type is @Inherited. The result is an array of the annotation type (empty when none).
+      if (name === 'getDeclaredAnnotationsByType' || name === 'getAnnotationsByType') {
+        const target = args[1] === null || args[1] === 0 ? null : this.object(args[1]).classType; if (!target) this.throwJava('Ljava/lang/NullPointerException;', 'annotationClass');
+        const repeatable = this.classAnnotations(target).find(marker => marker.type === 'Ljava/lang/annotation/Repeatable;');
+        const container = repeatable ? this.object(this.dispatch({ owner: 'Ljava/lang/annotation/Repeatable;', name: 'value', parameters: [], result: 'Ljava/lang/Class;', signature: '()Ljava/lang/Class;' }, [this.annotationObject(repeatable)], 'virtual'))?.classType ?? null : null;
+        const collect = owner => {
+          const found = [];
+          for (const a of this.classAnnotations(owner)) {
+            if (a.type === target) found.push(this.annotationObject(a));
+            else if (container && a.type === container) { const members = this.dispatch({ owner: container, name: 'value', parameters: [], result: `[${target}`, signature: `()[${target}` }, [this.annotationObject(a)], 'virtual'); if (members !== null && members !== 0) found.push(...this.object(members).elements); }
+          }
+          return found;
+        };
+        let found = collect(type);
+        if (!found.length && name === 'getAnnotationsByType' && this.classAnnotations(target).some(marker => marker.type === 'Ljava/lang/annotation/Inherited;')) {
+          for (let parent = this.parent(type), depth = 0; parent && !found.length && depth < 64; parent = this.parent(parent), depth++) found = collect(parent);
+        }
+        const value = this.newArray(`[${target}`, found.length); this.object(value).elements = found; return value;
       }
       if (['getDeclaredMethod', 'getMethod', 'getDeclaredConstructor', 'getConstructor', 'getDeclaredField', 'getField'].includes(name)) {
         const kind = name.includes('Constructor') ? 'constructor' : name.includes('Field') ? 'field' : 'method';

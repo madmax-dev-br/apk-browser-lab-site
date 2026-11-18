@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=a20604a8ef38';
-import { APKError } from './apk-error.js?v=a20604a8ef38';
-import { gcRoot } from './heap-gc.js?v=a20604a8ef38';
+import { createHostRegistry } from './host-contract.js?v=eb9f345313a7';
+import { APKError } from './apk-error.js?v=eb9f345313a7';
+import { gcRoot } from './heap-gc.js?v=eb9f345313a7';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -553,7 +553,24 @@ export function createActivityApiHost(platform) {
   noop('startLocalVoiceInteraction', `(${BUNDLE})V`); noop('stopLocalVoiceInteraction', '()V');
   constant('getContentScene', '()Landroid/transition/Scene;', null); constant('getContentTransitionManager', '()Landroid/transition/TransitionManager;', null);
   noop('setContentTransitionManager', '(Landroid/transition/TransitionManager;)V');
-  def(ACTIVITY, 'getSplashScreen', '()Landroid/window/SplashScreen;', () => unsupported('Activity.getSplashScreen: the system splash screen is not drawn by the lab', 'splash-screen-unsupported'));
+  // Activity.getSplashScreen (API 31): one SplashScreen.SplashScreenImpl per Activity (android-13.0.0_r1). Its OnExitAnimationListener is called by the system only when a starting
+  // window was shown and is handed to the app as a SplashScreenView (ActivityThread.handleAttachSplashScreenView). The lab shows no starting window -- the case of a launch without
+  // one -- so the listener is kept and never called; the app's own first frame is what the user sees. setSplashScreenTheme is kept for the next launch's starting window, which
+  // the lab does not draw either. Nothing is faked: the app's code paths for "no splash handed over" run as on a device.
+  const SPLASH = 'Landroid/window/SplashScreen;', SPLASH_IMPL = 'Landroid/window/SplashScreen$SplashScreenImpl;', EXIT_LISTENER = 'Landroid/window/SplashScreen$OnExitAnimationListener;';
+  type(SPLASH, 'Ljava/lang/Object;'); registry.interfaces.set(SPLASH, []); type(EXIT_LISTENER, 'Ljava/lang/Object;'); registry.interfaces.set(EXIT_LISTENER, []);
+  type(SPLASH_IMPL, 'Ljava/lang/Object;', [SPLASH], { allocatable: true });
+  const SPLASH_KEY = `${ACTIVITY}->mSplashScreen:${SPLASH}`, LISTENER_KEY = `${SPLASH_IMPL}->mExitAnimationListener:${EXIT_LISTENER}`;   // stored as fields: the collector sees them
+  def(ACTIVITY, 'getSplashScreen', `()${SPLASH}`, (r, _m, [self]) => {
+    const fields = own(r, self).fields, have = fields?.get(SPLASH_KEY); if (have) return have;
+    const impl = r.allocate(SPLASH_IMPL); r.storeField(own(r, self).fields, SPLASH_KEY, impl); return impl;
+  });
+  const splash = (r, self) => r.object(self).splash ?? (r.object(self).splash = { theme: 0 });
+  for (const owner of [SPLASH_IMPL, SPLASH]) {
+    def(owner, 'setOnExitAnimationListener', `(${EXIT_LISTENER})V`, (r, _m, [self, listener]) => { if (listener !== null && listener !== 0) { r.storeField(r.object(self).fields, LISTENER_KEY, listener); r.record('SPLASH exit listener registered: no starting window in the lab, so it is not called (as a launch without one)'); } });
+    def(owner, 'clearOnExitAnimationListener', '()V', (r, _m, [self]) => { r.storeField(r.object(self).fields, LISTENER_KEY, null); });
+    def(owner, 'setSplashScreenTheme', '(I)V', (r, _m, [self, theme]) => { splash(r, self).theme = theme; });
+  }
   def(ACTIVITY, 'getMediaController', '()Landroid/media/session/MediaController;', (r, _m, [self]) => own(r, self).mediaController ?? null);
   def(ACTIVITY, 'setMediaController', '(Landroid/media/session/MediaController;)V', (r, _m, [self, controller]) => { own(r, self).mediaController = controller; });
   def(ACTIVITY, 'getLoaderManager', '()Landroid/app/LoaderManager;', () => unsupported('Activity.getLoaderManager: android.app.LoaderManager (deprecated in API 28) is not part of the lab framework', 'loader-manager-unsupported'));
