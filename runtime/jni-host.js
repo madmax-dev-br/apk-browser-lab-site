@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=e04c619c649c';
-import { JavaException } from './apk-runtime.js?v=e04c619c649c';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=e04c619c649c';
-import { buildElfDescriptor } from './native-descriptor.js?v=e04c619c649c';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=e04c619c649c';
-import { NativeLinker, LinkError } from './native-linker.js?v=e04c619c649c';
-import { hostFunction } from './wasm-host-function.js?v=e04c619c649c';
-import { parseWasm } from './wasm-dylink.js?v=e04c619c649c';
-import { formatVersion } from './rn-version.js?v=e04c619c649c';
-import { registerWasmMemory } from './unsafe-native.js?v=e04c619c649c';
-import { writeSkPath } from './skia-path-layout.js?v=e04c619c649c';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=e04c619c649c';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=e04c619c649c';
-import { withVariants } from './native-provider-variants.js?v=e04c619c649c';
+import { APKError } from './apk-error.js?v=6e2914ae30a5';
+import { JavaException } from './apk-runtime.js?v=6e2914ae30a5';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=6e2914ae30a5';
+import { buildElfDescriptor } from './native-descriptor.js?v=6e2914ae30a5';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6e2914ae30a5';
+import { NativeLinker, LinkError } from './native-linker.js?v=6e2914ae30a5';
+import { hostFunction } from './wasm-host-function.js?v=6e2914ae30a5';
+import { parseWasm } from './wasm-dylink.js?v=6e2914ae30a5';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=6e2914ae30a5';
+import { registerWasmMemory } from './unsafe-native.js?v=6e2914ae30a5';
+import { writeSkPath } from './skia-path-layout.js?v=6e2914ae30a5';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=6e2914ae30a5';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=6e2914ae30a5';
+import { withVariants } from './native-provider-variants.js?v=6e2914ae30a5';
 
 // JNI -> WebAssembly bridge.
 //
@@ -123,7 +123,12 @@ export class JniBridge {
     const need = entry.requires, app = this.runtime.reactNativeVersion, appText = formatVersion(app), hermes = this.runtime.hermesBytecodeVersion;
     const fail = (why, details) => probe ? (() => { throw { probe: true, details: { ...details, why } }; })() : this.runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${soname}" is built by the lab for ${why}`, { kind: 'native-library-unavailable', soname, labReactNative: need?.reactNative ?? null, appReactNative: appText, appHermesBytecodeVersion: hermes ?? null, ...details });
     if (need?.reactNative && appText !== need.reactNative) {
-      fail(`React Native ${need.reactNative}, ${appText ? `but this app ships React Native ${appText}` : 'but the lab could not read this app\'s React Native version from its DEX'}. To serve it, add React Native ${appText ?? '<the app\'s version>'} to scripts/wasm/rn-versions.json and build it (scripts/build-native-libs.sh)`, { neededReactNative: appText });
+      // a nightly or a build from source is not a release the lab can name by its number: the libraries have to be built from the commit the app was built from
+      const unreleased = isUnreleased(app), commit = nightlyCommit(app), bytecode = hermes != null ? ` Its JS bundle is Hermes bytecode version ${hermes}${need.hermesBytecodeVersion ? ` (React Native ${need.reactNative} uses ${need.hermesBytecodeVersion})` : ''}.` : '';
+      const how = unreleased
+        ? `This is not a React Native release but ${app.prerelease ? `a prerelease (nightly or canary)` : 'a build from source whose version was not stamped (0.0.0)'}: its native libraries must be built from the React Native commit the app was built from${commit ? ` (${commit}, from the version string)` : ' (the version does not name it: take it from the app\'s package.json / lock file)'}, as an entry of scripts/wasm/rn-versions.json (scripts/build-native-libs.sh).${bytecode}`
+        : `To serve it, add React Native ${appText ?? '<the app\'s version>'} to scripts/wasm/rn-versions.json and build it (scripts/build-native-libs.sh).${bytecode}`;
+      fail(`React Native ${need.reactNative}, ${appText ? `but this app ships React Native ${appText}` : 'but the lab could not read this app\'s React Native version from its DEX'}. ${how}`, { neededReactNative: appText, unreleasedReactNative: unreleased, reactNativeCommit: commit });
     }
     if (need?.hermesBytecodeVersion && hermes != null && hermes !== need.hermesBytecodeVersion) {
       fail(`Hermes bytecode version ${need.hermesBytecodeVersion} (the Hermes of React Native ${need.reactNative ?? '?'}), but this app's JS bundle is Hermes bytecode version ${hermes}. Build the Hermes release that produces version ${hermes}`, { neededHermesBytecodeVersion: hermes });
