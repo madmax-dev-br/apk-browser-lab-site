@@ -3,7 +3,7 @@
 // can send its requests through a relay instead (Controles > Dispositivo > Proxy, `{url}` placeholder; src/network-transport.js openExchange), and this is that relay: it repeats each
 // request from this machine, as the device would send it, and answers the page with CORS headers.
 //
-//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>]
+//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--ca <ca.pem>]...   (--ca: CA certificates to trust besides the system's, for a server with an internal CA)
 //
 // Then put the printed "Proxy" URL in the lab's Proxy field. Contract with src/network-transport.js:
 //  - the target is the `url` query parameter; headers a browser may not send (Cookie, User-Agent, Origin, Referer ...) arrive as `x-apkweb-<name>` and are sent under their own name;
@@ -12,16 +12,21 @@
 //  - a failure to reach the target (unknown host, refused, timed out, bad certificate) is a 502 carrying `x-apkweb-relay-error-code` (the Node error code) and `x-apkweb-relay-error`
 //    (its message), which the lab turns into the exception an Android device would throw (UnknownHostException, ConnectException, SSLHandshakeException ...).
 //
+//  - a client certificate (mTLS): the lab hands the device's client identity for one host -- what the app's KeyManager chose for it, the private key (PKCS#8) and the certificate
+//    chain (DER) -- as POST ?url=<https://host[:port]/>&client-identity=1 with {"key": base64, "chain": [base64, ...]} (an empty chain forgets it; ?client-identity=forget-all, which the lab sends before the first request of a session, forgets every one). The relay keeps it in memory only,
+//    never writes or logs it, and presents it in the TLS handshakes to that host and port only: the HTTPS requests and the TLS tunnel (/tcp?tls=1). Other hosts never see it.
+//
 // Safety: it listens on 127.0.0.1 only; every request must carry the random token printed at start-up in its path, and must come from one of the allowed origins (the public lab and a
 // local copy by default), so another site open in the same browser cannot use it. Destinations are not restricted (the owner's decision, 2026-11-16: the relay is meant to be free): the
 // internet, this machine and the local network are all reachable. --allow-private, from older versions, is accepted and does nothing. It keeps no cookies and stores nothing: what
 // the app sends passes through and is forgotten.
 import http from 'node:http';
 import https from 'node:https';
-import { randomBytes, createHash } from 'node:crypto';
+import { randomBytes, createHash, createPrivateKey, X509Certificate } from 'node:crypto';
 import net, { isIP } from 'node:net';
 import tls from 'node:tls';
 import { fileURLToPath } from 'node:url';
+import { readFileSync } from 'node:fs';
 
 export const DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'host', 'content-length', 'expect']);
@@ -34,9 +39,10 @@ const MAX_BODY = 32 * 1024 * 1024;
  * The relay as an http.Server (not listening yet). `token`: the path segment every request must carry; `origins`: the page origins allowed to use it; Upstream requests go through node:http(s), not fetch: fetch adds headers of its own (Sec-Fetch-Mode, Accept-Language ...) that the app
  * never sent; here the target sees exactly the app's request.
  */
-export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 60000 } = {}) {
+export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 60000, ca = null } = {}) {
   if (!token) throw new Error('createRelay needs a token');
   const allowed = new Set(origins.map(origin => origin.replace(/\/$/, '')));
+  const identities = new Map();   // 'host:port' -> { key, cert } (PEM), the device's client identity for that destination, in memory only (clientIdentityFor)
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const fail = (res, status, message) => { res.statusCode = status; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end(message); };
   const server = http.createServer(async (req, res) => {
@@ -51,6 +57,16 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
     const target = url.searchParams.get('url');
     let parsed; try { parsed = new URL(target ?? ''); } catch { cors(origin, res); return fail(res, 400, 'missing or invalid url parameter'); }
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') { cors(origin, res); return fail(res, 400, `unsupported scheme ${parsed.protocol}`); }
+    if (url.searchParams.get('client-identity') === 'forget-all' && req.method === 'POST') { identities.clear(); cors(origin, res); res.statusCode = 204; return res.end(); }   // a new lab session: the identities of the previous one are gone
+    if (url.searchParams.get('client-identity') === '1') {
+      if (req.method !== 'POST' || parsed.protocol !== 'https:') { cors(origin, res); return fail(res, 400, 'a client identity is POSTed for an https:// destination'); }
+      const chunks = []; let size = 0;
+      for await (const chunk of req) { size += chunk.length; if (size > 1024 * 1024) { cors(origin, res); return fail(res, 413, 'client identity over 1 MiB'); } chunks.push(chunk); }
+      let identity; try { identity = parseIdentity(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch (error) { cors(origin, res); return fail(res, 400, `invalid client identity: ${error.message}`); }
+      const where = destination(parsed.hostname, parsed.port || '443');
+      if (identity) identities.set(where, identity); else identities.delete(where);
+      cors(origin, res); res.statusCode = 204; return res.end();
+    }
     const relayError = (code, message) => { cors(origin, res, { 'x-apkweb-relay-error-code': code, 'x-apkweb-relay-error': message.replace(/[\r\n]+/g, ' ').slice(0, 300), 'Access-Control-Expose-Headers': 'x-apkweb-relay-error-code, x-apkweb-relay-error' }); fail(res, 502, `${code}: ${message}`); };
     const headers = new Headers();
     for (const [name, value] of Object.entries(req.headers)) {
@@ -66,7 +82,7 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
       body = Buffer.concat(chunks);
     }
     let response;
-    try { response = await send(parsed, req.method, headers, body, timeoutMs); }
+    try { response = await send(parsed, req.method, headers, body, timeoutMs, 0, identities, ca); }
     catch (error) { return relayError(error?.code ?? 'EFETCH', String(error?.message ?? error)); }
     const exposed = [];
     for (const [name, value] of Object.entries(response.headers)) { const lower = name.toLowerCase(); if (RESPONSE_DROP.has(lower) || lower.startsWith('access-control-')) continue; res.setHeader(name, value); exposed.push(name); }
@@ -77,7 +93,7 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
     if (req.method === 'HEAD') { response.resume(); return res.end(); }
     response.on('error', () => res.destroy()).pipe(res);
   });
-  server.on('upgrade', (req, socket) => tunnel({ req, socket, token, allowed, timeoutMs }));
+  server.on('upgrade', (req, socket) => tunnel({ req, socket, token, allowed, timeoutMs, identities, ca }));
   return server;
 }
 
@@ -110,7 +126,19 @@ function wsDecoder() {
     return out;
   };
 }
-async function tunnel({ req, socket, token, allowed, timeoutMs }) {
+/** 'host:port' as the identities are keyed (the host lowercased, IPv6 brackets dropped). */
+const destination = (host, port) => `${String(host).toLowerCase().replace(/^\[|\]$/g, '')}:${port}`;
+const pem = (label, bytes) => `-----BEGIN ${label}-----\n${bytes.toString('base64').replace(/.{1,64}/g, line => line + '\n')}-----END ${label}-----\n`;
+/** {key: base64 PKCS#8, chain: [base64 DER]} -> { key, cert } in PEM, checked by node:crypto; null for an empty chain (forget). */
+function parseIdentity(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.chain)) throw new Error('expected {"key", "chain": [...]}');
+  if (body.chain.length === 0) return null;
+  const keyDer = Buffer.from(String(body.key ?? ''), 'base64'), certs = body.chain.map(item => Buffer.from(String(item), 'base64'));
+  const key = createPrivateKey({ key: keyDer, format: 'der', type: 'pkcs8' });   // throws for anything that is not a PKCS#8 private key
+  const leaf = new X509Certificate(certs[0]); if (!leaf.checkPrivateKey(key)) throw new Error('the private key does not match the first certificate of the chain');
+  return { key: pem('PRIVATE KEY', keyDer), cert: certs.map(der => pem('CERTIFICATE', der)).join('') };
+}
+async function tunnel({ req, socket, token, allowed, timeoutMs, identities, ca = null }) {
   const url = new URL(req.url, 'http://relay.invalid'), origin = req.headers.origin ?? '';
   const refuse = (status, text, message) => { socket.end(`HTTP/1.1 ${status} ${text}\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n${message}`); };
   if (url.pathname !== `/${token}/tcp`) return refuse(404, 'Not Found', 'unknown path');
@@ -125,7 +153,8 @@ async function tunnel({ req, socket, token, allowed, timeoutMs }) {
   const fail = (code, message) => { say({ error: { code, message: String(message).replace(/[\r\n]+/g, ' ').slice(0, 300) } }); socket.end(closeFrame(1011)); };
   socket.on('error', () => {});
   let connected = false;
-  const upstream = secure ? tls.connect({ host, port, servername: isIP(host) ? undefined : host, ALPNProtocols: alpn.length ? alpn : undefined }) : net.connect({ host, port });
+  const identity = secure ? identities?.get(destination(host, port)) : null;
+  const upstream = secure ? tls.connect({ host, port, servername: isIP(host) ? undefined : host, ALPNProtocols: alpn.length ? alpn : undefined, ...(identity ? { key: identity.key, cert: identity.cert } : {}), ...(ca ? { ca: [...tls.rootCertificates, ...ca] } : {}) }) : net.connect({ host, port });
   const timer = setTimeout(() => { if (!connected) { upstream.destroy(); fail('ETIMEDOUT', `connect to ${host}:${port} timed out after ${timeoutMs} ms`); } }, timeoutMs);
   upstream.once(secure ? 'secureConnect' : 'connect', () => { connected = true; clearTimeout(timer); upstream.setNoDelay?.(true); say({ connected: true, alpn: secure ? upstream.alpnProtocol || null : null }); });
   upstream.on('data', chunk => { if (!socket.destroyed) socket.write(wsFrame(0x2, chunk)); });
@@ -143,11 +172,12 @@ async function tunnel({ req, socket, token, allowed, timeoutMs }) {
 }
 
 /** One upstream exchange over node:http(s), following redirects the way fetch does (at most 20; 303, and 301/302 after a POST, continue as GET without a body). */
-function send(url, method, headers, body, timeoutMs, hops = 0) {
+function send(url, method, headers, body, timeoutMs, hops = 0, identities = null, ca = null) {
   return new Promise((resolve, reject) => {
     const outgoing = {}; headers.forEach((value, name) => { outgoing[name] = name.toLowerCase() === 'cookie' ? value : (outgoing[name] ? `${outgoing[name]}, ${value}` : value); });
     if (body) outgoing['content-length'] = String(body.length);
-    const request = (url.protocol === 'https:' ? https : http).request(url, { method, headers: outgoing, timeout: timeoutMs }, response => {
+    const identity = url.protocol === 'https:' ? identities?.get(destination(url.hostname, url.port || '443')) : null;   // only the destination the identity was given for
+    const request = (url.protocol === 'https:' ? https : http).request(url, { method, headers: outgoing, timeout: timeoutMs, ...(identity ? { key: identity.key, cert: identity.cert, agent: false } : {}), ...(ca && url.protocol === 'https:' ? { ca: [...tls.rootCertificates, ...ca], agent: false } : {}) }, response => {
       const status = response.statusCode, location = response.headers.location;
       if ([301, 302, 303, 307, 308].includes(status) && location) {
         response.resume();
@@ -155,7 +185,7 @@ function send(url, method, headers, body, timeoutMs, hops = 0) {
         const next = new URL(location, url), asGet = status === 303 || ((status === 301 || status === 302) && method === 'POST');
         const nextHeaders = new Headers(headers); if (asGet) { nextHeaders.delete('content-type'); nextHeaders.delete('content-length'); }
         if (next.host !== url.host) { nextHeaders.delete('authorization'); nextHeaders.delete('cookie'); }   // credentials never follow a redirect to another host, as with fetch
-        return resolve(send(next, asGet ? 'GET' : method, nextHeaders, asGet ? undefined : body, timeoutMs, hops + 1));
+        return resolve(send(next, asGet ? 'GET' : method, nextHeaders, asGet ? undefined : body, timeoutMs, hops + 1, identities, ca));
       }
       resolve(response);
     });
@@ -166,14 +196,15 @@ function send(url, method, headers, body, timeoutMs, hops = 0) {
 }
 
 function parseArguments(argv) {
-  const options = { port: 8787, origins: [], token: null };
+  const options = { port: 8787, origins: [], token: null, ca: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--port') options.port = Number(argv[++i]);
     else if (arg === '--origin') options.origins.push(argv[++i]);
     else if (arg === '--token') options.token = argv[++i];
+    else if (arg === '--ca') options.ca.push(readFileSync(argv[++i], 'utf8'));   // a PEM file of CA certificates to trust besides the system ones (a server with an internal CA)
     else if (arg === '--allow-private') continue;   // older versions refused private destinations; every destination is reachable now
-    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>]'); process.exit(0); }
+    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--ca <ca.pem>]...'); process.exit(0); }
     else throw new Error(`unknown argument ${arg}`);
   }
   if (!Number.isInteger(options.port) || options.port < 1 || options.port > 65535) throw new Error('--port must be 1-65535');
@@ -183,7 +214,7 @@ function parseArguments(argv) {
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const options = parseArguments(process.argv.slice(2));
   const token = options.token ?? randomBytes(12).toString('hex'), origins = options.origins.length ? options.origins : DEFAULT_ORIGINS;
-  const server = createRelay({ token, origins });
+  const server = createRelay({ token, origins, ca: options.ca.length ? options.ca : null });
   server.listen(options.port, '127.0.0.1', () => {
     console.log(`APK Web Lab CORS relay on http://127.0.0.1:${options.port} (only this machine can reach it)`);
     console.log(`Allowed page origins: ${origins.join(', ')}`);

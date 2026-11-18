@@ -1,8 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=529b25fb80f8';
-import { APKError } from './apk-error.js?v=529b25fb80f8';
-import { Blocked } from './scheduler.js?v=529b25fb80f8';
-import { networkOf } from './network-native.js?v=529b25fb80f8';
-import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=529b25fb80f8';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=e04c619c649c';
+import { APKError } from './apk-error.js?v=e04c619c649c';
+import { Blocked } from './scheduler.js?v=e04c619c649c';
+import { networkOf } from './network-native.js?v=e04c619c649c';
+import { installTlsSockets, TRUST_KEY, KEYS_KEY } from './tls-socket-host.js?v=e04c619c649c';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -77,6 +77,12 @@ export function createSecurityHost(platform) {
   const LAB = 'Ldev/apkweb/net/', TMI = LAB + 'LabTrustManager;', OSFI = LAB + 'LabSslSocketFactory;', EXT = 'Landroid/net/http/X509TrustManagerExtensions;';
   const NO_ANCHOR = 'java.security.cert.CertPathValidatorException: Trust anchor for certification path not found.';
   type(TM); type(KM); type(X509TM, OBJECT, [TM]); registry.interfaces.set(TM, []); registry.interfaces.set(KM, []); registry.interfaces.set(X509TM, [TM]);
+  // javax.net.ssl.X509KeyManager (interface, extends KeyManager) and X509ExtendedKeyManager (libcore: abstract class implementing it; its two engine methods answer null by default):
+  // Conscrypt's KeyManagerImpl extends the latter, and apps implement either for their mTLS identity.
+  const X509KM = 'Ljavax/net/ssl/X509KeyManager;', X509EKM = 'Ljavax/net/ssl/X509ExtendedKeyManager;';
+  type(X509KM, OBJECT, [KM]); registry.interfaces.set(X509KM, [KM]);
+  type(X509EKM, OBJECT, [X509KM], { allocatable: true }); def(X509EKM, '<init>', '()V', () => {});
+  for (const name of ['chooseEngineClientAlias', 'chooseEngineServerAlias']) def(X509EKM, name, name === 'chooseEngineClientAlias' ? `([${STRING}[Ljava/security/Principal;Ljavax/net/ssl/SSLEngine;)${STRING}` : `(${STRING}[Ljava/security/Principal;Ljavax/net/ssl/SSLEngine;)${STRING}`, () => null);
   type(TMI, OBJECT, [X509TM], { allocatable: true }); type(TMF, OBJECT, [], { allocatable: true }); type(KMF, OBJECT, [], { allocatable: true });
   type(SSL_CONTEXT, OBJECT, [], { allocatable: true }); type(OSFI, SSL_SOCKET_FACTORY, [], { allocatable: true }); type(EXT, OBJECT, [], { allocatable: true });
   const array = (r, element, items) => { const a = r.newArray(`[${element}`, items.length); r.array(a).elements = items; return a; };
@@ -158,8 +164,23 @@ export function createSecurityHost(platform) {
       return jsseFactory(r, owner, name, r.stringCharacters(r.dispatch({ owner: 'Ljava/security/Provider;', name: 'getName', parameters: [], result: STRING, signature: `()${STRING}` }, [provider], 'virtual')));
     }, { static: true });
   }
-  def(KMF, 'init', `(${KEYSTORE}${CHARS})V`, (r, _m, [self]) => { r.object(self).ready = true; });
-  def(KMF, 'getKeyManagers', `()[${KM}`, (r, _m, [self]) => { if (!r.object(self).ready) r.throwJava('Ljava/lang/IllegalStateException;', 'KeyManagerFactory is not initialized'); return array(r, KM, []); });
+  // KeyManagerFactory.init(KeyStore, char[]) is the provider's engineInit: on the device the PKIX/X509 factory is Conscrypt's KeyManagerFactoryImpl (pinned original, in DEX), whose
+  // KeyManagerImpl serves the PrivateKeyEntry aliases of the KeyStore (an AndroidKeyStore, a PKCS12/BKS file the app loaded, or the javax.net.ssl.keyStore default). Before, the list
+  // was always empty, so an app's mTLS client identity never existed.
+  const KMF_IMPL = 'Lcom/android/org/conscrypt/KeyManagerFactoryImpl;';
+  // javax.net.ssl.KeyManagerFactorySpi (libcore, abstract, no state): the superclass constructor KeyManagerFactoryImpl calls.
+  type('Ljavax/net/ssl/KeyManagerFactorySpi;', 'Ljava/lang/Object;', [], { allocatable: true }); def('Ljavax/net/ssl/KeyManagerFactorySpi;', '<init>', '()V', () => {});
+  def(KMF, 'init', `(${KEYSTORE}${CHARS})V`, (r, _m, [self, keyStore, password]) => {
+    const impl = r.allocate(KMF_IMPL); r.dispatch({ owner: KMF_IMPL, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [impl], 'direct');
+    r.dispatch({ owner: KMF_IMPL, name: 'engineInit', parameters: [KEYSTORE, CHARS], result: 'V', signature: `(${KEYSTORE}${CHARS})V` }, [impl, keyStore, password], 'virtual');
+    const o = r.object(self); o.impl = impl; o.ready = true;
+  });
+  def(KMF, 'init', '(Ljavax/net/ssl/ManagerFactoryParameters;)V', (r) => r.throwJava('Ljava/security/InvalidAlgorithmParameterException;', 'ManagerFactoryParameters not supported'));   // KeyManagerFactoryImpl.engineInit(ManagerFactoryParameters)
+  def(KMF, 'getKeyManagers', `()[${KM}`, (r, _m, [self]) => {
+    const o = r.object(self); if (!o.ready) r.throwJava('Ljava/lang/IllegalStateException;', 'KeyManagerFactory is not initialized');
+    const managers = o.impl ? r.dispatch({ owner: KMF_IMPL, name: 'engineGetKeyManagers', parameters: [], result: `[${KM}`, signature: `()[${KM}` }, [o.impl], 'virtual') : null;
+    return array(r, KM, managers === null || managers === 0 ? [] : [...r.array(managers).elements]);
+  });
 
   // SSLContext: the socket factory is Conscrypt's OpenSSLSocketFactoryImpl.
   const PROTOCOLS = ['TLS', 'TLSv1', 'TLSv1.1', 'TLSv1.2', 'TLSv1.3', 'SSL', 'SSLv3', 'Default'];
@@ -184,7 +205,7 @@ export function createSecurityHost(platform) {
   }, { static: true });
   def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => { const ref = r.allocate(SSL_CONTEXT); Object.assign(r.object(ref), { protocol: 'Default', factory: r.allocate(OSFI) }); return ref; }, { static: true });
   def(SSL_CONTEXT, 'getProtocol', `()${STRING}`, (r, _m, [self]) => r.object(self).protocol);
-  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, , trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); r.storeField(r.object(o.factory).fields, TRUST_KEY, o.trustManagers ? trust : null); });
+  def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, keys, trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); r.storeField(r.object(o.factory).fields, TRUST_KEY, o.trustManagers ? trust : null); r.storeField(r.object(o.factory).fields, KEYS_KEY, keys === null || keys === 0 || keys === undefined ? null : keys); });   // the KeyManagers: the client identity the handshake offers (tls-socket-host.js clientIdentity)
   def(SSL_CONTEXT, 'getSocketFactory', `()${SSL_SOCKET_FACTORY}`, (r, _m, [self]) => r.object(self).factory ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'));
 
   return { ...registry, interfaces: registry.interfacesOf };

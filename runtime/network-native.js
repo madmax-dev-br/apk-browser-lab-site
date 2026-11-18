@@ -1,16 +1,17 @@
-import { APKError } from './apk-error.js?v=529b25fb80f8';
-import { throwNew } from './java-throw.js?v=529b25fb80f8';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=529b25fb80f8';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=529b25fb80f8';
-import { Blocked } from './scheduler.js?v=529b25fb80f8';
-import { captureBody } from './network-capture.js?v=529b25fb80f8';
-import { OS_CONSTANTS } from './os-constants-data.js?v=529b25fb80f8';
-import { openExchange, describeFailure } from './network-transport.js?v=529b25fb80f8';
-import { WorkerExecutor } from './network-worker-executor.js?v=529b25fb80f8';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=529b25fb80f8';
-import { TransportAuthority } from './transport-ca.js?v=529b25fb80f8';
-import { openWebSocketSession } from './websocket-bridge.js?v=529b25fb80f8';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=529b25fb80f8';
+import { APKError } from './apk-error.js?v=e04c619c649c';
+import { throwNew } from './java-throw.js?v=e04c619c649c';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=e04c619c649c';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=e04c619c649c';
+import { Blocked } from './scheduler.js?v=e04c619c649c';
+import { captureBody } from './network-capture.js?v=e04c619c649c';
+import { OS_CONSTANTS } from './os-constants-data.js?v=e04c619c649c';
+import { openExchange, describeFailure } from './network-transport.js?v=e04c619c649c';
+import { WorkerExecutor } from './network-worker-executor.js?v=e04c619c649c';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=e04c619c649c';
+import { TransportAuthority } from './transport-ca.js?v=e04c619c649c';
+import { openWebSocketSession } from './websocket-bridge.js?v=e04c619c649c';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=e04c619c649c';
+import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=e04c619c649c';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -59,7 +60,7 @@ export class NetworkBridge {
   get policy() {
     if (this.platform.networkPolicy) return this.platform.networkPolicy;
     const network = this.platform.device?.network;
-    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], fetch: null, redirect: 'auto' } };
+    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], clientCertHosts: network?.clientCertHosts ?? [], fetch: null, redirect: 'auto' } };
     return this.derived.value;
   }
   /** The Worker's network log (src/netlog.js), or null (tests, hosts that attach none). */
@@ -155,7 +156,7 @@ export class NetworkBridge {
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl) }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
-    if (op.executor === 'worker') { try { (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    if (op.executor === 'worker') { try { const start = () => (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); const identity = this.clientIdentityReady(request.url); if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
@@ -244,8 +245,34 @@ export class NetworkBridge {
     return true;
   }
 
+  /**
+   * The app's client identity for a destination (src/tls-socket-host.js clientIdentity, at the handshake of a socket to a configured client-certificate host): handed to the relay once
+   * per identity, over its token-protected channel, for that destination only (the "Redirecionar hosts" target when a rule maps it). Without a relay the browser cannot present it:
+   * the server sees no client certificate, as it would from a device whose app offered none, and the trace says why.
+   */
+  useClientIdentity(dest, identity, alias) {
+    const mapped = this.redirectFor(`https://${dest}/`), target = mapped ? destinationOfUrl(mapped.url) ?? dest : dest, proxyUrl = this.policy.proxyUrl ?? '', key = identityKey(identity);
+    this.clientIdentities ??= new Map(); const current = this.clientIdentities.get(target);
+    if (current && current.key === key && current.proxyUrl === proxyUrl) return;
+    const record = text => this.runtime?.record?.(`NET tls client certificate for ${target}: ${text}`);
+    if (!proxyUrl) { this.clientIdentities.set(target, { key, proxyUrl, job: null }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) NOT presented: a browser cannot present a client certificate; set the relay as the Proxy (Controls > Device)`); return; }
+    if (this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }).catch(() => {}) };
+    const job = this.identityReset.job.then(() => registerClientIdentity({ proxyUrl, fetch: this.fetchFunction(), dest: target, identity }))
+      .then(() => { record(`alias "${alias}" (${identity.chain.length} certificate(s)) handed to the relay, presented in the TLS handshakes to this destination only`); },
+        error => { record(`alias "${alias}" NOT presented: ${String(error?.message ?? error).slice(0, 200)}`); this.clientIdentities.delete(target); });
+    this.clientIdentities.set(target, { key, proxyUrl, job });
+  }
+  /** The registration of the client identity a request's destination waits for, or null. */
+  clientIdentityReady(url) {
+    // the first request of a session through a relay first clears the identities a previous session handed over (a relay that is not the lab's ignores the request: errors are dropped)
+    const proxyUrl = this.policy.proxyUrl ?? ''; if (proxyUrl && this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }).catch(() => {}) };
+    const mapped = this.redirectFor(url), dest = destinationOfUrl(mapped?.url ?? url), own = dest ? this.clientIdentities?.get(dest)?.job ?? null : null, reset = proxyUrl ? this.identityReset.job : null;
+    return own && reset ? Promise.all([reset, own]) : own ?? reset;
+  }
+
   async run(op) {
     const { request } = op, policy = this.policy;
+    const identity = this.clientIdentityReady(request.url); if (identity) await identity;   // the relay has the client identity before the request that needs it
     const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders });
     if (op.closed || op.error !== null) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     if (head.status >= 300 && head.status < 400) this.stats.redirectsObserved++;

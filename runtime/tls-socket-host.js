@@ -1,8 +1,9 @@
-import { APKError } from './apk-error.js?v=529b25fb80f8';
-import { Blocked } from './scheduler.js?v=529b25fb80f8';
-import { JavaException } from './apk-runtime.js?v=529b25fb80f8';
-import { networkOf } from './network-native.js?v=529b25fb80f8';
-import { httpSocketOf } from './libcore-io-native.js?v=529b25fb80f8';
+import { APKError } from './apk-error.js?v=e04c619c649c';
+import { Blocked } from './scheduler.js?v=e04c619c649c';
+import { JavaException } from './apk-runtime.js?v=e04c619c649c';
+import { networkOf } from './network-native.js?v=e04c619c649c';
+import { httpSocketOf } from './libcore-io-native.js?v=e04c619c649c';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=e04c619c649c';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -20,6 +21,7 @@ const SSL_SOCKET = 'Ljavax/net/ssl/SSLSocket;', SSL_SESSION = 'Ljavax/net/ssl/SS
 const OSI = 'Lcom/android/org/conscrypt/OpenSSLSocketImpl;', ACS = 'Lcom/android/org/conscrypt/AbstractConscryptSocket;', LAB = 'Ldev/apkweb/net/LabSslSocket;', SESSION = 'Ldev/apkweb/net/LabSslSession;';
 const X509 = 'Ljava/security/cert/X509Certificate;', CERT = 'Ljava/security/cert/Certificate;', CERT_FACTORY = 'Ljava/security/cert/CertificateFactory;', X509TM = 'Ljavax/net/ssl/X509TrustManager;';
 export const TRUST_KEY = 'Ldev/apkweb/net/LabSslSocketFactory;->trustManagers:[Ljavax/net/ssl/TrustManager;';
+export const KEYS_KEY = 'Ldev/apkweb/net/LabSslSocketFactory;->keyManagers:[Ljavax/net/ssl/KeyManager;';   // the KeyManagers of SSLContext.init: the client identity (clientIdentity below)
 const SESSION_KEY = `${LAB}->session:${SSL_SESSION}`, CHAIN_KEY = `${SESSION}->chain:[${CERT}`;
 export const TLS_13_SUITE = 'TLS_AES_128_GCM_SHA256', TLS_12_SUITE = 'TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256', ALPN = 'http/1.1';
 const message = (error, fallback = '') => String(error?.message ?? fallback);
@@ -151,6 +153,32 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     try { call(r, X509TM, 'checkServerTrusted', [`[${X509}`, STRING], 'V', [x509, certificateArray(r, X509, chain), 'ECDHE_ECDSA']); }
     catch (error) { if (error instanceof JavaException) handshakeFailure(r, 'Chain validation failed', error.value); throw error; }
   };
+  /**
+   * The client certificate (mTLS) for a host the device settings name (network.clientCertHosts): what Conscrypt asks the app's X509KeyManager when the server sends a
+   * CertificateRequest -- chooseClientAlias(key types, issuers, socket), then getPrivateKey and getCertificateChain of that alias. The browser does the real TLS and cannot present it,
+   * so the identity goes to the relay for this destination only (network-native.js useClientIdentity). Hosts that are not listed never consult the KeyManager here.
+   */
+  const X509KM = 'Ljavax/net/ssl/X509KeyManager;', PRINCIPAL = 'Ljava/security/Principal;', PRIVATE_KEY = 'Ljava/security/PrivateKey;';
+  const clientIdentity = (r, self, host, port) => {
+    const network = networkOf(r); if (!clientCertHostMatches(network.policy?.clientCertHosts, host, port)) return;
+    const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } };
+    const managers = r.object(self).fields.get(KEYS_KEY);
+    const manager = managers === null || managers === undefined || managers === 0 ? null : r.object(managers).elements.find(item => item !== null && item !== 0 && r.isSubtype(r.object(item).type, X509KM));
+    if (!manager) return note('none offered: the SSLContext of this socket has no X509KeyManager (SSLContext.init with null KeyManagers), as on the device');
+    const alias = call(r, X509KM, 'chooseClientAlias', [`[${STRING}`, `[${PRINCIPAL}`, SOCKET], STRING, [manager, array(r, STRING, ['EC', 'RSA']), null, self]);
+    if (alias === null || alias === 0) return note('none offered: the app\'s KeyManager chose no alias (chooseClientAlias returned null)');
+    const name = text(r, alias), key = call(r, X509KM, 'getPrivateKey', [STRING], PRIVATE_KEY, [manager, alias]), certs = call(r, X509KM, 'getCertificateChain', [STRING], `[${X509}`, [manager, alias]);
+    const chain = certs === null || certs === 0 ? [] : r.object(certs).elements.filter(item => item !== null && item !== 0).map(cert => r.bytesOf(call(r, CERT, 'getEncoded', [], '[B', [cert])));
+    if (key === null || key === 0 || !chain.length) return note(`none offered: alias "${name}" has ${key === null || key === 0 ? 'no private key' : 'no certificate chain'} (the app must have registered its certificate first)`);
+    const encoded = call(r, 'Ljava/security/Key;', 'getEncoded', [], '[B', [key]);
+    let material = encoded === null || encoded === 0 ? null : r.bytesOf(encoded);
+    if (!material) {   // an AndroidKeyStore key (getEncoded is null on the device too): the lab's software KeyMint holds its PKCS#8 material
+      let bytes = null; try { bytes = r.platform.javaIo.fs().bytes(`/data/misc/keystore/user_0/${r.platform.packageName}/keystore.db`); } catch { /* no filesystem */ }
+      material = parseLabKeystore(bytes).find(entry => entry.alias === name && entry.material?.length)?.material ?? null;
+    }
+    if (!material) return note(`none offered: the private key of alias "${name}" is neither a PKCS#8 key nor an AndroidKeyStore key of this device`);
+    network.useClientIdentity(where, { key: material, chain }, name);
+  };
   const runHandshake = (r, self) => {
     const tls = state(r, self);
     if (tls.handshaken) return null;
@@ -165,6 +193,7 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     const host = certHostOf(r, self), entry = chainFor(r, host, 'TLS sockets need WebCrypto (ECDSA P-256) in the page'); if (entry instanceof Blocked) return entry;
     const chain = certificatesOf(r, entry);
     trustCheck(r, self, chain);
+    const peerPort = Number(call(r, SOCKET, 'getPort', [], 'I', [self])); clientIdentity(r, self, host, peerPort > 0 ? peerPort : 443);
     virtual.markTls(host);
     if (!entry.traced) { entry.traced = true; r.record(`NET tls: lab transport certificate for ${host} (issued by the APK Web Lab transport CA, SAN ${host}, valid until ${new Date(entry.notAfter).toISOString()}); not the server's certificate: the browser performs the real TLS`); }
     const port = Number(call(r, SOCKET, 'getPort', [], 'I', [self]));
@@ -251,6 +280,7 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     r.dispatch({ owner: OSI, name: '<init>', parameters, result: 'V', signature: `(${parameters.join('')})V` }, r.argumentWords(parameters, args, { receiver: self }), 'direct');
     const tls = state(r, self); tls.certHost = host ? host.toLowerCase() : null;
     r.storeField(r.object(self).fields, TRUST_KEY, r.object(factory).fields.get(TRUST_KEY) ?? null);
+    r.storeField(r.object(self).fields, KEYS_KEY, r.object(factory).fields.get(KEYS_KEY) ?? null);
     const raw = rawSocketOf(r, self); httpSocketOf(r, !raw || raw === self ? self : raw)?.markTls(host);   // a TLS socket's requests are https from the start; startHandshake() confirms it
     return self;
   };

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=529b25fb80f8';
-import { createHostRegistry, bitsFloat } from './host-contract.js?v=529b25fb80f8';
-import { AnimatedFrames, parseGifStructure, declaredFrameCount } from './animated-image.js?v=529b25fb80f8';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=529b25fb80f8';
-import { getSolidPaint } from './paint-host.js?v=529b25fb80f8';
+import { APKError } from './apk-error.js?v=e04c619c649c';
+import { createHostRegistry, bitsFloat } from './host-contract.js?v=e04c619c649c';
+import { AnimatedFrames, parseGifStructure, declaredFrameCount } from './animated-image.js?v=e04c619c649c';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=e04c619c649c';
+import { getSolidPaint } from './paint-host.js?v=e04c619c649c';
 
 // android.graphics.drawable.AnimatedImageDrawable (API 28) and android.graphics.Movie (API 1, deprecated in 28) over src/animated-image.js.
 //

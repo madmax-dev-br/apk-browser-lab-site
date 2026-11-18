@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=529b25fb80f8';
-import { isMemoryStep } from './memory-budget.js?v=529b25fb80f8';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=529b25fb80f8';
-import { sanitizeHostMap } from './host-map.js?v=529b25fb80f8';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=529b25fb80f8';
-import { sanitizeLocation } from './runtime-permissions.js?v=529b25fb80f8';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=529b25fb80f8';
+import { coreMemorySetting } from './core-memory.js?v=e04c619c649c';
+import { isMemoryStep } from './memory-budget.js?v=e04c619c649c';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e04c619c649c';
+import { sanitizeHostMap } from './host-map.js?v=e04c619c649c';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=e04c619c649c';
+import { sanitizeLocation } from './runtime-permissions.js?v=e04c619c649c';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=e04c619c649c';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -33,8 +33,8 @@ export function proxyState(raw) {
 // scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
 export const DEFAULT_ENGINE = 'wasm';
 export function sanitizeSettings(input = {}) {
-  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
-  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); }
+  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
+  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   { const custom = checkCustomScreen(input.customScreen); out.customScreen = custom.value ?? DEFAULT_CUSTOM_SCREEN; if (out.screen === 'custom' && !custom.value) out.screen = DEFAULT_DEVICE.screen; }   // "Personalizado" { width, height, unit: 'dp' | 'px' } (device-profile.js checkCustomScreen); kept while a preset is selected so switching back restores it
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));

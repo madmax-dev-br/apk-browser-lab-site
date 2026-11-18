@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=529b25fb80f8") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=529b25fb80f8">
-  <link rel="stylesheet" href="./lab-theme.css?v=529b25fb80f8">
-  <meta name="apk-browser-build" content="529b25fb80f8">
+  <style>@import url("./styles.css?v=e04c619c649c") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=e04c619c649c">
+  <link rel="stylesheet" href="./lab-theme.css?v=e04c619c649c">
+  <meta name="apk-browser-build" content="e04c619c649c">
 </head>
 <body>
   <header class="topbar">
@@ -72,9 +72,11 @@
                 <label for="dev-hosts-all">Allow all hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
                 <label for="dev-hosts">Allowed network hosts</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, *.cdn.example.com" aria-describedby="dev-hosts-note">
                 <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.example.com/?url={url}" aria-describedby="dev-proxy-note">
+                <label for="dev-client-cert">Client certificate hosts (mTLS)</label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note">
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
               </div>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
+              <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay over its token-protected channel, only for these hosts, and live there in memory only. Other hosts never see them.</p>
               <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers (availability, App Set ID, advertising ID, location). Still unavailable, with an explicit error: device registration, Google account sign-in, push (FCM), SafetyNet, Play Integrity and DroidGuard. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
               <div id="dev-microg-entries" class="cp-microg-entries" hidden>
                 <p class="cp-note">Entry points of the functions the lab does not run (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). Without a mock, each call logs a "not implemented" failure and microG's locked body runs. To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
@@ -269,7 +271,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=529b25fb80f8"></script>
+  <script type="module" src="./app.js?v=e04c619c649c"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

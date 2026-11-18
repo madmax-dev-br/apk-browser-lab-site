@@ -1,5 +1,5 @@
-import { parseSignature, floatBits } from './host-contract.js?v=529b25fb80f8';
-import { APKError } from './apk-error.js?v=529b25fb80f8';
+import { parseSignature, floatBits } from './host-contract.js?v=e04c619c649c';
+import { APKError } from './apk-error.js?v=e04c619c649c';
 
 // The attribute pass of the android.view.View and android.view.ViewGroup constructors and of ViewGroup.LayoutParams / MarginLayoutParams, as android-13.0.0_r1 runs it:
 // one TypedArray over the class's styleable (the tag's attributes, its style="", the default style and the theme, in Android's precedence: AndroidStyleBackend.obtain), read in
