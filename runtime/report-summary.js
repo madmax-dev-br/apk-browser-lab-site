@@ -1,12 +1,12 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=8ff16f6ecda0';
-import { staticRetentionLines } from './heap-gc.js?v=8ff16f6ecda0';
-import { overrideSummaryLines } from './method-overrides.js?v=8ff16f6ecda0';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=8ff16f6ecda0';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=8ff16f6ecda0';
-import { hostMapSummaryLines } from './host-map.js?v=8ff16f6ecda0';
-import { attributeGap } from './worker-task-log.js?v=8ff16f6ecda0';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=12145e24651e';
+import { staticRetentionLines } from './heap-gc.js?v=12145e24651e';
+import { overrideSummaryLines } from './method-overrides.js?v=12145e24651e';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=12145e24651e';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=12145e24651e';
+import { hostMapSummaryLines } from './host-map.js?v=12145e24651e';
+import { attributeGap } from './worker-task-log.js?v=12145e24651e';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -135,6 +135,11 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
         const oldest = Math.max(...overdue.map(event => now - event.when)), top = frames[0] ?? (runtime.lastHostCall ? `host call ${runtime.lastHostCall}` : 'the looper (idle)');
         out.push(`${overdue.length} overdue main Looper messages, the oldest for ${(oldest / 1000).toFixed(1)} s, waiting for the main thread to leave: ${top}`);
       } }
+  });
+  // XML attributes the lab did not apply while inflating layouts (android-platform.js noteXmlAttributeNotApplied): the screens were built without them
+  part(() => { const notes = runtime.platform?.xmlAttributesNotApplied; if (!notes?.size) return;
+    const rows = [...notes].sort((a, b) => b[1] - a[1]), total = rows.reduce((sum, row) => sum + row[1], 0);
+    out.push(`XML attributes NOT APPLIED: ${rows.length} kinds, ${total} uses (the lab's View classes do not implement them yet; screens were inflated without them): ${rows.slice(0, 12).map(([key, n]) => `${key} ×${n}`).join(', ')}${rows.length > 12 ? `, +${rows.length - 12} more` : ''}`);
   });
   // the last interaction (a tap, a drag, typing): how long the main thread ran, how much background work ran in between and why (android-platform.js drainEvents), the longest of each
   part(() => { const it = runtime.platform?.interactionStats?.(); if (!it) return;
