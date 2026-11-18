@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=12145e24651e';
-import { APKError } from './apk-runtime.js?v=12145e24651e';
-import { getVectorGraphics } from './vector-native.js?v=12145e24651e';
-import { deferRaster } from './deferred-raster.js?v=12145e24651e';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=12145e24651e';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=12145e24651e';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=43801fccd526';
+import { APKError } from './apk-runtime.js?v=43801fccd526';
+import { getVectorGraphics } from './vector-native.js?v=43801fccd526';
+import { deferRaster } from './deferred-raster.js?v=43801fccd526';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=43801fccd526';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=43801fccd526';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -55,9 +55,13 @@ export function createDrawableViewHost(platform) {
       else if (iw > 0 && ih > 0) { const availableWidth = right - left, availableHeight = bottom - top; let scale = [5, 7].includes(type) ? 1 : type === 6 ? Math.max(availableWidth / iw, availableHeight / ih) : Math.min(availableWidth / iw, availableHeight / ih); if (type === 7) scale = Math.min(1, availableWidth / iw, availableHeight / ih); const w = iw * scale, h = ih * scale, align = type === 2 ? 0 : type === 4 ? 1 : .5; left += (availableWidth - w) * align; top += (availableHeight - h) * align; right = left + w; bottom = top + h; }
     }
     dispatch(runtime, DRAWABLE, 'setBounds', ['I', 'I', 'I', 'I'], 'V', drawable, [Math.round(left), Math.round(top), Math.round(right), Math.round(bottom)]);
-    if (drawableMatrix) { dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'concat', ['Landroid/graphics/Matrix;'], 'V', canvas, [drawableMatrix]); }
+    // ImageView.onDraw: with android:cropToPadding the image is clipped to the area inside the padding (without it, an image larger than that area draws over the padding)
+    const crop = image && platform.imageViewApi.state(runtime, receiver).cropToPadding;
+    if (drawableMatrix || crop) dispatch(runtime, CANVAS, 'save', [], 'I', canvas);
+    if (crop) dispatch(runtime, CANVAS, 'clipRect', ['I', 'I', 'I', 'I'], 'Z', canvas, [padding.left || 0, padding.top || 0, width - (padding.right || 0), height - (padding.bottom || 0)]);
+    if (drawableMatrix) dispatch(runtime, CANVAS, 'concat', ['Landroid/graphics/Matrix;'], 'V', canvas, [drawableMatrix]);
     dispatch(runtime, DRAWABLE, 'draw', [CANVAS], 'V', drawable, [canvas]);
-    if (drawableMatrix) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
+    if (drawableMatrix || crop) dispatch(runtime, CANVAS, 'restore', [], 'V', canvas);
   };
   const render = (runtime, receiver) => {
     const view = runtime.object(receiver); if (view.drawingDrawable) return;
@@ -124,6 +128,7 @@ export function createDrawableViewHost(platform) {
     const text = runtime.isSubtype(view.type, TEXT);
     const defStyle = view.defStyleAttr || (text ? table.findId(defaultStyleName(runtime, view.type)) : 0);
     if (!defStyle) return;
+    if (view.viewAttributesHandled) { switchHost.attributes(runtime, receiver, attrsRef, defStyle); return; }   // the View constructor pass (view-xml-attributes.js) has read R.styleable.View, the default style included
     const names = ['background', 'padding', 'paddingLeft', 'paddingTop', 'paddingRight', 'paddingBottom', 'elevation', 'translationZ', 'stateListAnimator'], ids = runtime.newArray('[I', names.length); runtime.object(ids).elements = names.map(name => table.findId('attr/' + name));
     const theme = platform.styleBackend.theme(runtime, view.context), array = platform.styleBackend.obtain(runtime, theme, null, ids, defStyle), TA = 'Landroid/content/res/TypedArray;';
     try {
@@ -199,10 +204,22 @@ export function createDrawableViewHost(platform) {
     const font = { typeface: merged.typeface ?? null, familyName: merged.familyName ?? null, typefaceIndex: merged.typefaceIndex ?? -1, style: merged.style ?? 0, weight: merged.weight ?? -1 };
     if (font.typeface !== null || font.familyName !== null || font.typefaceIndex !== -1 || font.style !== 0 || font.weight >= 0) { view.styledFont = font; platform.typefaceBuilder.applyTextViewFont(runtime, receiver, font); }
   };
+  /** The ColorDrawable of a View whose background is a plain colour (see getBackground), made on first use and bound to the View as its callback. */
+  const colorBackground = (runtime, receiver) => {
+    const view = runtime.object(receiver), value = view.background;
+    const color = typeof value === 'string' && /^#[0-9a-f]{8}$/i.test(value) ? Number.parseInt(value.slice(1), 16) | 0 : typeof value === 'number' ? value | 0 : null;
+    if (color === null) return null;
+    if (!view.backgroundColorDrawable) {
+      const owner = 'Landroid/graphics/drawable/ColorDrawable;', drawable = runtime.allocate(owner); dispatch(runtime, owner, '<init>', ['I'], 'V', drawable, [color], 'direct');
+      view.backgroundColorDrawable = drawable; dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', drawable, [receiver]);
+    }
+    return view.backgroundColorDrawable;
+  };
   const setDrawable = (runtime, receiver, field, drawable) => {
     const view = runtime.object(receiver), previous = view[field];if(drawable)prepareCpuAnimatedVector(runtime,drawable);
     if (previous && !same(previous, drawable)) dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', previous, [null]);
     view[field] = drawable;
+    if (field === 'backgroundDrawable') { view.background = null; if (view.backgroundColorDrawable && !same(view.backgroundColorDrawable, drawable)) { dispatch(runtime, DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', view.backgroundColorDrawable, [null]); } view.backgroundColorDrawable = null; }   // View.setBackgroundDrawable replaces whatever the background was, a plain colour included
     if (field === 'backgroundDrawable' && drawable) {
       // View.setBackgroundDrawable: layout direction, current drawable state, then padding adoption.
       dispatch(runtime, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', drawable, [view.layoutDirection ?? 0]);
@@ -219,7 +236,7 @@ export function createDrawableViewHost(platform) {
   return {
     /** ImageView.onDraw into an app-provided Canvas (View.draw(canvas) of a custom parent): the image drawable placed by the scale type. */
     drawImage(runtime, receiver, canvas, width, height) { placeAndDraw(runtime, receiver, canvas, runtime.object(receiver).imageDrawable, true, width, height); },
-    compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,applyStyledTextAppearance,defaultStyleName,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
+    compoundPadding,drawButton,applyThemeDefaults,applyStyledTextSize,applyStyledTextAppearance,defaultStyleName,switchHost,switchWidget:(runtime,receiver)=>switchHost.get(runtime,receiver),measureSwitch:(runtime,receiver)=>switchHost.measure(runtime,receiver),checkedChanged:(runtime,receiver,checked)=>switchHost.checkedChanged(runtime,receiver,checked),
     setForegroundFromXML(runtime,receiver,attribute,context){
       const theme=platform.styleBackend.theme(runtime,context),reference=attribute.kind==='attribute'?platform.styleBackend.resolved(attribute,runtime.object(theme).themeValues,false):attribute;
       let drawable=null;
@@ -233,7 +250,7 @@ export function createDrawableViewHost(platform) {
     parent: type => type === IMAGE ? VIEW : ninePatch.parent(type),
     interfaces: type => type === VIEW || type === IMAGE ? ['Landroid/graphics/drawable/Drawable$Callback;'] : [],
     viewKind(runtime, object) { return runtime.isSubtype(object.type, IMAGE) ? 'image' : null; },
-    drawTree(runtime, root, seen = new Set()) { if (!root) return; const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); for (const child of view.children || []) this.drawTree(runtime, child, seen); },
+    drawTree(runtime, root, seen = new Set()) { if (!root) return; const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); if (view.vg?.controller && (view.vg.runAnimation || !view.vg.animationDone)) platform.viewGroupApi.frameLayoutAnimation(runtime, root); /* android:layoutAnimation: the first frame binds and starts the children's animations */ for (const child of view.children || []) this.drawTree(runtime, child, seen); },
     /** ImageView.onVisibilityAggregated: the image drawable is visible while its View is attached and VISIBLE (an Animatable drawable stops counting time, see AnimatedImageDrawable.setVisible).
      *  The lab does not aggregate the visibility of the ancestors: the View's own visibility and its attachment decide. */
     imageVisibility(runtime, receiver, attached = !!runtime.object(receiver).attached) {
@@ -253,6 +270,7 @@ export function createDrawableViewHost(platform) {
       if(name==='getButtonDrawable')return view.buttonDrawable??null;
       if(name==='setButtonDrawable'){
         const value=method.parameters?.[0]==='I'?(args[1]?platform.styleBackend.loadDrawable(runtime,args[1],platform.styleBackend.theme(runtime,view.context)):null):args[1]||null;
+        view.buttonDrawableSet=true;   // the button is now what the app (or android:button) said, null included: the theme's default indicator no longer applies
         if(same(view.buttonDrawable,value)||!view.buttonDrawable&&!value)return;if(view.buttonDrawable)dispatch(runtime,DRAWABLE,'setCallback',['Landroid/graphics/drawable/Drawable$Callback;'],'V',view.buttonDrawable,[null]);view.buttonDrawable=value;
         if(value){prepareCpuAnimatedVector(runtime,value);dispatch(runtime,DRAWABLE,'setCallback',['Landroid/graphics/drawable/Drawable$Callback;'],'V',value,[args[0]]);dispatch(runtime,DRAWABLE,'setLayoutDirection',['I'],'Z',value,[view.layoutDirection??0]);if(dispatch(runtime,DRAWABLE,'isStateful',[],'Z',value))dispatch(runtime,DRAWABLE,'setState',['[I'],'Z',value,[dispatch(runtime,VIEW,'getDrawableState',[],'[I',args[0])]);dispatch(runtime,DRAWABLE,'setVisible',['Z','Z'],'Z',value,[view.visibility===4||view.visibility===8?0:1,0]);dispatch(runtime,VIEW,'setMinimumHeight',['I'],'V',args[0],[dispatch(runtime,DRAWABLE,'getIntrinsicHeight',[],'I',value)]);applyButtonTint(runtime,args[0]);}render(runtime,args[0]);platform.requestDraw(runtime,args[0]);return;
       }
@@ -265,20 +283,23 @@ export function createDrawableViewHost(platform) {
       if (name === 'getDrawableState') { if (!view.drawableStateRef || view.drawableStateDirty) { view.drawableStateRef = dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'onCreateDrawableState', ['I'], '[I', args[0], [0]); view.drawableStateDirty = false; } return view.drawableStateRef; }
       if (name === 'onCreateDrawableState') {
         if (!Number.isInteger(args[1]) || args[1] < 0 || args[1] > 1024) fail('Invalid drawable state extra space');
+        if (view.duplicateParentState && view.parent && runtime.isSubtype(runtime.object(view.parent).type, VIEW)) return dispatch(runtime, VIEW, 'onCreateDrawableState', ['I'], '[I', view.parent, [args[1]]);   // View.onCreateDrawableState: DUPLICATE_PARENT_STATE takes the parent's state
         if (method.owner === IMAGE && view.imageState && !view.mergeImageState) return view.imageState;
         const extra = method.owner === IMAGE && view.imageState ? runtime.array(view.imageState).elements : [];
         const states = []; if (view.windowFocused !== false && view.attached) states.push(16842909); if (view.enabled !== false) states.push(16842910); if (view.focused) states.push(16842908); if (view.selected) states.push(16842913); if (view.activated) states.push(16843518); if (view.pressed) states.push(16842919); if (view.checked) states.push(16842912);
         const result = runtime.newArray('[I', states.length + args[1] + extra.length); runtime.object(result).cells.set(states);
         if (extra.length) return this.invoke(runtime, { owner: VIEW, name: 'mergeDrawableStates' }, [result, view.imageState]); return result;
       }
-      if (name === 'refreshDrawableState') { view.drawableStateDirty = true; dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'drawableStateChanged', [], 'V', args[0]); const parent = view.parent; if (parent && runtime.isSubtype(runtime.object(parent).type, 'Landroid/view/ViewGroup;')) dispatch(runtime, 'Landroid/view/ViewGroup;', 'childDrawableStateChanged', [VIEW], 'V', parent, [args[0]]); return; }   // View.refreshDrawableState tells the parent
+      if (name === 'refreshDrawableState') { view.drawableStateDirty = true; dispatch(runtime, runtime.isSubtype(view.type, IMAGE) ? IMAGE : VIEW, 'drawableStateChanged', [], 'V', args[0]); for (const child of view.children ?? []) if (runtime.object(child).duplicateParentState) dispatch(runtime, VIEW, 'refreshDrawableState', [], 'V', child);   /* ViewGroup.drawableStateChanged: children that duplicate the parent's state are refreshed with it */ const parent = view.parent; if (parent && runtime.isSubtype(runtime.object(parent).type, 'Landroid/view/ViewGroup;')) dispatch(runtime, 'Landroid/view/ViewGroup;', 'childDrawableStateChanged', [VIEW], 'V', parent, [args[0]]); return; }   // View.refreshDrawableState tells the parent
       if (name === 'drawableStateChanged') {
         for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable, ...(method.owner === IMAGE ? [view.imageDrawable] : []), ...(runtime.isSubtype(view.type, TEXT) ? platform.textViewApi.compoundList(runtime, args[0]) : [])]) if (drawable && dispatch(runtime, DRAWABLE, 'isStateful', [], 'Z', drawable)) { prepareCpuAnimatedVector(runtime,drawable);const state = dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0]); dispatch(runtime, DRAWABLE, 'setState', ['[I'], 'Z', drawable, [state]); }
         switchHost.stateChanged(runtime, args[0]);
         if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'setState', ['[I'], 'V', view.stateListAnimator, [dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0])]);
         return;
       }
-      if (name === '<init>') { dispatch(runtime, VIEW, '<init>', ['Landroid/content/Context;'], 'V', args[0], [args[1]], 'direct'); if (args[2]) { const node = runtime.object(args[2]).node; if (node) platform.inflate(runtime, node, args[1], 0, { existing: args[0], applyOnly: true }); } return; }
+      // ImageView(Context, AttributeSet, defStyleAttr, defStyleRes): View's constructor with the same arguments reads the tag, its style="" and the default style for every class
+      // (the constructor passes for R.styleable.View, AndroidPlatform.styleAttributes for src, scaleType and the other ImageView attributes).
+      if (name === '<init>') { dispatch(runtime, VIEW, '<init>', method.parameters, 'V', args[0], args.slice(1), 'direct'); return; }
       if (name === 'scheduleDrawable' || name === 'unscheduleDrawable') {
         // View.scheduleDrawable: run the Drawable's Runnable at its uptime on the VM task queue; unschedule cancels it (animated state-list transitions, AnimationDrawable).
         const pending = view.scheduledDrawables ??= new Map();
@@ -299,17 +320,21 @@ export function createDrawableViewHost(platform) {
         return;
       }
       if (name === 'jumpDrawablesToCurrentState') { for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable]) if (drawable) dispatch(runtime, DRAWABLE, 'jumpToCurrentState', [], 'V', drawable); if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'jumpToCurrentState', [], 'V', view.stateListAnimator); switchHost.jump(runtime, args[0]); return; }
-      if (name === 'invalidate' || name === 'postInvalidate' || name === 'postInvalidateOnAnimation') return platform.requestDraw(runtime, args[0]);   // a draw request is coalesced with the next frame
+      if (name === 'postInvalidateOnAnimation') return platform.requestDraw(runtime, args[0], 1000 / 60);   // the next frame of the display (Choreographer's animation callback), not this one
+      if (name === 'invalidate' || name === 'postInvalidate') return platform.requestDraw(runtime, args[0]);   // a draw request is coalesced with the next frame
       if (name === 'setForeground') return setDrawable(runtime,args[0],'foregroundDrawable',args[1]);
       if (name === 'getForeground') return view.foregroundDrawable || null;
       if (name === 'getDrawable') return view.imageDrawable || null;
-      if (name === 'getBackground') return view.backgroundDrawable || null;
+      // A plain colour background (android:background="#...", View.setBackgroundColor) is kept as a colour and drawn without a Drawable. View.getBackground() answers the
+      // ColorDrawable Android has there; it becomes the drawn background as soon as the app changes it (its invalidateSelf reaches invalidateDrawable below).
+      if (name === 'getBackground') return view.backgroundDrawable || colorBackground(runtime, args[0]);
       if (name === 'setContentDescription') { view.contentDescription = args[1]; return; }
       if (name === 'getContentDescription') return view.contentDescription || null;
       if (name === 'setImageAlpha' || name === 'setAlpha') { view.imageAlpha = args[1] & 255; if (view.imageDrawable) dispatch(runtime, DRAWABLE, 'setAlpha', ['I'], 'V', view.imageDrawable, [view.imageAlpha]); render(runtime, args[0]); return; }
       if (name === 'setImageResource' || name === 'setBackgroundResource') { const drawable = args[1] ? platform.styleBackend.loadDrawable(runtime, args[1], platform.styleBackend.theme(runtime, view.context)) : null; return setDrawable(runtime, args[0], name === 'setImageResource' ? 'imageDrawable' : 'backgroundDrawable', drawable); }
       if (name === 'setImageDrawable' || name === 'setBackground' || name === 'setBackgroundDrawable') return setDrawable(runtime, args[0], name === 'setImageDrawable' ? 'imageDrawable' : 'backgroundDrawable', args[1]);
-      if (name === 'verifyDrawable') return same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable) || same(args[1],view.buttonDrawable) ? 1 : 0;
+      if (name === 'verifyDrawable') return same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || (view.backgroundColorDrawable && same(args[1], view.backgroundColorDrawable)) || same(args[1], view.foregroundDrawable) || same(args[1],view.buttonDrawable) ? 1 : 0;
+      if (name === 'invalidateDrawable' && view.backgroundColorDrawable && !view.backgroundDrawable && same(args[1], view.backgroundColorDrawable)) { const drawable = view.backgroundColorDrawable; view.backgroundColorDrawable = null; return setDrawable(runtime, args[0], 'backgroundDrawable', drawable); }   // the app changed the ColorDrawable getBackground() gave it
       // View.invalidate does nothing for a View that is not VISIBLE (skipInvalidate) or was detached from its window (no AttachInfo to damage): its drawable is not drawn, so an
       // animated drawable that reschedules itself from draw() stops there, and goes on from the next draw when the View is shown or attached again.
       if (name === 'invalidateDrawable' && ((view.visibility ?? 0) !== 0 || view.attached === false)) return;

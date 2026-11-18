@@ -1,5 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { bestDateTimePattern, defaultHourCycle } from './date-skeleton.js?v=43801fccd526';
+import { APKError } from './apk-error.js?v=43801fccd526';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
@@ -57,6 +58,19 @@ export function createIcuTextHost(platform) {
     try { forward(I_DFS, J_DFS, `get${property}`, [], STRING); forward(I_DFS, J_DFS, `set${property}`, [STRING], 'V'); } catch { /* names the java host lacks fall through to unsupported */ }
   }
   forward(I_DFS, J_DFS, 'getCurrency', [], I_CUR); forward(I_DFS, J_DFS, 'setCurrency', [I_CUR], 'V');
+  // ICU keeps the ten digits as strings (digitStrings, cloned by the getter); setZeroDigit renumbers them from the new zero. The lab formats with the zero digit of the java.text symbols.
+  def(I_DFS, 'getDigitStrings', `()[${STRING}`, (r, _m, [self]) => {
+    const zero = call(r, inner(r, self), J_DFS, 'getZeroDigit', [], 'C'), digits = r.newArray(`[${STRING}`, 10);
+    r.array(digits).elements = Array.from({ length: 10 }, (_, i) => String.fromCharCode(zero + i)); return digits;
+  });
+  // ICU's plusSign is the locale's plus sign when it is one char, otherwise '+' (DEF_PLUS_SIGN); the sign itself comes from Intl (CLDR), with the latn digits the lab formats in.
+  def(I_DFS, 'getPlusSign', '()C', (r, _m, [self]) => {
+    const o = r.object(self); if (o.plusSign !== undefined) return o.plusSign;
+    const locale = call(r, inner(r, self), J_DFS, 'getLocale', [], LOCALE), tag = text(r, call(r, locale, LOCALE, 'toLanguageTag', [], STRING));
+    let sign = '+'; try { sign = new Intl.NumberFormat(tag, { numberingSystem: 'latn', signDisplay: 'always' }).formatToParts(1).find(part => part.type === 'plusSign')?.value ?? '+'; } catch { /* a tag Intl refuses: the default */ }
+    return sign.length === 1 ? sign.charCodeAt(0) : 0x2b;
+  });
+  def(I_DFS, 'setPlusSign', '(C)V', (r, _m, [self, sign]) => { inner(r, self); r.object(self).plusSign = sign & 0xffff; });
 
   // ---- NumberFormat / DecimalFormat ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const nfFactory = { getInstance: 'getNumberInstance', getNumberInstance: 'getNumberInstance', getIntegerInstance: 'getIntegerInstance', getCurrencyInstance: 'getCurrencyInstance', getPercentInstance: 'getPercentInstance' };
@@ -150,10 +164,107 @@ export function createIcuTextHost(platform) {
     def(I_DATEF, name, `(${STRING}${LOCALE})${I_DATEF}`, (r, _m, [skeleton, locale]) => fromSkeleton(r, skeleton, locale), { static: true });
     def(I_DATEF, name, `(${STRING}${ULOCALE})${I_DATEF}`, (r, _m, [skeleton, locale]) => fromSkeleton(r, skeleton, locale), { static: true });
   }
+  // MeasureFormat.getInstance(locale, width).formatMeasures(Measure...) for the time units (Chronometer's content description, "1 hour, 2 minutes, 5 seconds"): each measure is
+  // Intl's unit format of its width and the list is Intl's unit list of the same width, which is what ICU's MeasureFormat composes. Other units and the NUMERIC width are not modelled.
+  const MEASURE = 'Landroid/icu/util/Measure;', MEASURE_UNIT = 'Landroid/icu/util/MeasureUnit;', TIME_UNIT = 'Landroid/icu/util/TimeUnit;', MEASURE_FORMAT = 'Landroid/icu/text/MeasureFormat;', FORMAT_WIDTH = 'Landroid/icu/text/MeasureFormat$FormatWidth;';
+  type(TIME_UNIT, MEASURE_UNIT, [], { allocatable: true }); type(MEASURE, OBJECT, [], { allocatable: true }); type(MEASURE_FORMAT, 'Landroid/icu/text/UFormat;', [], { allocatable: true }); type(FORMAT_WIDTH, 'Ljava/lang/Enum;', [], { allocatable: true });
+  for (const [name, unit] of [['HOUR', 'hour'], ['MINUTE', 'minute'], ['SECOND', 'second'], ['DAY', 'day'], ['WEEK', 'week'], ['MONTH', 'month'], ['YEAR', 'year']]) staticField(MEASURE_UNIT, name, TIME_UNIT, r => { const o = r.allocate(TIME_UNIT); r.object(o).intlUnit = unit; return o; });
+  for (const [name, display] of [['WIDE', 'long'], ['SHORT', 'short'], ['NARROW', 'narrow'], ['NUMERIC', null]]) staticField(FORMAT_WIDTH, name, FORMAT_WIDTH, r => { const o = r.allocate(FORMAT_WIDTH); r.object(o).unitDisplay = display; r.object(o).enumName = name; return o; });
+  def(MEASURE, '<init>', `(Ljava/lang/Number;${MEASURE_UNIT})V`, (r, _m, [self, number, unit]) => { if (nullish(number) || nullish(unit)) npe(r, 'Number and MeasureUnit must not be null'); const o = r.object(self); o.measureNumber = number; o.measureUnit = unit; });
+  def(MEASURE, 'getNumber', '()Ljava/lang/Number;', (r, _m, [self]) => r.object(self).measureNumber); def(MEASURE, 'getUnit', `()${MEASURE_UNIT}`, (r, _m, [self]) => r.object(self).measureUnit);
+  for (const localeType of [LOCALE, ULOCALE]) def(MEASURE_FORMAT, 'getInstance', `(${localeType}${FORMAT_WIDTH})${MEASURE_FORMAT}`, (r, _m, [locale, width]) => {
+    if (nullish(width)) npe(r, 'formatWidth'); const display = r.object(width).unitDisplay; if (!display) unsupported('MeasureFormat width NUMERIC');
+    const o = r.allocate(MEASURE_FORMAT); r.object(o).measureFormat = { tag: text(r, callV(r, localeOf(r, locale) ?? defaultLocale(r), LOCALE, 'toLanguageTag', [], STRING)), display }; return o;
+  }, { static: true });
+  def(MEASURE_FORMAT, 'formatMeasures', `([${MEASURE})${STRING}`, (r, _m, [self, measures]) => {
+    const { tag, display } = r.object(self).measureFormat, parts = r.array(measures).elements.map(ref => {
+      const measure = r.object(ref), unit = r.object(measure.measureUnit).intlUnit; if (!unit) unsupported('MeasureFormat.formatMeasures for a unit other than the time units');
+      const bits = call(r, measure.measureNumber, 'Ljava/lang/Number;', 'doubleValue', [], 'D'), value = typeof bits === 'bigint' ? new Float64Array(new BigInt64Array([bits]).buffer)[0] : Number(bits);
+      return new Intl.NumberFormat(tag, { style: 'unit', unit, unitDisplay: display }).format(value);
+    });
+    return new Intl.ListFormat(tag, { type: 'unit', style: display }).format(parts);
+  });
   def(I_DATEF, 'getPatternInstance', `(Landroid/icu/text/DateFormat$HourCycle;${STRING}${LOCALE})${I_DATEF}`, () => unsupported('DateFormat.getPatternInstance(hourCycle, ...)'), { static: true });
-  for (const [name, params, result] of [['format', [DATE], STRING], ['format', [OBJECT], STRING], ['format', [DATE, SB, FP], SB], ['parse', [STRING], DATE], ['parse', [STRING, PP], DATE], ['parseObject', [STRING], OBJECT], ['setTimeZone', [I_TZ], 'V'], ['getTimeZone', [], I_TZ], ['setLenient', ['Z'], 'V'], ['isLenient', [], 'Z']]) { try { forward(I_DATEF, J_DATEF, name, params, result); } catch { /* unsupported at call */ } }
+  for (const [name, params, result] of [['format', [DATE, SB, FP], SB], ['parse', [STRING], DATE], ['parse', [STRING, PP], DATE], ['parseObject', [STRING], OBJECT], ['setTimeZone', [I_TZ], 'V'], ['getTimeZone', [], I_TZ], ['setLenient', ['Z'], 'V'], ['isLenient', [], 'Z']]) { try { forward(I_DATEF, J_DATEF, name, params, result); } catch { /* unsupported at call */ } }
   def(I_DATEF, 'getCalendar', '()Landroid/icu/util/Calendar;', () => unsupported('DateFormat.getCalendar (android.icu.util.Calendar)')); def(I_DATEF, 'setCalendar', '(Landroid/icu/util/Calendar;)V', () => unsupported('DateFormat.setCalendar (android.icu.util.Calendar)'));
-  for (const [name, params, result] of [['toPattern', [], STRING], ['applyPattern', [STRING], 'V']]) forward(I_SDF, J_SDF, name, params, result);
+  // DateFormat.setContext(DisplayContext): the capitalization context of the formatted text. NONE and MIDDLE_OF_SENTENCE change nothing; BEGINNING_OF_SENTENCE titlecases the first letter.
+  // UI_LIST_OR_MENU and STANDALONE titlecase it only where the locale's CLDR contextTransforms say so, data the engine does not expose: a text that already starts with an upper-case or
+  // caseless letter is returned as it is (no transform can change it), any other fails naming the context instead of guessing.
+  const DISPLAY_CONTEXT = 'Landroid/icu/text/DisplayContext;', DISPLAY_CONTEXT_TYPE = 'Landroid/icu/text/DisplayContext$Type;'; type(DISPLAY_CONTEXT, 'Ljava/lang/Enum;', [], { allocatable: true }); type(DISPLAY_CONTEXT_TYPE, 'Ljava/lang/Enum;', [], { allocatable: true });
+  const CONTEXT_TYPES = ['DIALECT_HANDLING', 'CAPITALIZATION', 'DISPLAY_LENGTH', 'SUBSTITUTE_HANDLING'];
+  CONTEXT_TYPES.forEach((name, ordinal) => staticField(DISPLAY_CONTEXT_TYPE, name, DISPLAY_CONTEXT_TYPE, r => { const o = r.allocate(DISPLAY_CONTEXT_TYPE); Object.assign(r.object(o), { enumName: name, enumOrdinal: ordinal }); return o; }));
+  [['STANDARD_NAMES', 0], ['DIALECT_NAMES', 0], ['CAPITALIZATION_NONE', 1], ['CAPITALIZATION_FOR_MIDDLE_OF_SENTENCE', 1], ['CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE', 1], ['CAPITALIZATION_FOR_UI_LIST_OR_MENU', 1], ['CAPITALIZATION_FOR_STANDALONE', 1], ['LENGTH_FULL', 2], ['LENGTH_SHORT', 2], ['SUBSTITUTE', 3], ['NO_SUBSTITUTE', 3]]
+    .forEach(([name, contextType], ordinal) => staticField(DISPLAY_CONTEXT, name, DISPLAY_CONTEXT, r => { const o = r.allocate(DISPLAY_CONTEXT); Object.assign(r.object(o), { enumName: name, enumOrdinal: ordinal, contextType }); return o; }));
+  def(DISPLAY_CONTEXT, 'type', `()${DISPLAY_CONTEXT_TYPE}`, (r, _m, [self]) => r.readStatic({ owner: DISPLAY_CONTEXT_TYPE, name: CONTEXT_TYPES[r.object(self).contextType], type: DISPLAY_CONTEXT_TYPE })); def(DISPLAY_CONTEXT, 'value', '()I', (r, _m, [self]) => r.object(self).enumOrdinal);
+  def(I_DATEF, 'setContext', `(${DISPLAY_CONTEXT})V`, (r, _m, [self, context]) => { const c = r.object(context); if (c.contextType === 1) r.object(self).capitalization = context; });
+  def(I_DATEF, 'getContext', `(${DISPLAY_CONTEXT_TYPE})${DISPLAY_CONTEXT}`, (r, _m, [self, kind]) => r.object(kind).enumName === 'CAPITALIZATION' ? r.object(self).capitalization ?? r.readStatic({ owner: DISPLAY_CONTEXT, name: 'CAPITALIZATION_NONE', type: DISPLAY_CONTEXT }) : unsupported('DateFormat.getContext for a type other than CAPITALIZATION'));
+  const inContext = (r, self, out) => {
+    const context = r.object(self).capitalization ? r.object(r.object(self).capitalization).enumName : 'CAPITALIZATION_NONE'; if (context === 'CAPITALIZATION_NONE' || context === 'CAPITALIZATION_FOR_MIDDLE_OF_SENTENCE') return out;
+    const value = text(r, out); if (!value) return out; const first = String.fromCodePoint(value.codePointAt(0)), upper = first.toLocaleUpperCase(platform.device?.locale ?? 'en-US'); if (upper === first) return out;
+    if (context === 'CAPITALIZATION_FOR_BEGINNING_OF_SENTENCE') return upper + value.slice(first.length);
+    return unsupported(`DateFormat.format with DisplayContext.${context} for a text that starts in lower case (whether the locale titlecases it is CLDR contextTransforms data)`);
+  };
+  for (const parameter of [DATE, OBJECT]) def(I_DATEF, 'format', `(${parameter})${STRING}`, (r, _m, [self, value]) => inContext(r, self, call(r, inner(r, self), J_DATEF, 'format', [parameter], STRING, [value])));
+
+  // ---- android.icu.util.Calendar / GregorianCalendar. The calendar system of a locale (getType) is its `ca` keyword when it has one, else the calendar CLDR prefers for the
+  // locale (Intl), under ICU's legacy names. The Gregorian calendar runs over java.util.GregorianCalendar (datetime-host.js) with the fields both classes share (ERA .. DST_OFFSET, the
+  // same numbers in both). A Calendar of another system (Buddhist, Persian, ...) answers its type and zone only: its arithmetic, and the ICU-only fields (YEAR_WOY, DOW_LOCAL,
+  // EXTENDED_YEAR, JULIAN_DAY, MILLISECONDS_IN_DAY) of any calendar, fail by name.
+  const I_CAL = 'Landroid/icu/util/Calendar;', I_GCAL = 'Landroid/icu/util/GregorianCalendar;', J_CAL = 'Ljava/util/Calendar;', CALENDAR_LEGACY = { gregory: 'gregorian', ethioaa: 'ethiopic-amete-alem', islamicc: 'islamic-civil' };
+  type(I_CAL, OBJECT, ['Ljava/io/Serializable;', 'Ljava/lang/Cloneable;', 'Ljava/lang/Comparable;'], { allocatable: true }); type(I_GCAL, I_CAL, [], { allocatable: true });
+  const calendarType = (r, locale) => {
+    const tag = text(r, call(r, localeOf(r, locale), LOCALE, 'toLanguageTag', [], STRING)), keyword = nullish(locale) ? undefined : r.object(locale).keywords?.ca;
+    let calendar = keyword || /-u(?:-[a-z0-9]{2,8})*-ca-([a-z0-9]{3,8}(?:-[a-z0-9]{3,8})?)/i.exec(tag)?.[1]?.toLowerCase();
+    if (!calendar) { try { calendar = new Intl.DateTimeFormat(tag).resolvedOptions().calendar; } catch { unsupported(`Calendar for locale ${tag}`, 'calendar-locale-unsupported'); } }
+    return CALENDAR_LEGACY[calendar] ?? calendar;
+  };
+  const javaCalendar = (r, zone) => nullish(zone) ? callStatic(r, J_CAL, 'getInstance', [], J_CAL) : callStatic(r, J_CAL, 'getInstance', [J_TZ], J_CAL, [inner(r, zone)]);
+  /** Calendar.getInstance: the Gregorian calendar is a GregorianCalendar over java.util's; another system is a Calendar that knows its type and zone only. */
+  const calendarFor = (r, locale, zone) => {
+    const kind = calendarType(r, locale ?? defaultLocale(r));
+    if (kind === 'gregorian') { const o = wrap(r, I_GCAL, javaCalendar(r, zone)); r.object(o).icuCalendar = { type: kind }; return o; }
+    const o = r.allocate(I_CAL); r.object(o).icuCalendar = { type: kind, zone: nullish(zone) ? callStatic(r, J_TZ, 'getDefault', [], J_TZ) : inner(r, zone) }; return o;
+  };
+  const calendarState = (r, self) => r.object(self).icuCalendar ?? r.throwJava('Ljava/lang/IllegalStateException;', 'android.icu.util.Calendar used before construction');
+  /** The java.util.Calendar a Gregorian android.icu Calendar computes with. */
+  const calendarInner = (r, self, what) => r.object(self).inner ?? unsupported(`android.icu.util.Calendar.${what} for the "${calendarState(r, self).type}" calendar (only the Gregorian calendar computes)`);
+  for (const [sig, zoneAt, localeAt] of [[[], -1, -1], [[LOCALE], -1, 0], [[ULOCALE], -1, 0], [[I_TZ], 0, -1], [[I_TZ, LOCALE], 0, 1], [[I_TZ, ULOCALE], 0, 1]])
+    def(I_CAL, 'getInstance', `(${sig.join('')})${I_CAL}`, (r, _m, args) => { if (localeAt >= 0 && nullish(args[localeAt])) npe(r); return calendarFor(r, localeAt < 0 ? null : args[localeAt], zoneAt < 0 ? null : args[zoneAt]); }, { static: true });
+  // new GregorianCalendar(...) is Gregorian whatever the locale's own calendar is; the locale gives the week data only
+  for (const [sig, zoneAt] of [[[], -1], [[LOCALE], -1], [[ULOCALE], -1], [[I_TZ], 1], [[I_TZ, LOCALE], 1], [[I_TZ, ULOCALE], 1]])
+    def(I_GCAL, '<init>', `(${sig.join('')})V`, (r, _m, args) => { const o = r.object(args[0]); o.inner = javaCalendar(r, zoneAt < 0 ? null : args[zoneAt]); o.icuCalendar = { type: 'gregorian' }; });
+  def(I_CAL, 'getType', `()${STRING}`, (r, _m, [self]) => calendarState(r, self).type);
+  const sharedField = field => { if (field < 0 || field > 16) unsupported(`android.icu.util.Calendar field ${field} (an ICU-only field)`); };
+  for (const [name, params, result, fieldFirst] of [['get', ['I'], 'I', true], ['set', ['I', 'I'], 'V', true], ['set', ['I', 'I', 'I'], 'V'], ['set', ['I', 'I', 'I', 'I', 'I'], 'V'], ['set', ['I', 'I', 'I', 'I', 'I', 'I'], 'V'], ['add', ['I', 'I'], 'V', true], ['roll', ['I', 'Z'], 'V', true],
+    ['roll', ['I', 'I'], 'V', true], ['clear', [], 'V'], ['clear', ['I'], 'V', true], ['isSet', ['I'], 'Z', true], ['getTimeInMillis', [], 'J'], ['setTimeInMillis', ['J'], 'V'], ['getTime', [], DATE], ['setTime', [DATE], 'V'], ['getActualMaximum', ['I'], 'I', true], ['getActualMinimum', ['I'], 'I', true],
+    ['getMaximum', ['I'], 'I', true], ['getMinimum', ['I'], 'I', true], ['getLeastMaximum', ['I'], 'I', true], ['getGreatestMinimum', ['I'], 'I', true], ['getFirstDayOfWeek', [], 'I'], ['setFirstDayOfWeek', ['I'], 'V'], ['getMinimalDaysInFirstWeek', [], 'I'], ['setMinimalDaysInFirstWeek', ['I'], 'V'],
+    ['isLenient', [], 'Z'], ['setLenient', ['Z'], 'V'], ['hashCode', [], 'I']])
+    def(I_CAL, name, `(${params.join('')})${result}`, (r, _m, [self, ...args]) => { if (fieldFirst) sharedField(args[0]); return call(r, calendarInner(r, self, name), J_CAL, name, params, result, args); });
+  def(I_CAL, 'getTimeZone', `()${I_TZ}`, (r, _m, [self]) => r.object(self).inner ? wrap(r, I_TZ, call(r, r.object(self).inner, J_CAL, 'getTimeZone', [], J_TZ)) : wrap(r, I_TZ, calendarState(r, self).zone));
+  def(I_CAL, 'setTimeZone', `(${I_TZ})V`, (r, _m, [self, zone]) => { if (nullish(zone)) npe(r); if (r.object(self).inner) call(r, r.object(self).inner, J_CAL, 'setTimeZone', [J_TZ], 'V', [inner(r, zone)]); else calendarState(r, self).zone = inner(r, zone); });
+  const otherCalendar = (r, other) => nullish(other) || !r.isSubtype(r.object(other).type, I_CAL) ? null : calendarInner(r, other, 'compare');
+  for (const name of ['before', 'after', 'equals']) def(I_CAL, name, `(${OBJECT})Z`, (r, _m, [self, other]) => { const o = otherCalendar(r, other); return o === null ? 0 : call(r, calendarInner(r, self, name), J_CAL, name, [OBJECT], 'Z', [o]); });
+  for (const parameter of [I_CAL, OBJECT]) def(I_CAL, 'compareTo', `(${parameter})I`, (r, _m, [self, other]) => { if (nullish(other)) npe(r); return call(r, calendarInner(r, self, 'compareTo'), J_CAL, 'compareTo', [J_CAL], 'I', [calendarInner(r, other, 'compareTo')]); });
+  def(I_CAL, 'clone', `()${OBJECT}`, (r, _m, [self]) => { const o = wrap(r, r.object(self).type, call(r, calendarInner(r, self, 'clone'), OBJECT, 'clone', [], OBJECT)); r.object(o).icuCalendar = { ...calendarState(r, self) }; return o; });
+  def(I_CAL, 'toString', `()${STRING}`, (r, _m, [self]) => text(r, call(r, calendarInner(r, self, 'toString'), OBJECT, 'toString', [], STRING)).replace('java.util.GregorianCalendar', 'android.icu.util.GregorianCalendar'));
+  for (const [name, params, result] of [['toPattern', [], STRING], ['applyPattern', [STRING], 'V'], ['toLocalizedPattern', [], STRING], ['applyLocalizedPattern', [STRING], 'V']]) forward(I_SDF, J_SDF, name, params, result);
+  // ---- DateTimePatternGenerator and DateFormat.HourCycle: the locale's best pattern for a skeleton and its preferred hour cycle, from the platform's CLDR data (src/date-skeleton.js).
+  // The generator holds its locale only: adding patterns, the append-item formats and the decimal string are not modelled (those methods stay absent).
+  const I_DTPG = 'Landroid/icu/text/DateTimePatternGenerator;', HOUR_CYCLE = 'Landroid/icu/text/DateFormat$HourCycle;', HOUR_CYCLES = ['HOUR_CYCLE_11', 'HOUR_CYCLE_12', 'HOUR_CYCLE_23', 'HOUR_CYCLE_24'];
+  type(I_DTPG, OBJECT, ['Ljava/lang/Cloneable;'], { allocatable: true }); type(HOUR_CYCLE, 'Ljava/lang/Enum;');
+  for (const name of HOUR_CYCLES) staticField(HOUR_CYCLE, name, HOUR_CYCLE, r => { const ref = r.makeObject(HOUR_CYCLE), o = r.object(ref); o.enumName = name; o.enumOrdinal = HOUR_CYCLES.indexOf(name); return ref; });
+  const hourCycle = (r, name) => r.readStatic({ owner: HOUR_CYCLE, name, type: HOUR_CYCLE });
+  def(HOUR_CYCLE, 'values', `()[${HOUR_CYCLE}`, r => { const array = r.newArray(`[${HOUR_CYCLE}`, HOUR_CYCLES.length); r.array(array).elements = HOUR_CYCLES.map(name => hourCycle(r, name)); return array; }, { static: true });
+  def(HOUR_CYCLE, 'valueOf', `(${STRING})${HOUR_CYCLE}`, (r, _m, [name]) => { if (nullish(name)) npe(r, 'name == null'); const wanted = text(r, name); if (!HOUR_CYCLES.includes(wanted)) r.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant android.icu.text.DateFormat.HourCycle.${wanted}`); return hourCycle(r, wanted); }, { static: true });
+  const generator = (r, locale) => { const o = r.allocate(I_DTPG); r.object(o).patternLocale = text(r, call(r, locale, LOCALE, 'toLanguageTag', [], STRING)); return o; };
+  const generatorTag = (r, self) => r.object(self).patternLocale ?? r.throwJava('Ljava/lang/IllegalStateException;', 'DateTimePatternGenerator used before construction');
+  def(I_DTPG, 'getInstance', `()${I_DTPG}`, r => generator(r, defaultLocale(r)), { static: true });
+  for (const localeType of [LOCALE, ULOCALE]) def(I_DTPG, 'getInstance', `(${localeType})${I_DTPG}`, (r, _m, [locale]) => { if (nullish(locale)) npe(r); return generator(r, localeOf(r, locale)); }, { static: true });
+  def(I_DTPG, 'getBestPattern', `(${STRING})${STRING}`, (r, _m, [self, skeleton]) => { if (nullish(skeleton)) npe(r); return bestDateTimePattern(generatorTag(r, self), text(r, skeleton)); });
+  def(I_DTPG, 'getBestPattern', `(${STRING}I)${STRING}`, (r, _m, [self, skeleton, options]) => { if (nullish(skeleton)) npe(r); if (options !== 0) unsupported(`DateTimePatternGenerator.getBestPattern with match options ${options}`); return bestDateTimePattern(generatorTag(r, self), text(r, skeleton)); });
+  // the hidden getBestPattern(skeleton, options, allowDuplicateFields) android.text.format.DateFormat.getBestDateTimePattern calls
+  def(I_DTPG, 'getBestPattern', `(${STRING}IZ)${STRING}`, (r, _m, [self, skeleton, options]) => { if (nullish(skeleton)) npe(r); if (options !== 0) unsupported(`DateTimePatternGenerator.getBestPattern with match options ${options}`); return bestDateTimePattern(generatorTag(r, self), text(r, skeleton)); });
+  def(I_DTPG, 'getDefaultHourCycle', `()${HOUR_CYCLE}`, (r, _m, [self]) => hourCycle(r, { h11: 'HOUR_CYCLE_11', h12: 'HOUR_CYCLE_12', h23: 'HOUR_CYCLE_23', h24: 'HOUR_CYCLE_24' }[defaultHourCycle(generatorTag(r, self))]));
   for (const sig of [[], [STRING], [STRING, LOCALE], [STRING, ULOCALE]]) def(I_SDF, '<init>', `(${sig.join('')})V`, (r, _m, [self, pattern, locale]) => {
     const o = r.allocate(J_SDF), params = sig.map(javaDescriptor), values = [pattern, localeOf(r, locale)].slice(0, sig.length);
     r.dispatch({ owner: J_SDF, name: '<init>', parameters: params, result: 'V', signature: `(${params.join('')})V` }, [o, ...values], 'direct'); r.object(self).inner = o;
@@ -177,7 +288,7 @@ export function createIcuTextHost(platform) {
   };
   const defineCollator = (owner, javaStyle) => {
     const sig = javaStyle ? [[], [LOCALE]] : [[], [LOCALE], [ULOCALE]];
-    for (const params of sig) def(owner, 'getInstance', `(${params.join('')})${owner}`, (r, _m, [locale]) => { const o = r.allocate(owner === I_COLL ? I_RBC : owner); makeCollator(r, o, params.length ? locale : null, javaStyle); return o; }, { static: true });   // ICU's Collator.getInstance returns a RuleBasedCollator
+    for (const params of sig) def(owner, 'getInstance', `(${params.join('')})${owner}`, (r, _m, [locale]) => { const o = r.allocate(owner === I_COLL ? I_RBC : J_RBC); makeCollator(r, o, params.length ? locale : null, javaStyle); return o; }, { static: true });   // Collator.getInstance returns a RuleBasedCollator, in ICU and in java.text
     def(owner, 'compare', `(${STRING}${STRING})I`, (r, _m, [self, a, b]) => compareStrings(r, self, a, b));
     def(owner, 'compare', `(${OBJECT}${OBJECT})I`, (r, _m, [self, a, b]) => compareStrings(r, self, a, b));
     def(owner, 'equals', `(${STRING}${STRING})Z`, (r, _m, [self, a, b]) => compareStrings(r, self, a, b) === 0 ? 1 : 0);
@@ -191,6 +302,9 @@ export function createIcuTextHost(platform) {
   };
   defineCollator(I_COLL, false); defineCollator(J_COLL, true);
   type(J_COLL, OBJECT, ['Ljava/util/Comparator;', 'Ljava/lang/Cloneable;'], { allocatable: true });
+  // java.text.RuleBasedCollator: the class of every collator java.text.Collator.getInstance makes (libcore wraps ICU's RuleBasedCollator); everything it answers is Collator's above.
+  const J_RBC = 'Ljava/text/RuleBasedCollator;'; type(J_RBC, J_COLL, [], { allocatable: true });
+  def(J_RBC, '<init>', `(${STRING})V`, () => unsupported('RuleBasedCollator(String rules): custom collation rules', 'collator-unsupported'));
   def(I_RBC, '<init>', `(${STRING})V`, () => unsupported('RuleBasedCollator(String rules): custom collation rules', 'collator-unsupported'));
   def(I_RBC, 'setNumericCollation', '(Z)V', (r, _m, [self, on]) => { collatorState(r, self).numeric = !!on; }); def(I_RBC, 'getNumericCollation', '()Z', (r, _m, [self]) => collatorState(r, self).numeric ? 1 : 0);
   def(I_RBC, 'setCaseLevel', '(Z)V', (r, _m, [self, on]) => { collatorState(r, self).caseLevel = !!on; }); def(I_RBC, 'isCaseLevel', '()Z', (r, _m, [self]) => collatorState(r, self).caseLevel ? 1 : 0);

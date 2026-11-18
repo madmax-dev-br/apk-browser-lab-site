@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
 
 // android.app.Notification, Notification.Builder / Action / BigTextStyle / BigPictureStyle / InboxStyle, NotificationChannel and android.graphics.drawable.Icon (android-13.0.0_r1).
 // None of these is in the framework DEX. The Builder is a recorder, exactly as in Notification.java: every setter stores a value and build() writes the public fields of
@@ -8,11 +8,11 @@ import { createHostRegistry } from './host-contract.js?v=12145e24651e';
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', CHARS = 'Ljava/lang/CharSequence;', CONTEXT = 'Landroid/content/Context;', PENDING = 'Landroid/app/PendingIntent;', BUNDLE = 'Landroid/os/Bundle;', BITMAP = 'Landroid/graphics/Bitmap;', URI = 'Landroid/net/Uri;';
 const NOTIFICATION = 'Landroid/app/Notification;', BUILDER = 'Landroid/app/Notification$Builder;', ACTION = 'Landroid/app/Notification$Action;', ACTION_BUILDER = 'Landroid/app/Notification$Action$Builder;', STYLE = 'Landroid/app/Notification$Style;';
 const BIG_TEXT = 'Landroid/app/Notification$BigTextStyle;', BIG_PICTURE = 'Landroid/app/Notification$BigPictureStyle;', INBOX = 'Landroid/app/Notification$InboxStyle;', CHANNEL = 'Landroid/app/NotificationChannel;', ICON = 'Landroid/graphics/drawable/Icon;';
-const PERSON = 'Landroid/app/Person;', PERSON_BUILDER = 'Landroid/app/Person$Builder;', MESSAGING = 'Landroid/app/Notification$MessagingStyle;', MESSAGE = 'Landroid/app/Notification$MessagingStyle$Message;', CALL = 'Landroid/app/Notification$CallStyle;', REMOTE_INPUT = 'Landroid/app/RemoteInput;';
+const PERSON = 'Landroid/app/Person;', PERSON_BUILDER = 'Landroid/app/Person$Builder;', MESSAGING = 'Landroid/app/Notification$MessagingStyle;', MESSAGE = 'Landroid/app/Notification$MessagingStyle$Message;', CALL = 'Landroid/app/Notification$CallStyle;', DECORATED = 'Landroid/app/Notification$DecoratedCustomViewStyle;', REMOTE_INPUT = 'Landroid/app/RemoteInput;';
 const EXTRAS = { EXTRA_SELF_DISPLAY_NAME: 'android.selfDisplayName', EXTRA_MESSAGING_PERSON: 'android.messagingUser', EXTRA_CONVERSATION_TITLE: 'android.conversationTitle', EXTRA_MESSAGES: 'android.messages', EXTRA_HISTORIC_MESSAGES: 'android.messages.historic',
   EXTRA_IS_GROUP_CONVERSATION: 'android.isGroupConversation', EXTRA_CALL_TYPE: 'android.callType', EXTRA_CALL_PERSON: 'android.callPerson', EXTRA_CALL_IS_VIDEO: 'android.callIsVideo', EXTRA_VERIFICATION_ICON: 'android.verificationIcon', EXTRA_VERIFICATION_TEXT: 'android.verificationText',
   EXTRA_ANSWER_INTENT: 'android.answerIntent', EXTRA_DECLINE_INTENT: 'android.declineIntent', EXTRA_HANG_UP_INTENT: 'android.hangUpIntent', EXTRA_ANSWER_COLOR: 'android.answerColor', EXTRA_DECLINE_COLOR: 'android.declineColor', EXTRA_TITLE: 'android.title', EXTRA_TITLE_BIG: 'android.title.big', EXTRA_TEXT: 'android.text', EXTRA_SUB_TEXT: 'android.subText', EXTRA_INFO_TEXT: 'android.infoText', EXTRA_SUMMARY_TEXT: 'android.summaryText', EXTRA_BIG_TEXT: 'android.bigText',
-  EXTRA_TEXT_LINES: 'android.textLines', EXTRA_SMALL_ICON: 'android.icon', EXTRA_LARGE_ICON: 'android.largeIcon', EXTRA_LARGE_ICON_BIG: 'android.largeIcon.big', EXTRA_PICTURE: 'android.picture', EXTRA_PROGRESS: 'android.progress', EXTRA_PROGRESS_MAX: 'android.progressMax',
+  EXTRA_TEXT_LINES: 'android.textLines', EXTRA_SMALL_ICON: 'android.icon', EXTRA_LARGE_ICON: 'android.largeIcon', EXTRA_LARGE_ICON_BIG: 'android.largeIcon.big', EXTRA_PICTURE: 'android.picture', EXTRA_PICTURE_ICON: 'android.pictureIcon', EXTRA_PICTURE_CONTENT_DESCRIPTION: 'android.pictureContentDescription', EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED: 'android.showBigPictureWhenCollapsed', EXTRA_PROGRESS: 'android.progress', EXTRA_PROGRESS_MAX: 'android.progressMax',
   EXTRA_PROGRESS_INDETERMINATE: 'android.progressIndeterminate', EXTRA_SHOW_CHRONOMETER: 'android.showChronometer', EXTRA_CHRONOMETER_COUNT_DOWN: 'android.chronometerCountDown', EXTRA_SHOW_WHEN: 'android.showWhen', EXTRA_TEMPLATE: 'android.template',
   EXTRA_BACKGROUND_IMAGE_URI: 'android.backgroundImageUri', EXTRA_PEOPLE_LIST: 'android.people.list', EXTRA_COMPACT_ACTIONS: 'android.compactActions', EXTRA_REMOTE_INPUT_HISTORY: 'android.remoteInputHistory', EXTRA_AUDIO_CONTENTS_URI: 'android.audioContents',
   EXTRA_CHANNEL_ID: 'android.intent.extra.CHANNEL_ID', EXTRA_NOTIFICATION_ID: 'android.intent.extra.NOTIFICATION_ID', EXTRA_NOTIFICATION_TAG: 'android.intent.extra.NOTIFICATION_TAG', EXTRA_SUBSTITUTE_APP_NAME: 'android.substName' };
@@ -28,7 +28,7 @@ export function createNotificationHost(platform) {
   const call = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
   const text = (r, v) => v === null ? null : r.stringCharacters(v);
   for (const owner of [NOTIFICATION, BUILDER, ACTION, ACTION_BUILDER, STYLE, BIG_TEXT, BIG_PICTURE, INBOX, CHANNEL, 'Landroid/app/NotificationChannelGroup;', ICON]) type(owner, OBJECT, [], { allocatable: true });
-  for (const style of [BIG_TEXT, BIG_PICTURE, INBOX, MESSAGING, CALL]) type(style, STYLE, [], { allocatable: true });
+  for (const style of [BIG_TEXT, BIG_PICTURE, INBOX, MESSAGING, CALL, DECORATED]) type(style, STYLE, [], { allocatable: true });
   for (const owner of [PERSON, PERSON_BUILDER, MESSAGE]) type(owner, OBJECT, [], { allocatable: true });
   registry.interfaces.set(PERSON, ['Landroid/os/Parcelable;']);
   registry.interfaces.set(NOTIFICATION, ['Landroid/os/Parcelable;']); registry.interfaces.set(CHANNEL, ['Landroid/os/Parcelable;']); registry.interfaces.set('Landroid/app/NotificationChannelGroup;', ['Landroid/os/Parcelable;']); registry.interfaces.set(ICON, ['Landroid/os/Parcelable;']);
@@ -238,14 +238,28 @@ export function createNotificationHost(platform) {
   // ---- Styles: record their text; Builder.setStyle applies them ---------------------------------------------------------------------------------------------
   const style = (r, ref) => r.object(ref).style ??= { lines: [] };
   for (const owner of [BIG_TEXT, BIG_PICTURE, INBOX, MESSAGING, CALL]) {
-    if (owner !== MESSAGING && owner !== CALL) def(owner, '<init>', '()V', () => {}); if (owner !== MESSAGING && owner !== CALL) def(owner, '<init>', `(${BUILDER})V`, (r, _m, [self, builder]) => { r.object(builder).builder.style = self; });
+    if (owner !== MESSAGING && owner !== CALL) def(owner, '<init>', '()V', () => {}); if (owner !== MESSAGING && owner !== CALL) def(owner, '<init>', `(${BUILDER})V`, (r, _m, [self, target]) => { call(r, self, STYLE, 'setBuilder', [BUILDER], 'V', [target]); });
     def(owner, 'setBigContentTitle', `(${CHARS})${owner}`, (r, _m, [self, title]) => { style(r, self).bigTitle = title; return self; });
     def(owner, 'setSummaryText', `(${CHARS})${owner}`, (r, _m, [self, summary]) => { style(r, self).summary = summary; return self; });
   }
   def(BIG_TEXT, 'bigText', `(${CHARS})${BIG_TEXT}`, (r, _m, [self, text_]) => { style(r, self).bigText = text_; return self; });
   def(INBOX, 'addLine', `(${CHARS})${INBOX}`, (r, _m, [self, line]) => { if (line !== null) style(r, self).lines.push(line); return self; });
-  def(BIG_PICTURE, 'bigPicture', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { style(r, self).picture = bitmap; return self; });
-  def(BIG_PICTURE, 'bigLargeIcon', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { style(r, self).bigLargeIcon = bitmap; return self; });
+  // BigPictureStyle keeps its picture and its big large icon as Icons (a Bitmap is wrapped with Icon.createWithBitmap), as Notification.java does; addExtras below writes them.
+  const bitmapIcon = (r, bitmap) => bitmap === null ? null : newIcon(r, { type: 1, bitmap });
+  def(BIG_PICTURE, 'bigPicture', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { style(r, self).pictureIcon = bitmapIcon(r, bitmap); return self; });
+  def(BIG_PICTURE, 'bigPicture', `(${ICON})${BIG_PICTURE}`, (r, _m, [self, icon]) => { style(r, self).pictureIcon = icon; return self; });
+  def(BIG_PICTURE, 'bigLargeIcon', `(${BITMAP})${BIG_PICTURE}`, (r, _m, [self, bitmap]) => { Object.assign(style(r, self), { bigLargeIconSet: true, bigLargeIcon: bitmapIcon(r, bitmap) }); return self; });
+  def(BIG_PICTURE, 'bigLargeIcon', `(${ICON})${BIG_PICTURE}`, (r, _m, [self, icon]) => { Object.assign(style(r, self), { bigLargeIconSet: true, bigLargeIcon: icon }); return self; });
+  def(BIG_PICTURE, 'setContentDescription', `(${CHARS})${BIG_PICTURE}`, (r, _m, [self, description]) => { style(r, self).pictureDescription = description; return self; });
+  def(BIG_PICTURE, 'showBigPictureWhenCollapsed', `(Z)${BIG_PICTURE}`, (r, _m, [self, show]) => { style(r, self).showWhenCollapsed = !!show; return self; });
+  // DecoratedCustomViewStyle carries no state of its own: Style.addExtras records its class name as the template. Its decorated RemoteViews are not built (no system UI).
+  def(DECORATED, '<init>', '()V', () => {});
+  // Style.setBuilder and Builder.setStyle keep each other in step, each only when its side changes (Notification.java).
+  const same = (r, a, b) => a === b || (a !== null && b !== null && r.object(a) === r.object(b));
+  def(STYLE, 'setBuilder', `(${BUILDER})V`, (r, _m, [self, target]) => {
+    const s = style(r, self); if (same(r, s.owner ?? null, target)) return;
+    s.owner = target; if (target !== null) call(r, target, BUILDER, 'setStyle', [STYLE], BUILDER, [self]);
+  });
 
   // ---- Notification.BubbleMetadata and its Builder (Notification.java, android-13.0.0_r1): same argument checks, messages and flag bits. The bubble is not shown (the virtual device has no
   // system UI); the metadata is recorded on the Notification and read back through getBubbleMetadata(). Parcel serialisation of the contained PendingIntent / Icon is not modelled.
@@ -299,6 +313,8 @@ export function createNotificationHost(platform) {
   def(BUBBLE, 'setFlags', '(I)V', (r, _m, [self, flags]) => { bubble(r, self).flags = flags; });
   def(BUBBLE, 'describeContents', '()I', () => 0);
   def(NOTIFICATION, 'getBubbleMetadata', `()${BUBBLE}`, (r, _m, [self]) => meta(r, self).bubbleMetadata ?? null);
+  def(NOTIFICATION, 'getSettingsText', `()${CHARS}`, (r, _m, [self]) => meta(r, self).settingsText ?? null);
+  def(NOTIFICATION, 'getAllowSystemGeneratedContextualActions', '()Z', (r, _m, [self]) => (meta(r, self).allowGeneratedActions ?? true) ? 1 : 0);   // mAllowSystemGeneratedContextualActions starts true
   def(NOTIFICATION, 'getLocusId', '()Landroid/content/LocusId;', (r, _m, [self]) => meta(r, self).locusId ?? null);
 
   // ---- Notification.Builder -----------------------------------------------------------------------------------------------------------------------------
@@ -324,8 +340,13 @@ export function createNotificationHost(platform) {
   setter('setChannelId', STRING, (b, [v]) => { b.channelId = v; }); setter('setTimeoutAfter', 'J', (b, [v]) => { b.timeoutAfter = BigInt(v); }); setter('setShortcutId', STRING, (b, [v]) => { b.shortcutId = v; });
   setter('setRemoteInputHistory', '[' + CHARS, (b, [v]) => { b.remoteInputHistory = v; }); setter('setSettingsText', CHARS, (b, [v]) => { b.settingsText = v; });
   setter('setLocusId', 'Landroid/content/LocusId;', (b, [v]) => { b.locusId = v; }); setter('setBubbleMetadata', 'Landroid/app/Notification$BubbleMetadata;', (b, [v]) => { b.bubbleMetadata = v; });
-  setter('setStyle', STYLE, (b, [v], r) => { b.style = v; if (v !== null) style(r, v).builder = true; });
-  setter('addPerson', PERSON, (b, [v]) => { if (v !== null) b.people.push(v); }); setter('addPerson', STRING, (b, [v], r) => { b.people.push(newPerson(r, { name: null, icon: null, uri: v, key: null, bot: false, important: false })); }); setter('setAllowSystemGeneratedContextualActions', 'Z', () => {}); setter('setForegroundServiceBehavior', 'I', (b, [v]) => { b.foregroundBehavior = v; });
+  def(BUILDER, 'setStyle', `(${STYLE})${BUILDER}`, (r, _m, [self, v]) => {
+    const b = builder(r, self); if (same(r, b.style, v)) return self;
+    b.style = v; if (v !== null) { style(r, v).builder = true; call(r, v, STYLE, 'setBuilder', [BUILDER], 'V', [self]); }
+    return self;
+  });
+  def(BUILDER, 'setActions', `([${ACTION})${BUILDER}`, (r, _m, [self, actions]) => { const b = builder(r, self); b.actions = r.array(actions).elements.filter(action => action !== null && action !== 0 && action !== undefined); return self; });
+  setter('addPerson', PERSON, (b, [v]) => { if (v !== null) b.people.push(v); }); setter('addPerson', STRING, (b, [v], r) => { b.people.push(newPerson(r, { name: null, icon: null, uri: v, key: null, bot: false, important: false })); }); setter('setAllowSystemGeneratedContextualActions', 'Z', (b, [v]) => { b.allowGeneratedActions = !!v; }); setter('setForegroundServiceBehavior', 'I', (b, [v]) => { b.foregroundBehavior = v; });
   setter('addExtras', BUNDLE, (b, [v], r) => { if (v !== null) { b.extras ??= platform.bundle(r); call(r, b.extras, BUNDLE, 'putAll', [BUNDLE], 'V', [v]); } }); setter('setExtras', BUNDLE, (b, [v]) => { b.extras = v; });
   setter('addAction', `I${CHARS}${PENDING}`, (b, [icon, title, intent], r) => { const a = r.allocate(ACTION_BUILDER); r.object(a).actionBuilder = { icon, title, intent, extras: null, allowGenerated: true, semantic: 0, contextual: false }; b.actions.push(call(r, a, ACTION_BUILDER, 'build', [], ACTION)); });
   setter('addAction', ACTION, (b, [action]) => { if (action !== null) b.actions.push(action); });
@@ -348,7 +369,15 @@ export function createNotificationHost(platform) {
       putText(EXTRAS.EXTRA_TITLE_BIG, o.bigTitle ?? null); putText(EXTRAS.EXTRA_SUMMARY_TEXT, o.summary ?? null);
       if (owner === BIG_TEXT) { putText(EXTRAS.EXTRA_BIG_TEXT, o.bigText ?? null); call(r, extras, BUNDLE, 'putString', [STRING, STRING], 'V', [EXTRAS.EXTRA_TEMPLATE, 'android.app.Notification$BigTextStyle']); }
       else if (owner === INBOX) { const lines = r.newArray(`[${CHARS}`, o.lines.length); r.array(lines).elements = [...o.lines]; call(r, extras, BUNDLE, 'putCharSequenceArray', [STRING, `[${CHARS}`], 'V', [EXTRAS.EXTRA_TEXT_LINES, lines]); call(r, extras, BUNDLE, 'putString', [STRING, STRING], 'V', [EXTRAS.EXTRA_TEMPLATE, 'android.app.Notification$InboxStyle']); }
-      else if (owner === BIG_PICTURE) { if (o.picture) call(r, extras, BUNDLE, 'putParcelable', [STRING, 'Landroid/os/Parcelable;'], 'V', [EXTRAS.EXTRA_PICTURE, o.picture]); call(r, extras, BUNDLE, 'putString', [STRING, STRING], 'V', [EXTRAS.EXTRA_TEMPLATE, 'android.app.Notification$BigPictureStyle']); }
+      else if (owner === BIG_PICTURE) {   // BigPictureStyle.addExtras: a bitmap picture goes under the old key, any other icon under EXTRA_PICTURE_ICON, the other key holds null
+        const parcel = (key, value) => call(r, extras, BUNDLE, 'putParcelable', [STRING, 'Landroid/os/Parcelable;'], 'V', [key, value]);
+        call(r, extras, BUNDLE, 'putString', [STRING, STRING], 'V', [EXTRAS.EXTRA_TEMPLATE, 'android.app.Notification$BigPictureStyle']);
+        if (o.bigLargeIconSet) parcel(EXTRAS.EXTRA_LARGE_ICON_BIG, o.bigLargeIcon);
+        putText(EXTRAS.EXTRA_PICTURE_CONTENT_DESCRIPTION, o.pictureDescription ?? null); putBool(EXTRAS.EXTRA_SHOW_BIG_PICTURE_WHEN_COLLAPSED, o.showWhenCollapsed === true);
+        const picture = o.pictureIcon ?? null, bitmap = picture !== null && iconState(r, picture).type === 1;
+        parcel(EXTRAS.EXTRA_PICTURE, bitmap ? iconState(r, picture).bitmap : null); parcel(EXTRAS.EXTRA_PICTURE_ICON, bitmap ? null : picture);
+      }
+      else if (owner === DECORATED) call(r, extras, BUNDLE, 'putString', [STRING, STRING], 'V', [EXTRAS.EXTRA_TEMPLATE, 'android.app.Notification$DecoratedCustomViewStyle']);
       else if (owner === MESSAGING) {
         const user = o.user ?? null;
         if (targetSdk(r) >= 28 && (user === null || person(r, user).name === null)) r.throwJava('Ljava/lang/RuntimeException;', 'User must be valid and have a name.');   // MessagingStyle.validate
@@ -382,7 +411,7 @@ export function createNotificationHost(platform) {
       ['tickerText', CHARS, b.ticker], ['largeIcon', BITMAP, b.largeIcon], ['sound', URI, b.sound], ['audioStreamType', 'I', b.audioStreamType], ['vibrate', '[J', b.vibrate], ['ledARGB', 'I', lights?.argb ?? 0], ['ledOnMS', 'I', lights?.on ?? 0], ['ledOffMS', 'I', lights?.off ?? 0],
       ['defaults', 'I', defaults], ['flags', 'I', flags | (defaults & 4 ? 1 : 0)], ['priority', 'I', b.priority], ['category', STRING, b.category], ['color', 'I', b.color], ['visibility', 'I', b.visibility], ['publicVersion', NOTIFICATION, b.publicVersion], ['extras', BUNDLE, extras]]) put(r, n, name, t, value);
     if (b.actions.length) { const actions = r.newArray(`[${ACTION}`, b.actions.length); r.array(actions).elements = [...b.actions]; put(r, n, 'actions', `[${ACTION}`, actions); }
-    Object.assign(meta(r, n), { channelId: b.channelId, group: b.group, sortKey: b.sortKey, timeoutAfter: b.timeoutAfter, smallIcon: b.smallIcon, largeIcon: b.largeIconObject ?? null, groupAlert: b.groupAlert, badgeIcon: b.badge, shortcutId: b.shortcutId, settingsText: b.settingsText ?? null, bubbleMetadata: b.bubbleMetadata ?? null, locusId: b.locusId ?? null });
+    Object.assign(meta(r, n), { channelId: b.channelId, group: b.group, sortKey: b.sortKey, timeoutAfter: b.timeoutAfter, smallIcon: b.smallIcon, largeIcon: b.largeIconObject ?? null, groupAlert: b.groupAlert, badgeIcon: b.badge, shortcutId: b.shortcutId, settingsText: b.settingsText ?? null, allowGeneratedActions: b.allowGeneratedActions ?? true, bubbleMetadata: b.bubbleMetadata ?? null, locusId: b.locusId ?? null });
     return n;
   }
   return { ...registry, interfaces: registry.interfacesOf };

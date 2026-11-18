@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { PACKAGE_VALUE_FIELDS, PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { PACKAGE_VALUE_FIELDS, PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=43801fccd526';
 
 // Construction, copy and Parcel behaviour of the android.content.pm value classes (PackageItemInfo, ComponentInfo, ApplicationInfo, ServiceInfo, ProviderInfo, InstrumentationInfo, PermissionInfo,
 // PermissionGroupInfo, PackageInfo, ResolveInfo, FeatureInfo, ConfigurationInfo, Signature). They are host objects whose fields are declared by the AOSP class that owns them
@@ -131,6 +131,9 @@ export function createPackageValueObjectsHost(platform) {
 
   // ---- toString (the android-13 forms) ---------------------------------------------------------------------------------------------------
   const identityHex = (r, self) => (call(r, self, OBJECT, 'hashCode', [], 'I') >>> 0).toString(16);
+  // PermissionInfo.getProtection / getProtectionFlags: the base level is the low four bits of protectionLevel (PROTECTION_MASK_BASE), the flags are the rest.
+  def(`${PM}PermissionInfo;`, 'getProtection', '()I', (r, _m, [self]) => get(r, self, `${PM}PermissionInfo;`, 'protectionLevel', 'I') & 0xf);
+  def(`${PM}PermissionInfo;`, 'getProtectionFlags', '()I', (r, _m, [self]) => get(r, self, `${PM}PermissionInfo;`, 'protectionLevel', 'I') & ~0xf);
   def(`${PM}ApplicationInfo;`, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => `ApplicationInfo{${identityHex(r, self)} ${get(r, self, ITEM, 'packageName', 'Ljava/lang/String;')}}`);
   def(`${PM}ServiceInfo;`, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => `ServiceInfo{${identityHex(r, self)} ${get(r, self, ITEM, 'name', 'Ljava/lang/String;')}}`);
 

@@ -1,10 +1,10 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { APKError } from './apk-error.js?v=43801fccd526';
 
 // android.widget.ImageView API (API 33) beyond ScaleType / setImageBitmap (image-view-host.js): colour filter, alpha, tint, level, matrix, crop-to-padding, adjustViewBounds and the max
 // size, baseline alignment, setImageURI / setImageIcon, with the semantics of android-13.0.0_r1 ImageView.java. Colour filter, alpha, tint and level act on the image Drawable itself
 // (so they show wherever the Drawable draws); the image matrix replaces the MATRIX scale type's transform in the draw pass; the properties that change measurement or clipping
-// (adjustViewBounds, maxWidth / maxHeight, cropToPadding, baseline) are kept and `unsupportedRendering` names the ones the native image path does not apply yet.
+// (adjustViewBounds, maxWidth / maxHeight, cropToPadding, baseline) are read by the native measure (view-layout-host.js imageMeasure, getBaseline) and draw (drawable-view-host.js).
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', TINT = 'Landroid/content/res/ColorStateList;', BLEND = 'Landroid/graphics/BlendMode;', MODE = 'Landroid/graphics/PorterDuff$Mode;';
 const FILTER = 'Landroid/graphics/ColorFilter;', MATRIX = 'Landroid/graphics/Matrix;', URI = 'Landroid/net/Uri;', INT_MAX = 0x7fffffff;
 const nullish = v => v === null || v === undefined || v === 0;
@@ -82,7 +82,12 @@ export function createImageViewApiHost(platform) {
     def(IMAGE, setName, setSig, (r, _m, [self, raw]) => { const s = st(r, self), value = type === 'Z' ? flag(raw) : raw; if (s[key] === value) return; s[key] = value; if (effect === 'relayout') relayout(r, self); else redraw(r, self); });
     def(IMAGE, getName, getSig, (r, _m, [self]) => { const value = st(r, self)[key]; return type === 'Z' ? (value ? 1 : 0) : value; });
   };
-  prop('setAdjustViewBounds(Z)V', 'getAdjustViewBounds()Z', 'adjustViewBounds', 'Z');
+  // ImageView.setAdjustViewBounds: "if (adjustViewBounds) setScaleType(ScaleType.FIT_CENTER)"
+  def(IMAGE, 'setAdjustViewBounds', '(Z)V', (r, _m, [self, raw]) => {
+    const s = st(r, self); s.adjustViewBounds = flag(raw);
+    if (s.adjustViewBounds) { const SCALE = 'Landroid/widget/ImageView$ScaleType;'; call(r, self, IMAGE, 'setScaleType', [SCALE], 'V', [r.readStatic({ owner: SCALE, name: 'FIT_CENTER', type: SCALE })]); }
+  });
+  def(IMAGE, 'getAdjustViewBounds', '()Z', (r, _m, [self]) => st(r, self).adjustViewBounds ? 1 : 0);
   prop('setMaxWidth(I)V', 'getMaxWidth()I', 'maxWidth', 'I'); prop('setMaxHeight(I)V', 'getMaxHeight()I', 'maxHeight', 'I');
   prop('setCropToPadding(Z)V', 'getCropToPadding()Z', 'cropToPadding', 'Z', 'redraw');
   prop('setBaselineAlignBottom(Z)V', 'getBaselineAlignBottom()Z', 'baselineAlignBottom', 'Z');
@@ -92,15 +97,8 @@ export function createImageViewApiHost(platform) {
     call(r, self, VIEW, 'setLeftTopRightBottom', ['I', 'I', 'I', 'I'], 'V', [l, t, rr, b]); return changed ? 1 : 0;
   });
 
-  /** Why the native image path cannot lay out / draw this ImageView as AOSP would, or null. */
-  registry.unsupportedRendering = (r, self) => {
-    const s = r.object(self).iv; if (!s) return null;
-    if (s.adjustViewBounds) return 'adjustViewBounds (the measure pass does not resize to the drawable\'s aspect ratio)';
-    if (s.maxWidth !== INT_MAX || s.maxHeight !== INT_MAX) return 'maxWidth / maxHeight';
-    if (s.cropToPadding) return 'cropToPadding';
-    if (s.baselineAlignBottom || s.baseline !== -1) return 'baseline';
-    return null;
-  };
+  /** What ImageView.onMeasure, getBaseline and onDraw read: adjustViewBounds, maxWidth / maxHeight, baseline / baselineAlignBottom, cropToPadding (view-layout-host.js, drawable-view-host.js). */
+  registry.state = (r, self) => st(r, self);
   void APKError;
   return registry;
 }

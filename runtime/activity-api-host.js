@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { gcRoot } from './heap-gc.js?v=43801fccd526';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -64,6 +64,11 @@ export function createActivityApiHost(platform) {
   def(COMPONENT, 'compareTo', `(${COMPONENT})I`, (r, _m, [self, other]) => compare(r, self, other));
   def(COMPONENT, 'compareTo', `(${OBJECT})I`, (r, _m, [self, other]) => compare(r, self, other));
   def(COMPONENT, 'describeContents', '()I', () => 0);
+  // equals / hashCode / toString by value, as ComponentName.java: without them two names of the same component differed and a ComponentName was no HashMap key.
+  const stringHash = value => { let hash = 0; for (let i = 0; i < value.length; i++) hash = (Math.imul(hash, 31) + value.charCodeAt(i)) | 0; return hash; };
+  def(COMPONENT, 'equals', `(${OBJECT})Z`, (r, _m, [self, other]) => { if (nullish(other) || r.typeOf(other) !== COMPONENT) return 0; const a = cn(r, self), b = cn(r, other); return text(r, a.packageName) === text(r, b.packageName) && text(r, a.className) === text(r, b.className) ? 1 : 0; });
+  def(COMPONENT, 'hashCode', '()I', (r, _m, [self]) => (stringHash(text(r, cn(r, self).packageName)) + stringHash(text(r, cn(r, self).className))) | 0);
+  def(COMPONENT, 'toString', `()${STRING}`, (r, _m, [self]) => `ComponentInfo{${text(r, cn(r, self).packageName)}/${text(r, cn(r, self).className)}}`);
   const PARCEL = 'Landroid/os/Parcel;';
   def(COMPONENT, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, out]) => { call(r, out, PARCEL, 'writeString', [STRING], 'V', [cn(r, self).packageName]); call(r, out, PARCEL, 'writeString', [STRING], 'V', [cn(r, self).className]); });
   def(COMPONENT, 'writeToParcel', `(${COMPONENT}${PARCEL})V`, (r, _m, [component, out]) => {   // null is a null package string
@@ -82,22 +87,38 @@ export function createActivityApiHost(platform) {
     const pkg = value.slice(0, sep); let cls = value.slice(sep + 1); if (cls.length > 0 && cls[0] === '.') cls = pkg + cls; return newComponent(r, pkg, cls);
   }, { static: true });
 
-  // ---- ViewGroup.MarginLayoutParams: relative (start / end) margins and their resolution by layout direction (android-13.0.0_r1 MarginLayoutParams). Undefined is Integer.MIN_VALUE; once a relative
-  // margin is set the left / right margins follow the layout direction when it is resolved (RTL: start is the right margin).
+  // ---- ViewGroup.MarginLayoutParams: relative (start / end) margins and their resolution by layout direction (android-13.0.0_r1 MarginLayoutParams). Undefined is Integer.MIN_VALUE.
+  // The state mirrors mMarginFlags: the layout direction, whether the left / right margins were given, whether a resolution is pending, and the RTL compatibility mode (an app
+  // before Jelly Bean MR1 or without android:supportsRtl), which only the XML constructor sets (view-xml-attributes.js readMarginLayout).
   const MARGIN = 'Landroid/view/ViewGroup$MarginLayoutParams;', UNDEFINED = -2147483648;
-  const margin = (r, self) => r.object(self).marginState ??= { start: UNDEFINED, end: UNDEFINED, dir: 0, relative: false };
+  const margin = (r, self) => r.object(self).marginState ??= { start: UNDEFINED, end: UNDEFINED, dir: 0, leftUndefined: true, rightUndefined: true, needResolution: false, rtlCompatibility: false };
   const marginField = (r, self, edge, value) => { const key = `${MARGIN}->${edge}Margin:I`; if (value === undefined) return r.object(self).fields.get(key) ?? 0; r.storeField(r.object(self).fields, key, value); return undefined; };
-  const applyRelative = (r, self) => {
-    const m = margin(r, self); if (!m.relative) return; const rtl = m.dir === 1;
-    if (rtl) { if (m.end !== UNDEFINED) marginField(r, self, 'left', m.end); if (m.start !== UNDEFINED) marginField(r, self, 'right', m.start); } else { if (m.start !== UNDEFINED) marginField(r, self, 'left', m.start); if (m.end !== UNDEFINED) marginField(r, self, 'right', m.end); }
+  const marginRelative = m => m.start !== UNDEFINED || m.end !== UNDEFINED;
+  /** MarginLayoutParams.doResolveMargins. */
+  const resolveMargins = (r, self) => {
+    const m = margin(r, self); if (!marginRelative(m)) { m.needResolution = false; return; }
+    if (m.rtlCompatibility) {   // start / end only fill in a left / right margin that was not given
+      if (m.leftUndefined && m.start > UNDEFINED) marginField(r, self, 'left', m.start);
+      if (m.rightUndefined && m.end > UNDEFINED) marginField(r, self, 'right', m.end);
+    } else {   // the relative margins override left / right; one that is not defined is 0
+      const rtl = m.dir === 1, left = rtl ? m.end : m.start, right = rtl ? m.start : m.end;
+      marginField(r, self, 'left', left > UNDEFINED ? left : 0); marginField(r, self, 'right', right > UNDEFINED ? right : 0);
+    }
+    m.needResolution = false;
   };
-  def(MARGIN, 'resolveLayoutDirection', '(I)V', (r, _m, [self, dir]) => { margin(r, self).dir = dir; applyRelative(r, self); });
-  def(MARGIN, 'setLayoutDirection', '(I)V', (r, _m, [self, dir]) => { margin(r, self).dir = dir; }); def(MARGIN, 'getLayoutDirection', '()I', (r, _m, [self]) => margin(r, self).dir);
-  def(MARGIN, 'setMarginStart', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.start = v; m.relative = true; applyRelative(r, self); });
-  def(MARGIN, 'setMarginEnd', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.end = v; m.relative = true; applyRelative(r, self); });
-  def(MARGIN, 'getMarginStart', '()I', (r, _m, [self]) => { const m = margin(r, self); return m.start !== UNDEFINED ? m.start : marginField(r, self, m.dir === 1 ? 'right' : 'left'); });
-  def(MARGIN, 'getMarginEnd', '()I', (r, _m, [self]) => { const m = margin(r, self); return m.end !== UNDEFINED ? m.end : marginField(r, self, m.dir === 1 ? 'left' : 'right'); });
-  def(MARGIN, 'isMarginRelative', '()Z', (r, _m, [self]) => margin(r, self).relative ? 1 : 0);
+  const setDirection = (r, self, dir) => { const m = margin(r, self); if (dir !== 0 && dir !== 1) return; if (dir !== m.dir) { m.dir = dir; m.needResolution = marginRelative(m); } };
+  def(MARGIN, 'resolveLayoutDirection', '(I)V', (r, _m, [self, dir]) => { setDirection(r, self, dir); const m = margin(r, self); if (!marginRelative(m) || !m.needResolution) return; resolveMargins(r, self); });
+  def('Landroid/view/ViewGroup$LayoutParams;', 'resolveLayoutDirection', '(I)V', () => {});   // ViewGroup.LayoutParams.resolveLayoutDirection: empty
+  def(MARGIN, 'setLayoutDirection', '(I)V', (r, _m, [self, dir]) => setDirection(r, self, dir)); def(MARGIN, 'getLayoutDirection', '()I', (r, _m, [self]) => margin(r, self).dir);
+  // Android resolves a changed relative margin when the View next resolves its layout params (setLayoutParams, the measure pass after the direction is known). The lab resolves at
+  // once with the direction the params hold, which is what that pass would use.
+  def(MARGIN, 'setMarginStart', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.start = v; m.needResolution = true; resolveMargins(r, self); });
+  def(MARGIN, 'setMarginEnd', '(I)V', (r, _m, [self, v]) => { const m = margin(r, self); m.end = v; m.needResolution = true; resolveMargins(r, self); });
+  def(MARGIN, 'setMarginsRelative', '(IIII)V', (r, _m, [self, start, top, end, bottom]) => { const m = margin(r, self); m.start = start; m.end = end; marginField(r, self, 'top', top); marginField(r, self, 'bottom', bottom); m.needResolution = true; resolveMargins(r, self); });
+  def(MARGIN, 'getMarginStart', '()I', (r, _m, [self]) => { const m = margin(r, self); if (m.start !== UNDEFINED) return m.start; if (m.needResolution) resolveMargins(r, self); return marginField(r, self, m.dir === 1 ? 'right' : 'left'); });
+  def(MARGIN, 'getMarginEnd', '()I', (r, _m, [self]) => { const m = margin(r, self); if (m.end !== UNDEFINED) return m.end; if (m.needResolution) resolveMargins(r, self); return marginField(r, self, m.dir === 1 ? 'left' : 'right'); });
+  def(MARGIN, 'isMarginRelative', '()Z', (r, _m, [self]) => marginRelative(margin(r, self)) ? 1 : 0);
+  def(MARGIN, 'isLayoutRtl', '()Z', (r, _m, [self]) => margin(r, self).dir === 1 ? 1 : 0);
 
   // ---- Orientation -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   def(ACTIVITY, 'setRequestedOrientation', '(I)V', (r, _m, [self, request]) => {
@@ -205,7 +226,7 @@ export function createActivityApiHost(platform) {
   constant('onCreateOptionsMenu', `(${MENU})Z`, 1); constant('onPrepareOptionsMenu', `(${MENU})Z`, 1); constant('onOptionsItemSelected', `(${MENU_ITEM})Z`, 0); constant('onContextItemSelected', `(${MENU_ITEM})Z`, 0);
   constant('onNavigateUpFromChild', `(${ACTIVITY})Z`, 0);
   constant('onCreateThumbnail', `(${BITMAP}Landroid/graphics/Canvas;)Z`, 0); constant('onCreateDescription', `()${CHARS}`, null); constant('onCreatePanelView', `(I)${VIEW}`, null);
-  constant('onGenericMotionEvent', `(${MOTION})Z`, 0); constant('onTrackballEvent', `(${MOTION})Z`, 0); constant('onKeyShortcut', `(I${KEYEVENT})Z`, 0); constant('onKeyLongPress', `(I${KEYEVENT})Z`, 0); constant('onKeyMultiple', `(II${KEYEVENT})Z`, 0);
+  constant('onGenericMotionEvent', `(${MOTION})Z`, 0); constant('onTrackballEvent', `(${MOTION})Z`, 0); constant('onKeyLongPress', `(I${KEYEVENT})Z`, 0); constant('onKeyMultiple', `(II${KEYEVENT})Z`, 0);
   // Activity.onWindowStartingActionMode: only a primary mode goes to the Activity's action bar (initWindowDecorActionBar + ActionBar.startActionMode); the lab's windows inflate no decor
   // action bar (getActionBar is null), so the decor creates the mode itself (src/action-mode-host.js). The typed form records the type and asks the untyped one, which an app may override.
   def(ACTIVITY, 'onWindowStartingActionMode', `(${AM_CALLBACK}I)${ACTION_MODE}`, (r, _m, [self, callback, type]) => {
@@ -267,11 +288,15 @@ export function createActivityApiHost(platform) {
     const decor = decorOf(r, self); if (!nullish(decor) && flag(call(r, decor, VIEW, 'dispatchTrackballEvent', [MOTION], 'Z', [event]))) return 1;
     return call(r, self, ACTIVITY, 'onTrackballEvent', [MOTION], 'Z', [event]);
   });
+  // Activity.dispatchKeyShortcutEvent (Activity.java): onUserInteraction, the view hierarchy (Window.superDispatchKeyShortcutEvent), then onKeyShortcut. The options-panel steps
+  // that DecorView.dispatchKeyShortcutEvent runs around the Window.Callback are the window's, not the Activity's: registry.dispatchKeyShortcut below.
   def(ACTIVITY, 'dispatchKeyShortcutEvent', `(${KEYEVENT})Z`, (r, _m, [self, event]) => {
     interaction(r, self);
     const decor = decorOf(r, self); if (!nullish(decor) && flag(call(r, decor, VIEW, 'dispatchKeyShortcutEvent', [KEYEVENT], 'Z', [event]))) return 1;
-    return call(r, self, ACTIVITY, 'onKeyShortcut', ['I', KEYEVENT], 'Z', [call(r, event, KEYEVENT, 'getKeyCode', [], 'I'), event]);
+    return flag(call(r, self, ACTIVITY, 'onKeyShortcut', ['I', KEYEVENT], 'Z', [call(r, event, KEYEVENT, 'getKeyCode', [], 'I'), event])) ? 1 : 0;
   });
+  // Activity.onKeyShortcut: "Let the Action Bar have a chance at handling the shortcut."
+  def(ACTIVITY, 'onKeyShortcut', `(I${KEYEVENT})Z`, (r, _m, [self, code, event]) => { const bar = own(r, self).actionBar ?? null; return !nullish(bar) && flag(call(r, bar, 'Landroid/app/ActionBar;', 'onKeyShortcut', ['I', KEYEVENT], 'Z', [code, event])) ? 1 : 0; });
   def(ACTIVITY, 'dispatchKeyEvent', `(${KEYEVENT})Z`, (r, _m, [self, event]) => {
     interaction(r, self);
     const decor = decorOf(r, self); if (!nullish(decor) && flag(call(r, decor, VIEW, 'dispatchKeyEvent', [KEYEVENT], 'Z', [event]))) return 1;
@@ -289,32 +314,152 @@ export function createActivityApiHost(platform) {
     if (!nullish(title) && r.stringCharacters(title).length) call(r, call(r, event, A, 'getText', [], 'Ljava/util/List;'), 'Ljava/util/List;', 'add', [OBJECT], 'Z', [title]);
     return 1;
   });
-  // Window callback panels: the lab has no options-menu panel, so the panel callbacks answer as a Window without a menu does.
+  // Window.Callback panel methods as Activity.java implements them (the options panel is prepared by the options-menu section below or by ToolbarActionBar).
   def(ACTIVITY, 'onCreatePanelMenu', `(I${MENU})Z`, (r, _m, [self, feature, menu]) => feature === 0 ? call(r, self, ACTIVITY, 'onCreateOptionsMenu', [MENU], 'Z', [menu]) : 0);
   def(ACTIVITY, 'onPreparePanel', `(I${VIEW}${MENU})Z`, (r, _m, [self, feature, view, menu]) => feature === 0 && !nullish(menu) ? call(r, self, ACTIVITY, 'onPrepareOptionsMenu', [MENU], 'Z', [menu]) : 1);
-  def(ACTIVITY, 'onMenuOpened', `(I${MENU})Z`, () => 1);
+  // onMenuOpened / onPanelClosed(FEATURE_ACTION_BAR): the action bar tells its ActionBar.OnMenuVisibilityListeners (ToolbarActionBar calls both through the wrapped callback)
+  def(ACTIVITY, 'onMenuOpened', `(I${MENU})Z`, (r, _m, [self, feature]) => {
+    if (feature === 8) { const bar = own(r, self).actionBar ?? null; if (!nullish(bar)) call(r, bar, 'Landroid/app/ActionBar;', 'dispatchMenuVisibilityChanged', ['Z'], 'V', [1]); }   // without a bar Activity only logs "Tried to open action bar menu with no action bar"
+    return 1;
+  });
   def(ACTIVITY, 'onMenuItemSelected', `(I${MENU_ITEM})Z`, (r, _m, [self, feature, item]) => {
-    if (feature === 0 || feature === 8) return call(r, self, ACTIVITY, 'onOptionsItemSelected', [MENU_ITEM], 'Z', [item]);
-    if (feature === 6) return call(r, self, ACTIVITY, 'onContextItemSelected', [MENU_ITEM], 'Z', [item]);
+    if (feature === 0) {   // Window.FEATURE_OPTIONS_PANEL
+      if (flag(call(r, self, ACTIVITY, 'onOptionsItemSelected', [MENU_ITEM], 'Z', [item]))) return 1;
+      const bar = own(r, self).actionBar ?? null;   // android.R.id.home with DISPLAY_HOME_AS_UP: Activity.onNavigateUp
+      if (!nullish(bar) && call(r, item, MENU_ITEM, 'getItemId', [], 'I') === 0x0102002c && (call(r, bar, 'Landroid/app/ActionBar;', 'getDisplayOptions', [], 'I') & 4) !== 0) return call(r, self, ACTIVITY, 'onNavigateUp', [], 'Z');
+      return 0;
+    }
+    if (feature === 6) return call(r, self, ACTIVITY, 'onContextItemSelected', [MENU_ITEM], 'Z', [item]);   // Window.FEATURE_CONTEXT_MENU
     return 0;
   });
   def(ACTIVITY, 'onPanelClosed', `(I${MENU})V`, (r, _m, [self, feature, menu]) => {
     if (feature === 0) call(r, self, ACTIVITY, 'onOptionsMenuClosed', [MENU], 'V', [menu]); else if (feature === 6) call(r, self, ACTIVITY, 'onContextMenuClosed', [MENU], 'V', [menu]);
+    else if (feature === 8) { const bar = own(r, self).actionBar ?? null; if (!nullish(bar)) call(r, bar, 'Landroid/app/ActionBar;', 'dispatchMenuVisibilityChanged', ['Z'], 'V', [0]); }
   });
 
-  // ---- Options / context menus, search, assist: the virtual device draws none of these surfaces (action modes: src/action-mode-host.js) ---------------------------------------------------------------------------------------------------
-  def(ACTIVITY, 'getMenuInflater', '()Landroid/view/MenuInflater;', () => unsupported('Activity.getMenuInflater: the lab has no android.view.MenuInflater (menu XML inflation) and no options-menu panel', 'menu-unsupported'));
-  def(ACTIVITY, 'openOptionsMenu', '()V', () => unsupported('Activity.openOptionsMenu: the lab has no options-menu panel to show', 'menu-unsupported'));
+  // ---- Options menu (Activity.java + PhoneWindow's FEATURE_OPTIONS_PANEL state, android-13.0.0_r1) -----------------------------------------------------------------------------------------
+  // The menu is the original com.android.internal.view.menu.MenuBuilder and menu XML is inflated by the original android.view.MenuInflater. Where the menu lives follows the window:
+  //   * Activity.setActionBar(Toolbar) makes the original com.android.internal.app.ToolbarActionBar the action bar: it wraps the Window.Callback, populates the Toolbar's menu through
+  //     onCreatePanelMenu / onPreparePanel, and a click on an item reaches onMenuItemSelected(FEATURE_OPTIONS_PANEL, item) -> onOptionsItemSelected.
+  //   * Without an action bar (the lab's windows inflate no decor action bar) the panel is PhoneWindow's: it is prepared (onCreatePanelMenu once, onPreparePanel each time) when it is
+  //     opened or when a key shortcut is tried on it (DecorView.dispatchKeyShortcutEvent), and invalidateOptionsMenu only marks it for a rebuild (PhoneWindow.doInvalidatePanelMenu
+  //     prepares at once only under a decor action bar). Showing that panel in its own window (PhoneWindow.openPanel) is not implemented and fails naming it.
+  const MENU_INFLATER = 'Landroid/view/MenuInflater;', ACTION_BAR = 'Landroid/app/ActionBar;', TOOLBAR = 'Landroid/widget/Toolbar;', TOOLBAR_ACTION_BAR = 'Lcom/android/internal/app/ToolbarActionBar;';
+  const MENU_BUILDER = 'Lcom/android/internal/view/menu/MenuBuilder;', MENU_BUILDER_CALLBACK = 'Lcom/android/internal/view/menu/MenuBuilder$Callback;', PANEL_CALLBACK = 'Lapkweb/bridge/OptionsPanelMenuCallback;';
+  const WINDOW_CALLBACK = 'Landroid/view/Window$Callback;', FEATURE_OPTIONS_PANEL = 0, FLAG_PERFORM_NO_CLOSE = 1;
+  type(PANEL_CALLBACK, OBJECT, [MENU_BUILDER_CALLBACK], { allocatable: true });
+  const panelOf = (r, self) => own(r, self).optionsPanel ??= { menu: null, refreshMenuContent: true, isPrepared: false };
+  const windowCallbackOf = (r, self) => { const window = call(r, self, ACTIVITY, 'getWindow', [], WINDOW); return nullish(window) ? self : (call(r, window, WINDOW, 'getCallback', [], WINDOW_CALLBACK) ?? self); };
+  // PhoneWindow.onMenuItemSelected(MenuBuilder, MenuItem): the Window.Callback's onMenuItemSelected with the panel's feature id
+  def(PANEL_CALLBACK, 'onMenuItemSelected', `(${MENU_BUILDER}${MENU_ITEM})Z`, (r, _m, [self, , item]) => {
+    const activity = r.object(self).panelActivity; if (flag(call(r, activity, ACTIVITY, 'isDestroyed', [], 'Z'))) return 0;
+    return flag(call(r, windowCallbackOf(r, activity), WINDOW_CALLBACK, 'onMenuItemSelected', ['I', MENU_ITEM], 'Z', [FEATURE_OPTIONS_PANEL, item])) ? 1 : 0;
+  });
+  def(PANEL_CALLBACK, 'onMenuModeChange', `(${MENU_BUILDER})V`, () => {});
+  /** PhoneWindow.preparePanel for the options panel of a window without an action bar. */
+  const preparePanel = (r, self, event = null) => {
+    if (flag(call(r, self, ACTIVITY, 'isDestroyed', [], 'Z'))) return false;
+    const st = panelOf(r, self); if (st.isPrepared) return true;
+    const cb = windowCallbackOf(r, self);
+    if (!nullish(call(r, cb, WINDOW_CALLBACK, 'onCreatePanelView', ['I'], VIEW, [FEATURE_OPTIONS_PANEL]))) unsupported('Window.Callback.onCreatePanelView returned a custom options panel view: the lab shows no options panel window (PhoneWindow.openPanel)', 'menu-panel-unsupported');
+    if (nullish(st.menu) || st.refreshMenuContent) {
+      if (nullish(st.menu)) {
+        st.menu = construct(r, MENU_BUILDER, [CONTEXT], [self]);
+        const callback = r.allocate(PANEL_CALLBACK); r.object(callback).panelActivity = self;
+        call(r, st.menu, MENU_BUILDER, 'setCallback', [MENU_BUILDER_CALLBACK], 'V', [callback]);
+      }
+      call(r, st.menu, MENU_BUILDER, 'stopDispatchingItemsChanged', [], 'V');
+      if (!flag(call(r, cb, WINDOW_CALLBACK, 'onCreatePanelMenu', ['I', MENU], 'Z', [FEATURE_OPTIONS_PANEL, st.menu]))) { st.menu = null; return false; }   // "Ditch the menu created above"
+      st.refreshMenuContent = false;
+    }
+    call(r, st.menu, MENU_BUILDER, 'stopDispatchingItemsChanged', [], 'V');
+    if (!flag(call(r, cb, WINDOW_CALLBACK, 'onPreparePanel', ['I', VIEW, MENU], 'Z', [FEATURE_OPTIONS_PANEL, null, st.menu]))) { call(r, st.menu, MENU_BUILDER, 'startDispatchingItemsChanged', [], 'V'); return false; }
+    const KCM = 'Landroid/view/KeyCharacterMap;', kmap = r.dispatch({ owner: KCM, name: 'load', parameters: ['I'], result: KCM, signature: `(I)${KCM}` }, [nullish(event) ? -1 : call(r, event, KEYEVENT, 'getDeviceId', [], 'I')], 'static');   // VIRTUAL_KEYBOARD = -1
+    call(r, st.menu, MENU_BUILDER, 'setQwertyMode', ['Z'], 'V', [call(r, kmap, KCM, 'getKeyboardType', [], 'I') !== 1 ? 1 : 0]);   // KeyCharacterMap.NUMERIC
+    call(r, st.menu, MENU_BUILDER, 'startDispatchingItemsChanged', [], 'V');
+    st.isPrepared = true;
+    return true;
+  };
+  /** PhoneWindow.performPanelShortcut. */
+  const performPanelShortcut = (r, self, event, flags) => {
+    if (flag(call(r, event, KEYEVENT, 'isSystem', [], 'Z'))) return false;
+    const st = panelOf(r, self);
+    return (st.isPrepared || preparePanel(r, self, event)) && !nullish(st.menu) && flag(call(r, st.menu, MENU_BUILDER, 'performShortcut', ['I', KEYEVENT, 'I'], 'Z', [call(r, event, KEYEVENT, 'getKeyCode', [], 'I'), event, flags]));
+  };
+  /**
+   * DecorView.dispatchKeyShortcutEvent for the Activity's window (the lab has no DecorView class; this is where a key shortcut enters the window): a prepared options panel tries
+   * the shortcut first; then the Window.Callback's dispatchKeyShortcutEvent (the Activity, or what the app or an action bar wrapped around it); then the options panel prepared
+   * just for this key and marked unprepared again. The steps wrap the callback, so an app override of Activity.dispatchKeyShortcutEvent that does not call super keeps them.
+   */
+  registry.dispatchKeyShortcut = (r, self, event) => {
+    const st = panelOf(r, self);
+    if (st.isPrepared && performPanelShortcut(r, self, event, FLAG_PERFORM_NO_CLOSE)) return true;
+    const cb = windowCallbackOf(r, self);
+    if (!flag(call(r, self, ACTIVITY, 'isDestroyed', [], 'Z')) && flag(call(r, cb, WINDOW_CALLBACK, 'dispatchKeyShortcutEvent', [KEYEVENT], 'Z', [event]))) return true;
+    if (st.isPrepared || !nullish(own(r, self).actionBar)) return false;
+    preparePanel(r, self, event);
+    const handled = performPanelShortcut(r, self, event, FLAG_PERFORM_NO_CLOSE);
+    st.isPrepared = false;
+    return handled;
+  };
+  /**
+   * PhoneWindow.generateLayout requests FEATURE_ACTION_BAR for a theme with android:windowActionBar and without android:windowNoTitle, and installDecor then builds the decor
+   * action bar (screen_action_bar, WindowDecorActionBar), which creates the options menu at start. The lab's windows build none: recorded once per run for the diagnostics, so an
+   * app whose getActionBar() is null or whose options menu never shows is not mistaken for an app bug.
+   */
+  registry.noteDecorActionBar = (r, self) => {
+    const table = platform.resources?.table, framework = platform.resources?.frameworkTable; if (!table?.getThemeAttribute || !framework || !nullish(own(r, self).actionBar)) return;
+    const theme = r.object(platform.styleBackend.theme(r, self)).themeValues, truthy = name => { const id = framework.findId(`attr/${name}`), found = id ? table.getThemeAttribute(theme, id, true) : null; return !!found && found.value.kind === 'boolean' && found.value.value === true; };
+    if (!truthy('windowActionBar') || truthy('windowNoTitle')) return;
+    platform.noteFrameworkGap(r, 'decor-action-bar', "the decor action bar of a theme with android:windowActionBar (PhoneWindow's screen_action_bar layout with com.android.internal.app.WindowDecorActionBar): the Activity window has no bar, Activity.getActionBar() returns null until setActionBar(Toolbar), and the options menu is not created at start (onCreateOptionsMenu is not called) nor shown");
+  };
+  /** The options menu of an Activity as the window holds it now (null before the panel was ever prepared), for tools and tests. */
+  registry.optionsPanelMenu = (r, self) => panelOf(r, self).menu ?? null;
+  registry.prepareOptionsPanel = (r, self) => preparePanel(r, self, null);
+  def(ACTIVITY, 'getMenuInflater', `()${MENU_INFLATER}`, (r, _m, [self]) => {
+    const state = own(r, self);
+    if (nullish(state.menuInflater)) {   // "Make sure that action views can get an appropriate theme."
+      const bar = call(r, self, ACTIVITY, 'getActionBar', [], ACTION_BAR);
+      state.menuInflater = nullish(bar) ? construct(r, MENU_INFLATER, [CONTEXT], [self]) : construct(r, MENU_INFLATER, [CONTEXT, OBJECT], [call(r, bar, ACTION_BAR, 'getThemedContext', [], CONTEXT), self]);
+    }
+    return state.menuInflater;
+  });
+  def(ACTIVITY, 'getActionBar', `()${ACTION_BAR}`, (r, _m, [self]) => own(r, self).actionBar ?? null);   // android:windowActionBar of the lab's themes is never inflated into a decor action bar: the action bar is the Toolbar given to setActionBar
+  def(ACTIVITY, 'setActionBar', `(${TOOLBAR})V`, (r, _m, [self, toolbar]) => {
+    const state = own(r, self), previous = state.actionBar ?? null, window = call(r, self, ACTIVITY, 'getWindow', [], WINDOW);
+    state.menuInflater = null;   // "First clear out the MenuInflater to make sure that it is valid for the new Action Bar"
+    if (!nullish(previous)) call(r, previous, ACTION_BAR, 'onDestroy', [], 'V');
+    if (!nullish(toolbar)) {
+      const bar = construct(r, TOOLBAR_ACTION_BAR, [TOOLBAR, CHARS, WINDOW_CALLBACK], [toolbar, call(r, self, ACTIVITY, 'getTitle', [], CHARS), self]);
+      state.actionBar = bar;
+      call(r, window, WINDOW, 'setCallback', [WINDOW_CALLBACK], 'V', [call(r, bar, TOOLBAR_ACTION_BAR, 'getWrappedWindowCallback', [], WINDOW_CALLBACK)]);
+    } else { state.actionBar = null; call(r, window, WINDOW, 'setCallback', [WINDOW_CALLBACK], 'V', [self]); }
+    call(r, self, ACTIVITY, 'invalidateOptionsMenu', [], 'V');
+  });
+  def(ACTIVITY, 'invalidateOptionsMenu', '()V', (r, _m, [self]) => {
+    const bar = own(r, self).actionBar ?? null;
+    if (!nullish(bar) && flag(call(r, bar, ACTION_BAR, 'invalidateOptionsMenu', [], 'Z'))) return;
+    const st = panelOf(r, self);   // PhoneWindow.doInvalidatePanelMenu without a decor action bar: clear the menu and rebuild it the next time the panel is prepared
+    if (!nullish(st.menu)) { call(r, st.menu, MENU_BUILDER, 'stopDispatchingItemsChanged', [], 'V'); call(r, st.menu, MENU, 'clear', [], 'V'); }
+    st.refreshMenuContent = true;
+    st.isPrepared = false;   // not in doInvalidatePanelMenu, which calls closePanel for an open panel: the lab has no panel window to close, and the next prepare must rebuild the menu
+  });
+  def(ACTIVITY, 'openOptionsMenu', '()V', (r, _m, [self]) => {
+    const bar = own(r, self).actionBar ?? null;
+    if (!nullish(bar) && flag(call(r, bar, ACTION_BAR, 'openOptionsMenu', [], 'Z'))) return;
+    if (!preparePanel(r, self, null)) return;   // PhoneWindow.openPanel: nothing to show when the panel cannot be prepared
+    panelOf(r, self).isPrepared = false;   // no panel was opened: mPreparedPanel stays null, so a later key shortcut prepares the panel for itself
+    unsupported('Activity.openOptionsMenu on a window without an action bar: the options panel window (PhoneWindow.openPanel: the menu list in its own panel window) is not implemented; the menu itself was created and prepared. Put the menu in a Toolbar (Activity.setActionBar) to show it', 'menu-panel-unsupported');
+  });
+  def(ACTIVITY, 'closeOptionsMenu', '()V', (r, _m, [self]) => { const bar = own(r, self).actionBar ?? null; if (!nullish(bar)) call(r, bar, ACTION_BAR, 'closeOptionsMenu', [], 'Z'); });   // no panel window is ever open
   def(ACTIVITY, 'openContextMenu', `(${VIEW})V`, () => unsupported('Activity.openContextMenu: the lab has no context-menu panel to show', 'menu-unsupported'));
-  noop('closeOptionsMenu', '()V'); noop('closeContextMenu', '()V'); noop('invalidateOptionsMenu', '()V');   // no panel is ever open; there is no menu to rebuild
+  noop('closeContextMenu', '()V');
   noop('registerForContextMenu', `(${VIEW})V`); noop('unregisterForContextMenu', `(${VIEW})V`);
   def(ACTIVITY, 'registerForContextMenu', `(${VIEW})V`, (r, _m, [self, view]) => { call(r, view, VIEW, 'setOnCreateContextMenuListener', ['Landroid/view/View$OnCreateContextMenuListener;'], 'V', [self]); });
   def(ACTIVITY, 'unregisterForContextMenu', `(${VIEW})V`, (r, _m, [, view]) => { call(r, view, VIEW, 'setOnCreateContextMenuListener', ['Landroid/view/View$OnCreateContextMenuListener;'], 'V', [null]); });
   // Activity.startActionMode: the window decor starts it (DecorView.startActionMode with the decor as the originating view)
   def(ACTIVITY, 'startActionMode', `(${AM_CALLBACK})${ACTION_MODE}`, (r, _m, [self, callback]) => call(r, decorOf(r, self), VIEW, 'startActionMode', [AM_CALLBACK], ACTION_MODE, [callback]));
   def(ACTIVITY, 'startActionMode', `(${AM_CALLBACK}I)${ACTION_MODE}`, (r, _m, [self, callback, type]) => call(r, decorOf(r, self), VIEW, 'startActionMode', [AM_CALLBACK, 'I'], ACTION_MODE, [callback, type]));
-  constant('getActionBar', '()Landroid/app/ActionBar;', null);    // android:windowActionBar of the lab's themes is never inflated into a decor action bar
-  def(ACTIVITY, 'setActionBar', '(Landroid/widget/Toolbar;)V', () => unsupported('Activity.setActionBar: the lab has no Toolbar/ActionBar framework classes', 'action-bar-unsupported'));
   def(ACTIVITY, 'startSearch', `(${STRING}Z${BUNDLE}Z)V`, () => unsupported('Activity.startSearch: the virtual device has no global search provider', 'search-unsupported'));
   def(ACTIVITY, 'triggerSearch', `(${STRING}${BUNDLE})V`, () => unsupported('Activity.triggerSearch: the virtual device has no global search provider', 'search-unsupported'));
   constant('getSearchEvent', '()Landroid/view/SearchEvent;', null);

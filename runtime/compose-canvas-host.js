@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=12145e24651e';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=12145e24651e';
-import {getVectorGraphics} from './vector-native.js?v=12145e24651e';
-import {deferRaster} from './deferred-raster.js?v=12145e24651e';
+import {APKError} from './apk-runtime.js?v=43801fccd526';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=43801fccd526';
+import {getVectorGraphics} from './vector-native.js?v=43801fccd526';
+import {deferRaster} from './deferred-raster.js?v=43801fccd526';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -65,17 +65,43 @@ export function createComposeCanvasHost(platform){
   };
   const textColor=(r,receiver,hint)=>{
     const view=r.object(receiver);if(!hint&&view.textColor!=null){if(typeof view.textColor==='number')return view.textColor|0;const value=view.textColor.slice(1);return (Number.parseInt(value,16)|(value.length===6?0xff000000:0))|0;}
-    const list=textStyleValue(r,receiver,hint?'textColorHint':'textColor','getColorStateList','Landroid/content/res/ColorStateList;',null);
+    // The TextView's own colours (setTextColor / setHintTextColor with a ColorStateList, or the ones its constructor read), else the style's, resolved for the View's state
+    const list=(hint?view.tv?.hintTextColors:view.tv?.textColors)??textStyleValue(r,receiver,hint?'textColorHint':'textColor','getColorStateList','Landroid/content/res/ColorStateList;',null);
     if(!list)fail('Native TextView Canvas needs a resolved '+(hint?'hint':'text')+' color from its actual theme');
     const color=call(r,list,'Landroid/content/res/ColorStateList;','getDefaultColor',[],'I'),state=call(r,receiver,VIEW,'getDrawableState',[],'[I');return call(r,list,'Landroid/content/res/ColorStateList;','getColorForState',['[I','I'],'I',[state,color]);
   };
+  /**
+   * TextView.onDraw for a text that is drawn by its original Layout (textViewApi.layoutDrawn; view.textLayout from the measure pass): the Layout of the measured width, drawn
+   * with the TextView's paint in the current text (or hint) colour, inside the box left by the compound padding, at the vertical gravity's offset. A horizontally scrolling
+   * text (single line) is laid out unbounded: TextView.bringTextIntoView scrolls the view so that its line sits where the alignment puts it, which is the shift applied here.
+   */
+  const drawTextLayout=(r,receiver,target,{left,top,innerWidth,innerHeight,scrollX=0,scrollY=0,hint=false,color=null})=>{
+    const view=r.object(receiver),LAYOUT='Landroid/text/Layout;',PAINT='Landroid/graphics/Paint;',layout=platform.textViewApi.layoutFor(r,receiver,view.textLayout.inner);
+    call(r,platform.textViewApi.syncedPaint(r,receiver),PAINT,'setColor',['I'],'V',[color??textColor(r,receiver,hint)]);
+    const gravity=platform.textViewApi.layoutGravity(r,receiver),abs=r.classes.has('Landroid/view/Gravity;')?call(r,null,'Landroid/view/Gravity;','getAbsoluteGravity',['I','I'],'I',[gravity,view.layoutDirection??0],'static'):gravity;
+    const blockHeight=call(r,layout,LAYOUT,'getHeight',[],'I'),vertical=abs&0x70,dy=blockHeight>=innerHeight?0:vertical===0x10?(innerHeight-blockHeight)>>1:vertical===0x50?innerHeight-blockHeight:0;
+    let dx=0;
+    if(view.singleLine||view.horizontallyScrolling){
+      const float=bits=>{const v=new DataView(new ArrayBuffer(4));v.setInt32(0,bits,true);return v.getFloat32(0,true);},lineLeft=Math.floor(float(call(r,layout,LAYOUT,'getLineLeft',['I'],'F',[0]))),lineRight=Math.ceil(float(call(r,layout,LAYOUT,'getLineRight',['I'],'F',[0]))),horizontal=abs&7;
+      dx=-(horizontal===1?(lineRight-lineLeft<innerWidth?(lineRight+lineLeft)/2-innerWidth/2:lineLeft):horizontal===5?lineRight-innerWidth:lineLeft);
+    }
+    const save=canvas(r,target,'save',[],'I');
+    try{canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(left),raw(top),raw(left+innerWidth),raw(top+innerHeight)]);canvas(r,target,'translate',['F','F'],'V',[raw(left+dx-scrollX),raw(top+dy-scrollY)]);call(r,layout,LAYOUT,'draw',[CANVAS],'V',[target]);}
+    finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
+  };
   const drawNativeText=(r,receiver,target)=>{
-    const view=r.object(receiver);if(r.isSubtype(view.type,'Landroid/widget/CompoundButton;')&&!view.buttonDrawable)fail('CompoundButton Canvas needs its real indicator drawable and geometry');
+    const view=r.object(receiver);if(r.isSubtype(view.type,'Landroid/widget/CompoundButton;')&&!view.buttonDrawable&&!view.buttonDrawableSet)fail('CompoundButton Canvas needs its real indicator drawable and geometry');
     if(view.marquee||view.ellipsize)fail('Native TextView Canvas marquee/ellipsis layout is not connected');
     if(!view.textMetrics)fail('Native TextView Canvas requires completed actual font measurement');
     {const [cw,ch]=dimensions(view);for(const {drawable:d,x,y} of platform.textViewApi.compoundPlacements(r,receiver,cw,ch)){const save=canvas(r,target,'save',[],'I');try{canvas(r,target,'translate',['F','F'],'V',[raw(x),raw(y)]);call(r,d,DRAWABLE,'draw',[CANVAS],'V',[target]);}finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}}}   // TextView.onDraw: compound drawables first, then the text
     const displayed=String(view.ellipsizedText??view.displayText??view.text??''),hint=!displayed&&!!view.hint,text=hint?String(view.hint):displayed;if(!text)return;
     const [width,height]=dimensions(view),pad=platform.drawableViewHost.compoundPadding(r,receiver)??view.padding??{},innerWidth=Math.max(0,width-(pad.left??0)-(pad.right??0)),innerHeight=Math.max(0,height-(pad.top??0)-(pad.bottom??0));if(!innerWidth||!innerHeight)return;
+    if(view.textLayout&&!hint){
+      const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
+      drawTextLayout(r,receiver,target,{left:pad.left??0,top:pad.top??0,innerWidth,innerHeight,scrollX,scrollY});
+      view.nativeCanvasText={source:'original android.text.Layout.draw ('+view.textLayout.reason+')',textLength:text.length,hint:false,gravity:view.gravity??0x800033};r.record('DRAW TextView text: original Layout.draw -> Canvas');
+      return;
+    }
     // Styled text (a Spanned with CharacterStyle spans: colours, sizes, typefaces, underlines per range): TextView.onDraw draws its Layout, and the spans change the paint run by run
     // (android.text.TextLine). The single-style paragraph below cannot show that, so the original StaticLayout the TextView builds (getLayout) draws itself on this Canvas.
     if(!hint&&!view.marquee){const TEXTVIEW='Landroid/widget/TextView;',CS='Ljava/lang/CharSequence;',SPANNED='Landroid/text/Spanned;',LAYOUT='Landroid/text/Layout;',source=call(r,receiver,TEXTVIEW,'getText',[],CS);
@@ -94,10 +120,10 @@ export function createComposeCanvasHost(platform){
     const horizontal=abs&7,vertical=abs&0x70,lines=text.split('\n'),font={textSize:size,flags:1,typefaceRef:typeface},metrics=r.skiaHost.measureText('',font).metrics,top=view.includeFontPadding===false?Math.round(metrics.ascent):Math.floor(metrics.bounds[1]),bottom=view.includeFontPadding===false?Math.round(metrics.descent):Math.ceil(metrics.bounds[3]);
     const nativeParagraph=!hint&&view.textParagraph,fontPadTop=nativeParagraph?view.textParagraph.padTop??0:0,blockHeight=nativeParagraph?view.textParagraph.height+fontPadTop+(view.textParagraph.padBottom??0):bottom-top+(lines.length-1)*(view.textLineHeight??bottom-top),dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
     try{canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(pad.left??0),raw(pad.top??0),raw(width-(pad.right??0)),raw(height-(pad.bottom??0))]);const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
-      if(nativeParagraph){const renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,color,align,view.layoutDirection,view.maxLines]);
-        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,hint?text:view.textBreakText??text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color,alignment:align,raster:true});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
+      if(nativeParagraph){const renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',extra=view.textParagraph.extra??{},key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,face.families??null,face.fontVariations??null,color,align,view.layoutDirection,view.maxLines,extra]);
+        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,hint?text:view.textBreakText??text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,families:face.families??null,fontVariations:face.fontVariations??null,nativeTypeface:face.custom?face.face:null,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color,alignment:align,raster:true,...extra});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
         r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy+fontPadTop-scrollY]});   // fontPadTop: StaticLayout's first line starts at the font's top, above the ascent the paragraph starts at
-      }else{const paint={argb:color>>>0,color:color>>>0,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3,textSize:size,textScaleX:1,textSkewX:0,letterSpacing:0,wordSpacing:0,hinting:1,weight:face.weight,italic:face.italic};
+      }else{const paint={argb:color>>>0,color:color>>>0,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3,textSize:size,textScaleX:1,textSkewX:0,letterSpacing:0,wordSpacing:0,hinting:1,...r.skiaHost.faceState(face)};   // the face the text was measured with: an app or system font, its variation, the synthetic styles
         lines.forEach((line,index)=>{const advance=r.skiaHost.measureText(line,font).width,dx=horizontal===1?(innerWidth-advance)/2:horizontal===5?innerWidth-advance:0;r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'paragraphRun',text:line,args:[(pad.left??0)+dx-scrollX,(pad.top??0)+dy-top+index*(view.textLineHeight??bottom-top)-scrollY],isRtl:!!view.layoutDirection,paint});});
       }
       view.nativeCanvasText={source:'official-Skia/actual measured system-widget text',textLength:text.length,hint,gravity,color:color>>>0};r.record('DRAW system TextView/EditText: actual measured text + themed color -> Skia glyph/paragraph Canvas');
@@ -124,6 +150,8 @@ export function createComposeCanvasHost(platform){
       call(r,paint,PAINT,'setColor',['I'],'V',[color]);canvas(r,target,'drawRect',['F','F','F','F',PAINT],'V',[raw(0),raw(0),raw(w),raw(h),paint]);
     }
     sourceDraw(r,receiver,target);
+    // View.draw step 5: "if (mOverlay != null && !mOverlay.isEmpty()) mOverlay.getOverlayView().dispatchDraw(canvas)", after the children and before the foreground
+    if(view.overlay){const OVERLAY='Landroid/view/ViewOverlay;',group=platform.viewApi.overlayView(r,receiver);if(group&&!call(r,view.overlay,OVERLAY,'isEmpty',[],'Z'))call(r,group,GROUP,'dispatchDraw',[CANVAS],'V',[target]);}
     if(view.buttonDrawable)platform.drawableViewHost.drawButton(r,receiver,target,w,h);
     if(view.foregroundDrawable){
       const bounds=view.foregroundBounds;if(!bounds)fail('Foreground must be positioned by the original Gravity before Canvas draw');
@@ -131,9 +159,9 @@ export function createComposeCanvasHost(platform){
       call(r,view.foregroundDrawable,DRAWABLE,'draw',[CANVAS],'V',[target]);
     }
   };
-  const drawChild=(r,parentRef,target,childRef)=>{
+  const drawChild=(r,parentRef,target,childRef,disappearing=false)=>{
     const parent=r.object(parentRef),child=r.object(childRef);
-    if(child.visibility===4||child.visibility===8)return 0;
+    if(!disappearing&&(child.visibility===4||child.visibility===8))return 0;
     if(!child.bounds)fail('Custom Canvas child has not completed its original layout');
     const [w,h]=dimensions(child),save=canvas(r,target,'save',[],'I');
     try{
@@ -166,6 +194,9 @@ export function createComposeCanvasHost(platform){
     markDirty,updateDisplayList,
     /** The TextView's current text colour (its own, or the one its style / TextAppearance resolves to in its theme, for its drawable state). */
     textColor:(r,receiver)=>textColor(r,receiver,false),
+    drawTextLayout,
+    /** The ColorStateList the TextView constructor would have read: android:textColor of the view, its style or its text appearance (null when the theme gives none). */
+    themeTextColors:(r,receiver)=>textStyleValue(r,receiver,'textColor','getColorStateList','Landroid/content/res/ColorStateList;',null),
     /** TextView.getGravity as the constructor leaves it: the view's own gravity, or android:gravity of its style / default style (a Button's is center). */
     textGravity:(r,receiver)=>{const view=r.object(receiver);if(view.gravity!=null)return view.gravity;return view.styledGravity??=textStyleValue(r,receiver,'gravity','getInt','I',0x800033);},
     reflectionDefinition(owner,kind,name,parameters,publicOnly){
@@ -178,25 +209,53 @@ export function createComposeCanvasHost(platform){
       return null;
     },
     renderTree(r,root){
+      // An original framework class whose onDraw the page needs (see visit). LinearLayout.onDraw draws only its dividers: a layout without a divider drawable is left alone.
+      const LINEAR_ONDRAW='Landroid/widget/LinearLayout;',DIVIDER='Landroid/widget/LinearLayout;->mDivider:Landroid/graphics/drawable/Drawable;';
+      const frameworkDraws=(r,view,onDraw)=>r.dex.bootClasses?.has(onDraw.owner)&&(onDraw.owner!==LINEAR_ONDRAW||!!view.fields.get(DIVIDER));
+
       const seen=new Set();drawingTime=Math.floor(r.platform?.lastFrameMs??r.clock.now());
       const visit=(receiver,depth=0)=>{
         const view=r.object(receiver);if(seen.has(view.id)||seen.size>=4096||depth>64)fail('Cyclic/excessive custom Canvas View tree');seen.add(view.id);
         if(view.visibility===4||view.visibility===8)return;
         // A View whose class (in the app's DEX) overrides onDraw paints itself through the original Canvas callbacks. A ViewGroup that does so (react-native-svg's SvgView draws its whole
         // vector output from onDraw) keeps its children as separate layers: only its own onDraw runs here, and the walk continues into the children.
-        const isGroup=r.isSubtype(view.type,GROUP),overridesDraw=r.dex.classes.has(view.type)&&!!r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V');
+        // The same holds for an original framework class that draws itself in onDraw (the thumb of the seek bars, NumberPicker's wheel, the month and clock faces of the pickers,
+        // CheckedTextView's check mark, the dividers of the original LinearLayout): the page has no element for that drawing, so it is the View's content layer. What such a
+        // class cannot draw in this VM (an explicit failure of the lab, never a Java exception) leaves the View as the page shows it without the layer, and is said once.
+        const isGroup=r.isSubtype(view.type,GROUP),onDraw=r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V'),ownDraw=!!onDraw&&r.dex.classes.has(view.type),frameworkDraw=!!onDraw&&!ownDraw&&!view.frameworkDrawFailed&&r.skiaHost&&frameworkDraws(r,view,onDraw);
+        const overridesDraw=ownDraw||frameworkDraw;
+        const guarded=draw=>{
+          if(!frameworkDraw)return draw();
+          try{return draw();}catch(failure){
+            if(failure?.name!=='APKError'||failure.details?.kind==='instruction-budget')throw failure;
+            view.frameworkDrawFailed=true;view.contentRaster=null;view.canvasChildrenCaptured=false;
+            platform.noteFrameworkGap?.(r,`framework-ondraw:${view.type}`,`${view.type.slice(1,-1).replaceAll('/','.')}.onDraw: the widget is shown on the page without what it draws itself (${String(failure.message).replace(/\s+/g,' ').replace(/^(?:L[^ ]+ \[[^\]]*\] at PC 0x[\da-f]+: )+/i,'').slice(0,200)})`);
+            return false;
+          }
+        };
         const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!r.isSubtype(view.type,OWNER);
         if(customGroup){
           const [gw,gh]=dimensions(view);
-          if(view.laidOut&&gw&&gh&&r.skiaHost){
+          if(view.laidOut&&gw&&gh&&r.skiaHost)guarded(()=>{
             const target=view.contentCanvas??=r.allocate(CANVAS);
             if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
             const graphics=getVectorGraphics(r);graphics.resetCanvas(target,gw,gh);
             call(r,receiver,VIEW,'onDraw',[CANVAS],'V',[target]);
             setContentRaster(r,view,graphics,target,gw,gh);r.record(`DRAW custom ViewGroup onDraw: original ${view.type} -> Skia CPU`);
-          }
+          });
         }
-        if(r.isSubtype(view.type,OWNER)||customLeaf){
+        if(frameworkDraw&&customLeaf){
+          const [width,height]=dimensions(view);if(!view.laidOut||!width||!height)return;
+          if(guarded(()=>{
+            const target=view.contentCanvas??=r.allocate(CANVAS);
+            if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
+            const graphics=getVectorGraphics(r);graphics.resetCanvas(target,width,height);
+            sourceDraw(r,receiver,target);
+            setContentRaster(r,view,graphics,target,width,height);view.canvasChildrenCaptured=true;
+            r.record(`DRAW framework View: original ${view.type} onDraw -> Skia CPU`);
+          })!==false)return;
+        }
+        if(r.isSubtype(view.type,OWNER)||customLeaf&&ownDraw){
           const [width,height]=dimensions(view);if(!view.laidOut||!width||!height)return;
           if(!r.skiaHost)fail('Compose drawing requires the verified Skia Canvas backend');
           const target=view.contentCanvas??=r.allocate(CANVAS);
@@ -236,26 +295,17 @@ export function createComposeCanvasHost(platform){
           if(view.imageDrawable){const [w,h]=dimensions(view);platform.drawableViewHost.drawImage(r,receiver,target,w,h);}
           return;
         }
-        if(r.isSubtype(view.type,'Landroid/widget/ProgressBar;')){   // ProgressBar.drawTrack: the current drawable (progress or indeterminate) inside the padding, at the level the bar's progress set
-          const current=view.pb?.current;if(current===null||current===undefined)return;
-          const padding=view.padding??{left:0,right:0,top:0,bottom:0},[w,h]=dimensions(view),drawable='Landroid/graphics/drawable/Drawable;';
-          r.dispatch({owner:drawable,name:'setBounds',parameters:['I','I','I','I'],result:'V',signature:'(IIII)V'},[current,0,0,Math.max(0,w-(padding.left??0)-(padding.right??0)),Math.max(0,h-(padding.top??0)-(padding.bottom??0))],'virtual');
-          const save=canvas(r,target,'save',[],'I');
-          try{canvas(r,target,'translate',['F','F'],'V',[raw(padding.left??0),raw(padding.top??0)]);r.dispatch({owner:drawable,name:'draw',parameters:['Landroid/graphics/Canvas;'],result:'V',signature:'(Landroid/graphics/Canvas;)V'},[current,target],'virtual');}
-          finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
-          return;
-        }
+        if(r.isSubtype(view.type,'Landroid/widget/ProgressBar;'))return r.dispatch({owner:'Landroid/widget/ProgressBar;',name:'drawTrack',parameters:['Landroid/graphics/Canvas;'],result:'V',signature:'(Landroid/graphics/Canvas;)V'},[receiver,target],'virtual');   // ProgressBar.onDraw: drawTrack, which AbsSeekBar overrides (src/progress-bar-api-host.js)
         return;
       }
       if(method.name==='dispatchDraw'&&method.owner===VIEW)return; // Empty original View hook.
       if(method.name==='dispatchDraw'){
-        if(view.fields.get(`${GROUP}->mTransition:Landroid/animation/LayoutTransition;`))fail('Animated child Canvas ordering requires the original transition engine');
         const save=canvas(r,target,'save',[],'I'),[w,h]=dimensions(view),padding=view.padding??{};
         try{
           if(view.clipToPadding!==false&&Object.values(padding).some(value=>value>0))canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(padding.left??0),raw(padding.top??0),raw(w-(padding.right??0)),raw(h-(padding.bottom??0))]);
           platform.viewGroupApi.beforeDispatchDraw(r,receiver);
           for(const child of platform.viewGroupApi.drawOrder(r,receiver))drawChild(r,receiver,target,child);
-          for(const child of platform.viewGroupApi.disappearing(r,receiver))drawChild(r,receiver,target,child);
+          for(const child of platform.viewGroupApi.disappearing(r,receiver))drawChild(r,receiver,target,child,true);   // "Draw any disappearing views that have animations": whatever their visibility
           platform.viewGroupApi.afterDispatchDraw(r,receiver);
         }finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
         return;

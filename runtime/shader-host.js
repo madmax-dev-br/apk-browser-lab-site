@@ -1,18 +1,25 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { createHostRegistry, bitsFloat } from './host-contract.js?v=12145e24651e';
-import { getMatrixValues } from './matrix-native.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { createHostRegistry, bitsFloat } from './host-contract.js?v=43801fccd526';
+import { getMatrixValues } from './matrix-native.js?v=43801fccd526';
+import { gcRoot } from './heap-gc.js?v=43801fccd526';
 // android.graphics.Shader / BitmapShader / Shader.TileMode. A BitmapShader samples a Bitmap's pixels at draw time (snapshot
 // semantics, as the Bitmap host already does for drawBitmap); RippleDrawable uses an ALPHA_8 mask this way. Skia builds the
 // real image shader when the recorded command is replayed (skia-canvas-host makePaint).
 const SHADER = 'Landroid/graphics/Shader;', BITMAP_SHADER = 'Landroid/graphics/BitmapShader;', TILE = 'Landroid/graphics/Shader$TileMode;', BITMAP = 'Landroid/graphics/Bitmap;', MATRIX = 'Landroid/graphics/Matrix;';
-const TILES = ['CLAMP', 'REPEAT', 'MIRROR'];
+const TILES = ['CLAMP', 'REPEAT', 'MIRROR', 'DECAL'];   // Shader.TileMode, in declaration order: nativeInt 0..3 are SkTileMode's values
 const fail = message => { throw new APKError(message, { kind: 'shader-unsupported' }); };
 export function createShaderHost(platform) {
   const registry = createHostRegistry(), { def, type, staticField } = registry;
   type(SHADER, 'Ljava/lang/Object;', [], { allocatable: false }); type(BITMAP_SHADER, SHADER, [], { allocatable: true }); type(TILE, 'Ljava/lang/Enum;');
   const tileConstants = gcRoot(new Map());   // Shader.TileMode.CLAMP/REPEAT/MIRROR are singletons that live as long as the VM (the collector must not free them)
   for (const name of TILES) staticField(TILE, name, TILE, runtime => { if (!tileConstants.has(name)) { const ref = runtime.makeObject(TILE), object = runtime.object(ref); object.enumName = name; object.enumOrdinal = TILES.indexOf(name); tileConstants.set(name, ref); } return tileConstants.get(name); });
+  const tileConstant = (runtime, name) => runtime.readStatic({ owner: TILE, name, type: TILE });
+  def(TILE, 'values', `()[${TILE}`, runtime => { const array = runtime.newArray(`[${TILE}`, TILES.length); runtime.array(array).elements = TILES.map(name => tileConstant(runtime, name)); return array; }, { static: true });
+  def(TILE, 'valueOf', `(Ljava/lang/String;)${TILE}`, (runtime, _m, [name]) => {
+    if (name === null) runtime.throwJava('Ljava/lang/NullPointerException;', 'name == null');
+    const text = runtime.stringCharacters(name); if (!TILES.includes(text)) runtime.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant android.graphics.Shader.TileMode.${text}`);
+    return tileConstant(runtime, text);
+  }, { static: true });
   const state = (runtime, ref) => { const shader = runtime.object(ref).webShader; if (!shader) fail('Shader used before construction'); return shader; };
   def(BITMAP_SHADER, '<init>', `(${BITMAP}${TILE}${TILE})V`, (runtime, method, [self, bitmap, tileX, tileY]) => {
     for (const value of [bitmap, tileX, tileY]) if (value === null || value === undefined || value === 0) runtime.throwJava('Ljava/lang/NullPointerException;', 'BitmapShader arguments must not be null');

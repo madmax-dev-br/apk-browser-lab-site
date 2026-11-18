@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { Invoke } from './interpreter.js?v=12145e24651e';
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=43801fccd526';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { Invoke } from './interpreter.js?v=43801fccd526';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
 
 // Generic-type reflection and java.lang.reflect.Proxy for the libraries that wire themselves up with reflection at launch (Retrofit, Gson, Moshi, Koin, Dagger,
 // Room, WorkManager). Contracts: java.lang.Class / java.lang.reflect.{Method,Constructor,Field,Proxy,Type,ParameterizedType,TypeVariable,WildcardType,GenericArrayType}
@@ -10,6 +10,7 @@ import { createHostRegistry } from './host-contract.js?v=12145e24651e';
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', CLASS = 'Ljava/lang/Class;', TYPE = 'Ljava/lang/reflect/Type;', METHOD = 'Ljava/lang/reflect/Method;', CONSTRUCTOR = 'Ljava/lang/reflect/Constructor;', FIELD = 'Ljava/lang/reflect/Field;';
 const PARAMETERIZED = 'Ljava/lang/reflect/ParameterizedType;', TYPE_VARIABLE = 'Ljava/lang/reflect/TypeVariable;', WILDCARD = 'Ljava/lang/reflect/WildcardType;', GENERIC_ARRAY = 'Ljava/lang/reflect/GenericArrayType;', GENERIC_DECLARATION = 'Ljava/lang/reflect/GenericDeclaration;';
 const PT = 'Llibcore/reflect/ParameterizedTypeImpl;', TV = 'Llibcore/reflect/TypeVariableImpl;', WT = 'Llibcore/reflect/WildcardTypeImpl;', GAT = 'Llibcore/reflect/GenericArrayTypeImpl;';
+const PARAMETER = 'Ljava/lang/reflect/Parameter;';
 const ANNOTATION = 'Ljava/lang/annotation/Annotation;', SIGNATURE = 'Ldalvik/annotation/Signature;', INVOCATION_HANDLER = 'Ljava/lang/reflect/InvocationHandler;', PROXY = 'Ljava/lang/reflect/Proxy;', UNDECLARED = 'Ljava/lang/reflect/UndeclaredThrowableException;';
 
 // ---- generic signature grammar --------------------------------------------------------------------------------------------------------------------
@@ -237,6 +238,44 @@ export function createReflectionHost(platform) {
       return array(r, `[${ANNOTATION}`, method.parameters.map((_p, i) => array(r, ANNOTATION, (perParameter[i] ?? []).map(a => r.annotationObject(a)))));
     });
     def(owner, 'isVarArgs', '()Z', (r, _m, [self]) => (r.object(self).member.flags & 0x80) ? 1 : 0);
+    // getExceptionTypes: the classes of the method's dalvik.annotation.Throws (none for a method without one). getGenericExceptionTypes: the throws part of its generic signature when
+    // it has one, else the same classes (libcore GenericSignatureParser.parseForMethod).
+    def(owner, 'getExceptionTypes', `()[${CLASS}`, (r, _m, [self]) => array(r, CLASS, declaredThrows(r, self).map(t => r.classObject(t))));
+    def(owner, 'getGenericExceptionTypes', `()[${TYPE}`, (r, _m, [self]) => {
+      const { signature, scope } = scopeOf(r, self);
+      return array(r, TYPE, signature?.throws?.length ? signature.throws.map(t => materialize(r, t, scope)) : declaredThrows(r, self).map(t => r.classObject(t)));
+    });
+    // getParameters (libcore Executable.getParameters over ART's getParameters0): the names and access flags of dalvik.annotation.MethodParameters when the compiler kept them
+    // (javac -parameters), otherwise synthesized arg0, arg1, ... with no modifiers. Each element is the original java.lang.reflect.Parameter, which asks this executable for its
+    // types and annotations (hasRealParameterData, getAllGenericParameterTypes are the package-private members it calls).
+    def(owner, 'hasRealParameterData', '()Z', (r, _m, [self]) => methodParameters(r, self) ? 1 : 0);
+    def(owner, 'getAllGenericParameterTypes', `()[${TYPE}`, (r, _m, [self]) => dispatchVirtual(r, owner, 'getGenericParameterTypes', [], `[${TYPE}`, [self]));
+    def(owner, 'getParameters', `()[${PARAMETER}`, (r, _m, [self]) => {
+      const count = r.object(self).member.method.parameters.length, real = methodParameters(r, self);
+      if (real && (real.names.length !== count || real.accessFlags.length !== count)) throw new APKError(`${owner.slice(1, -1).replaceAll('/', '.')}.getParameters: the MethodParameters metadata names ${real.names.length} parameters and ${real.accessFlags.length} access flags for a method of ${count} (java.lang.reflect.MalformedParametersException is not modelled)`);
+      return array(r, PARAMETER, Array.from({ length: count }, (_x, i) => {
+        const ref = r.allocate(PARAMETER), parameters = [STRING, 'I', 'Ljava/lang/reflect/Executable;', 'I'];
+        r.dispatch({ owner: PARAMETER, name: '<init>', parameters, result: 'V', signature: `(${parameters.join('')})V` }, r.argumentWords(parameters, [real ? real.names[i] : `arg${i}`, real ? real.accessFlags[i] : 0, self, i], { receiver: ref }), 'direct');
+        return ref;
+      }));
+    });
+  }
+  /** The exception classes a DEX method declares (dalvik.annotation.Throws, a system annotation). A method a host contract serves has no DEX definition and its throws clause is
+   *  recorded nowhere: answering "none" would be a quiet wrong answer (Thread.sleep declares InterruptedException), so it fails by name. */
+  function declaredThrows(r, self) {
+    const member = r.object(self).member, dex = member?.method?.dex;
+    if (!dex) {
+      const method = member?.method, where = method ? `${method.owner.slice(1, -1).replaceAll('/', '.')}.${method.name}` : 'this member';
+      throw new APKError(`java.lang.reflect.Executable.getExceptionTypes: the throws clause of ${where} is not recorded (the method is served by a host contract, not by a DEX definition)`, { kind: 'reflection-throws-unrecorded' });
+    }
+    const annotation = dex.memberAnnotations(member, 2).find(a => a.type === 'Ldalvik/annotation/Throws;');
+    return annotation ? annotation.values.get('value').values.map(v => v.value) : [];
+  }
+  /** dalvik.annotation.MethodParameters of a DEX method: { names (null for an unnamed one), accessFlags }, or null when the compiler kept none. */
+  function methodParameters(r, self) {
+    const member = r.object(self).member, annotation = member?.method?.dex?.memberAnnotations(member, 2).find(a => a.type === 'Ldalvik/annotation/MethodParameters;');
+    if (!annotation) return null;
+    return { names: annotation.values.get('names').values.map(v => v.value ?? null), accessFlags: annotation.values.get('accessFlags').values.map(v => Number(v.value)) };
   }
   def(METHOD, 'isDefault', '()Z', (r, _m, [self]) => { const { method, flags } = r.object(self).member, cls = r.classes.get(method.owner); return cls && (cls.flags & 0x200) && (flags & (0x400 | 1 | 8)) === 1 ? 1 : 0; });
   def(FIELD, 'isSynthetic', '()Z', (r, _m, [self]) => (r.object(self).member.flags & 0x1000) ? 1 : 0);

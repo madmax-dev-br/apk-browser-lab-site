@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=43801fccd526';
 
 // android.window.OnBackInvokedDispatcher of an Activity window (WindowOnBackInvokedDispatcher): the registry of OnBackInvokedCallbacks a window keeps and the Back dispatch rule
 // of Android 13. AndroidX (AppCompat's Api33Impl, ComponentActivity / OnBackPressedDispatcher) registers its callbacks here when SDK_INT >= 33.
@@ -22,6 +22,8 @@ export function createBackDispatcherHost(platform) {
     const value = (manifest.application ?? {}).enableOnBackInvokedCallback;
     return value === true || value === 'true' || value === 1;
   };
+  // WindowOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled(Context): what PopupWindow asks before it registers its own back callback
+  def(DISPATCHER, 'isOnBackInvokedCallbackEnabled', '(Landroid/content/Context;)Z', r => (enabled(r, null) ? 1 : 0), { static: true });
   def(DISPATCHER, 'registerOnBackInvokedCallback', `(I${CALLBACK})V`, (r, _m, [self, priority, callback]) => {
     if (callback === null) r.throwJava('Ljava/lang/NullPointerException;', 'OnBackInvokedCallback is null');
     if (priority < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Application registered OnBackInvokedCallback cannot have negative priority. Priority: ' + priority);

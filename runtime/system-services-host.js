@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=43801fccd526';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=43801fccd526';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -351,6 +351,11 @@ export function createSystemServicesHost(platform) {
     def(LOG_RECORD, 'get' + name, `()${type}`, (r, _m, [self]) => r.object(self).record[key]); def(LOG_RECORD, 'set' + name, `(${type})V`, (r, _m, [self, value]) => { r.object(self).record[key] = value; });
   }
   def(LOG_RECORD, 'getMillis', '()J', (r, _m, [self]) => r.object(self).record.millis);
+  // setSourceClassName / setSourceMethodName keep what they are given; a record that was never told its source would infer it from the calling stack frame (LogRecord.inferCaller), which is not modelled
+  for (const [name, key] of [['SourceClassName', 'sourceClass'], ['SourceMethodName', 'sourceMethod']]) {
+    def(LOG_RECORD, 'set' + name, '(Ljava/lang/String;)V', (r, _m, [self, value]) => { r.object(self).record[key] = value; });
+    def(LOG_RECORD, 'get' + name, '()Ljava/lang/String;', (r, _m, [self]) => { const value = r.object(self).record[key]; if (value === undefined) throw new APKError(`LogRecord.get${name}: inferring the caller of a log record from the stack is not modelled (set${name} was not called)`, { kind: 'log-record-source-unsupported' }); return value; });
+  }
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;)V`, (r, _m, [self, level, msg]) => emit(r, self, level, msg, null));
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;Ljava/lang/Throwable;)V`, (r, _m, [self, level, msg, t]) => emit(r, self, level, msg, t));
   def(LOGGER, 'log', `(${LEVEL}Ljava/lang/String;Ljava/lang/Object;)V`, (r, _m, [self, level, msg]) => emit(r, self, level, msg, null));

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=43801fccd526';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=43801fccd526';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -25,7 +25,8 @@ export function createViewWindowHost(platform){
  const focusedWindows=gcRoot(new Map()),focusQueryStack=new Set();let focusDepth=0,inTouchMode=true,focusQueryNodes=0; /* config_defaultInTouchMode is true on a touchscreen device: a window starts in touch mode and leaves it on a key press */
  const rootOf=(runtime,receiver)=>{let current=receiver;const seen=new Set();while(runtime.object(current).parent){if(seen.has(current.ref)||seen.size>=4096)error('Cyclic/excessive View window hierarchy');seen.add(current.ref);current=runtime.object(current).parent;}return current;};
  const frameOf=(runtime,receiver)=>{const root=rootOf(runtime,receiver);const context=runtime.object(receiver).context;return platform.allFrames().find(frame=>same(frame.root,root)||frame.window&&same(runtime.object(frame.window).decor,root)||same(frame.activity,context))||null;};
- const focusKey=(runtime,receiver)=>frameOf(runtime,receiver)?.activity.ref??rootOf(runtime,receiver).ref;
+ // Focus belongs to a window (ViewRootImpl): a view tree added through WindowManager (a PopupWindow, a Dialog decor) has its own focused view, whatever Context its views were built with
+ const focusKey=(runtime,receiver)=>{const root=rootOf(runtime,receiver);return runtime.object(root).surfaceRecord?.attached?root.ref:frameOf(runtime,receiver)?.activity.ref??root.ref;};
  const isFocusable=(runtime,receiver)=>{const view=runtime.object(receiver),mode=view.focusableMode;if(mode!==undefined&&mode!==16)return mode===1;return runtime.isSubtype(view.type,'Landroid/widget/EditText;')||runtime.isSubtype(view.type,'Landroid/widget/Button;')||!!view.listener||!!view.clickable;};
  const inTouchFocusable=(runtime,receiver)=>runtime.object(receiver).focusableInTouchMode??runtime.isSubtype(runtime.object(receiver).type,'Landroid/widget/EditText;');
  const findFocus=(runtime,receiver)=>{const pending=[receiver],seen=new Set();while(pending.length){const value=pending.shift(),view=runtime.object(value);if(seen.has(view.id)||seen.size>=4096)error('Cyclic/excessive focus hierarchy');seen.add(view.id);if(view.focused)return value;pending.unshift(...(view.children??[]));}return null;};
@@ -48,7 +49,10 @@ export function createViewWindowHost(platform){
    const own=()=>{if(!isFocusable(runtime,receiver)||view.enabled===false||inTouchMode&&!inTouchFocusable(runtime,receiver))return 0;
     const key=focusKey(runtime,receiver),old=focusedWindows.get(key);if(view.focused){focusedWindows.set(key,receiver);return 1;}
     if(old&&!same(old,receiver)){runtime.object(old).focused=false;focusedWindows.delete(key);notifyFocus(runtime,old,false,direction,rect);if(focusedWindows.has(key))return view.focused?1:0;}
-    focusedWindows.set(key,receiver);view.focused=true;notifyFocus(runtime,receiver,true,direction,rect);return view.focused?1:0;};
+    focusedWindows.set(key,receiver);view.focused=true;
+    // View.handleFocusGainInternal: mParent.requestChildFocus(this, this) before onFocusChanged -- a scrolling parent (HorizontalScrollView, ScrollView) brings the focused view into view
+    if(view.parent&&runtime.isSubtype(runtime.object(view.parent).type,'Landroid/view/ViewGroup;'))runtime.dispatch({owner:'Landroid/view/ViewGroup;',name:'requestChildFocus',signature:'(Landroid/view/View;Landroid/view/View;)V',parameters:['Landroid/view/View;','Landroid/view/View;'],result:'V'},[view.parent,receiver,receiver],'virtual');
+    notifyFocus(runtime,receiver,true,direction,rect);return view.focused?1:0;};
    const children=()=>runtime.isSubtype(view.type,'Landroid/view/ViewGroup;')&&runtime.dispatch({owner:'Landroid/view/ViewGroup;',name:'onRequestFocusInDescendants',signature:'(ILandroid/graphics/Rect;)Z',parameters:['I','Landroid/graphics/Rect;'],result:'Z'},[receiver,direction,rect],'virtual')?1:0;
    const descendants=view.descendantFocusability??0x20000;
    if(descendants===0x60000)return own();if(descendants===0x40000)return children()||own();return own()||children();

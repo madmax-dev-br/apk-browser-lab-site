@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=12145e24651e';
-import { colorLongToArgb } from './color-long.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=43801fccd526';
+import { colorLongToArgb } from './color-long.js?v=43801fccd526';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -26,7 +26,7 @@ const keys = new Set([
   '<init>()V', '<init>(I)V', `<init>(${PAINT})V`, 'reset()V', `set(${PAINT})V`,
   'getNativeInstance()J', 'getTextLocale()Ljava/util/Locale;', 'getTextLocales()Landroid/os/LocaleList;', 'setTextLocale(Ljava/util/Locale;)V', 'setTextLocales(Landroid/os/LocaleList;)V',
   'getBlendMode()Landroid/graphics/BlendMode;', 'setBlendMode(Landroid/graphics/BlendMode;)V',
-  'getColor()I', 'setColor(I)V', 'setColor(J)V', 'getColorLong()J', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V',
+  'getColor()I', 'setColor(I)V', 'setColor(J)V', 'setARGB(IIII)V', 'getColorLong()J', 'getAlpha()I', 'setAlpha(I)V', 'getFlags()I', 'setFlags(I)V',
   'clearShadowLayer()V', 'setShadowLayer(FFFI)V', 'hasShadowLayer()Z',
   'getHinting()I', 'setHinting(I)V', 'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
   'getTextBounds(Ljava/lang/String;IILandroid/graphics/Rect;)V', 'getTextBounds([CIILandroid/graphics/Rect;)V', 'getTextBounds(Ljava/lang/CharSequence;IILandroid/graphics/Rect;)V',
@@ -68,7 +68,11 @@ const referenceEffects = ['Shader', 'PathEffect', 'MaskFilter'];
 // android.graphics.DashPathEffect(float[] intervals, float phase) and CornerPathEffect(float radius): path effects the Skia backend applies to stroked paths (android-13.0.0_r1 DashPathEffect.java:
 // "intervals array must contain at least 2 elements" and an even count). Other PathEffect subclasses fail explicitly when a paint carrying them draws.
 const PATH_EFFECT = 'Landroid/graphics/PathEffect;', DASH = 'Landroid/graphics/DashPathEffect;', CORNER = 'Landroid/graphics/CornerPathEffect;';
-for (const key of [`${DASH}-><init>([FF)V`, `${CORNER}-><init>(F)V`]) keys.add(key);
+// PathDashPathEffect(Path shape, float advance, float phase, Style style) (android-13.0.0_r1 PathDashPathEffect.java: nativeCreate(shape.readOnlyNI(), advance, phase, style.native_style),
+// which is SkPath1DPathEffect::Make): the shape is copied when the effect is made, as the native does. Its Style enum is the original class in framework.dex.
+// ComposePathEffect(PathEffect outerpe, PathEffect innerpe) keeps its two effects; the pinned CanvasKit exports no composed path effect, so a paint that carries one fails by name when it draws.
+const PATH_DASH = 'Landroid/graphics/PathDashPathEffect;', PATH_DASH_STYLE = 'Landroid/graphics/PathDashPathEffect$Style;', COMPOSE_EFFECT = 'Landroid/graphics/ComposePathEffect;';
+for (const key of [`${DASH}-><init>([FF)V`, `${CORNER}-><init>(F)V`, `${PATH_DASH}-><init>(Landroid/graphics/Path;FF${PATH_DASH_STYLE})V`, `${COMPOSE_EFFECT}-><init>(${PATH_EFFECT}${PATH_EFFECT})V`]) keys.add(key);
 // android.graphics.MaskFilter and BlurMaskFilter(float radius, BlurMaskFilter.Blur style) (android-13.0.0_r1 BlurMaskFilter.java: native_instance = nativeConstructor(radius,
 // style.native_int); libs/hwui/jni/MaskFilter.cpp createBlur: sigma = SkBlurMask::ConvertRadiusToSigma(radius), SkMaskFilter::MakeBlur((SkBlurStyle)style, sigma), and
 // IllegalArgumentException when Skia makes no filter, which is a sigma that is not positive). The Skia backend applies it to what the paint draws; EmbossMaskFilter and other
@@ -92,7 +96,7 @@ const copyOf = (runtime, ref, source) => runtime.wasm?.paints ? runtime.wasm.pai
 const pull = (runtime, state, receiver) => { runtime.wasm?.paints?.pull(state, runtime.object(receiver)); return state; };
 /** The methods after which the state goes back to memory: true when they may change a reference (the constructors and reset push their locales after binding). */
 const PUSHED = new Map([
-  ...['setColor', 'setAlpha', 'setFlags', 'setStartHyphenEdit', 'setEndHyphenEdit', ...flagMasks.map(([suffix]) => 'set' + suffix), 'setHinting', 'setElegantTextHeight',
+  ...['setColor', 'setARGB', 'setAlpha', 'setFlags', 'setStartHyphenEdit', 'setEndHyphenEdit', ...flagMasks.map(([suffix]) => 'set' + suffix), 'setHinting', 'setElegantTextHeight',
     'setShadowLayer', 'clearShadowLayer', 'setFontFeatureSettings', ...['StrokeWidth', 'StrokeMiter', 'TextSize', 'TextScaleX', 'TextSkewX', 'LetterSpacing', 'WordSpacing'].map(suffix => 'set' + suffix),
     ...enums.map(([suffix]) => 'set' + suffix)].map(name => [name, false]),
   ...['<init>', 'reset', 'setShader', 'setPathEffect', 'setMaskFilter', 'setColorFilter', 'setXfermode', 'setBlendMode', 'setTextLocale', 'setTextLocales', 'setFontVariationSettings']
@@ -125,8 +129,8 @@ function noteLocaleTag(runtime,paint){if(runtime.wasm?.paints&&paint.textLocales
 export function createPaintHost() {
   const paintHost = {
     supports: key => keys.has(key),
-    canAllocate: type => type === PAINT || type === PDX || type === DASH || type === CORNER || type === MASK_FILTER || type === BLUR_FILTER,
-    parent: type => type === PAINT || type === PATH_EFFECT || type === MASK_FILTER ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : type === DASH || type === CORNER ? PATH_EFFECT : type === BLUR_FILTER ? MASK_FILTER : null,
+    canAllocate: type => type === PAINT || type === PDX || type === DASH || type === CORNER || type === PATH_DASH || type === COMPOSE_EFFECT || type === MASK_FILTER || type === BLUR_FILTER,
+    parent: type => type === PAINT || type === PATH_EFFECT || type === MASK_FILTER ? 'Ljava/lang/Object;' : type === PDX ? XFERMODE : type === DASH || type === CORNER || type === PATH_DASH || type === COMPOSE_EFFECT ? PATH_EFFECT : type === BLUR_FILTER ? MASK_FILTER : null,
     invoke(runtime, method, args) {
       const result = paintHost.serve(runtime, method, args);
       if (method.owner === PAINT && runtime.wasm?.paints) { const references = PUSHED.get(method.name); if (references !== undefined) { const object = runtime.object(args[0]); runtime.wasm.paints.push(object.webPaint, object, references); } }
@@ -140,6 +144,17 @@ export function createPaintHost() {
         object.pathEffect = { dash: { intervals: values.map(floatOf), phase: floatOf(args[2]) } }; return;
       }
       if (method.owner === CORNER) { object.pathEffect = { corner: floatOf(args[1]) }; return; }
+      if (method.owner === PATH_DASH) {
+        if (nullish(args[1]) || nullish(args[4])) runtime.throwJava('Ljava/lang/NullPointerException;', null);   // shape.readOnlyNI(), style.native_style
+        if (!runtime.skiaHost?.pathSnapshot) fail('PathDashPathEffect requires the Skia backend (the shape is a Skia path)');
+        const shape = runtime.skiaHost.pathSnapshot(args[1]), style = runtime.object(args[4]).fields.get(`${PATH_DASH_STYLE}->native_style:I`);
+        if (!Number.isInteger(style) || style < 0 || style > 2) fail('PathDashPathEffect needs the original PathDashPathEffect.Style enum');
+        object.pathEffect = { path1d: { commands: Array.from(shape.commands), fillType: shape.fillType, advance: floatOf(args[2]), phase: floatOf(args[3]), style } }; return;
+      }
+      if (method.owner === COMPOSE_EFFECT) {
+        if (nullish(args[1]) || nullish(args[2])) runtime.throwJava('Ljava/lang/NullPointerException;', null);   // outerpe.native_instance, innerpe.native_instance
+        object.pathEffect = { compose: { outer: runtime.object(args[1]).pathEffect ?? null, inner: runtime.object(args[2]).pathEffect ?? null } }; return;
+      }
       if (method.owner === MASK_FILTER) return;   // MaskFilter(): the base class holds no filter (native_instance 0)
       if (method.owner === BLUR_FILTER) {
         if (nullish(args[2])) runtime.throwJava('Ljava/lang/NullPointerException;', null);   // style.native_int
@@ -312,7 +327,7 @@ export function createPaintHost() {
       if (name === 'setFontVariationSettings') {   // Paint.setFontVariationSettings: the axes the typeface's fonts declare are applied through Typeface.createFromTypefaceWithVariation; false (and no change) when it supports none
         const value = nullish(args[1]) ? '' : runtime.stringCharacters(args[1]);
         if (value === (paint.fontVariationSettings ?? '')) return 1;
-        if (value === '') { paint.fontVariationSettings = null; return 1; }
+        if (value === '') { paint.fontVariationSettings = null; const plain = runtime.skiaHost.variationTypeface?.(paint.typefaceRef ?? null, []); if (plain) paint.typefaceRef = plain; return 1; }   // Typeface.createFromTypefaceWithVariation(typeface, emptyList)
         let axes; try { axes = runtime.platform.typefaceBuilder.parseVariationSettings(runtime, value); } catch (error) { if (error?.name === 'JavaException' && runtime.isSubtype(runtime.typeOf(error.value), 'Ljava/lang/IllegalArgumentException;')) return 0; throw error; }
         const face = axes ? runtime.skiaHost.variationTypeface(paint.typefaceRef ?? null, axes) : null;
         if (!face) return 0;
@@ -361,6 +376,7 @@ export function createPaintHost() {
       }
       if (name === 'getColorLong') return paint.colorLong ?? BigInt.asIntN(64, BigInt(paint.color >>> 0) << 32n);   // Color.pack(int): sRGB, the int in the upper half
       if (name === 'setColor') { paint.color = args[1] | 0; paint.colorLong = null; return; }
+      if (name === 'setARGB') { paint.color = ((args[1] << 24) | (args[2] << 16) | (args[3] << 8) | args[4]) | 0; paint.colorLong = null; return; }   // Paint.setARGB: setColor((a << 24) | (r << 16) | (g << 8) | b)
       if (name === 'getAlpha') return paint.color >>> 24;
       if (name === 'setAlpha') {
         if (args[1] < 0 || args[1] > 255) fail('Software Paint alpha must be in [0,255]');
@@ -429,7 +445,8 @@ export function getSolidPaint(runtime, receiver) {
   const maskFilter = nullish(paint.maskFilter) ? null : (runtime.object(paint.maskFilter).maskFilter ?? fail('This paint needs an implemented MaskFilter drawing backend (only BlurMaskFilter is)'));
   if (maskFilter && !runtime.skiaHost) fail('A Paint with a BlurMaskFilter requires the Skia backend');
   if (paint.shadowLayer && !runtime.skiaHost) fail('A Paint with a shadow layer (Paint.setShadowLayer) requires the Skia backend');
-  const pathEffect = nullish(paint.pathEffect) ? null : (runtime.object(paint.pathEffect).pathEffect ?? fail('This paint needs an implemented PathEffect drawing backend (only DashPathEffect and CornerPathEffect are)'));
+  const pathEffect = nullish(paint.pathEffect) ? null : (runtime.object(paint.pathEffect).pathEffect ?? fail('This paint needs an implemented PathEffect drawing backend (only DashPathEffect, CornerPathEffect and PathDashPathEffect are)'));
+  if (pathEffect?.compose) fail('A Paint with a ComposePathEffect cannot draw: the Skia build of the lab exports no composed path effect (SkPathEffect::MakeCompose)');
   const shader = nullish(paint.shader) ? null : (runtime.platform?.shaderHost?.snapshot?.(runtime, paint.shader) ?? fail('This paint needs an implemented Shader drawing backend'));
   const colorFilterSnapshot=snapshotPaintColorFilter(runtime,paint.colorFilter);
   const blendMode=nullish(paint.xfermode)?3:runtime.object(paint.xfermode).fields.get(`${XFERMODE}->porterDuffMode:I`);

@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How APK Browser Lab runs an Android APK in the browser: from the file to the screen, threads and time, memory, rendering, network, native code, tools and limitations.">
-  <link rel="stylesheet" href="./site-pages.css?v=12145e24651e">
-  <link rel="stylesheet" href="./lab-tokens.css?v=12145e24651e">
+  <link rel="stylesheet" href="./site-pages.css?v=43801fccd526">
+  <link rel="stylesheet" href="./lab-tokens.css?v=43801fccd526">
 </head>
 <body>
   <header class="topbar">
@@ -322,7 +322,8 @@ Vary: Origin</code></pre></div>
           <li><b>Native code only with a wasm32 build.</b><span><code>.so</code> libraries without a matching build do not run and produce <code>UnsatisfiedLinkError</code>.</span></li>
           <li><b>Protection is not faked.</b><span>Integrity checks, attestation, root or emulator checks and protected natives run as they are or fail; the lab does not change device identifiers to get past them.</span></li>
           <li><b>Services the virtual device does not have.</b><span>Google Play services do not exist here; its location client, for example, fails explicitly.</span></li>
-          <li><b>Floating action bar only.</b><span><code>View.startActionMode</code> with <code>ActionMode.TYPE_FLOATING</code> follows AOSP (the floating copy-and-paste bar appears over the screen and the click reaches <code>onActionItemClicked</code>). The primary mode (<code>TYPE_PRIMARY</code>, the contextual bar at the top of the window) only works when the app provides its own bar, such as AppCompat; without it, it fails explicitly. Submenus, <code>MenuInflater</code> and keyboard shortcuts in menus also fail explicitly.</span></li>
+          <li><b>Floating action bar only.</b><span><code>View.startActionMode</code> with <code>ActionMode.TYPE_FLOATING</code> follows AOSP (the floating copy-and-paste bar appears over the screen and the click reaches <code>onActionItemClicked</code>). The primary mode (<code>TYPE_PRIMARY</code>, the contextual bar at the top of the window) only works when the app provides its own bar, such as AppCompat; without it, it fails explicitly.</span></li>
+          <li><b>Menus need a bar of the app.</b><span>Menu XML (<code>MenuInflater</code>), submenus, menu shortcuts, <code>android.widget.Toolbar</code> with its overflow and <code>PopupMenu</code> are the original Android classes. The lab's windows have no action bar of their own: the options menu appears when the app puts it in a <code>Toolbar</code> (<code>setActionBar</code>) or uses AppCompat's bar. On a window without a bar the menu is still created for keyboard shortcuts, and <code>openOptionsMenu</code> fails explicitly.</span></li>
           <li><b>Software keystore.</b><span>The Android Keystore is a software KeyMint: <code>isInsideSecureHardware()</code> is false, and there is no StrongBox and no attestation key.</span></li>
           <li><b>Text is not identical to the device's.</b><span>Text shaping comes from SkParagraph, not the whole of Minikin; there are no hyphenation patterns. Breaks and metrics may differ in rare cases.</span></li>
           <li><b>Browser memory.</b><span>The browser uses much more than the Java heap: DEX tables, the CanvasKit heap, rasters. A very large tab may be terminated by the browser.</span></li>
@@ -336,6 +337,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=12145e24651e"></script>
+  <script type="module" src="./site-pages.js?v=43801fccd526"></script>
 </body>
 </html>

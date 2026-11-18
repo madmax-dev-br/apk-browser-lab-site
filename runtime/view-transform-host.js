@@ -1,14 +1,14 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
-import { getMatrixValues } from './matrix-native.js?v=12145e24651e';
-import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=43801fccd526';
+import { getMatrixValues } from './matrix-native.js?v=43801fccd526';
+import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=43801fccd526';
+import { cameraTransform, hasCameraRotation } from './camera-transform.js?v=43801fccd526';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
-const fields = ['TranslationX', 'TranslationY', 'ScaleX', 'ScaleY', 'Rotation', 'PivotX', 'PivotY', 'X', 'Y'];
+const fields = ['TranslationX', 'TranslationY', 'ScaleX', 'ScaleY', 'Rotation', 'RotationX', 'RotationY', 'PivotX', 'PivotY', 'X', 'Y'];
 const keys = new Set([
   'getMatrix()' + MATRIX, 'getInverseMatrix()' + MATRIX, 'hasIdentityMatrix()Z', 'isPivotSet()Z', 'resetPivot()V',
   ...fields.flatMap(field => [`get${field}()F`, `set${field}(F)V`]),
-  ...['RotationX', 'RotationY'].flatMap(field => [`get${field}()F`, `set${field}(F)V`]),
   'getElevation()F','setElevation(F)V','getTranslationZ()F','setTranslationZ(F)V','getZ()F','setZ(F)V',
 ].map(signature => VIEW + '->' + signature));
 const bits = new DataView(new ArrayBuffer(4));
@@ -20,16 +20,17 @@ const dimensions = view => {
   return { left: edge('left'), top: edge('top'), width: edge('right') - edge('left'), height: edge('bottom') - edge('top') };
 };
 
-/** Native View/RenderNode boundary for planar transforms. Composition follows
- * Android13 RenderProperties::updateMatrix's 2D branch, calling original Matrix
- * Java and its Skia backend. The public matrix is a cache, not mutable View state.
- * Camera/perspective transforms are refused until an actual 3D backend exists.
+/** Native View/RenderNode boundary for View transforms. Composition follows
+ * Android13 RenderProperties::updateMatrix: the 2D branch calls original Matrix
+ * Java and its Skia backend; with a rotation about the X or Y axis the 3D branch
+ * (the Skia camera at View.getCameraDistance(), src/camera-transform.js) gives a
+ * matrix with a perspective row. The public matrix is a cache, not mutable View state.
  */
 export function createViewTransformHost(platform) {
   const call = (runtime, receiver, name, parameters = [], result = 'V', values = [], mode = 'virtual') => runtime.dispatch(
     { owner: MATRIX, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], mode);
   const state = view => view.webTransform ??= {
-    translationX: 0, translationY: 0, scaleX: 1, scaleY: 1, rotation: 0,
+    translationX: 0, translationY: 0, scaleX: 1, scaleY: 1, rotation: 0, rotationX: 0, rotationY: 0, cameraDistance: 8,   // the camera distance in inches, as the RenderNode keeps it
     pivotX: dimensions(view).width / 2, pivotY: dimensions(view).height / 2, explicitPivot: false,
     key: null, values: IDENTITY.slice(), elevation: 0, translationZ: 0, shadowKey: null, shadowValue: null, matrix: null, inverse: null, buffer: null,
   };
@@ -37,9 +38,10 @@ export function createViewTransformHost(platform) {
   const update = (runtime, receiver) => {
     const view = runtime.object(receiver), s = state(view), size = dimensions(view);
     if (!s.explicitPivot) { s.pivotX = Math.fround(size.width / 2); s.pivotY = Math.fround(size.height / 2); }
-    const key = [s.translationX, s.translationY, s.scaleX, s.scaleY, s.rotation, s.pivotX, s.pivotY].join(':');
+    const key = [s.translationX, s.translationY, s.scaleX, s.scaleY, s.rotation, s.pivotX, s.pivotY, s.rotationX, s.rotationY, s.cameraDistance].join(':');
     if (s.key !== key) {
-      if (s.translationX === 0 && s.translationY === 0 && s.rotation === 0 && s.scaleX === 1 && s.scaleY === 1) s.values = IDENTITY.slice();
+      if (hasCameraRotation(s.rotationX, s.rotationY)) s.values = cameraTransform(s);
+      else if (s.translationX === 0 && s.translationY === 0 && s.rotation === 0 && s.scaleX === 1 && s.scaleY === 1) s.values = IDENTITY.slice();
       else {
         s.matrix ??= makeMatrix(runtime);
         call(runtime, s.matrix, 'setTranslate', ['F', 'F'], 'V', [raw(s.translationX), raw(s.translationY)]);
@@ -61,12 +63,15 @@ export function createViewTransformHost(platform) {
     bindRenderNode(runtime, receiver, nodeReference) {
       const view = runtime.object(receiver), s = state(view); if (s.boundNode === nodeReference?.ref) return;
       const target = renderNodeProperties(runtime, nodeReference);
-      for (const key of ['translationX', 'translationY', 'scaleX', 'scaleY', 'rotation', 'pivotX', 'pivotY', 'elevation', 'translationZ']) {
+      for (const key of ['translationX', 'translationY', 'scaleX', 'scaleY', 'rotation', 'rotationX', 'rotationY', 'pivotX', 'pivotY', 'elevation', 'translationZ']) {
         target[key] = s[key]; Object.defineProperty(s, key, { get: () => target[key], set: value => { target[key] = value; }, configurable: true, enumerable: true });
       }
       target.pivotExplicit = s.explicitPivot; Object.defineProperty(s, 'explicitPivot', { get: () => target.pivotExplicit, set: value => { target.pivotExplicit = value; }, configurable: true, enumerable: true });
       s.boundNode = nodeReference.ref; s.key = null;
     },
+    /** View.setCameraDistance / getCameraDistance: the RenderNode keeps |distance| / densityDpi inches (RenderNode.setCameraDistance), 8 inches until it is set. */
+    setCameraDistance(runtime, receiver, inches) { const s = state(runtime.object(receiver)); s.cameraDistance = Math.fround(Math.abs(inches)); s.key = null; platform.requestDraw(runtime, receiver); },
+    cameraDistance(runtime, receiver) { return runtime.object(receiver).webTransform?.cameraDistance ?? 8; },
     snapshot(runtime, receiver) {
       if (!runtime.object(receiver).webTransform) return null;
       const values = update(runtime, receiver).values;
@@ -80,7 +85,7 @@ export function createViewTransformHost(platform) {
       const shape = platform.viewOutlineHost.shape(runtime, receiver), size = dimensions(view);
       if (!shape || !(shape.alpha > 0) || size.width <= 0 || size.height <= 0) return null;
       const light = renderLightInfo(runtime, size.width + 2 * Math.min(256, Math.ceil(z * 3 + 24)), view.context ?? runtime.activity);
-      const alpha = Math.max(0, Math.min(1, (view.alpha ?? 1) * shape.alpha)), key = [z, size.width, size.height, shape.rect.join(','), shape.radius, shape.alpha, alpha, JSON.stringify(light)].join(':');
+      const alpha = Math.max(0, Math.min(1, (view.alpha ?? 1) * shape.alpha)), key = [z, size.width, size.height, shape.commands ? Array.from(shape.commands).join(',') + '/' + shape.fillType : shape.rect.join(','), shape.radius, shape.alpha, alpha, JSON.stringify(light)].join(':');
       if (s.shadowKey === key) return s.shadowValue;
       const CK = runtime.skia?.CanvasKit; if (!CK) fail('View shadows require verified Skia');
       const margin = Math.min(256, Math.ceil(z * 3 + 24)), width = size.width + margin * 2, height = size.height + margin * 2;
@@ -88,7 +93,7 @@ export function createViewTransformHost(platform) {
       const surface = CK.MakeSurface(width, height); if (!surface) fail('View shadow surface allocation failed');
       try {
         const canvas = surface.getCanvas(), builder = new CK.PathBuilder(); canvas.clear(CK.TRANSPARENT);
-        builder.addRRect(CK.RRectXY(shape.rect, shape.radius, shape.radius)); const path = builder.snapshot(); builder.delete();
+        let path; if (shape.commands) { builder.delete(); path = CK.Path.MakeFromCmds(shape.commands); if (!path) fail('Skia rejected the View outline path'); path.setFillType({ value: shape.fillType }); } else { builder.addRRect(CK.RRectXY(shape.rect, shape.radius, shape.radius)); path = builder.snapshot(); builder.delete(); }
         const color = a => CK.Color4f(0, 0, 0, a);
         canvas.translate(margin, margin);
         // Device-space light: horizontally centred over the view; y/z/radius/alphas as in HWUI.
@@ -121,10 +126,6 @@ export function createViewTransformHost(platform) {
       const s = state(view);
       if (name === 'isPivotSet') return s.explicitPivot ? 1 : 0;
       if (name === 'resetPivot') { s.explicitPivot = false; s.key = null; platform.requestDraw(runtime, receiver); return; }
-      if (name.endsWith('RotationX') || name.endsWith('RotationY')) {
-        if (name.startsWith('set') && number(args[1]) !== 0) fail('3D View rotation requires the original camera/perspective backend');
-        return name.startsWith('get') ? raw(0) : undefined;
-      }
       const suffix = name.slice(3), property = suffix[0].toLowerCase() + suffix.slice(1), size = dimensions(view);
       if (name.startsWith('get')) {
         if (property === 'x' || property === 'y') return raw(Math.fround(property === 'x' ? size.left + s.translationX : size.top + s.translationY));

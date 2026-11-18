@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=12145e24651e';
-import { installNetworkCallbacks } from './network-callbacks.js?v=12145e24651e';
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { resolveDevice } from './device-profile.js?v=12145e24651e';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=43801fccd526';
+import { installNetworkCallbacks } from './network-callbacks.js?v=43801fccd526';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
+import { resolveDevice } from './device-profile.js?v=43801fccd526';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=43801fccd526';
+import { gcRoot } from './heap-gc.js?v=43801fccd526';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -31,6 +31,8 @@ export function createDeviceStateHost(platform) {
   type(BATTERY, 'Ljava/lang/Object;'); type(CONNECTIVITY, 'Ljava/lang/Object;'); type(NETWORK, 'Ljava/lang/Object;', [], { allocatable: true }); type(CAPABILITIES, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
   const registrations = gcRoot([]), callbacks = gcRoot([]), sent = { broadcasts: 0 };
   const filterOf = (r, ref) => { const o = r.object(ref); return o.intentFilter ??= { actions: [] }; };
+  // BroadcastReceiver.onReceive is abstract: a call that names the base class dispatches on the receiver's own class, and only a receiver without the method ends here (as ART answers)
+  def(RECEIVER, 'onReceive', `(${CONTEXT}${INTENT})V`, r => r.throwJava('Ljava/lang/AbstractMethodError;', 'abstract method "void android.content.BroadcastReceiver.onReceive(android.content.Context, android.content.Intent)"'));
   def(RECEIVER, '<init>', '()V', () => {}); def(RECEIVER, 'isOrderedBroadcast', '()Z', () => 0); def(RECEIVER, 'isInitialStickyBroadcast', '()Z', (r, _m, [self]) => r.object(self).initialSticky ? 1 : 0);
   def(RECEIVER, 'getResultCode', '()I', () => -1 | 0); def(RECEIVER, 'setResultCode', '(I)V', () => {}); def(RECEIVER, 'abortBroadcast', '()V', () => {});
   def(FILTER, '<init>', '()V', () => {}); def(FILTER, '<init>', `(${STRING})V`, (r, _m, [self, action]) => { filterOf(r, self).actions.push(action); });
@@ -60,6 +62,8 @@ export function createDeviceStateHost(platform) {
   for (const owner of [CONTEXT, CONTEXT_WRAPPER]) {
     def(owner, 'registerReceiver', `(${RECEIVER}${FILTER})${INTENT}`, register); def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}I)${INTENT}`, register);
     def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}${STRING}${HANDLER})${INTENT}`, register); def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}${STRING}${HANDLER}I)${INTENT}`, register);
+    // Hidden Context.registerReceiverAsUser (the framework's own widgets register this way): the virtual device has one user, so it is registerReceiver.
+    def(owner, 'registerReceiverAsUser', `(${RECEIVER}Landroid/os/UserHandle;${FILTER}${STRING}${HANDLER})${INTENT}`, (r, m, [context, receiver, , filter]) => register(r, m, [context, receiver, filter]));
     def(owner, 'unregisterReceiver', `(${RECEIVER})V`, (r, _m, [, receiver]) => { const at = registrations.findIndex(entry => entry.receiver.ref === receiver?.ref); if (at < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Receiver not registered: ' + r.typeOf(receiver)); registrations.splice(at, 1); });
     def(owner, 'sendBroadcast', `(${INTENT})V`, (r, _m, [, intent]) => { const action = r.object(intent).action; if (action) for (const entry of [...registrations]) if (entry.actions.includes(action)) platform.queueTask(() => { if (registrations.includes(entry)) call(r, entry.receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [entry.context, intent]); }, 0, [entry.receiver, entry.context, intent]); });
     def(owner, 'sendBroadcast', `(${INTENT}${STRING})V`, (r, m, args) => r.dispatch({ owner: CONTEXT, name: 'sendBroadcast', signature: `(${INTENT})V`, parameters: [INTENT], result: 'V' }, [args[0], args[1]], 'virtual'));

@@ -6,8 +6,8 @@
   <title>APK Player · Integration</title>
   <meta name="description" content="Documentation of the APK Player component: embed it, load an APK, configure the device and every lab feature, plugins, events and security, with a live demo.">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
-  <link rel="stylesheet" href="../site-pages.css?v=12145e24651e">
-  <link rel="stylesheet" href="../lab-tokens.css?v=12145e24651e">
+  <link rel="stylesheet" href="../site-pages.css?v=43801fccd526">
+  <link rel="stylesheet" href="../lab-tokens.css?v=43801fccd526">
   <style>
     /* The live demo: the player's slot and its controls. Everything else comes from site-pages.css. */
     .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:16px}
@@ -39,6 +39,55 @@
     .shot img{max-width:100%;border-radius:8px;border:1px solid var(--line);margin-top:8px}
     @media (max-width:1100px){.demo{grid-template-columns:minmax(0,1fr)}}
     @media (max-width:560px){.device-slot{height:620px}}
+    /* The animated path of a request to a development backend (#backend-flow): app -> host map -> browser (CORS) -> backend, and back. */
+    .flow{margin:18px 0 24px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:14px 16px}
+    .flow-head{display:flex;flex-wrap:wrap;gap:10px 16px;justify-content:space-between;align-items:center;font-size:14.5px}
+    .flow-switches{display:flex;flex-wrap:wrap;gap:8px}
+    .flow-seg{display:inline-flex;border:1px solid var(--line-strong);border-radius:8px;overflow:hidden}
+    .flow-seg button{font:inherit;font-size:13px;border:0;background:transparent;color:var(--soft);padding:5px 10px;cursor:pointer}
+    .flow-seg button+button{border-left:1px solid var(--line)}
+    .flow-seg button[aria-pressed=true]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+    .flow-lane{display:grid;grid-template-columns:minmax(0,1fr) 56px minmax(0,1fr) 56px minmax(0,1fr) 56px minmax(0,1fr);margin:18px 0 12px}
+    .flow-node{position:relative;z-index:1;border:1px solid var(--line);border-radius:10px;padding:10px 11px;background:var(--bg);font-size:13px;line-height:1.4;transition:border-color .35s,box-shadow .35s,transform .35s}
+    .flow-node b{display:block;font-size:14px;margin:1px 0 3px}
+    .flow-kicker{font-size:11.5px;color:var(--muted)}
+    .flow-node small{display:block;color:var(--soft);overflow-wrap:anywhere}
+    .flow-node.is-on{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);transform:translateY(-2px)}
+    .flow-node.is-ok{border-color:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+    .flow-node.is-bad{border-color:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+    .flow-link{position:relative;z-index:2;align-self:center;height:2px;margin:0 -1px;background:var(--line-strong);transition:background .35s}
+    .flow-link.is-on{background:var(--accent)}.flow-link.is-bad{background:var(--warn)}
+    .flow-packet{position:absolute;top:50%;left:0;transform:translate(-50%,-50%);font:600 10.5px/1 var(--mono);font-style:normal;background:var(--accent);color:var(--bg);border-radius:999px;padding:4px 7px;white-space:nowrap;opacity:0;pointer-events:none}
+    .flow-packet:empty{display:none}
+    .flow-link.is-bad .flow-packet{background:var(--warn)}
+    .flow-link.go-fwd .flow-packet{animation:flow-fwd 1.25s cubic-bezier(.45,0,.25,1) forwards}
+    .flow-link.go-back .flow-packet{animation:flow-back 1.25s cubic-bezier(.45,0,.25,1) forwards}
+    .flow-link.at-end .flow-packet{left:100%;opacity:1}.flow-link.at-start .flow-packet{left:0;opacity:1}
+    @keyframes flow-fwd{0%{left:0;opacity:0}15%{opacity:1}100%{left:100%;opacity:1}}
+    @keyframes flow-back{0%{left:100%;opacity:0}15%{opacity:1}100%{left:0;opacity:1}}
+    .flow-steps{display:flex;flex-wrap:wrap;gap:6px;list-style:none;padding:0;margin:4px 0 6px}
+    .flow-steps li{margin:0}
+    .flow-steps button{width:28px;height:28px;border-radius:50%;border:1px solid var(--line-strong);background:var(--surface);color:var(--soft);font:600 12.5px/1 var(--mono);cursor:pointer;transition:background .25s,color .25s,border-color .25s}
+    .flow-steps button.is-done{border-color:var(--accent);color:var(--accent-ink)}
+    .flow-steps button[aria-current=step]{background:var(--accent);border-color:var(--accent);color:var(--bg)}
+    .flow[data-case=cors] .flow-steps li:nth-last-child(-n+2) button[aria-current=step],.flow[data-case=pna] .flow-steps li:nth-last-child(-n+2) button[aria-current=step]{background:var(--warn);border-color:var(--warn)}
+    .flow-caption{min-height:4.7em;margin:6px 0 4px;font-size:14.5px;line-height:1.55}
+    .flow-num{font:600 12px var(--mono);color:var(--muted);margin-right:6px}
+    .flow-foot{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:13px;color:var(--muted)}
+    .flow-play{font:inherit;font-size:13px;border:1px solid var(--line-strong);background:var(--bg);color:inherit;border-radius:7px;padding:5px 11px;cursor:pointer}
+    .flow-play:hover,.flow-seg button:hover,.flow-steps button:hover{border-color:var(--accent)}
+    .flow button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+    @media (max-width:760px){
+      .flow-lane{grid-template-columns:minmax(0,1fr)}
+      .flow-caption{min-height:6.3em}
+      .flow-link{justify-self:center;width:2px;height:40px;margin:-1px 0}
+      .flow-packet{left:50%;top:0}
+      .flow-link.go-fwd .flow-packet{animation-name:flow-fwd-v}.flow-link.go-back .flow-packet{animation-name:flow-back-v}
+      .flow-link.at-end .flow-packet{left:50%;top:100%}.flow-link.at-start .flow-packet{left:50%;top:0}
+    }
+    @keyframes flow-fwd-v{0%{top:0;opacity:0}15%{opacity:1}100%{top:100%;opacity:1}}
+    @keyframes flow-back-v{0%{top:100%;opacity:0}15%{opacity:1}100%{top:0;opacity:1}}
+    @media (prefers-reduced-motion:reduce){.flow-node,.flow-link,.flow-steps button{transition:none}.flow-node.is-on{transform:none}.flow-link .flow-packet{animation-duration:.01s}}
   </style>
 </head>
 <body>
@@ -515,6 +564,105 @@ await player.configure({ network: { allowedHosts: ['*'], proxyUrl: 'http://127.0
 
     <h2 id="backend">Integrate with your backend (Node and Micronaut)</h2>
     <p>When the app talks to an API you develop, the most direct path is to point it at the backend running on your computer and make that backend accept the player's runtime. There are three parts: the redirect in the player, CORS on the backend and the local network permission. The two examples below do all three and expose the same small API: <code>GET /v1/hello</code> and <code>POST /v1/echo</code>.</p>
+    <figure class="flow" id="backend-flow" aria-labelledby="backend-flow-title">
+      <figcaption class="flow-head">
+        <strong id="backend-flow-title">The path of a request from the app to your backend</strong>
+        <span class="flow-switches">
+          <span class="flow-seg" role="group" aria-label="Backend">
+            <button type="button" data-backend="node" aria-pressed="true">Node</button><button type="button" data-backend="micronaut" aria-pressed="false">Micronaut</button>
+          </span>
+          <span class="flow-seg" role="group" aria-label="Scenario">
+            <button type="button" data-scenario="ok" aria-pressed="true">All set</button><button type="button" data-scenario="cors" aria-pressed="false">No CORS</button><button type="button" data-scenario="pna" aria-pressed="false">No local network</button>
+          </span>
+        </span>
+      </figcaption>
+      <div class="flow-lane">
+        <div class="flow-node" data-node="app"><span class="flow-kicker">In the VM</span><b>App</b><small>OkHttp asks for <code>GET /v1/hello</code><br>on <code>api.example.com</code></small></div>
+        <div class="flow-link" data-link="0" aria-hidden="true"><i class="flow-packet"></i></div>
+        <div class="flow-node" data-node="map"><span class="flow-kicker">VM Worker</span><b>Redirect hosts</b><small><code>api.example.com</code> → <code>localhost:8080</code></small></div>
+        <div class="flow-link" data-link="1" aria-hidden="true"><i class="flow-packet"></i></div>
+        <div class="flow-node" data-node="browser"><span class="flow-kicker">Browser</span><b>fetch with CORS</b><small>origin: the runtime's<br>(<code>player/frame.html</code>)</small></div>
+        <div class="flow-link" data-link="2" aria-hidden="true"><i class="flow-packet"></i></div>
+        <div class="flow-node" data-node="backend"><span class="flow-kicker">Your computer</span><b data-backend-name>Node · server.mjs</b><small><code>localhost:8080</code></small></div>
+      </div>
+      <ol class="flow-steps" aria-label="Steps"></ol>
+      <p class="flow-caption" aria-live="polite"></p>
+      <div class="flow-foot">
+        <button type="button" class="flow-play">Replay</button>
+        <span class="flow-hint">Click a step to see it.</span>
+        <span>The path without a relay: with <code>proxyUrl</code> set, the relay repeats the redirected request and answers the page's CORS itself.</span>
+      </div>
+    </figure>
+    <script>
+    (() => {
+      // The path of one request from an app in the player to a development backend: the steps of each scenario (packet position, label, which node speaks, caption).
+      // `at` is the node the step ends on (0 app, 1 host map, 2 browser, 3 backend); `link` and `dir` move the packet along a connector; `bad` ends the run in red.
+      const figure = document.getElementById('backend-flow'); if (!figure) return;
+      const reduced = matchMedia('(prefers-reduced-motion: reduce)');
+      const names = { node: 'Node · server.mjs', micronaut: 'Micronaut · @Controller' };
+      const hello = { node: 'Hello from Node', micronaut: 'Hello from Micronaut' }, preflight = { node: '204', micronaut: '200' };
+      const steps = (backend, scenario) => {
+        const common = [
+          { at: 0, label: 'GET', text: 'The app asks for <code>GET https://api.example.com/v1/hello</code> with the <code>Authorization</code> header, as it would on a device.' },
+          { at: 1, link: 0, dir: 1, label: 'GET', text: 'The VM Worker applies <b>Redirect hosts</b> (<code>hostMap</code>): the exchange goes to <code>http://localhost:8080</code>. The app keeps seeing <code>api.example.com</code>.' },
+          { at: 2, link: 1, dir: 1, label: 'OPTIONS', text: 'With <code>Authorization</code> the request is not “simple”: the browser first sends a <b>preflight</b> <code>OPTIONS</code> with <code>Origin</code> and, in browsers that check local network access there, <code>Access-Control-Request-Private-Network: true</code>.' },
+          { at: 3, link: 2, dir: 1, label: 'OPTIONS', text: `${backend === 'node' ? 'The Node server' : "Micronaut's CORS filter"} receives the preflight coming from the runtime origin.` },
+        ];
+        if (scenario === 'cors') return [...common,
+          { at: 2, link: 2, dir: -1, label: 'no CORS', bad: true, text: 'The backend answers, but without <code>Access-Control-Allow-Origin</code> for that origin. The browser discards the response and the GET is never sent.' },
+          { at: 0, link: 1, dir: -1, label: 'error', bad: true, also: [0], text: 'The app receives <code>java.net.ConnectException</code>: the browser does not tell the page why. The console shows “blocked by CORS policy”.' }];
+        if (scenario === 'pna') return [...common.slice(0, 3),
+          { at: 2, label: 'blocked', bad: true, text: 'A public page asking for <code>localhost</code>: depending on the browser and version, without <code>Access-Control-Allow-Private-Network: true</code> in the preflight, or with the local network permission denied, the request is blocked.' },
+          { at: 0, link: 1, dir: -1, label: 'error', bad: true, also: [0], text: 'The app receives <code>java.net.ConnectException</code>. The fix is the header in the backend\'s preflight (both examples below send it) or allowing local network access in the browser.' }];
+        return [...common,
+          { at: 2, link: 2, dir: -1, label: preflight[backend], text: `The backend answers <code>${preflight[backend]}</code> with <code>Access-Control-Allow-Origin</code>, <code>Allow-Headers: authorization</code> and <code>Allow-Private-Network: true</code>. Preflight accepted.` },
+          { at: 3, link: 2, dir: 1, label: 'GET', text: 'Now the real <code>GET /v1/hello</code> is sent, to the same backend.' },
+          { at: 2, link: 2, dir: -1, label: '200', text: `<code>200 {"message":"${hello[backend]}"}</code>, with <code>Allow-Origin</code> and <code>Expose-Headers: X-Request-Id</code> (without it the app would not see that header).` },
+          { at: 0, link: 1, dir: -1, label: '200', ok: true, also: [1], text: 'The app receives the response as if it came from <code>api.example.com</code>: HTTP 200, the body and <code>X-Request-Id</code>.' }];
+      };
+      const nodes = [...figure.querySelectorAll('.flow-node')], links = [...figure.querySelectorAll('.flow-link')], list = figure.querySelector('.flow-steps'), caption = figure.querySelector('.flow-caption');
+      let backend = 'node', scenario = 'ok', run = [], index = -1, timer = null, seen = false;
+      const STEP_MS = 1900;
+      function show(i, { moving = true } = {}) {
+        index = i; const step = run[i];
+        nodes.forEach((node, n) => { node.classList.toggle('is-on', n === step.at || (step.also ?? []).includes(n)); node.classList.toggle('is-bad', !!step.bad && n === step.at); node.classList.toggle('is-ok', !!step.ok && n === step.at); });
+        links.forEach((link, n) => {
+          const active = step.link === n, packet = link.firstElementChild;
+          link.classList.toggle('is-on', active); link.classList.toggle('is-bad', active && !!step.bad);
+          packet.textContent = active ? step.label : '';
+          link.classList.remove('go-fwd', 'go-back', 'at-end', 'at-start'); void link.offsetWidth;   // restart the packet's run
+          if (active) link.classList.add(moving && !reduced.matches ? (step.dir > 0 ? 'go-fwd' : 'go-back') : (step.dir > 0 ? 'at-end' : 'at-start'));
+        });
+        caption.innerHTML = `<span class="flow-num">${i + 1}/${run.length}</span> ${step.text}`;
+        list.querySelectorAll('button').forEach((button, n) => { if (n === i) button.setAttribute('aria-current', 'step'); else button.removeAttribute('aria-current'); button.classList.toggle('is-done', n < i); });
+      }
+      function stop() { clearTimeout(timer); timer = null; }
+      function play(from = 0) {
+        stop(); show(from);
+        if (reduced.matches) return;   // no motion: each step is one click
+        const next = () => { if (index + 1 < run.length) { show(index + 1); timer = setTimeout(next, STEP_MS); } else timer = null; };
+        timer = setTimeout(next, STEP_MS);
+      }
+      function build() {
+        run = steps(backend, scenario);
+        list.replaceChildren(...run.map((step, i) => { const li = document.createElement('li'), button = document.createElement('button'); button.type = 'button'; button.textContent = String(i + 1); button.setAttribute('aria-label', `Step ${i + 1}`); button.addEventListener('click', () => { stop(); show(i, { moving: true }); }); li.append(button); return li; }));
+        figure.querySelector('[data-backend-name]').textContent = names[backend];
+        figure.dataset.case = scenario;   // styling only (not data-scenario: the switch buttons are found by that attribute)
+      }
+      figure.addEventListener('click', event => {
+        const b = event.target.closest('button[data-backend]'), s = event.target.closest('button[data-scenario]');
+        if (b) { backend = b.dataset.backend; figure.querySelectorAll('[data-backend]').forEach(x => x.setAttribute('aria-pressed', String(x === b))); build(); play(); }
+        if (s) { scenario = s.dataset.scenario; figure.querySelectorAll('[data-scenario]').forEach(x => x.setAttribute('aria-pressed', String(x === s))); build(); play(); }
+      });
+      figure.querySelector('.flow-play').addEventListener('click', () => play());
+      build(); show(0, { moving: false });
+      if (reduced.matches) figure.querySelector('.flow-hint').textContent = 'Animation off (reduced motion): click the steps.';
+      // starts the first time it is on screen, pauses off screen
+      let paused = false;   // the run stopped because the figure left the screen: it goes on from that step when it comes back
+      if ('IntersectionObserver' in window) new IntersectionObserver(entries => { for (const entry of entries) { if (entry.isIntersecting) { if (!seen) { seen = true; play(); } else if (paused) { paused = false; play(index); } } else if (timer !== null) { paused = true; stop(); } } }, { threshold: 0.45 }).observe(figure);
+      window.__backendFlow = { show, play, steps: () => run, state: () => ({ backend, scenario, index }) };   // for automated checks
+    })();
+    </script>
     <h3 id="backend-player">In the player: redirect the API host</h3>
     <p>The app keeps using the production URL; only the network exchange goes to your server. A <code>localhost</code> destination without a scheme becomes <code>http://</code>, so the local backend needs no TLS. The app sees the connection as HTTPS with the lab's certificate, which works with OkHttp and <code>HttpURLConnection</code>; an app that pins the real server's certificate refuses this connection, as it would behind a proxy.</p>
     <div class="code"><pre><code>await player.configure({
@@ -668,7 +816,7 @@ await player.plugins.stop('components');</code></pre></div>
     </nav>
   </main>
 </div>
-<script type="module" src="../site-pages.js?v=12145e24651e"></script>
+<script type="module" src="../site-pages.js?v=43801fccd526"></script>
 <script type="module">
   import { ApkPlayer } from './apk-player.js';
   const $ = id => document.getElementById(id);

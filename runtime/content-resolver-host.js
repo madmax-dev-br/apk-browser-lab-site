@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=43801fccd526';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=43801fccd526';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -13,7 +13,7 @@ add('Landroid/net/Uri;', ['buildUpon()Landroid/net/Uri$Builder;']);
 for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/Application;', 'Landroid/app/Activity;']) add(owner, ['getContentResolver()Landroid/content/ContentResolver;']);
 add(GLOBAL, ['getInt(Landroid/content/ContentResolver;Ljava/lang/String;I)I', 'getInt(Landroid/content/ContentResolver;Ljava/lang/String;)I', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J', 'getLong(Landroid/content/ContentResolver;Ljava/lang/String;)J', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;)F',
   'getString(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;', 'getFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)F', 'putString(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z', 'putFloat(Landroid/content/ContentResolver;Ljava/lang/String;F)Z', 'getUriFor(Ljava/lang/String;)Landroid/net/Uri;']);
-add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V',
+add(RESOLVER, ['registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;)V', 'registerContentObserver(Landroid/net/Uri;ZLandroid/database/ContentObserver;I)V' /* hidden: the user handle; the virtual device has one user */, 'unregisterContentObserver(Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;)V', 'notifyChange(Landroid/net/Uri;Landroid/database/ContentObserver;Z)V',
   ...['acquireContentProviderClient', 'acquireUnstableContentProviderClient'].flatMap(name => [`${name}(Landroid/net/Uri;)Landroid/content/ContentProviderClient;`, `${name}(Ljava/lang/String;)Landroid/content/ContentProviderClient;`])]);
 add('Landroid/os/Binder;', ['getCallingUid()I']);
 add('Landroid/os/Process;', ['myUid()I', 'myPid()I']);
@@ -112,6 +112,8 @@ export function createContentResolverHost(platform) {
       // With a companion package installed (src/package-registry.js) the process is the package whose code runs, and the calling uid that of the transaction being served.
       if (owner === 'Landroid/os/Binder;') return platform.packages?.multi ? platform.packages.callingIdentity(runtime).uid : platform.virtualProcess.uid;
       if (owner === 'Landroid/os/Process;') { const self = platform.packages?.multi ? platform.packages.callerEntry(runtime) : platform.virtualProcess; return name === 'myPid' ? self.pid : self.uid; }
+      // android.text.format.DateFormat.DISALLOW_DUPLICATE_FIELD_IN_SKELETON (170233598): @EnabledSince(targetSdkVersion = CUR_DEVELOPMENT), so it is off for every released target SDK
+      if (owner === 'Landroid/app/compat/CompatChanges;' && args[0] === 170233598n) return 0;
       if (owner === 'Landroid/app/compat/CompatChanges;') { if (args[0] !== 150939131n) fail(`Unmodeled compatibility change ${args[0]}`); runtime.record('COMPAT ContentObserver flags disabled in explicit API28 virtual profile'); return 0; }
       if (name === 'getContentResolver') { resolver ??= runtime.makeObject(RESOLVER); runtime.record(`CONTENT VM Settings provider, animator_duration_scale=${settings.get('animator_duration_scale')}; no host services`); return resolver; }
       if (owner === URI_BUILDER) {

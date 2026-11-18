@@ -1,4 +1,4 @@
-import TABLES from './hidden-member-tables.js?v=12145e24651e';
+import TABLES from './hidden-member-tables.js?v=43801fccd526';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with
@@ -38,7 +38,7 @@ export const hiddenMethods = (owner, wantConstructors) => (entry(owner)?.methods
   return { method: { owner, name: row[0], parameters: [...row[1]], result: row[2], signature, key: `${owner}->${row[0]}${signature}` }, flags: row[3] };
 });
 
-const HANDLER = 'Landroid/os/Handler;', LOOPER = 'Landroid/os/Looper;', QUEUE = 'Landroid/os/MessageQueue;', MESSAGE = 'Landroid/os/Message;', THREAD = 'Landroid/app/ActivityThread;', H = 'Landroid/app/ActivityThread$H;';
+const WMG = 'Landroid/view/WindowManagerGlobal;', HANDLER = 'Landroid/os/Handler;', LOOPER = 'Landroid/os/Looper;', QUEUE = 'Landroid/os/MessageQueue;', MESSAGE = 'Landroid/os/Message;', THREAD = 'Landroid/app/ActivityThread;', H = 'Landroid/app/ActivityThread$H;';
 const isNull = value => value === null || value === undefined || value === 0;
 const same = (a, b) => !isNull(a) && !isNull(b) && a.ref === b.ref;
 const mainLooper = rt => rt.platform.looperHost.mainLooper(rt);
@@ -66,6 +66,10 @@ export const ACCESSORS = new Map([
 /** Static fields: accessors by key, then the compile-time constants of the table; the rest is shadow storage in the runtime's static table (read: default of the type). */
 const STATIC_ACCESSORS = new Map([
   [key(THREAD, 'sCurrentActivityThread', THREAD), rt => activityThread(rt)],
+  // WindowManagerGlobal (src/window-manager-global.js): the singleton once getInstance() or a window created it; the IWindowManager from the first Activity launch on
+  // (WindowManagerGlobal.initialize() in ActivityThread.handleLaunchActivity); no IWindowSession in the lab (null, as before a device's first window).
+  [key(WMG, 'sDefaultWindowManager', WMG), rt => rt.hostWindowManagerGlobal ?? null],
+  [key(WMG, 'sWindowManagerService', 'Landroid/view/IWindowManager;'), rt => rt.platform.allFrames?.().length ? rt.dispatch({ owner: WMG, name: 'getWindowManagerService', parameters: [], result: 'Landroid/view/IWindowManager;', signature: '()Landroid/view/IWindowManager;' }, [], 'static') : null],
 ]);
 export function hiddenStatic(rt, field) {
   const table = entry(field.owner); if (!table) return { handled: false };

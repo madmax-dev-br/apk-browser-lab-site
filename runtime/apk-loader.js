@@ -1,19 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=12145e24651e';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=12145e24651e';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=12145e24651e';
-import { inspectELF } from './native-inspector.js?v=12145e24651e';
-import { elfBuildId } from './elf-build-id.js?v=12145e24651e';
-import { inflateRaw } from './inflate.js?v=12145e24651e';
-import { crc32, inflateEntry } from './zip-entry.js?v=12145e24651e';
-import { resolveDevice } from './device-profile.js?v=12145e24651e';
-import { resourceProfileFor } from './device-configuration.js?v=12145e24651e';
-import { JniBridge } from './jni-host.js?v=12145e24651e';
-import { providerForApk } from './native-provider-variants.js?v=12145e24651e';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=12145e24651e';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=12145e24651e';
-import { AndroidResources } from './android-resources.js?v=12145e24651e';
-import { AndroidPlatform } from './android-platform.js?v=12145e24651e';
-import { FrameworkProvider } from './framework-provider.js?v=12145e24651e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=43801fccd526';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=43801fccd526';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=43801fccd526';
+import { inspectELF } from './native-inspector.js?v=43801fccd526';
+import { elfBuildId } from './elf-build-id.js?v=43801fccd526';
+import { inflateRaw } from './inflate.js?v=43801fccd526';
+import { crc32, inflateEntry } from './zip-entry.js?v=43801fccd526';
+import { resolveDevice } from './device-profile.js?v=43801fccd526';
+import { resourceProfileFor } from './device-configuration.js?v=43801fccd526';
+import { JniBridge } from './jni-host.js?v=43801fccd526';
+import { providerForApk } from './native-provider-variants.js?v=43801fccd526';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=43801fccd526';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=43801fccd526';
+import { AndroidResources } from './android-resources.js?v=43801fccd526';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=43801fccd526';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=43801fccd526';
+import { FrameworkProvider } from './framework-provider.js?v=43801fccd526';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -164,7 +165,8 @@ export class APKArchive {
 // Production bundles blank the attribute-name strings; Android's XmlBlock then resolves them from the RES_XML_RESOURCE_MAP chunk.
 const MANIFEST_ATTRIBUTE_IDS = new Map(Object.entries({ scheme: 0x01010027, host: 0x01010028, autoVerify: 0x010104ee, theme: 0x01010000, label: 0x01010001, icon: 0x01010002, name: 0x01010003, permission: 0x01010006, readPermission: 0x01010007, writePermission: 0x01010008, protectionLevel: 0x01010009, enabled: 0x0101000e, exported: 0x01010010, process: 0x01010011, authorities: 0x01010018, initOrder: 0x0101001a, multiprocess: 0x01010013, grantUriPermissions: 0x0101001b, launchMode: 0x0101001d, taskAffinity: 0x01010012, finishOnTaskLaunch: 0x01010014, clearTaskOnLaunch: 0x01010015, excludeFromRecents: 0x01010017, alwaysRetainTaskState: 0x01010203, allowTaskReparenting: 0x01010204, noHistory: 0x0101022d, documentLaunchMode: 0x01010445, autoRemoveFromRecents: 0x01010447, screenOrientation: 0x0101001e, configChanges: 0x0101001f, value: 0x01010024, resource: 0x01010025, targetActivity: 0x01010202, minSdkVersion: 0x0101020c, versionCode: 0x0101021b, versionName: 0x0101021c, windowSoftInputMode: 0x0101022b, targetSdkVersion: 0x01010270, maxSdkVersion: 0x01010271, allowBackup: 0x01010280, parentActivityName: 0x010103a7, appComponentFactory: 0x0101057a, extractNativeLibs: 0x010104ea, usesCleartextTraffic: 0x010104ec, enableOnBackInvokedCallback: 0x0101066c, networkSecurityConfig: 0x01010527, foregroundServiceType: 0x01010599,
   // <intent-filter> and <data>: without these a bundle with blanked attribute names lost the port, the path rules, the MIME type and the priority of every filter
-  priority: 0x0101001c, mimeType: 0x01010026, port: 0x01010029, path: 0x0101002a, pathPrefix: 0x0101002b, pathPattern: 0x0101002c, pathSuffix: 0x0101061e, pathAdvancedPattern: 0x01010620 }).map(([name, id]) => [id, name]));
+  priority: 0x0101001c, mimeType: 0x01010026, port: 0x01010029, path: 0x0101002a, pathPrefix: 0x0101002b, pathPattern: 0x0101002c, pathSuffix: 0x0101061e, pathAdvancedPattern: 0x01010620,
+  supportsRtl: 0x010103af }).map(([name, id]) => [id, name]));
 export const MANIFEST_ATTRIBUTES = MANIFEST_ATTRIBUTE_IDS;   // id -> name (tests check every id against android.R.attr)
 const FILTER_DATA_ATTRIBUTES = ['scheme', 'host', 'port', 'path', 'pathPrefix', 'pathPattern', 'pathAdvancedPattern', 'pathSuffix', 'mimeType'];
 /**
@@ -319,6 +321,7 @@ export async function prepareResources(archive, names, options, report, yieldCon
     parsedLayoutBytes: 0, inspectionComplete: false, errors: [], omittedErrors: 0 };
   if (options.resources === false || (!arsc && !frameworkTable)) {
     if (options.resources === false && arsc) summary.errors.push('Resource parsing disabled by caller.');
+    options.onLayoutFiles?.(layoutFiles);
     return { environment: null, summary };
   }
   const layouts = new Map(), layoutErrors = new Map();
@@ -343,6 +346,7 @@ export async function prepareResources(archive, names, options, report, yieldCon
     }
     layoutFiles = [...referenced].sort(); summary.layoutFiles = layoutFiles.length;
   } catch (error) { note(`resources.arsc: ${error.message}`); }
+  options.onLayoutFiles?.(layoutFiles);   // the layout files by resource type, whatever their ZIP path: what the load scans for layout-only widgets
   await report('resources', 1, layoutFiles.length + 1, 'resources.arsc', 'Android resource table inspected');
   await yieldControl();
   // Eager preparation is a startup-cost budget, not a semantic limit: files beyond it are parsed on first use (resolveXML), as Android parses on demand.
@@ -588,7 +592,10 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // The resources need nothing from the DEX files: they are prepared (framework resource data, the resource configuration, resources.arsc and the compiled XML) while the DEX files
   // expand, which on a large APK is a wait for its largest file in a helper Worker with this thread idle. What they report (progress, warnings, a failure) is held and given back
   // where the load used to prepare them, after Skia, so the progress order, the warnings and which error a broken APK reports are those of the sequential load.
-  const resourcesReady = holdUntilReleased(async (hold) => {
+  // The APK's layout files as the resource table names them (type "layout", whatever the ZIP path: a release build with shortened resource paths has no res/layout*/ entries), known as
+  // soon as resources.arsc is read; null when the resources could not be prepared that far (the scan below then falls back to the res/layout*/ paths).
+  let layoutFilesKnown; const layoutFilesReady = new Promise(resolve => { layoutFilesKnown = resolve; });
+  const resourcesReady = holdUntilReleased(async (hold) => { try {
     let frameworkResources = null;
     if (options.frameworkResourceProvider) {
       const source = options.frameworkResourceProvider;
@@ -602,9 +609,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
     if(resourceConfiguration?.reconfigure&&options.device){const device=resolveDevice(options.device);resourceConfiguration.reconfigure(resourceProfileFor(device,{left:0,right:0,top:device.statusBarHeightDp??24,bottom:device.navigation==='buttons'?48:24}));}
     if(resourceConfiguration&&frameworkResources)frameworkResources.table.options.chooseConfiguration=resourceConfiguration.chooseConfiguration;
     const resources = await prepareResources(archive, names, { ...options, frameworkResources: frameworkResources?.table,
-      frameworkGetXml: frameworkResources?.getXml,resourceConfiguration }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
+      frameworkGetXml: frameworkResources?.getXml,resourceConfiguration, onLayoutFiles: layoutFilesKnown }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
     return { frameworkResources, resourceConfiguration, resources };
-  }, { onProgress: options.onProgress, warnings });
+  } finally { layoutFilesKnown(null); } }, { onProgress: options.onProgress, warnings });
   const files = [], dexSummaries = [];
   for (let i = 0; i < dexFiles.length; i++) {
     const filename = dexFiles[i];
@@ -643,10 +650,65 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesGravityDrawables=files.some(file=>file.dex.types.some(type=>gravityDrawableTypes.has(type)))||[...archive.entries.keys()].filter(name=>/^res\/(?:drawable|mipmap)[^/]*\/[^/]+\.xml$/.test(name)).slice(0,512).some(name=>{
     if(archive.entries.get(name).size>65536)return false;let data;try{data=archive.inspectSync(name,65536);}catch{return false;}return tagPatterns.some(pattern=>containsPattern(data,pattern));
   });
+  // Widgets that an APK may use only as a layout tag. android.widget.TextClock (an original framework class) computes its next tick with java.time, which needs the ICU and tz backends
+  // chosen below from the APK's own types. The layout widgets whose original classes are in the layouts profile (docs/WIDGET-ORIGINALS.md) need the profile, or the widget is an
+  // "Unsupported widget" there. Either is found by its class in the code or by its tag in a layout: the tag is a whole string of the compiled XML string pool, with or without the
+  // android.widget. prefix. The layout files come from the resource table, so shortened or obfuscated resource paths are scanned like res/layout*/ ones; one pass serves both questions
+  // and is skipped for a question the code (or another reason to load the profile) already answered.
+  const profileWidgetTypes=new Set(LAYOUTS_PROFILE_WIDGETS.map(name=>`Landroid/widget/${name};`));
+  const widgetTags=namesOfTags=>namesOfTags.flatMap(name=>[name,`android.widget.${name}`]).flatMap(tag=>[poolString(tag,false),poolString(tag,true)]);
+  const clockScan={patterns:widgetTags(['TextClock']),found:files.some(file=>file.dex.types.includes('Landroid/widget/TextClock;'))};
+  // android.widget.Toolbar, ActionMenuView and the menu popups (PopupMenu and the list rows MenuInflater's menus are shown with) are original classes of the default framework DEX
+  // over the original LinearLayout / FrameLayout, PopupWindow and ListPopupWindow of the layouts profile: the profile is loaded when the code names one or a layout uses the Toolbar or
+  // ActionMenuView tag.
+  const menuWidgetTypes=new Set(['Landroid/widget/Toolbar;','Landroid/widget/ActionMenuView;','Landroid/widget/PopupMenu;','Landroid/widget/PopupWindow;','Landroid/widget/ListPopupWindow;','Landroid/view/MenuInflater;']);
+  const menuScan={patterns:widgetTags(['Toolbar','ActionMenuView']),found:files.some(file=>file.dex.types.some(type=>menuWidgetTypes.has(type)))};
+  const profileScan={patterns:widgetTags(LAYOUTS_PROFILE_WIDGETS),found:files.some(file=>file.dex.types.some(type=>profileWidgetTypes.has(type)))};
+  // A ProgressBar (and the seek bars over it) is drawn and measured with the drawables of its style, which for the Material styles are layer drawables placed with the original
+  // android.view.Gravity of the layouts profile; android.animation.LayoutTransition and the View overlays are original classes of the profile too. An APK whose code names one of
+  // them, or whose layouts use a progress bar tag, gets the profile.
+  const barTypes=new Set(['ProgressBar','SeekBar','RatingBar','AbsSeekBar'].map(name=>`Landroid/widget/${name};`)),profileOnlyTypes=new Set(['Landroid/animation/LayoutTransition;','Landroid/view/ViewOverlay;','Landroid/view/ViewGroupOverlay;']);
+  const barScan={patterns:widgetTags(['ProgressBar','SeekBar','RatingBar']),found:files.some(file=>file.dex.types.some(type=>barTypes.has(type)||profileOnlyTypes.has(type)))};
+  // The attributes only an original class of the profile applies (src/host-styleables.js: LinearLayout's weight sum, dividers and baseline alignment, FrameLayout's
+  // measureAllChildren, layout animations and transitions, a ProgressBar interpolator): found in a layout by the attribute's name (a whole string of the string pool) or by its
+  // public id (the resource map of the compiled XML, which a build that strips the names keeps), and in a style by the id (resources.arsc keys a style's items by attribute id).
+  const idBytes=id=>[id&255,(id>>>8)&255,(id>>>16)&255,(id>>>24)&255],profileAttributeIds=new Set(Object.values(LAYOUTS_PROFILE_ATTRIBUTES).map(entry=>entry.id&0xffff));
+  const attributeScan={patterns:Object.entries(LAYOUTS_PROFILE_ATTRIBUTES).flatMap(([name,entry])=>[poolString(name,false),poolString(name,true),idBytes(entry.id)]),found:false};
+  // android:lineBreakStyle / lineBreakWordStyle (LineBreakConfig) are applied by the optimal line breaker over the ICU line-break iterator, which is otherwise prepared for an APK
+  // whose code names a class that needs it (icuTypes below). An APK without such code whose layouts or styles give one of the two attributes gets the iterator too.
+  const icuTypes=type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/');
+  const lineBreakIds=new Set(Object.values(LINE_BREAK_ATTRIBUTES).map(entry=>entry.id&0xffff));
+  const lineBreakScan={patterns:Object.entries(LINE_BREAK_ATTRIBUTES).flatMap(([name,entry])=>[poolString(name,false),poolString(name,true),idBytes(entry.id)]),found:false,skip:!!options.icuBreakBackend||!options.icuBreakProvider||files.some(file=>file.dex.types.some(icuTypes))};
+  const layoutScans=[clockScan,menuScan,profileScan,barScan,attributeScan,lineBreakScan].filter(scan=>!scan.found&&!scan.skip&&!(scan!==clockScan&&scan!==lineBreakScan&&(options.enableLayoutProfile!==undefined||appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables)));
+  if(layoutScans.length){
+    const layoutFiles=(await layoutFilesReady)??[...archive.entries.keys()].filter(name=>/^res\/layout[^/]*\/[^/]+\.xml$/.test(name));
+    // A budget on the bytes read, not a silent limit: a layout that is not scanned (too large, unreadable, past the budget) counts as using the widgets, which only loads more.
+    const MAX_LAYOUT=1024*1024;let budget=64*1024*1024;
+    for(const name of layoutFiles){
+      const size=archive.entries.get(name)?.size;if(size===undefined)continue;
+      let data=null;if(size<=MAX_LAYOUT&&size<=budget){budget-=size;try{data=archive.inspectSync(name,MAX_LAYOUT);}catch{data=null;}}
+      for(const scan of layoutScans)if(!scan.found&&(data===null||scan.patterns.some(pattern=>containsPattern(data,pattern))))scan.found=true;
+      if(layoutScans.every(scan=>scan.found))break;
+    }
+  }
+  // Styles: every item of a style in resources.arsc is a (attribute id, value) pair; an id of the list anywhere in the file counts (a chance match only loads more, as an
+  // unreadable or oversized table does). Asked only when nothing else has chosen the profile.
+  if(!attributeScan.found&&!profileScan.found&&!barScan.found&&!menuScan.found&&!(options.enableLayoutProfile!==undefined||appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables)&&archive.entries.has('resources.arsc')){
+    const MAX_TABLE=64*1024*1024;let data=null;if(archive.entries.get('resources.arsc').size<=MAX_TABLE)try{data=archive.inspectSync('resources.arsc',MAX_TABLE);}catch{data=null;}
+    if(data===null)attributeScan.found=true;
+    else for(let at=data.indexOf(1,2);at>=0&&at+1<data.length;at=data.indexOf(1,at+1))if(data[at+1]===1&&profileAttributeIds.has(data[at-2]|data[at-1]<<8)){attributeScan.found=true;break;}
+  }
+  if(!lineBreakScan.found&&!lineBreakScan.skip&&archive.entries.has('resources.arsc')){   // a style that gives one: by the attribute id of its items
+    const MAX_TABLE=64*1024*1024;let data=null;if(archive.entries.get('resources.arsc').size<=MAX_TABLE)try{data=archive.inspectSync('resources.arsc',MAX_TABLE);}catch{data=null;}
+    if(data===null)lineBreakScan.found=true;
+    else for(let at=data.indexOf(1,2);at>=0&&at+1<data.length;at=data.indexOf(1,at+1))if(data[at+1]===1&&lineBreakIds.has(data[at-2]|data[at-1]<<8)){lineBreakScan.found=true;break;}
+  }
+  const usesLineBreakAttributes=lineBreakScan.found;
+  const usesTextClock=clockScan.found,usesMenuWidgets=menuScan.found,usesProfileWidgets=profileScan.found,usesProgressBars=barScan.found,usesProfileAttributes=attributeScan.found;
   const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
-    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':'APK-uses-Gravity-dependent-drawables'},
+    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
   ];
   for(const selection of profiles){
@@ -687,7 +749,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // The id tables are decoded on demand: only the method ids carrying one of these names are looked at.
   const transformNames = new Set([...transformSignatures].map(signature => signature.slice(0, signature.indexOf('('))));
   const usesViewTransforms = program.files.some(({ dex }) => dex.methodsNamed(transformNames).some(method => transformSignatures.has(method.name + method.signature) && viewOwner(method.owner)));
-  const needsSkia=program.types.some(type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||
+  // With the layouts profile every View is measured in the VM by the original layout classes, text included: an APK that got the profile for a widget it uses only as a layout tag
+  // (no android.graphics type in its own code) needs the text backend like any other.
+  const needsSkia=program.types.some(type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||(framework?.metadata?.profiles??[]).some(profile=>profile.name==='layouts')||
     usesViewTransforms || program.files.some(({ dex }) => dex.methodsNamed('onMeasure').some(method => method.signature === '(II)V'))&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
@@ -702,7 +766,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // A companion package's code (options.companionPackages, the microG option) is not scanned at load: it may need any of the lazily chosen backends below, so with one installed
   // every one of them is prepared (a device with the app alone decides by the app's types, as before).
   const backendTypes = (options.companionPackages?.length ?? 0) > 0 || options.microg ? { some: () => true } : program.types;
-  if(!icuBreakBackend&&options.icuBreakProvider&&backendTypes.some(type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/'))){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
+  if(!icuBreakBackend&&options.icuBreakProvider&&backendTypes.some(icuTypes)||!icuBreakBackend&&options.icuBreakProvider&&(usesTextClock||usesLineBreakAttributes)){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
     const provider=options.icuBreakProvider;icuBreakBackend=typeof provider==='function'?await provider():await provider.load();
     if(typeof icuBreakBackend?.breaks!=='function')fail('Invalid original ICU break-analysis provider');
   }
@@ -723,7 +787,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   {const javacrypto=options.javacryptoProvider??getDefaultJavacryptoProvider();if(javacrypto)nativeLibraryProvider=javacrypto.compose(nativeLibraryProvider);}
   // IANA tz database (AOSP tzdata2022a compiled to java.time ZoneRules) for the original java.time sources; loaded when the app can reach java.time.
   let tzdata=options.tzdata??null;
-  if(!tzdata&&options.tzdataProvider&&backendTypes.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type))){
+  if(!tzdata&&options.tzdataProvider&&(usesTextClock||backendTypes.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type)))){
     const provider=options.tzdataProvider;tzdata=typeof provider==='function'?await provider():await provider.load();
     if(!tzdata?.bytes)fail('Invalid tz database provider');
   }

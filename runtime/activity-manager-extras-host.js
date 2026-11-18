@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=43801fccd526';
 
 // More of android.app.ActivityManager for the one-process virtual device (frameworks/base ActivityManager.java and ActivityManagerService, android-13.0.0_r1):
 //  getHistoricalProcessExitReasons / setProcessStateSummary (ApplicationExitInfo is the original class): nothing of this app has ever exited in the VM, so the history is empty;
@@ -19,6 +19,7 @@ export function createActivityManagerExtrasHost(platform) {
   });
   def(AM_STATIC, 'isLowMemoryKillReportSupported', '()Z', r => (r.dispatch({ owner: 'Landroid/os/SystemProperties;', name: 'getBoolean', parameters: [STRING, 'Z'], result: 'Z', signature: `(${STRING}Z)Z` }, ['persist.sys.lmk.reportkills', 0], 'static') ? 1 : 0), { static: true });
   def(AM_STATIC, 'isRunningInTestHarness', '()Z', () => 0, { static: true });
+  def(AM_STATIC, 'getCurrentUser', '()I', () => 0, { static: true });   // hidden: the foreground user; the virtual device has only the system user (UserHandle.USER_SYSTEM)
   def(AM, 'isRunningInUserTestHarness', '()Z', () => 0); def(AM, 'isUserAMonkey', '()Z', () => 0);
   def(AM, 'getProcessesInErrorState', `()${LIST}`, () => null);   // no process of the device is in an error state
   def(AM, 'getRecentTasks', `(II)${LIST}`, r => emptyList(r));

@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { Blocked } from './scheduler.js?v=12145e24651e';
-import { bitsDouble, doubleBits } from './host-contract.js?v=12145e24651e';
-import { ByteCells } from './java-arrays.js?v=12145e24651e';
-import { state as ioState } from './libcore-io-native.js?v=12145e24651e';
-import { FORMAT, supportsSize } from './camera-frames.js?v=12145e24651e';
-import { splitAnnexB, joinAnnexB, nalType, NAL, createMp4Writer } from './media-mp4.js?v=12145e24651e';
-import { AVC_PROFILE } from './media-codec-backend.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=43801fccd526';
+import { Blocked } from './scheduler.js?v=43801fccd526';
+import { bitsDouble, doubleBits } from './host-contract.js?v=43801fccd526';
+import { ByteCells } from './java-arrays.js?v=43801fccd526';
+import { state as ioState } from './libcore-io-native.js?v=43801fccd526';
+import { FORMAT, supportsSize } from './camera-frames.js?v=43801fccd526';
+import { splitAnnexB, joinAnnexB, nalType, NAL, createMp4Writer } from './media-mp4.js?v=43801fccd526';
+import { AVC_PROFILE } from './media-codec-backend.js?v=43801fccd526';
 
 // android.media for recording video (android-13.0.0_r1: MediaFormat.java, MediaCodecList.java, MediaCodecInfo.java, MediaCodec.java, MediaMuxer.java, MediaRecorder.java,
 // CamcorderProfile.java, EncoderProfiles.java, AudioRecord.java), over the codec backend of the host (src/media-codec-backend.js: the browser's WebCodecs) and the MP4 writer of
@@ -30,7 +30,7 @@ const M = 'Landroid/media/';
 const MEDIA_FORMAT = `${M}MediaFormat;`, CODEC_LIST = `${M}MediaCodecList;`, CODEC_INFO = `${M}MediaCodecInfo;`, CAPS = `${M}MediaCodecInfo$CodecCapabilities;`, VIDEO_CAPS = `${M}MediaCodecInfo$VideoCapabilities;`, ENCODER_CAPS = `${M}MediaCodecInfo$EncoderCapabilities;`, PROFILE_LEVEL = `${M}MediaCodecInfo$CodecProfileLevel;`;
 const CODEC = `${M}MediaCodec;`, BUFFER_INFO = `${M}MediaCodec$BufferInfo;`, CODEC_CALLBACK = `${M}MediaCodec$Callback;`, CODEC_EXCEPTION = `${M}MediaCodec$CodecException;`, CRYPTO = `${M}MediaCrypto;`;
 const MUXER = `${M}MediaMuxer;`, RECORDER = `${M}MediaRecorder;`, INFO_LISTENER = `${M}MediaRecorder$OnInfoListener;`, ERROR_LISTENER = `${M}MediaRecorder$OnErrorListener;`;
-const CAMCORDER = `${M}CamcorderProfile;`, ENCODER_PROFILES = `${M}EncoderProfiles;`, VIDEO_PROFILE = `${M}EncoderProfiles$VideoProfile;`, AUDIO_PROFILE = `${M}EncoderProfiles$AudioProfile;`;
+const CAMCORDER = `${M}CamcorderProfile;`, ENCODER_PROFILES = `${M}EncoderProfiles;`, VIDEO_PROFILE = `${M}EncoderProfiles$VideoProfile;`;
 const AUDIO_RECORD = `${M}AudioRecord;`, AUDIO_RECORD_BUILDER = `${M}AudioRecord$Builder;`, AUDIO_FORMAT = `${M}AudioFormat;`;
 const AVC = 'video/avc', COLOR_FORMAT_SURFACE = 0x7f000789;
 const FLAG_KEY_FRAME = 1, FLAG_CODEC_CONFIG = 2, FLAG_END_OF_STREAM = 4, INFO_TRY_AGAIN_LATER = -1, INFO_OUTPUT_FORMAT_CHANGED = -2;
@@ -389,7 +389,7 @@ export function installMediaCodecs({ platform, registry, post, call, callStatic,
   def(MUXER, 'release', '()V', (r, _m, [self]) => { const muxer = r.object(self).muxer; if (!muxer) return; if (muxer.state === 'started') { try { muxer.writer.finish(); } catch { /* nothing was written: the file stays without a movie */ } } r.object(self).muxer = null; });
 
   // ---- CamcorderProfile / EncoderProfiles ---------------------------------------------------------------------------------------------------------------------------------------
-  type(CAMCORDER, OBJECT); type(ENCODER_PROFILES, OBJECT); type(VIDEO_PROFILE, OBJECT); type(AUDIO_PROFILE, OBJECT);
+  type(CAMCORDER, OBJECT); type(ENCODER_PROFILES, OBJECT); type(VIDEO_PROFILE, OBJECT);   // EncoderProfiles.AudioProfile is the original class in framework.dex (no profile of it exists here: no audio encoder)
   const CAMCORDER_FIELDS = ['duration', 'quality', 'fileFormat', 'videoCodec', 'videoBitRate', 'videoFrameRate', 'videoFrameWidth', 'videoFrameHeight', 'audioCodec', 'audioBitRate', 'audioSampleRate', 'audioChannels'];
   for (const name of CAMCORDER_FIELDS) registry.instanceField(CAMCORDER, name, 'I', { reflect: true });
   /** The profile of `quality` for one of the device's cameras, or null: a quality needs a camera, an encoder that takes the size and bitrate, and the camera to produce the size. */

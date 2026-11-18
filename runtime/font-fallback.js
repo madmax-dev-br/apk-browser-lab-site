@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=12145e24651e';
-import {DIGESTS} from './crypto-host.js?v=12145e24651e';
+import {APKError} from './apk-runtime.js?v=43801fccd526';
+import {DIGESTS} from './crypto-host.js?v=43801fccd526';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -61,10 +61,19 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
     if (!roboto.has(key)) roboto.set(key, {font: new CK.Font(selectTypeface(weight, italic), 12), cache: new Map()});
     return roboto.get(key);
   };
+  /**
+   * The coverage of a Typeface whose first font is an app or system font: that font's own cmap (asked through Skia, kept per Skia typeface) and then Roboto's, which closes
+   * the family chain of such a Typeface in the paragraph ([its fonts..., Roboto]). What neither has goes to the fallback chain.
+   */
+  const custom = new WeakMap(), primaryOf = (weight, italic, typeface) => {
+    if (!typeface) return primary(weight, italic);
+    let entry = custom.get(typeface); if (!entry) custom.set(typeface, entry = {font: new CK.Font(typeface, 12), cache: new Map()});
+    return {font: entry.font, cache: entry.cache, also: primary(weight, italic)};
+  };
   const primaryCovers = (face, cp) => {
     let known = face.cache.get(cp);
     if (known === undefined) { const glyphs = face.font.getGlyphIDs(String.fromCodePoint(cp)); known = glyphs.length > 0 && glyphs[0] !== 0; face.cache.set(cp, known); }
-    return known;
+    return known || (face.also ? primaryCovers(face.also, cp) : false);
   };
   const fileCovers = (file, cp) => inRanges(file.ranges, cp);
   const familyFile = (family, cp) => family.files.find(file => fileCovers(file, cp));
@@ -81,9 +90,10 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
 
   return {
     /** Itemizes `text` for the primary face `{weight,italic}`. Returns null when Roboto alone covers it (the caller keeps its original
-     * single-family path, so Roboto-only text is shaped exactly as before). Otherwise `{runs:[{start,end,families|null}], files}`. */
-    itemize(text, {weight = 400, italic = false} = {}) {
-      const face = primary(weight, italic);
+     * single-family path, so Roboto-only text is shaped exactly as before). Otherwise `{runs:[{start,end,families|null}], files}`. `typeface` is the Skia typeface of an
+     * app or system font that is the Typeface's first font: the characters it has stay with it, as the first family of a Minikin FontCollection wins. */
+    itemize(text, {weight = 400, italic = false, typeface = null} = {}) {
+      const face = primaryOf(weight, italic, typeface);   // the Typeface's first font: Roboto of the weight and slant, or the app / system font given
       // Cheap exit: every code point is a layout control or covered by the primary face (nothing to itemize).
       let pure = true;
       for (let i = 0; i < text.length;) { const cp = text.codePointAt(i); i += cp > 0xffff ? 2 : 1; if (!LAYOUT_CONTROL(cp) && (NO_SUPPORT_NEEDED(cp) || !primaryCovers(face, cp))) { pure = false; break; } }
@@ -144,6 +154,15 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
         i += width;
       }
       return true;
+    },
+    /** The bytes of a system family font file (vendor/android-fonts/<tag>/system/, src/system-fonts.js), read synchronously the first time a family asks for it and checked against its pinned size and SHA-256. */
+    readSystemFont(file, expected) {
+      if (typeof readSync !== 'function') fail('Android system font families need a synchronous font reader (Worker XMLHttpRequest or Node fs)');
+      if (!/^[A-Za-z0-9_.-]+\.(ttf|otf)$/.test(file) || !expected) fail('Unknown system font file ' + file);
+      const bytes = readSync(new URL('system/' + file, baseURL), MAX_FONT);
+      if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + file);
+      stats.loadedFiles.push('system/' + file); stats.loadedBytes += bytes.length;
+      return bytes;
     },
     /** Registers app font bytes with the paragraph font provider under `name` (a content-derived family name), so a text style can list it ahead of Roboto. */
     registerCustom(name, bytes) { getProvider().registerFont(bytes, name); generation++; },
