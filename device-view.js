@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=79581f96c833';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=79581f96c833';
-import { isTrustedRasterURL } from './raster-cache.js?v=79581f96c833';
+import { updateWebViewSlot } from './webview-slot.js?v=5273acf85d70';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=5273acf85d70';
+import { isTrustedRasterURL } from './raster-cache.js?v=5273acf85d70';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -71,6 +71,15 @@ export function paintBitmapContentLayer(element, drawing, counters) {
  * ctx: { $ (id lookup), state, deviceState ({settings, bars, clockTimer}), hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, clickView, notifyParent, hooks }
  * hooks: navigationChanged(canGoBack), closed(snapshot), rendered(snapshot, composeReady).
  */
+/** One input RPC, retried while another VM operation holds the Worker (a device-settings change, an app-data edit...): a "VM busy" refusal is not a failure of the
+ * app, the input simply waits its turn (up to ~5 s, then the refusal surfaces as before). */
+export async function whenVmFree(call, { attempts = 200, waitMs = 25 } = {}) {
+  for (let attempt = 0; ; attempt++) {
+    try { return await call(); }
+    catch (error) { if (error?.kind !== 'vm-busy' || attempt >= attempts) throw error; await new Promise(resolve => setTimeout(resolve, waitMs)); }
+  }
+}
+
 export function createDeviceView(ctx) {
 const { $, state, deviceState, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, hooks = {} } = ctx, clickView = id => ctx.clickView(id);
 // VM timer events (animations, handlers) can arrive faster than the display refreshes: only the newest is rendered, once per frame. An RPC result
@@ -708,7 +717,7 @@ async function flushPendingInputs() {
     while ((state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) && !state.busy && token === state.operation) {
       if (!state.pendingPointers.length && state.pendingScrollBys.size) {
         const [id, delta] = state.pendingScrollBys.entries().next().value; state.pendingScrollBys.delete(id);
-        try { const snapshot = await state.runtime.scrollBy(id, delta.dx, delta.dy); if (token === state.operation) renderSnapshot(snapshot); }
+        try { const snapshot = await whenVmFree(() => state.runtime.scrollBy(id, delta.dx, delta.dy)); if (token === state.operation) renderSnapshot(snapshot); }
         catch (error) { if (token === state.operation) reportAPKError(error, 'List scrolling interrupted'); state.pendingScrollBys.clear(); break; }
         continue;
       }
@@ -716,16 +725,16 @@ async function flushPendingInputs() {
         // Pointer samples keep their order; consecutive MOVEs of the same gesture collapse to the newest while the VM is busy.
         while (state.pendingPointers.length > 1 && state.pendingPointers[0].action === 2 && state.pendingPointers[1].action === 2 && state.pendingPointers[0].ownerViewId === state.pendingPointers[1].ownerViewId) state.pendingPointers.shift();
         const sample = state.pendingPointers.shift(); state.pointerInFlight = sample; (state.pointerLog ??= []).push([sample.action, Math.round(sample.x * 10) / 10, Math.round(sample.y * 10) / 10, sample.ownerViewId]); if (state.pointerLog.length > 12) state.pointerLog.shift();
-        try { const snapshot = await state.runtime.pointer(sample); if (token === state.operation) renderSnapshot(snapshot); }
+        try { const snapshot = await whenVmFree(() => state.runtime.pointer(sample)); if (token === state.operation) renderSnapshot(snapshot); }
         catch (error) { if (token === state.operation) reportAPKError(error, 'Pointer input interrupted'); state.pendingPointers.length = 0; break; }
         finally { state.pointerInFlight = null; }
         continue;
       }
-      if (state.pendingFocus.length && (state.pendingFocus[0].focused || !state.pendingInputs.size)) { const event = state.pendingFocus.shift(); try { const snapshot = event.pressed !== undefined ? await state.runtime.press(event.id, event.pressed, event.x, event.y) : await state.runtime.focus(event.id, event.focused); if (token === state.operation) renderSnapshot(snapshot); } catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de foco interrompido'); state.pendingFocus.length = 0; state.pendingInputs.clear(); break; } continue; }
+      if (state.pendingFocus.length && (state.pendingFocus[0].focused || !state.pendingInputs.size)) { const event = state.pendingFocus.shift(); try { const snapshot = await whenVmFree(() => event.pressed !== undefined ? state.runtime.press(event.id, event.pressed, event.x, event.y) : state.runtime.focus(event.id, event.focused)); if (token === state.operation) renderSnapshot(snapshot); } catch (error) { if (token === state.operation) reportAPKError(error, 'Callback de foco interrompido'); state.pendingFocus.length = 0; state.pendingInputs.clear(); break; } continue; }
       if (!state.pendingInputs.size && state.pendingScrolls.size) {
         const [id, position] = state.pendingScrolls.entries().next().value; state.pendingScrolls.delete(id); state.scrollInFlight = id;
         try {
-          const snapshot = await state.runtime.scroll(id, position.x, position.y);
+          const snapshot = await whenVmFree(() => state.runtime.scroll(id, position.x, position.y));
           if (token === state.operation) { state.scrollAcknowledging = id; try { renderSnapshot(snapshot); } finally { state.scrollAcknowledging = null; } }
         } catch (error) { if (token === state.operation) reportAPKError(error, 'Scroll callback interrupted'); state.pendingScrolls.clear(); break; }
         finally { state.scrollInFlight = null; }

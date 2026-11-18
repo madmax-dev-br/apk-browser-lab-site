@@ -1,52 +1,52 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=79581f96c833';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=79581f96c833';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=79581f96c833';
-import { initCollapsibleSections } from './panel-sections.js?v=79581f96c833';
-import { warmupLabel } from './warmup.js?v=79581f96c833';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=79581f96c833';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=79581f96c833';
-import { initHelpTips } from './help-tips.js?v=79581f96c833';
-import { createToolDock } from './tool-dock.js?v=79581f96c833';
-import { createPermissionsPanel } from './permissions-panel.js?v=79581f96c833';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=79581f96c833';
-import { createAppDataPanel } from './app-data-panel.js?v=79581f96c833';
-import { createCameraLab } from './camera-lab.js?v=79581f96c833';
-import { createOverridesPanel } from './overrides-panel.js?v=79581f96c833';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=79581f96c833';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=79581f96c833';
-import { createHostMapPanel } from './host-map-panel.js?v=79581f96c833';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=79581f96c833';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=79581f96c833';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=79581f96c833';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=79581f96c833';
-import { createDeviceView, createViewState } from './device-view.js?v=79581f96c833';
-import { createTaskSwitcher } from './task-switcher.js?v=79581f96c833';
-import { createDeviceZoom } from './device-zoom.js?v=79581f96c833';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=79581f96c833';
-import { formatApiGapReport } from './api-gap-scan.js?v=79581f96c833';
-import { createLogcatPanel } from './logcat-panel.js?v=79581f96c833';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=79581f96c833';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=79581f96c833';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=79581f96c833';
-import { captureImage, paintScreen } from './screen-capture.js?v=79581f96c833';
-import { createScreenRecorder } from './screen-recorder.js?v=79581f96c833';
-import { createPluginsPanel } from './plugins-panel.js?v=79581f96c833';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=79581f96c833';
-import { createAdb } from './adb-commands.js?v=79581f96c833';
-import { createAdbTerminal } from './adb-terminal.js?v=79581f96c833';
-import { memorySummary } from './worker-memory.js?v=79581f96c833';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=79581f96c833';
-import { createModalHost } from './lab-modal.js?v=79581f96c833';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=79581f96c833';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=79581f96c833';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=79581f96c833';
-import { createDragLayer } from './lab-drag.js?v=79581f96c833';
-import { createLabScroll } from './lab-scroll.js?v=79581f96c833';
-import { createGlSurfaces } from './gl-surfaces.js?v=79581f96c833';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=79581f96c833';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=79581f96c833';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=79581f96c833';
-import { resolveIntentFields } from './intent-resolver.js?v=79581f96c833';
+import { APKWorkerClient } from './apk-worker-client.js?v=5273acf85d70';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=5273acf85d70';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=5273acf85d70';
+import { initCollapsibleSections } from './panel-sections.js?v=5273acf85d70';
+import { warmupLabel } from './warmup.js?v=5273acf85d70';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=5273acf85d70';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=5273acf85d70';
+import { initHelpTips } from './help-tips.js?v=5273acf85d70';
+import { createToolDock } from './tool-dock.js?v=5273acf85d70';
+import { createPermissionsPanel } from './permissions-panel.js?v=5273acf85d70';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=5273acf85d70';
+import { createAppDataPanel } from './app-data-panel.js?v=5273acf85d70';
+import { createCameraLab } from './camera-lab.js?v=5273acf85d70';
+import { createOverridesPanel } from './overrides-panel.js?v=5273acf85d70';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=5273acf85d70';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=5273acf85d70';
+import { createHostMapPanel } from './host-map-panel.js?v=5273acf85d70';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=5273acf85d70';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5273acf85d70';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=5273acf85d70';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=5273acf85d70';
+import { createDeviceView, createViewState } from './device-view.js?v=5273acf85d70';
+import { createTaskSwitcher } from './task-switcher.js?v=5273acf85d70';
+import { createDeviceZoom } from './device-zoom.js?v=5273acf85d70';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5273acf85d70';
+import { formatApiGapReport } from './api-gap-scan.js?v=5273acf85d70';
+import { createLogcatPanel } from './logcat-panel.js?v=5273acf85d70';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5273acf85d70';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=5273acf85d70';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=5273acf85d70';
+import { captureImage, paintScreen } from './screen-capture.js?v=5273acf85d70';
+import { createScreenRecorder } from './screen-recorder.js?v=5273acf85d70';
+import { createPluginsPanel } from './plugins-panel.js?v=5273acf85d70';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=5273acf85d70';
+import { createAdb } from './adb-commands.js?v=5273acf85d70';
+import { createAdbTerminal } from './adb-terminal.js?v=5273acf85d70';
+import { memorySummary } from './worker-memory.js?v=5273acf85d70';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=5273acf85d70';
+import { createModalHost } from './lab-modal.js?v=5273acf85d70';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=5273acf85d70';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=5273acf85d70';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=5273acf85d70';
+import { createDragLayer } from './lab-drag.js?v=5273acf85d70';
+import { createLabScroll } from './lab-scroll.js?v=5273acf85d70';
+import { createGlSurfaces } from './gl-surfaces.js?v=5273acf85d70';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=5273acf85d70';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=5273acf85d70';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=5273acf85d70';
+import { resolveIntentFields } from './intent-resolver.js?v=5273acf85d70';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -1255,6 +1255,7 @@ let deviceApplying = Promise.resolve();
 function applyDeviceSettings(settings) {
   const rendererChanged = (deviceState.settings?.renderer ?? 'cpu') !== (settings.renderer ?? 'cpu');
   const timeChanged = (deviceState.settings?.eventSeconds ?? 0) !== (settings.eventSeconds ?? 0), rasterChanged = JSON.stringify(deviceState.settings?.raster ?? null) !== JSON.stringify(settings.raster ?? null);
+  const vmDeviceChanged = !deviceState.settings || JSON.stringify(vmDeviceModel(deviceState.settings)) !== JSON.stringify(vmDeviceModel(settings));   // only what the running app sees goes through the exclusive 'device' RPC
   deviceState.settings = settings; updateVmMemoryHint(); saveDeviceSettings(settings);
   if (rasterChanged && apkVM.worker && params.get('raster') !== 'full') apkVM.setRasterSettings({ scale: settings.raster.motionScale, navigation: settings.raster.navigation, settled: settings.raster.stillScale }).catch(() => {});   // "Resolution while moving" / "New screen starts at low resolution" (src/motion-raster.js)
   if (rendererChanged) { if (apkVM.worker) apkVM.setRenderer(settings.renderer).then(showRendererStatus, error => showRendererStatus({ requested: settings.renderer, active: 'cpu', reason: String(error?.message ?? error) })); else showRendererStatus(null); }   // "Rendering" applies live (src/gpu-raster.js)
@@ -1262,6 +1263,7 @@ function applyDeviceSettings(settings) {
   writeDevicePanel(settings); updateSystemBarIcons(); redrawLayoutBounds();
   const note = $('device-status');
   if (state.runtime !== apkVM || !state.apkRunning) { note.textContent = 'No app is running: the settings apply from the next launch.'; return deviceApplying; }
+  if (!vmDeviceChanged) return deviceApplying;   // motion/still resolution, renderer, time per event: applied above on their own side channels; no exclusive VM operation that would refuse the user's input
   // One RPC at a time: wait for a VM operation in flight, then deliver the newest settings through ActivityThread semantics.
   deviceApplying = deviceApplying.then(async () => {
     for (let attempt = 0; attempt < 100 && apkVM.pending; attempt++) await new Promise(resolve => setTimeout(resolve, 50));

@@ -51,6 +51,8 @@ export function memorySummary(health, pageBytes = null) {
   } else rows.push({ label: 'Worker', value: 'unavailable', sub: 'nothing measured yet' });
   rows.push({ label: 'Page', value: page ? mib(page) : 'unavailable', sub: page ? 'JS heap' : 'this browser does not report it' });
   if (live !== null) rows.push({ label: 'Java objects', value: limit ? `${count(live)} of ${count(limit)}` : count(live), sub: `${limit ? `${pct} % of the limit` : 'no fixed object limit (bounded by the core\'s memory)'}${estimate !== null ? ` · ~${mib(estimate)} estimated` : ''}` });
+  const threads = health?.threads;
+  if (threads && finite(threads.alive)) rows.push({ label: 'Threads', value: String(threads.alive), sub: [`${threads.runnable} runnable · ${threads.waiting} waiting`, ...(threads.families ?? []).filter(family => family.count > 1).map(family => `${family.name} ×${family.count}`)].join(' · ') });
   if (finite(health?.collections)) rows.push({ label: 'Collections', value: String(health.collections), sub: `${count(health.freedObjects ?? 0)} objects freed · ${Math.round(health.gcMs ?? 0)} ms` });
   const notes = [`${limit ? 'Above the Java object limit' : 'When the core\'s memory is full'} the VM throws java.lang.OutOfMemoryError. The Java heap estimate is part of the Worker figure, not added to it.`];
   if (parts?.reserved) notes.push('The Worker limit is reserved address space, not RAM: only pages already written take memory.');

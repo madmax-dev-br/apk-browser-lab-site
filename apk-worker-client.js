@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=79581f96c833';
-import { createRasterReceiver } from './raster-cache.js?v=79581f96c833';
+import { createWebAudioPlayer } from './web-audio-player.js?v=5273acf85d70';
+import { createRasterReceiver } from './raster-cache.js?v=5273acf85d70';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=79581f96c833', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=5273acf85d70', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -67,7 +67,14 @@ export class APKWorkerClient {
   /** "Último sinal da VM ...": what the last heartbeat said, and whether the VM went silent after it (a long synchronous host call or a loop that never reaches a tick). */
   describeLastSignal(type) {
     const beat = this.lastHeartbeat;
-    if (!beat) return { heartbeat: null, silentSeconds: null, text: `No signal from the VM was received during the ${type} operation; the Worker never ran VM code.` };
+    if (!beat) {
+      // Nothing since the request: the Worker never took it, because it was still inside earlier work (a scheduled pump, a long main-thread event) that sent no signal since.
+      const before = this.beforeRequest, ago = before ? Math.round((before.requestAt - before.receivedAt) / 100) / 10 : null;
+      const text = before
+        ? `No signal from the VM was received during the ${type} operation: the Worker did not start it, it was still busy with earlier work. Its last signal came ${ago} s before the request: ${before.operation ?? 'scheduled work between requests'}, ${before.thread ?? 'no thread'}, ${(before.stack ?? []).join(' < ') || 'no stack'}, host call: ${before.hostCall ?? 'none'}${before.queueDepth !== null && before.queueDepth !== undefined ? `, queue: ${before.queueDepth}` : ''}.`
+        : `No signal from the VM was received during the ${type} operation, and none before it: the Worker was busy with earlier work and did not start it.`;
+      return { heartbeat: before ?? null, silentSeconds: null, text };
+    }
     const silent = Math.max(0, (Date.now() - beat.receivedAt) / 1000), seconds = Math.round(silent * 10) / 10;
     let text = `Last VM signal ${seconds} s ago: ${beat.operation ?? type}, ${beat.thread ?? 'no thread'}, ${(beat.stack ?? []).join(' < ') || 'no stack'}, host call: ${beat.hostCall ?? 'none'}, events in this operation: ${beat.events ?? 0}, instructions: ${beat.instructions ?? 0}`;
     if (beat.busiest?.length) text += `, busiest: ${beat.busiest.join(', ')}`;
@@ -80,7 +87,7 @@ export class APKWorkerClient {
     if (this.pending) return Promise.reject(Object.assign(new Error('A VM operation is already in progress.'), { kind: 'vm-busy', operation: this.pending.type ?? null }));
     try { this.ensureWorker(); } catch (error) { return Promise.reject(error); }
     return new Promise((resolve, reject) => {
-      const requestId = ++this.sequence; if (type !== 'screen-state') this.lastHeartbeat = null;   // a state request must not forget the signals of the work the VM is busy with
+      const requestId = ++this.sequence; if (type !== 'screen-state') { if (this.lastHeartbeat) this.beforeRequest = { ...this.lastHeartbeat, requestAt: Date.now() }; this.lastHeartbeat = null; }   // what the Worker last said before this request: the explanation when it never starts it   // a state request must not forget the signals of the work the VM is busy with
       const timer = setTimeout(() => {
         const signal = this.describeLastSignal(type), error = new Error(`The ${type} operation exceeded ${Math.round(timeoutMs / 1000)} s. The Worker was terminated; reopen the APK to continue.${signal ? ' ' + signal.text : ''}`);
         error.name = 'TimeoutError'; if (signal) error.details = { kind: 'vm-timeout', operation: type, heartbeat: signal.heartbeat, silentSeconds: signal.silentSeconds, heartbeatText: signal.text }; this.cancel(error);

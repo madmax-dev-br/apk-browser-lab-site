@@ -1,6 +1,6 @@
-import { TimeBreakdown } from './time-breakdown.js?v=79581f96c833';
-import { APKError } from './apk-error.js?v=79581f96c833';
-import { gcBlockReason } from './heap-gc.js?v=79581f96c833';
+import { TimeBreakdown } from './time-breakdown.js?v=5273acf85d70';
+import { APKError } from './apk-error.js?v=5273acf85d70';
+import { gcBlockReason } from './heap-gc.js?v=5273acf85d70';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -14,7 +14,7 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.active = false;
+    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.hostCount = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
@@ -94,7 +94,13 @@ export class OperationMonitor {
     if (this.sink === null) return;
     let slow = holder.slowHost;
     if (slow === undefined) slow = holder.slowHost = SLOW_HOST.test(key);
-    if (slow) { const now = performance.now(); if (now - this.lastBeat >= 50) this.beat(now, 'host'); }
+    if (slow) { const now = performance.now(); if (now - this.lastBeat >= 50) this.beat(now, 'host'); return; }
+    // The WebAssembly core runs the main thread without quanta (it never returns to the scheduler tick inside an event): its host calls are where a long main-thread event can
+    // still be seen. Every 256th one checks the clock: the heartbeat when due, and the main-thread watchdog (report after 10 s, the named error at the hard cap).
+    if ((++this.hostCount & 255) !== 0) return;
+    const now = performance.now();
+    if (this.mainEvent) this.watchMain(now);
+    if (now - this.lastBeat >= this.intervalMs) this.beat(now, 'host');
   }
   /** A long host-side phase (a collection) reports progress: heartbeat when due, labelled, without the operation-budget check (the phase cannot be abandoned half way). */
   pulse(label) {

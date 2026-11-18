@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=79581f96c833';
-import { isMemoryStep } from './memory-budget.js?v=79581f96c833';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=79581f96c833';
-import { sanitizeHostMap } from './host-map.js?v=79581f96c833';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=79581f96c833';
-import { sanitizeLocation } from './runtime-permissions.js?v=79581f96c833';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=79581f96c833';
+import { coreMemorySetting } from './core-memory.js?v=5273acf85d70';
+import { isMemoryStep } from './memory-budget.js?v=5273acf85d70';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5273acf85d70';
+import { sanitizeHostMap } from './host-map.js?v=5273acf85d70';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=5273acf85d70';
+import { sanitizeLocation } from './runtime-permissions.js?v=5273acf85d70';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=5273acf85d70';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -83,4 +83,7 @@ export function saveDeviceSettings(settings) { try { globalThis.localStorage?.se
 export { resolveDevice, checkCustomScreen };
 
 /** The device model the VM gets: the page-only blocks (simulated location) are left out so they never count as a device change. */
+/** The part of the settings the running app's Configuration/device model reads (src/device-profile.js resolveDevice): a change of anything else (motion/still
+ * resolution, renderer, time per event: side calls; memory, core memory, engine: next load) needs no exclusive 'device' VM operation. */
+export function vmDeviceModel(settings) { const { raster, eventSeconds, memoryMiB, coreMemory, engine, ...device } = deviceForVM(settings); return device; }
 export function deviceForVM(settings) { const { location, renderer, microg, ...device } = settings; return device; }   // microg: a load option (the installed packages), not part of the device model
