@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=f64153dca9f4';
-import { createRasterReceiver } from './raster-cache.js?v=f64153dca9f4';
+import { createWebAudioPlayer } from './web-audio-player.js?v=8a8392fe0f08';
+import { createRasterReceiver } from './raster-cache.js?v=8a8392fe0f08';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=f64153dca9f4', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8a8392fe0f08', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -141,6 +141,14 @@ export class APKWorkerClient {
   /** "Renderização" (src/gpu-raster.js): 'cpu' (default) or 'gpu' (experimental), applied live; resolves the renderer status (requested, active, fallback reason). */
   async setRenderer(renderer) { const response = await this.sideCall('renderer', { renderer: renderer === 'gpu' ? 'gpu' : 'cpu' }); this.renderer = response.renderer ?? null; return response.renderer; }
   async setRasterSettings({ scale, navigation, settled }) { return (await this.sideCall('raster-settings', { scale, navigation, settled })).raster; }
+  /** "Show layout bounds": with `on`, the Worker's snapshots carry the rectangles Compose draws for debug.layout (src/compose-layout-bounds.js). Sent only when it changes for the
+   * current Worker (a new Worker starts with it off); resolves false when there is no Worker or the call fails. */
+  syncLayoutBounds(on) {
+    const worker = this.worker, wanted = !!on; if (!worker) return Promise.resolve(false);
+    if ((this.layoutBoundsWorker === worker) === wanted) return Promise.resolve(wanted);
+    this.layoutBoundsWorker = wanted ? worker : null;
+    return this.sideCall('layout-bounds', { on: wanted }).then(reply => !!reply.layoutBounds, () => { if (this.layoutBoundsWorker === worker) this.layoutBoundsWorker = null; return false; });
+  }
   async setTimeLimits(seconds) { return (await this.sideCall('time-limits', { seconds })).limits; }
   /** The Logcat panel opened (the Worker posts its recent lines, then streams) or closed (only a counter, src/logcat.js). Without a Worker there is nothing to stream. */
   async setLogcatStreaming(open) { if (!this.worker) return { streaming: false, total: 0 }; return this.sideCall('logcat-stream', { open: !!open }); }

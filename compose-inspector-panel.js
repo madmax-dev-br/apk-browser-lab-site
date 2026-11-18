@@ -4,12 +4,12 @@
 // element is clicked the right column is an empty state and no crop is cut; selecting an element cuts exactly one crop and highlights the element on the device screen.
 // Nothing runs while the panel is closed: no Worker message, no DOM, no images. Opening captures once; "Capture" takes a new capture (keeping the selection when the same element
 // is still there); "Update on navigation" (off by default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
-// "Full tree" is on by default: every LayoutNode of the inspection. Off, the elements are the boxes "Show layout bounds" draws (src/layout-bounds.js: Views and Compose semantics
-// nodes), each crop outlined like that overlay and named from the inspected LayoutNode with the same semanticsId.
+// "Full tree" is on by default: every LayoutNode of the inspection. Off, the elements are the boxes of lab.layoutBounds() (Views and Compose semantics nodes; the overlay of
+// src/layout-bounds.js also outlines the LayoutNodes and layout modifiers without semantics), each crop outlined and named from the inspected LayoutNode with the same semanticsId.
 // The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=f64153dca9f4';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=8a8392fe0f08';
 
 const NO_RASTER = 'the displayed frame has no content raster for this element';
 const DETAIL_W = 360, DETAIL_H = 260;

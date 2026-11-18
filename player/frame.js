@@ -1,15 +1,15 @@
 // Entry of dist/player/frame.html: device frame + system bars + rendering, driven by postMessage from the embedding page.
-import { APKWorkerClient } from '../apk-worker-client.js?v=f64153dca9f4';
-import { createDeviceView, createViewState } from '../device-view.js?v=f64153dca9f4';
-import { createGlSurfaces } from '../gl-surfaces.js?v=f64153dca9f4';
-import { sanitizeSettings } from '../device-settings.js?v=f64153dca9f4';
-import { createFrameController } from './frame-controller.js?v=f64153dca9f4';
-import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=f64153dca9f4';
-import { createPluginHost } from '../plugin-host.js?v=f64153dca9f4';
-import { captureImage } from '../screen-capture.js?v=f64153dca9f4';
-import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=f64153dca9f4';
-import { PERMISSION_ICONS } from '../permissions-panel.js?v=f64153dca9f4';
-import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=f64153dca9f4';
+import { APKWorkerClient } from '../apk-worker-client.js?v=8a8392fe0f08';
+import { createDeviceView, createViewState } from '../device-view.js?v=8a8392fe0f08';
+import { createGlSurfaces } from '../gl-surfaces.js?v=8a8392fe0f08';
+import { sanitizeSettings } from '../device-settings.js?v=8a8392fe0f08';
+import { createFrameController } from './frame-controller.js?v=8a8392fe0f08';
+import { validateHostMessage, envelope, REVISION, CAPABILITIES } from './protocol.js?v=8a8392fe0f08';
+import { createPluginHost } from '../plugin-host.js?v=8a8392fe0f08';
+import { captureImage } from '../screen-capture.js?v=8a8392fe0f08';
+import { layoutBoundsRects, drawLayoutBounds } from '../layout-bounds.js?v=8a8392fe0f08';
+import { PERMISSION_ICONS } from '../permissions-panel.js?v=8a8392fe0f08';
+import { createSandboxedWorkerFactory } from './plugin-sandbox.js?v=8a8392fe0f08';
 
 const parentOrigin = new URLSearchParams(location.search).get('parent');
 const $ = id => document.getElementById(id) ?? (frameStub[id] ??= Object.assign(document.createElement('div'), { id }));
@@ -38,9 +38,10 @@ const getHost = id => state.viewElements.get(String(id)) ?? null;
 // "Mostrar limites de layout" (layoutBounds config): the lab's overlay, redrawn only when a frame is drawn or the option changes (as src/app.js redrawLayoutBounds).
 function redrawLayoutBounds(snapshot, settings) {
   const canvas = document.getElementById('layout-bounds-canvas'); if (!canvas) return;
+  vm.syncLayoutBounds(!!settings?.layoutBounds);   // the Worker adds Compose's own rectangles to its snapshots only while the option is on
   const on = !!settings?.layoutBounds && !!snapshot; canvas.hidden = !on; if (!on) return;
   const screen = document.getElementById('android-screen'), frame = deviceState.bars?.contentFrame, width = screen?.clientWidth || deviceState.bars?.widthDp || 411, height = screen?.clientHeight || deviceState.bars?.heightDp || 914;
-  drawLayoutBounds(canvas, layoutBoundsRects(snapshot, { origin: { x: frame?.left ?? 0, y: frame?.top ?? 0 } }), width, height);
+  drawLayoutBounds(canvas, layoutBoundsRects(snapshot, { origin: { x: frame?.left ?? 0, y: frame?.top ?? 0 } }), width, height, { density: snapshot.density ?? 1 });
 }
 // permissionDialog: 'frame': the lab's own permission dialog over the phone screen (markup of src/index.html, rules of src/runtime-permissions.js applied by the controller).
 const shortPermission = name => String(name).replace(/^android\.permission\./, '').replace(/^com\.android\./, '');

@@ -1,7 +1,7 @@
 // The "Logcat" panel of the lab page: the app's log lines (src/logcat.js batches from the Worker) in `logcat -v threadtime` format, coloured by level, with a text filter,
 // a minimum level, autoscroll, "Limpar" and "Salvar". The formatting and filter functions are pure (tested without a DOM); createLogcatPanel() wires them to the page.
-import { LEVELS, MAX_LINES, formatThreadtime, rowToEntry } from './logcat.js?v=f64153dca9f4';
-import { createReadingHold } from './reading-hold.js?v=f64153dca9f4';
+import { LEVELS, MAX_LINES, formatThreadtime, rowToEntry } from './logcat.js?v=8a8392fe0f08';
+import { createReadingHold } from './reading-hold.js?v=8a8392fe0f08';
 
 export const RENDER_MAX = 2000;   // rows kept in the DOM; the whole buffer is still saved by "Salvar"
 export const LEVEL_NAMES = { V: 'Verbose', D: 'Debug', I: 'Info', W: 'Warning', E: 'Error', A: 'Assert' };
