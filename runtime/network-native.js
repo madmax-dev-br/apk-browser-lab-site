@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=6e2914ae30a5';
-import { throwNew } from './java-throw.js?v=6e2914ae30a5';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=6e2914ae30a5';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=6e2914ae30a5';
-import { Blocked } from './scheduler.js?v=6e2914ae30a5';
-import { captureBody } from './network-capture.js?v=6e2914ae30a5';
-import { OS_CONSTANTS } from './os-constants-data.js?v=6e2914ae30a5';
-import { openExchange, describeFailure } from './network-transport.js?v=6e2914ae30a5';
-import { WorkerExecutor } from './network-worker-executor.js?v=6e2914ae30a5';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=6e2914ae30a5';
-import { TransportAuthority } from './transport-ca.js?v=6e2914ae30a5';
-import { openWebSocketSession } from './websocket-bridge.js?v=6e2914ae30a5';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=6e2914ae30a5';
-import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=6e2914ae30a5';
+import { APKError } from './apk-error.js?v=4eb00f0fc2b9';
+import { throwNew } from './java-throw.js?v=4eb00f0fc2b9';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=4eb00f0fc2b9';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=4eb00f0fc2b9';
+import { Blocked } from './scheduler.js?v=4eb00f0fc2b9';
+import { captureBody } from './network-capture.js?v=4eb00f0fc2b9';
+import { OS_CONSTANTS } from './os-constants-data.js?v=4eb00f0fc2b9';
+import { openExchange, describeFailure } from './network-transport.js?v=4eb00f0fc2b9';
+import { WorkerExecutor } from './network-worker-executor.js?v=4eb00f0fc2b9';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=4eb00f0fc2b9';
+import { TransportAuthority } from './transport-ca.js?v=4eb00f0fc2b9';
+import { openWebSocketSession } from './websocket-bridge.js?v=4eb00f0fc2b9';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=4eb00f0fc2b9';
+import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=4eb00f0fc2b9';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -156,7 +156,7 @@ export class NetworkBridge {
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl) }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
-    if (op.executor === 'worker') { try { const start = () => (this.worker ??= new WorkerExecutor(this)).start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); const identity = this.clientIdentityReady(request.url); if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); const identity = this.clientIdentityJob(request.url); if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
@@ -262,6 +262,8 @@ export class NetworkBridge {
         error => { record(`alias "${alias}" NOT presented: ${String(error?.message ?? error).slice(0, 200)}`); this.clientIdentities.delete(target); });
     this.clientIdentities.set(target, { key, proxyUrl, job });
   }
+  /** Only the registration of this destination's own client identity (the synchronous bridge blocks the thread: it must not wait for the session's relay reset, a browser-loop promise). */
+  clientIdentityJob(url) { const mapped = this.redirectFor(url), dest = destinationOfUrl(mapped?.url ?? url); return dest ? this.clientIdentities?.get(dest)?.job ?? null : null; }
   /** The registration of the client identity a request's destination waits for, or null. */
   clientIdentityReady(url) {
     // the first request of a session through a relay first clears the identities a previous session handed over (a relay that is not the lab's ignores the request: errors are dropped)
