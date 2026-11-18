@@ -1,12 +1,12 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=15e12aa41512';
-import { staticRetentionLines } from './heap-gc.js?v=15e12aa41512';
-import { overrideSummaryLines } from './method-overrides.js?v=15e12aa41512';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=15e12aa41512';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=15e12aa41512';
-import { hostMapSummaryLines } from './host-map.js?v=15e12aa41512';
-import { attributeGap } from './worker-task-log.js?v=15e12aa41512';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=65876789f860';
+import { staticRetentionLines } from './heap-gc.js?v=65876789f860';
+import { overrideSummaryLines } from './method-overrides.js?v=65876789f860';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=65876789f860';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=65876789f860';
+import { hostMapSummaryLines } from './host-map.js?v=65876789f860';
+import { attributeGap } from './worker-task-log.js?v=65876789f860';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -163,6 +163,8 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const rows = [...notes].sort((a, b) => b[1].count - a[1].count);
     out.push(`Resources NOT RESOLVED: ${rows.length} kinds (read without them, as AssetManager does): ${rows.slice(0, 8).map(([what, note]) => `${what} ×${note.count} (${note.reason})`).join('; ')}${rows.length > 8 ? `; +${rows.length - 8} more` : ''}`);
   });
+  // the opt-in permissive native version mode: which libraries went to an app of another version (jni-host.js)
+  part(() => { const waived = runtime.nativeVersionWaivers; if (!waived?.size) return; out.push(`NATIVE VERSION MISMATCH ALLOWED (permissive mode): ${[...waived].map(([soname, what]) => `${soname} ${what}`).join('; ')}`); });
   // framework behaviour the lab tolerates without implementing it (android-platform.js noteFrameworkGap)
   part(() => { const notes = runtime.platform?.frameworkGaps; if (!notes?.size) return;
     out.push(`Framework behaviour NOT IMPLEMENTED (the app went on without it): ${[...notes.values()].slice(0, 8).map(note => `${note.text}${note.count > 1 ? ` ×${note.count}` : ''}`).join('; ')}${notes.size > 8 ? `; +${notes.size - 8} more` : ''}`);

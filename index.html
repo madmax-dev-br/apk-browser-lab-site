@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=15e12aa41512") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=15e12aa41512">
-  <link rel="stylesheet" href="./lab-theme.css?v=15e12aa41512">
-  <meta name="apk-browser-build" content="15e12aa41512">
+  <style>@import url("./styles.css?v=65876789f860") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=65876789f860">
+  <link rel="stylesheet" href="./lab-theme.css?v=65876789f860">
+  <meta name="apk-browser-build" content="65876789f860">
 </head>
 <body>
   <header class="topbar">
@@ -148,6 +148,7 @@
               <label class="cp-field" for="vm-renderer"><span>Rendering<small>Where screen content (Compose, Canvas) is drawn. GPU uses WebGL in the Worker and falls back to CPU by itself if it fails; applies immediately</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (default)</option><option value="cpu">CPU</option></select></label>
               <p id="vm-renderer-status" class="cp-note" role="status">In use: CPU</p>
               <label class="cp-field" for="tolerate-missing"><span>Tolerant mode<small>Missing Android APIs become <code>STUB-VOID</code>/<code>STUB-RETURN</code> in the log instead of stopping the app</small></span><select id="tolerate-missing"><option value="off">Off (strict)</option><option value="void">Void methods only</option><option value="primitives" selected>void and primitives (0, false)</option><option value="all">All types (0, false, null)</option></select></label>
+              <label class="cp-check" for="native-version-mismatch"><input id="native-version-mismatch" type="checkbox"><span>Allow native library version mismatch<small>The lab's React Native native libraries are built for one release (0.79.4). On, an app of another React Native or Hermes version gets them anyway instead of an <code>UnsatisfiedLinkError</code>: it may fail later where the versions differ. Recorded as <code>NATIVE VERSION MISMATCH ALLOWED</code> in the log and the summary. Applies when the APK is reopened</small></span></label>
               <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Strict crash mode<small>A fatal exception in any thread ends the app (as on Android). Off, it is recorded as <code>FATAL (tolerated)</code> in the summary and only the thread that failed ends</small></span></label>
               <div id="app-data-row" class="app-data-row">
                 <label class="cp-check" for="keep-app-data"><input id="keep-app-data" type="checkbox" checked><span>Keep app data between reloads<small>The app's SharedPreferences, SQLite databases, files and cache, per package and certificate</small></span></label>
@@ -271,7 +272,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=15e12aa41512"></script>
+  <script type="module" src="./app.js?v=65876789f860"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

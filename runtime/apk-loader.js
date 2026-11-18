@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=15e12aa41512';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=15e12aa41512';
-import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=15e12aa41512';
-import { inspectELF } from './native-inspector.js?v=15e12aa41512';
-import { elfBuildId } from './elf-build-id.js?v=15e12aa41512';
-import { inflateRaw } from './inflate.js?v=15e12aa41512';
-import { crc32, inflateEntry } from './zip-entry.js?v=15e12aa41512';
-import { resolveDevice } from './device-profile.js?v=15e12aa41512';
-import { resourceProfileFor } from './device-configuration.js?v=15e12aa41512';
-import { JniBridge } from './jni-host.js?v=15e12aa41512';
-import { providerForApk } from './native-provider-variants.js?v=15e12aa41512';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=15e12aa41512';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=15e12aa41512';
-import { AndroidResources } from './android-resources.js?v=15e12aa41512';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=15e12aa41512';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=15e12aa41512';
-import { FrameworkProvider } from './framework-provider.js?v=15e12aa41512';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=65876789f860';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=65876789f860';
+import { detectReactNativeVersion, detectHermesBytecodeVersion } from './rn-version.js?v=65876789f860';
+import { inspectELF } from './native-inspector.js?v=65876789f860';
+import { elfBuildId } from './elf-build-id.js?v=65876789f860';
+import { inflateRaw } from './inflate.js?v=65876789f860';
+import { crc32, inflateEntry } from './zip-entry.js?v=65876789f860';
+import { resolveDevice } from './device-profile.js?v=65876789f860';
+import { resourceProfileFor } from './device-configuration.js?v=65876789f860';
+import { JniBridge } from './jni-host.js?v=65876789f860';
+import { providerForApk } from './native-provider-variants.js?v=65876789f860';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=65876789f860';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=65876789f860';
+import { AndroidResources } from './android-resources.js?v=65876789f860';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=65876789f860';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=65876789f860';
+import { FrameworkProvider } from './framework-provider.js?v=65876789f860';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -870,6 +870,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   if (nativeLibraryProvider) { // the lab's React Native libraries are built for one RN version: record the app's (from its DEX) and Hermes bytecode version (from its bundle) for the provider's gate
     runtime.reactNativeVersion = detectReactNativeVersion(runtime); runtime.hermesBytecodeVersion = await detectHermesBytecodeVersion(archive);
   }
+  runtime.nativeVersionMismatch = options.nativeVersionMismatch === true;   // opt-in: serve the lab's React Native libraries to an app of another release (jni-host.js #requireVersions), reported
   if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256), runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));

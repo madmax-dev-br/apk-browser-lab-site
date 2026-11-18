@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=15e12aa41512';
-import { APKError } from './apk-error.js?v=15e12aa41512';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=15e12aa41512';
+import { gcRoot } from './heap-gc.js?v=65876789f860';
+import { APKError } from './apk-error.js?v=65876789f860';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=65876789f860';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over

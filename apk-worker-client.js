@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=15e12aa41512';
-import { createRasterReceiver } from './raster-cache.js?v=15e12aa41512';
+import { createWebAudioPlayer } from './web-audio-player.js?v=65876789f860';
+import { createRasterReceiver } from './raster-cache.js?v=65876789f860';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=15e12aa41512', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=65876789f860', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -103,9 +103,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false } = {}) {
+  async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false } = {}) {
     this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.apiGapWaiters = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
-    const response = await this.request('load', { buffer, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
   }
