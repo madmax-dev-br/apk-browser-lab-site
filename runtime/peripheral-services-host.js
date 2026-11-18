@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=98402358ed3b';
-import { APKError } from './apk-error.js?v=98402358ed3b';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=98402358ed3b';
-import { installCameraManager } from './camera-host.js?v=98402358ed3b';
+import { bitsFloat, floatBits } from './host-contract.js?v=529b25fb80f8';
+import { APKError } from './apk-error.js?v=529b25fb80f8';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=529b25fb80f8';
+import { installCameraManager } from './camera-host.js?v=529b25fb80f8';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -121,6 +121,17 @@ export function createPeripheralServicesHost(platform) {
   def('Landroid/app/ActivityThread;', 'getPackageManager', `()${IPM}`, r => { platform.packageManagerBinder ??= r.allocate(PM_BINDER); return platform.packageManagerBinder; }, { static: true });
   for (const owner of [IPM, PM_BINDER]) def(owner, 'hasSystemFeature', `(${STRING}I)Z`, (r, _m, [, name]) => { if (nullish(name)) npe(r); return hasFeature(text(r, name)) ? 1 : 0; });
   for (const name of ['isResumed', 'registerOnActivityPausedListener', 'unregisterOnActivityPausedListener']) def('Ldev/apkweb/os/NfcHost;', name, name === 'isResumed' ? '(Landroid/app/Activity;)Z' : '(Landroid/app/Activity;Landroid/app/OnActivityPausedListener;)V', () => { throw new APKError(`NfcAdapter foreground dispatch (${name}) needs an NFC adapter, which this virtual device does not have`, { kind: 'nfc-unavailable' }); }, { static: true });
+  // android.nfc.cardemulation.CardEmulation / NfcFCardEmulation.getInstance(NfcAdapter) (android-13.0.0_r1): the first statement of both is
+  // `if (adapter == null) throw new NullPointerException("NfcAdapter is null")`. With no NFC hardware no NfcAdapter object can exist (see above), so that is the only path an app
+  // reaches; the rest of the original (the FEATURE_NFC_HOST_CARD_EMULATION check, the INfcCardEmulation service) and every instance method need an adapter, and an adapter that
+  // somehow got here takes the original's next branch on this device: no card emulation feature, UnsupportedOperationException.
+  for (const owner of ['Landroid/nfc/cardemulation/CardEmulation;', 'Landroid/nfc/cardemulation/NfcFCardEmulation;']) {
+    type(owner, OBJECT, [], { allocatable: false });
+    def(owner, 'getInstance', `(Landroid/nfc/NfcAdapter;)${owner}`, (r, _m, [adapter]) => {
+      if (nullish(adapter)) r.throwJava('Ljava/lang/NullPointerException;', 'NfcAdapter is null');
+      r.throwJava('Ljava/lang/UnsupportedOperationException;', null);
+    }, { static: true });
+  }
   def(BLUETOOTH, 'getAdapter', '()Landroid/bluetooth/BluetoothAdapter;', () => null);
   const gattProfile = (r, profile) => { if (profile !== 7 && profile !== 8) iae(r, `Profile not supported: ${profile}`); };   // BluetoothProfile.GATT / GATT_SERVER
   def(BLUETOOTH, 'getConnectedDevices', `(I)${LIST}`, (r, _m, [, profile]) => { gattProfile(r, profile); return emptyList(r); });

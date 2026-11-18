@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=98402358ed3b';
-import { createHostRegistry } from './host-contract.js?v=98402358ed3b';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=98402358ed3b';
+import { APKError } from './apk-error.js?v=529b25fb80f8';
+import { createHostRegistry } from './host-contract.js?v=529b25fb80f8';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=529b25fb80f8';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -179,6 +179,15 @@ export function createJobSchedulerHost(platform) {
   function stop(r, job, reason, constraint) {
     if (!job.running) return;
     stats.stopped++; r.object(job.params).stopReason = reason;
+    if (constraint === false) {
+      // cancel(id), cancelAll() or schedule() of an id that is running: JobSchedulerService ends the job in its own state at once and tells the app afterwards: JobServiceContext
+      // sends onStopJob through the service's binder, and JobServiceEngine runs it on the app's main thread -- never inside the caller's schedule/cancel, on the caller's thread.
+      // Its answer does not matter for a cancelled job. The unbind (releaseService) is queued after it.
+      const service = job.service, params = job.params;
+      job.running = false; job.params = null; releaseWork(job);
+      platform.queueTask(() => { dispatch(r, service.callee.descriptor, 'onStopJob', [PARAMS], 'Z', [service.callee.ref, params]); r.record(`JOB stopped ${describe(job.spec)} reason=${reason} (cancelled)`); }, 0, [service.callee.ref, service.ref, params]);
+      releaseService(r, job); return;
+    }
     const reschedule = dispatch(r, job.service.callee.descriptor, 'onStopJob', [PARAMS], 'Z', [job.service.callee.ref, job.params]);
     r.record(`JOB stopped ${describe(job.spec)} reason=${reason} reschedule=${!!reschedule}`);
     job.running = false; job.params = null; releaseWork(job); releaseService(r, job);

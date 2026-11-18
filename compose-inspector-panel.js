@@ -9,7 +9,7 @@
 // The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=98402358ed3b';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=529b25fb80f8';
 
 const NO_RASTER = 'the displayed frame has no content raster for this element';
 const DETAIL_W = 360, DETAIL_H = 260;
