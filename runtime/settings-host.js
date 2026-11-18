@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=12145e24651e';
-import { DIGESTS } from './crypto-host.js?v=12145e24651e';
+import { createHostRegistry, floatBits } from './host-contract.js?v=9b79f2cfbe27';
+import { DIGESTS } from './crypto-host.js?v=9b79f2cfbe27';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
@@ -14,6 +14,12 @@ export function createSettingsHost(platform) {
   type('Landroid/util/AndroidException;', 'Ljava/lang/Exception;', [], { allocatable: true }); type(NOT_FOUND, 'Landroid/util/AndroidException;', [], { allocatable: true });
   const ANDROID_EXCEPTION = 'Landroid/util/AndroidException;';
   def(ANDROID_EXCEPTION, '<init>', '()V', () => {}); def(ANDROID_EXCEPTION, '<init>', `(${STRING})V`, (r, _m, [self, message]) => { r.object(self).message = message; });
+  // AndroidException(String name, Throwable cause) and AndroidException(Exception cause): Exception's constructors (a cause alone makes the message its toString())
+  def(ANDROID_EXCEPTION, '<init>', `(${STRING}Ljava/lang/Throwable;)V`, (r, _m, [self, message, cause]) => { Object.assign(r.object(self), { message, cause, causeInitialized: true }); });
+  def(ANDROID_EXCEPTION, '<init>', '(Ljava/lang/Exception;)V', (r, _m, [self, cause]) => {
+    const message = cause === null ? null : r.stringCharacters(r.dispatch({ owner: 'Ljava/lang/Object;', name: 'toString', parameters: [], result: STRING, signature: `()${STRING}` }, [cause], 'virtual'));
+    Object.assign(r.object(self), { message, cause, causeInitialized: true });
+  });
   def(NOT_FOUND, '<init>', `(${STRING})V`, (r, _m, [self, message]) => { r.object(self).message = message; }); def(NOT_FOUND, '<init>', '()V', () => {});
   const device = () => platform.device ?? {};
   const androidId = r => { const bytes = DIGESTS['SHA-256'].fn(new TextEncoder().encode(`apkweb-device:${platform.packageName ?? 'app'}`)); return Array.from(bytes.slice(0, 8), b => b.toString(16).padStart(2, '0')).join(''); };
@@ -32,6 +38,8 @@ export function createSettingsHost(platform) {
   for (const owner of [SECURE, SYSTEM]) {
     def(owner, 'getString', `(${RESOLVER}${STRING})${STRING}`, (r, _m, [, name]) => lookup(r, owner, name), { static: true });
     def(owner, 'getStringForUser', `(${RESOLVER}${STRING}I)${STRING}`, (r, _m, [, name]) => lookup(r, owner, name), { static: true });
+    // Settings.NameValueTable.getUriFor: content://settings/<table>/<name>, the Uri a ContentObserver of one setting is registered for (TextClock watches time_12_24 this way).
+    def(owner, 'getUriFor', `(${STRING})Landroid/net/Uri;`, (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name'); return r.dispatch({ owner: 'Landroid/net/Uri;', name: 'parse', parameters: [STRING], result: 'Landroid/net/Uri;', signature: `(${STRING})Landroid/net/Uri;` }, [`content://settings/${owner === SECURE ? 'secure' : 'system'}/${encodeURIComponent(r.stringCharacters(name))}`], 'static'); }, { static: true });
     const typed = (suffix, code, parse, wrap) => {
       def(owner, `get${suffix}`, `(${RESOLVER}${STRING}${code})${code}`, (r, _m, [, name, fallback]) => { const v = lookup(r, owner, name), n = v === null ? NaN : parse(v); return Number.isNaN(n) ? fallback : wrap(n); }, { static: true });
       def(owner, `get${suffix}`, `(${RESOLVER}${STRING})${code}`, (r, _m, [, name]) => { const v = lookup(r, owner, name), n = v === null ? NaN : parse(v); if (Number.isNaN(n)) r.throwJava(NOT_FOUND, r.stringCharacters(name)); return wrap(n); }, { static: true });

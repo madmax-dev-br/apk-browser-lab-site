@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { createHostRegistry, floatBits } from './host-contract.js?v=12145e24651e';
-import { DIGESTS } from './crypto-host.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { createHostRegistry, floatBits } from './host-contract.js?v=9b79f2cfbe27';
+import { DIGESTS } from './crypto-host.js?v=9b79f2cfbe27';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
@@ -361,6 +361,17 @@ export function createSerializationHost(platform) {
     if (r.classes.has(t) || BOX[t] || COLLECTIONS[t] || t === NUMBER || t === ENUM) return t;
     r.throwJava('Ljava/lang/ClassNotFoundException;', name);
   };
+  // java.io.ObjectStreamClass as resolveClass receives it: the descriptor read from the stream (its name and serialVersionUID), bound to the local class once resolved.
+  const STREAM_CLASS = 'Ljava/io/ObjectStreamClass;';
+  type(STREAM_CLASS, OBJECT, ['Ljava/io/Serializable;'], { allocatable: false });
+  const streamClass = (r, d) => { if (d.ref === undefined) { d.ref = r.makeObject(STREAM_CLASS); r.object(d.ref).streamDescriptor = d; } return d.ref; };
+  const descriptorOf = (r, self) => r.object(self).streamDescriptor ?? r.throwJava('Ljava/lang/IllegalStateException;', 'ObjectStreamClass without a stream descriptor');
+  def(STREAM_CLASS, 'getName', `()${STRING}`, (r, _m, [self]) => descriptorOf(r, self).name);
+  def(STREAM_CLASS, 'getSerialVersionUID', '()J', (r, _m, [self]) => descriptorOf(r, self).suid);
+  def(STREAM_CLASS, 'forClass', '()Ljava/lang/Class;', (r, _m, [self]) => { const d = descriptorOf(r, self); return d.type ? r.classObject(d.type) : null; });
+  def(STREAM_CLASS, 'toString', `()${STRING}`, (r, _m, [self]) => { const d = descriptorOf(r, self); return `${d.name}: static final long serialVersionUID = ${d.suid}L;`; });
+  // ObjectInputStream.resolveClass (protected): Class.forName(desc.getName(), false, loader), ClassNotFoundException when the VM has no such class
+  def(OIS, 'resolveClass', `(${STREAM_CLASS})Ljava/lang/Class;`, (r, _m, [, desc]) => { if (desc === null || desc === 0) r.throwJava('Ljava/lang/NullPointerException;', null); return r.classObject(resolveType(r, descriptorOf(r, desc).name)); });
   /** TC_CLASSDESC / TC_NULL / TC_REFERENCE -> { name, suid, flags, fields, superDesc, type }. */
   function readClassDesc(r, s) {
     const tag = rawByte(r, s);
@@ -380,7 +391,12 @@ export function createSerializationHost(platform) {
     }
     for (let tagSkip = rawByte(r, s); tagSkip !== TC.ENDBLOCKDATA; tagSkip = rawByte(r, s)) { s.peeked = tagSkip; readObject0(r, s, false); }   // class annotations
     d.superDesc = readClassDesc(r, s);
-    try { d.type = resolveType(r, d.name); } catch (error) { d.unresolved = error; }
+    // readNonProxyDesc: the stream's own resolveClass names the local class (a subclass may override it and call super); what it throws is kept and raised when the class is needed
+    try {
+      const resolved = vcall(r, s.self, OIS, 'resolveClass', [STREAM_CLASS], 'Ljava/lang/Class;', [streamClass(r, d)]);
+      if (resolved === null || resolved === 0) r.throwJava('Ljava/lang/ClassNotFoundException;', 'null class');
+      d.type = r.object(resolved).classType;
+    } catch (error) { d.unresolved = error; }
     if (d.type && !d.type.startsWith('[')) {
       const local = describe(r, d.type);
       if (local.suid !== d.suid && !local.enum && !local.enumBase) r.throwJava(INVALID_CLASS, `${d.name}; local class incompatible: stream classdesc serialVersionUID = ${d.suid}, local class serialVersionUID = ${local.suid}`);

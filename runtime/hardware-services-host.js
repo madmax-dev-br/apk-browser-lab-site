@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=12145e24651e';
-import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=12145e24651e';
-import { GC_ROOTS } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=9b79f2cfbe27';
+import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=9b79f2cfbe27';
+import { GC_ROOTS } from './heap-gc.js?v=9b79f2cfbe27';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes
@@ -175,6 +175,22 @@ export function createHardwareServicesHost(platform) {
   const gnssRegister = (r, callback) => { if (callback === null || callback === 0) r.throwJava('Ljava/lang/NullPointerException;', null); enforce(r, 'gps'); registrations.set(callback.ref ?? callback, { provider: 'gps', key: callback, cancelled: false }); return 1; };
   def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${GNSS_CB}${HANDLER})Z`, (r, _m, [, cb]) => gnssRegister(r, cb)); def(LOCATION, 'registerGnssStatusCallback', `(${EXECUTOR}${GNSS_CB})Z`, (r, _m, [, , cb]) => gnssRegister(r, cb));
   def(LOCATION, 'unregisterGnssStatusCallback', `(${GNSS_CB})V`, (r, _m, [, cb]) => { if (cb !== null && cb !== 0) registrations.delete(cb.ref ?? cb); });
+  // GNSS measurements (LocationManager.registerGnssMeasurementsCallback, android-13.0.0_r1): GnssMeasurementsTransport checks its executor, then its callback; the service enforces
+  // ACCESS_FINE_LOCATION. The registration always succeeds; with no GNSS hardware no measurement is ever delivered (and onStatusChanged is not called since Android 12).
+  const GNSS_MEASUREMENTS = 'Landroid/location/GnssMeasurementsEvent$Callback;', GPS_LISTENER = 'Landroid/location/GpsStatus$Listener;';
+  const measurementsRegister = (r, executorGiven, callback) => {
+    if (!executorGiven) iae(r, 'invalid null executor'); if (callback === null || callback === 0) iae(r, 'invalid null callback');
+    enforce(r, 'gps'); registrations.set(callback.ref ?? callback, { provider: 'gps', key: callback, cancelled: false }); return 1;
+  };
+  def(LOCATION, 'registerGnssMeasurementsCallback', `(${GNSS_MEASUREMENTS})Z`, (r, _m, [, cb]) => measurementsRegister(r, true, cb));   // DIRECT_EXECUTOR
+  def(LOCATION, 'registerGnssMeasurementsCallback', `(${GNSS_MEASUREMENTS}${HANDLER})Z`, (r, _m, [, cb]) => measurementsRegister(r, true, cb));   // a null Handler becomes new Handler()
+  def(LOCATION, 'registerGnssMeasurementsCallback', `(${EXECUTOR}${GNSS_MEASUREMENTS})Z`, (r, _m, [, executor, cb]) => measurementsRegister(r, executor !== null && executor !== 0, cb));
+  def(LOCATION, 'unregisterGnssMeasurementsCallback', `(${GNSS_MEASUREMENTS})V`, (r, _m, [, cb]) => { if (cb !== null && cb !== 0) registrations.delete(cb.ref ?? cb); });
+  // The legacy GpsStatus listeners: refused for apps targeting Android 12 and above (BLOCK_GPS_STATUS_USAGE, enabled after R); below that they register like a GnssStatus callback
+  // (a null listener is wrapped and accepted, as GpsAdapter does) and never fire here.
+  const gpsStatusBlocked = r => { if ((r.targetSdkVersion ?? Number(r.platform?.manifest?.usesSdk?.targetSdkVersion ?? 1)) > 30) r.throwJava('Ljava/lang/UnsupportedOperationException;', 'GpsStatus APIs not supported, please use GnssStatus APIs instead'); };
+  def(LOCATION, 'addGpsStatusListener', `(${GPS_LISTENER})Z`, (r, _m, [, listener]) => { gpsStatusBlocked(r); enforce(r, 'gps'); if (listener !== null && listener !== 0) registrations.set(listener.ref ?? listener, { provider: 'gps', key: listener, cancelled: false }); return 1; });
+  def(LOCATION, 'removeGpsStatusListener', `(${GPS_LISTENER})V`, (r, _m, [, listener]) => { gpsStatusBlocked(r); if (listener !== null && listener !== 0) registrations.delete(listener.ref ?? listener); });
   def(LOCATION, 'getGnssYearOfHardware', '()I', () => 0); def(LOCATION, 'getGnssHardwareModelName', `()${STRING}`, () => null);
 
   // ---- SensorManager: a device without sensors ------------------------------------------------------------------------------------------------------------

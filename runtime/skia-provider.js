@@ -1,8 +1,9 @@
-import {APKError} from './apk-runtime.js?v=12145e24651e';
-import {PathApproxProvider} from './path-approx-provider.js?v=12145e24651e';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=12145e24651e';
-import {createFontFallback} from './font-fallback.js?v=12145e24651e';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=12145e24651e';
+import {APKError} from './apk-runtime.js?v=9b79f2cfbe27';
+import {PathApproxProvider} from './path-approx-provider.js?v=9b79f2cfbe27';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=9b79f2cfbe27';
+import {createFontFallback} from './font-fallback.js?v=9b79f2cfbe27';
+import {createSystemFontStore} from './system-fonts.js?v=9b79f2cfbe27';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=9b79f2cfbe27';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -83,8 +84,10 @@ export class SkiaProvider{
   if(!this.fontReader&&node){const fs=await import('node:fs'),{fileURLToPath}=await import('node:url');readSync=(url,limit)=>{const bytes=new Uint8Array(fs.readFileSync(fileURLToPath(url)));if(bytes.length>limit)throw new APKError('Skia fallback font exceeds VM limit');return bytes;};}
   if(!this.fontReader&&!node){const direct=readSync;readSync=(url,limit)=>{const key=String(url),hit=this.prefetched?.sync.get(key);if(hit){this.prefetched.sync.delete(key);if(hit.length<=limit)return hit;}return direct(url,limit);};}   // a prefetched manifest instead of a synchronous request
   const fallback=createFontFallback({CK,baseURL:this.fallbackBaseURL(),readSync,robotoFiles:fonts.map(f=>({file:f.file,bytes:assets[f.file]})),selectTypeface});
+  const fontBoxes=new WeakMap();   // Skia typeface -> the font's head bounding box, for the faces whose metrics CanvasKit gives without bounds (variable fonts)
+  const systemFonts=createSystemFontStore({CK,fallback,fontBoxes});   // the named families of Android's fonts.xml; a font file is read when a family is first asked for
   const pathApprox=await(this.pathApproxProvider??new PathApproxProvider({fetchImpl:this.fetch})).load();
-  const result={pathApprox,codecs:null,codecsError:null,prepareCodecs:null,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height,options)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height,options)};
+  const result={pathApprox,codecs:null,codecsError:null,prepareCodecs:null,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,systemFonts,fontBoxes,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height,options)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height,options)};
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) are not part of Skia's own load: apk-loader prepares them when the APK can decode or encode images. The load is bounded; a failure is recorded in codecsError
   // (the hosts that need a codec then fail with that message) instead of blocking the run.
   result.prepareCodecs=()=>this.codecsPending??=loadLabCodecs({baseURL:this.codecBaseURL(),readBytes:this.codecReadBytes??((url,limit)=>this.readCodecBytes(url,limit)),timeoutMs:this.codecTimeoutMs}).then(codecs=>{result.codecs=codecs;return codecs;},error=>{result.codecsError=error;return null;});

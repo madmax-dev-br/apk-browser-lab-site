@@ -1,6 +1,7 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { sfntStyle, tagToInt } from './sfnt.js?v=12145e24651e';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=9b79f2cfbe27';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
+import { sfntStyle, tagToInt } from './sfnt.js?v=9b79f2cfbe27';
+import { hasSystemFamily } from './system-fonts.js?v=9b79f2cfbe27';
 
 export { sfntStyle };
 
@@ -9,8 +10,7 @@ export { sfntStyle };
 // The Java sources run as host code with the same checks, messages and fallbacks as the originals; the native half (Font.cpp / Typeface.cpp) is replaced by the Skia canvas host: a font is validated by FreeType
 // (the Font.Builder.build() IllegalArgumentException for data that is no font), kept once per distinct file, and a Typeface keeps its whole family chain so the style requested at use time (Typeface.create(tf, BOLD),
 // textFontWeight) selects the font by Minikin's closest-match score and decides the synthetic bold / italic Android applies.
-// Approximations: a downloadable-font family (fontProviderAuthority) always answers Typeface.DEFAULT because no font provider exists in the VM; system families that fonts.xml defines but the lab has no file for
-// (serif, monospace, cursive, ...) answer Roboto; Font.getLocaleList is always empty; a ParcelFileDescriptor font is read from the descriptor's current position.
+// Approximations: a downloadable-font family (fontProviderAuthority) always answers Typeface.DEFAULT because no font provider exists in the VM; Font.getLocaleList is always empty; a ParcelFileDescriptor font is read from the descriptor's current position.
 
 const FONT = 'Landroid/graphics/fonts/Font;', FONT_BUILDER = 'Landroid/graphics/fonts/Font$Builder;', FAMILY = 'Landroid/graphics/fonts/FontFamily;', FAMILY_BUILDER = 'Landroid/graphics/fonts/FontFamily$Builder;';
 const STYLE = 'Landroid/graphics/fonts/FontStyle;', AXIS = 'Landroid/graphics/fonts/FontVariationAxis;', TYPEFACE = 'Landroid/graphics/Typeface;', TB = 'Landroid/graphics/Typeface$Builder;', CFB = 'Landroid/graphics/Typeface$CustomFallbackBuilder;';
@@ -20,7 +20,7 @@ const NOT_FOUND = 'Landroid/content/res/Resources$NotFoundException;', IOEXCEPTI
 const WEIGHTS = { THIN: 100, EXTRA_LIGHT: 200, LIGHT: 300, NORMAL: 400, MEDIUM: 500, SEMI_BOLD: 600, BOLD: 700, EXTRA_BOLD: 800, BLACK: 900 };
 const RESOLVE_BY_FONT_TABLE = -1, DEFAULT_FAMILY = 'sans-serif', MAX_FALLBACK = 64;
 const MAX_FONT_BYTES = 64 * 1024 * 1024;
-const SYSTEM_FAMILIES = new Set(['sans-serif', 'sans-serif-thin', 'sans-serif-light', 'sans-serif-medium', 'sans-serif-black', 'arial', 'helvetica', 'tahoma', 'verdana']);
+const SYSTEM_FAMILIES = { has: hasSystemFamily };   // the system font map of fonts.xml (src/system-fonts.js)
 
 export function createTypefaceBuilderHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;

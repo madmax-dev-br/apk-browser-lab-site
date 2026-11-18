@@ -1,4 +1,4 @@
-import {APKError} from './apk-runtime.js?v=12145e24651e';
+import {APKError} from './apk-runtime.js?v=9b79f2cfbe27';
 const VIEW='Landroid/view/View;',PROVIDER='Landroid/view/ViewOutlineProvider;',OUTLINE='Landroid/graphics/Outline;',RECT='Landroid/graphics/Rect;',PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const keys=new Set(['setOutlineProvider('+PROVIDER+')V','getOutlineProvider()'+PROVIDER,'invalidateOutline()V','setClipToOutline(Z)V','getClipToOutline()Z','setClipBounds('+RECT+')V','getClipBounds()'+RECT,'getClipBounds('+RECT+')Z'].map(signature=>VIEW+'->'+signature));
 const bits=new DataView(new ArrayBuffer(4)),encode=value=>{bits.setFloat32(0,value,true);return bits.getInt32(0,true);},decode=value=>{bits.setInt32(0,value,true);return bits.getFloat32(0,true);};
@@ -20,14 +20,16 @@ export function createViewOutlineHost(platform){
  };
  return{
   supports:key=>keys.has(key),
-  /** Original Outline state for shadows: {rect,radius,alpha} or null when empty/none. Convex-path outlines fail explicitly. */
+  /** Original Outline state for shadows: {rect,radius,alpha}, {commands,fillType,alpha} for a path outline, or null when empty/none. */
   /** The View's original Outline object (null without a provider); RenderNode.setOutline consumes it when a View is recorded into a display list. */
   outlineObject(r,receiver){return outline(r,receiver);},
   shape(r,receiver){
    const target=outline(r,receiver);if(!target||call(r,target,OUTLINE,'isEmpty',[],'Z'))return null;
    const fields=r.object(target).fields,mode=fields.get(`${OUTLINE}->mMode:I`),alpha=decode(fields.get(`${OUTLINE}->mAlpha:F`)??encode(1));
    if(mode===1)return{rect:rectangle(r,fields.get(`${OUTLINE}->mRect:${RECT}`)),radius:decode(fields.get(`${OUTLINE}->mRadius:F`)??0),alpha};
-   fail('Shadows for convex-path View outlines are not connected to the View shadow raster yet');
+   // Outline.setPath (MODE_PATH: a GradientDrawable with per-corner radii, a custom provider): the shadow is cast by the path itself, as HWUI does with the outline's SkPath.
+   if(mode===2){const path=fields.get(`${OUTLINE}->mPath:${PATH}`)??fields.get(`${OUTLINE}->mConvexPath:${PATH}`);if(!path)fail('Original Outline path is absent');if(!r.skiaHost?.pathSnapshot)fail('Shadows for path View outlines require verified Skia');return{...r.skiaHost.pathSnapshot(path),alpha};}
+   fail('Unsupported original Outline mode '+mode);
   },
   clip(r,receiver,canvas){
    const view=r.object(receiver);

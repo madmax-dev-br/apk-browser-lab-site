@@ -1,6 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { parseFontFeatureSettings } from './skia-paragraph.js?v=9b79f2cfbe27';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -42,6 +43,7 @@ export function createTextViewApiHost(platform) {
     def(TEXT, setName, setSig, (r, _m, [self, raw]) => {
       let value = type === 'Z' ? flag(raw) : (type.startsWith('L') || type.startsWith('[')) && nullish(raw) ? null : raw; value = validate ? (validate(r, value, self) ?? value) : value;
       const state = tv(r, self), previous = state[key]; state[key] = value;
+      if (key === 'includeFontPadding') r.object(self).includeFontPadding = value;   // the field the native measure and draw read
       if (previous !== value) { if (effect === 'relayout') relayout(r, self); else if (effect === 'redraw') platform.requestDraw?.(r, self); }
     });
     def(TEXT, getName, getSig, (r, _m, [self]) => { const value = tv(r, self)[key]; return type === 'Z' ? (value ? 1 : 0) : value; });
@@ -146,7 +148,7 @@ export function createTextViewApiHost(platform) {
   // ---- sizes: width / height / ems / min / max (TextView keeps a mode per axis: PIXELS or EMS, and for height LINES) ----------------------------------------------------------------------------------
   const sizeProps = [['MaxWidth', 'maxWidth'], ['MinWidth', 'minWidth'], ['MaxHeight', 'maxHeight'], ['MinHeight', 'minHeight']];
   for (const [Name, key] of sizeProps) {
-    def(TEXT, `set${Name}`, '(I)V', (r, _m, [self, pixels]) => { const s = tv(r, self); s[key] = pixels; s[key + 'Mode'] = 'px'; relayout(r, self); });
+    def(TEXT, `set${Name}`, '(I)V', (r, _m, [self, pixels]) => { const s = tv(r, self); s[key] = pixels; s[key + 'Mode'] = 'px'; if (key.endsWith('Height')) r.object(self)[key === 'maxHeight' ? 'maxLines' : 'minLines'] = null; /* mMaxMode / mMinMode = PIXELS: the line limit of that side is gone */ relayout(r, self); });
     def(TEXT, `get${Name}`, '()I', (r, _m, [self]) => { const s = tv(r, self); return s[key + 'Mode'] === 'ems' ? s[key + 'Ems'] : (s[key] ?? (key.startsWith('max') ? -1 : -1)); });
   }
   for (const [Name, key] of [['MaxEms', 'maxWidth'], ['MinEms', 'minWidth']]) def(TEXT, `set${Name}`, '(I)V', (r, _m, [self, ems]) => { const s = tv(r, self); s[key + 'Ems'] = ems; s[key + 'Mode'] = 'ems'; relayout(r, self); });
@@ -158,7 +160,18 @@ export function createTextViewApiHost(platform) {
   def(TEXT, 'getMinHeight', '()I', (r, _m, [self]) => { const s = tv(r, self); return s.minHeightMode === 'px' ? s.minHeight : -1; });
   def(TEXT, 'setEms', '(I)V', (r, _m, [self, ems]) => { const s = tv(r, self); s.minWidthEms = s.maxWidthEms = ems; s.minWidthMode = s.maxWidthMode = 'ems'; relayout(r, self); });
   def(TEXT, 'setWidth', '(I)V', (r, _m, [self, pixels]) => { const s = tv(r, self); s.minWidth = s.maxWidth = pixels; s.minWidthMode = s.maxWidthMode = 'px'; relayout(r, self); });
-  def(TEXT, 'setHeight', '(I)V', (r, _m, [self, pixels]) => { const s = tv(r, self); s.minHeight = s.maxHeight = pixels; s.minHeightMode = s.maxHeightMode = 'px'; relayout(r, self); });
+  def(TEXT, 'setHeight', '(I)V', (r, _m, [self, pixels]) => { const s = tv(r, self), view = r.object(self); s.minHeight = s.maxHeight = pixels; s.minHeightMode = s.maxHeightMode = 'px'; view.minLines = view.maxLines = null; relayout(r, self); });
+  /**
+   * TextView.onMeasure's size limits other than the line counts: android:minWidth / maxWidth / width (pixels) or minEms / maxEms / ems (ems are line heights, as in the original),
+   * and android:minHeight / maxHeight / height in pixels. null where the TextView has none.
+   */
+  registry.sizeLimits = (r, self) => {
+    const s = r.object(self).tv; if (!s || !(s.minWidthMode || s.maxWidthMode || s.minHeightMode === 'px' || s.maxHeightMode === 'px')) return null;
+    const em = s.minWidthMode === 'ems' || s.maxWidthMode === 'ems' ? call(r, self, TEXT, 'getLineHeight', [], 'I') : 0;
+    const width = key => s[key + 'Mode'] === 'px' ? (s[key] >= 0 ? s[key] : null) : s[key + 'Mode'] === 'ems' ? (s[key + 'Ems'] >= 0 ? s[key + 'Ems'] * em : null) : null;
+    const height = key => s[key + 'Mode'] === 'px' && s[key] >= 0 ? s[key] : null;
+    return { minWidth: width('minWidth'), maxWidth: width('maxWidth'), minHeight: height('minHeight'), maxHeight: height('maxHeight') };
+  };
 
   // ---- colours ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   const argb = n => `#${(n >>> 0).toString(16).padStart(8, '0')}`;
@@ -169,7 +182,8 @@ export function createTextViewApiHost(platform) {
   };
   const colorList = (r, color) => callStatic(r, TINT, 'valueOf', ['I'], TINT, [color]);
   const textColorOf = (r, self) => { const s = tv(r, self); if (s.textColors) return s.textColors; const c = r.object(self).textColor; return c == null ? null : colorList(r, typeof c === 'number' ? c | 0 : Number.parseInt(c.slice(1), 16) | (c.length === 7 ? 0xff000000 : 0)); };
-  def(TEXT, 'getTextColors', `()${TINT}`, (r, _m, [self]) => textColorOf(r, self));
+  // TextView.getTextColors is never null: the constructor reads android:textColor (attributes, style, text appearance) and falls back to ColorStateList.valueOf(0xFF000000)
+  def(TEXT, 'getTextColors', `()${TINT}`, (r, _m, [self]) => textColorOf(r, self) ?? (tv(r, self).themeTextColors ??= platform.composeCanvasHost?.themeTextColors?.(r, self) ?? colorList(r, 0xff000000 | 0)));
   def(TEXT, 'getCurrentTextColor', '()I', (r, _m, [self]) => {
     const list = textColorOf(r, self); if (list === null) return 0xff000000 | 0;   // TextView's theme default is resolved by the draw path; an unset TextView reports the default text colour black
     return currentColor(r, self, list, 0xff000000 | 0);
@@ -178,6 +192,9 @@ export function createTextViewApiHost(platform) {
     if (nullish(colors)) r.throwJava('Ljava/lang/NullPointerException;', null);
     tv(r, self).textColors = colors; legacy(r, self, 'setTextColor', ['I'], 'V', [currentColor(r, self, colors, 0xff000000 | 0)]);
   });
+  // TextView.setTextColor(int) is mTextColor = ColorStateList.valueOf(color): it replaces a list a text appearance or setTextColor(ColorStateList) gave, for getTextColors(),
+  // getCurrentTextColor() and the draw alike (Toolbar gives its title the text appearance first and android:titleTextColor after it).
+  def(TEXT, 'setTextColor', '(I)V', (r, _m, [self, color]) => { tv(r, self).textColors = null; legacy(r, self, 'setTextColor', ['I'], 'V', [color]); });
   def(TEXT, 'getHintTextColors', `()${TINT}`, (r, _m, [self]) => tv(r, self).hintTextColors ?? null);
   def(TEXT, 'getCurrentHintTextColor', '()I', (r, _m, [self]) => { const list = tv(r, self).hintTextColors; return nullish(list) ? textColorOf(r, self) ? currentColor(r, self, textColorOf(r, self), 0) : 0 : currentColor(r, self, list, 0); });
   def(TEXT, 'setHintTextColor', '(I)V', (r, _m, [self, color]) => { tv(r, self).hintTextColors = colorList(r, color); platform.requestDraw?.(r, self); });
@@ -195,8 +212,10 @@ export function createTextViewApiHost(platform) {
     if (!nullish(view.typeface)) call(r, paint, PAINT, 'setTypeface', ['Landroid/graphics/Typeface;'], 'Landroid/graphics/Typeface;', [view.typeface]);
     call(r, paint, PAINT, 'setColor', ['I'], 'V', [call(r, self, TEXT, 'getCurrentTextColor', [], 'I')]);
     call(r, paint, PAINT, 'setLetterSpacing', ['F'], 'V', [f2i(s.letterSpacing)]); call(r, paint, PAINT, 'setTextScaleX', ['F'], 'V', [f2i(s.textScaleX)]);
-    if (s.fontFeatureSettings !== null) call(r, paint, PAINT, 'setFontFeatureSettings', [STRING], 'V', [s.fontFeatureSettings]);
+    call(r, paint, PAINT, 'setFontFeatureSettings', [STRING], 'V', [s.fontFeatureSettings]);
     if (s.shadowRadius !== 0) call(r, paint, TEXT_PAINT, 'setShadowLayer', ['F', 'F', 'F', 'I'], 'V', [f2i(s.shadowRadius), f2i(s.shadowDx), f2i(s.shadowDy), s.shadowColor]);
+    else if (s.paintShadow) call(r, paint, PAINT, 'clearShadowLayer', [], 'V', []);   // a shadow the TextView no longer has
+    s.paintShadow = s.shadowRadius !== 0;
     call(r, paint, PAINT, 'setElegantTextHeight', ['Z'], 'V', [s.elegantTextHeight ? 1 : 0]);
   };
   def(TEXT, 'getPaintFlags', '()I', (r, _m, [self]) => call(r, paintOf(r, self), PAINT, 'getFlags', [], 'I'));
@@ -206,8 +225,19 @@ export function createTextViewApiHost(platform) {
   def(TEXT, 'getLetterSpacing', '()F', (r, _m, [self]) => f2i(tv(r, self).letterSpacing));
   def(TEXT, 'setLetterSpacing', '(F)V', (r, _m, [self, letterSpacing]) => { const s = tv(r, self), value = i2f(letterSpacing); if (value !== s.letterSpacing) { s.letterSpacing = value; relayout(r, self); } });
   def(TEXT, 'setFontVariationSettings', `(${STRING})Z`, (r, _m, [self, settings]) => {
-    const s = tv(r, self), value = nullish(settings) ? null : settings; if (value === s.fontVariationSettings) return 1;
-    s.fontVariationSettings = value; relayout(r, self); return 1;
+    // TextView.setFontVariationSettings -> Paint.setFontVariationSettings: the settings are kept only when the typeface supports one of the axes (its own fonts or the
+    // fallback chain's), and the TextView's typeface becomes Typeface.createFromTypefaceWithVariation(typeface, supported axes). null or "" clears them.
+    const s = tv(r, self), text = nullish(settings) ? '' : typeof settings === 'string' ? settings : r.stringCharacters(settings), current = nullish(s.fontVariationSettings) ? '' : typeof s.fontVariationSettings === 'string' ? s.fontVariationSettings : r.stringCharacters(s.fontVariationSettings);
+    if (text === current) return 1;
+    if (!r.skiaHost?.variationTypeface) { s.fontVariationSettings = text === '' ? null : settings; relayout(r, self); return 1; }   // the page draws the text (no font backend): the value is kept
+    const TYPEFACE = 'Landroid/graphics/Typeface;', base = call(r, self, TEXT, 'getTypeface', [], TYPEFACE) ?? null;
+    let axes = [];
+    if (text !== '') { try { axes = platform.typefaceBuilder.parseVariationSettings(r, text) ?? []; } catch (error) { if (error?.name === 'JavaException' && r.isSubtype(r.typeOf(error.value), 'Ljava/lang/IllegalArgumentException;')) return 0; throw error; } if (!axes.length) return 0; }
+    const face = r.skiaHost.variationTypeface(base, axes);
+    if (text !== '' && !face) return 0;
+    s.fontVariationSettings = text === '' ? null : settings;
+    if (face) call(r, self, TEXT, 'setTypeface', [TYPEFACE], 'V', [face]);
+    relayout(r, self); return 1;
   });
   def(TEXT, 'getFontVariationSettings', `()${STRING}`, (r, _m, [self]) => tv(r, self).fontVariationSettings);
   def(TEXT, 'setShadowLayer', '(FFFI)V', (r, _m, [self, radius, dx, dy, color]) => { const s = tv(r, self); s.shadowRadius = i2f(radius); s.shadowDx = i2f(dx); s.shadowDy = i2f(dy); s.shadowColor = color; relayout(r, self); });
@@ -267,11 +297,11 @@ export function createTextViewApiHost(platform) {
   const setCompound = (r, self, left, top, right, bottom) => {
     const c = drawables(r, self); c.relative = false; c.start = c.end = null;
     for (const [key, d] of [['left', left], ['top', top], ['right', right], ['bottom', bottom]]) { if (c[key] !== d && !nullish(c[key])) call(r, c[key], DRAWABLE, 'setCallback', ['Landroid/graphics/drawable/Drawable$Callback;'], 'V', [null]); c[key] = adopt(r, self, d); }
-    syncCompoundPaddingState(r, self); relayout(r, self);
+    applyCompoundTint(r, self); relayout(r, self);
   };
   const setCompoundRelative = (r, self, start, top, end, bottom) => {
     const c = drawables(r, self), rtl = call(r, self, VIEW, 'getLayoutDirection', [], 'I') === 1; c.relative = true; c.start = adopt(r, self, start); c.end = adopt(r, self, end);
-    c.top = adopt(r, self, top); c.bottom = adopt(r, self, bottom); c.left = rtl ? c.end : c.start; c.right = rtl ? c.start : c.end; syncCompoundPaddingState(r, self); relayout(r, self);
+    c.top = adopt(r, self, top); c.bottom = adopt(r, self, bottom); c.left = rtl ? c.end : c.start; c.right = rtl ? c.start : c.end; applyCompoundTint(r, self); relayout(r, self);
   };
   const D4 = DRAWABLE.repeat(4);
   def(TEXT, 'setCompoundDrawables', `(${D4})V`, (r, _m, [self, l, t, rr, b]) => {
@@ -455,6 +485,10 @@ export function createTextViewApiHost(platform) {
     // fixFocusableAndClickableSettings: a movement method makes the View focusable, clickable and long-clickable (and a TextView without one is not, unless it is an EditText)
     if (next !== null) { call(r, self, VIEW, 'setFocusable', ['Z'], 'V', [1]); call(r, self, VIEW, 'setClickable', ['Z'], 'V', [1]); call(r, self, VIEW, 'setLongClickable', ['Z'], 'V', [1]); }
   });
+  def(TEXT, 'onFocusChanged', '(ZILandroid/graphics/Rect;)V', (r, _m, [self, focused, direction, rect]) => {   // TextView.onFocusChanged -> Editor.onFocusChanged: android:selectAllOnFocus selects the whole text (TextView.selectAllText)
+    if (flag(focused) && tv(r, self).selectAllOnFocus) { const text = spannableText(r, self); if (text) callStatic(r, 'Landroid/text/Selection;', 'setSelection', [SPANNABLE, 'I', 'I'], 'V', [text, 0, csString(r, text).length]); }
+    r.dispatch({ owner: VIEW, name: 'onFocusChanged', parameters: ['Z', 'I', 'Landroid/graphics/Rect;'], result: 'V', signature: '(ZILandroid/graphics/Rect;)V' }, [self, focused, direction, rect], 'direct');
+  });
   def(TEXT, 'onTouchEvent', '(Landroid/view/MotionEvent;)Z', (r, _m, [self, event]) => {   // TextView.onTouchEvent: View's click / press handling, then the movement method over the Spannable text
     const result = r.dispatch({ owner: VIEW, name: 'onTouchEvent', parameters: ['Landroid/view/MotionEvent;'], result: 'Z', signature: '(Landroid/view/MotionEvent;)Z' }, [self, event], 'direct');
     const method = r.object(self).movementMethod, text = spannableText(r, self);
@@ -509,9 +543,12 @@ export function createTextViewApiHost(platform) {
     def(TEXT, get, '()Landroid/view/ActionMode$Callback;', (r, _m, [self]) => tv(r, self)[key] ?? null);
   }
   for (const [Name, key] of [['TextCursorDrawable', 'textCursorDrawable'], ['TextSelectHandle', 'textSelectHandle'], ['TextSelectHandleLeft', 'textSelectHandleLeft'], ['TextSelectHandleRight', 'textSelectHandleRight']]) {
-    def(TEXT, `set${Name}`, `(${DRAWABLE})V`, (r, _m, [self, d]) => { tv(r, self)[key] = nullish(d) ? null : d; platform.requestDraw?.(r, self); });
-    def(TEXT, `set${Name}`, '(I)V', (r, _m, [self, id]) => { tv(r, self)[key] = id === 0 ? null : call(r, call(r, self, VIEW, 'getContext', [], CONTEXT), CONTEXT, 'getDrawable', ['I'], DRAWABLE, [id]); platform.requestDraw?.(r, self); });
-    def(TEXT, `get${Name}`, `()${DRAWABLE}`, (r, _m, [self]) => tv(r, self)[key] ?? null);
+    def(TEXT, `set${Name}`, `(${DRAWABLE})V`, (r, _m, [self, d]) => { tv(r, self)[key] = nullish(d) ? null : d; tv(r, self)[key + 'Res'] = 0; platform.requestDraw?.(r, self); });
+    def(TEXT, `set${Name}`, '(I)V', (r, _m, [self, id]) => { tv(r, self)[key + 'Res'] = id; tv(r, self)[key] = id === 0 ? null : call(r, call(r, self, VIEW, 'getContext', [], CONTEXT), CONTEXT, 'getDrawable', ['I'], DRAWABLE, [id]); platform.requestDraw?.(r, self); });
+    def(TEXT, `get${Name}`, `()${DRAWABLE}`, (r, _m, [self]) => {   // the Drawable set, else the one of the resource the constructor read (android:textCursorDrawable, android:textSelectHandle*), loaded on first use
+      const s = tv(r, self); if (nullish(s[key]) && s[key + 'Res']) s[key] = call(r, call(r, self, VIEW, 'getContext', [], CONTEXT), CONTEXT, 'getDrawable', ['I'], DRAWABLE, [s[key + 'Res']]);
+      return s[key] ?? null;
+    });
   }
   def(TEXT, 'moveCursorToVisibleOffset', '()Z', (r, _m, [self]) => {   // TextView.moveCursorToVisibleOffset: only an Editable with a collapsed selection can have its cursor moved into the visible lines
     const text = call(r, self, TEXT, 'getText', [], CHARS); if (nullish(text) || typeof text === 'string' || !r.isSubtype(r.object(text).type, SPANNABLE)) return 0;
@@ -527,27 +564,59 @@ export function createTextViewApiHost(platform) {
 
   // ---- layout and the queries answered from it ---------------------------------------------------------------------------------------------------------------------------------------------------------
   const layoutWidth = (r, self) => call(r, self, VIEW, 'getMeasuredWidth', [], 'I') - compoundPad(r, self, 'left') - compoundPad(r, self, 'right');
-  def(TEXT, 'getLayout', `()${LAYOUT}`, (r, _m, [self]) => {
+  /**
+   * The Layout TextView.makeSingleLayout builds for the text (or the hint of an empty TextView) at `width` pixels (the view's width inside its compound padding): the original
+   * StaticLayout with the TextView's paint, alignment, spacing, break strategy, hyphenation frequency, justification, line-break configuration, line limit and ellipsis.
+   * Kept until one of its inputs changes.
+   */
+  /** The gravity the text is laid out with: the TextView's own, else its style's (a Button's text is centred). */
+  const layoutGravity = (r, self) => { const view = r.object(self); if (view.gravity != null) return view.gravity; try { return platform.composeCanvasHost?.textGravity?.(r, self) ?? 0x800033; } catch (error) { if (error?.name === 'JavaException') throw error; return 0x800033; } };
+  /** mTransformed, or the hint of an empty TextView: the characters the Layout is built from. */
+  const shownText = (r, self) => {
+    const view = r.object(self), text = call(r, self, TEXT, 'getText', [], CHARS), raw = csString(r, text);
+    // The transformation method's text (all caps, single line, password): the platform keeps it as a string (view.displayText); a text with spans is laid out as it is.
+    const transformed = view.displayText != null && String(view.displayText) !== raw && (typeof text === 'string' || nullish(text) || isEditText(r, self) || !r.isSubtype(r.object(text).type, 'Landroid/text/Spanned;')) ? String(view.displayText) : text;
+    return nullish(text) || raw === '' ? (view.hint ?? '') : transformed;
+  };
+  /** Layout.getDesiredWidth(mTransformed, mTextPaint): the width of the widest line when nothing wraps it (TextView.onMeasure for a text that is not boring). */
+  registry.desiredTextWidth = (r, self) => { syncPaint(r, self); return i2f(callStatic(r, LAYOUT, 'getDesiredWidth', [CHARS, TEXT_PAINT], 'F', [shownText(r, self), paintOf(r, self)])); };
+  const layoutFor = (r, self, innerWidth) => {
     const view = r.object(self), s = tv(r, self);
-    if (!view.measuredDimensionSet) return null;                       // TextView builds its layout in onMeasure: before that getLayout() is null
-    let width = Math.max(0, layoutWidth(r, self));
-    const text = call(r, self, TEXT, 'getText', [], CHARS), shown = nullish(text) || csString(r, text) === '' ? (view.hint ?? '') : text;
-    const singleLine = !!view.singleLine || !!view.horizontallyScrolling; if (singleLine) width = Math.max(width, 1024 * 1024);
-    const key = JSON.stringify([csString(r, shown), width, s.lineSpacingExtra, s.lineSpacingMult, s.breakStrategy, s.hyphenationFrequency, s.justificationMode, s.letterSpacing, s.includeFontPadding, s.fallbackLineSpacing, view.maxLines ?? null, view.textSize ?? null, gravityOf(r, self), view.layoutDirection ?? 0, !!s.ellipsize, view.textColor ?? null, typeof shown === 'object' && shown !== null ? shown.ref ?? null : null]);   // the CharSequence itself too: the same characters with other spans are another layout
+    let width = Math.max(0, innerWidth);
+    const shown = shownText(r, self);
+    const singleLine = !!view.singleLine || !!view.horizontallyScrolling, ellipsisWidth = width; if (singleLine) width = Math.max(width, 1024 * 1024);   // VERY_WIDE: a horizontally scrolling text is laid out unbounded
+    const typeface = view.typeface ?? null, gravity = layoutGravity(r, self);
+    const key = JSON.stringify([csString(r, shown), width, ellipsisWidth, s.lineSpacingExtra, s.lineSpacingMult, s.breakStrategy, s.hyphenationFrequency, s.justificationMode, s.lineBreakStyle, s.lineBreakWordStyle, s.letterSpacing, s.textScaleX, csString(r, s.fontFeatureSettings), typeface?.ref ?? null,
+      s.shadowRadius, s.shadowDx, s.shadowDy, s.shadowColor, s.includeFontPadding, s.fallbackLineSpacing, view.maxLines ?? null, !!view.singleLine, view.textSize ?? null, gravity, view.layoutDirection ?? 0, nullish(s.ellipsize) ? null : r.object(s.ellipsize).enumName ?? true, s.marqueeFadeMode ?? 0, typeof r.icuBreakBackend?.breaks === 'function', !!s.layoutLineBreakOff, view.textColor ?? null, typeof shown === 'object' && shown !== null ? shown.ref ?? null : null]);   // the CharSequence itself too: the same characters with other spans are another layout
     if (s.layoutKey === key && s.layout) return s.layout;
     syncPaint(r, self);
-    const paint = paintOf(r, self), len = csString(r, shown).length, gravityH = gravityOf(r, self) & 0x800007, rtl = call(r, self, VIEW, 'getLayoutDirection', [], 'I') === 1;
+    const paint = paintOf(r, self), len = csString(r, shown).length, gravityH = gravity & 0x800007, rtl = call(r, self, VIEW, 'getLayoutDirection', [], 'I') === 1;
     const alignName = gravityH === 0x800003 ? 'ALIGN_NORMAL' : gravityH === 0x800005 ? 'ALIGN_OPPOSITE' : gravityH === 3 ? (rtl ? 'ALIGN_OPPOSITE' : 'ALIGN_NORMAL') : gravityH === 5 ? (rtl ? 'ALIGN_NORMAL' : 'ALIGN_OPPOSITE') : (gravityH & 7) === 1 ? 'ALIGN_CENTER' : 'ALIGN_NORMAL';
-    const AL = 'Landroid/text/Layout$Alignment;';
+    const AL = 'Landroid/text/Layout$Alignment;', CONFIG = 'Landroid/graphics/text/LineBreakConfig;';
     let b = callStatic(r, STATIC_LAYOUT.slice(0, -1) + '$Builder;', 'obtain', [CHARS, 'I', 'I', TEXT_PAINT, 'I'], BUILDER, [shown, 0, len, paint, width]);
     const step = (name, parameters, args) => { b = call(r, b, BUILDER, name, parameters, BUILDER, args); };
     step('setAlignment', [AL], [staticField(r, 'Landroid/text/Layout$Alignment;', alignName)]);
     step('setLineSpacing', ['F', 'F'], [f2i(s.lineSpacingExtra), f2i(s.lineSpacingMult)]); step('setIncludePad', ['Z'], [s.includeFontPadding ? 1 : 0]); step('setUseLineSpacingFromFallbacks', ['Z'], [s.fallbackLineSpacing ? 1 : 0]);
-    step('setBreakStrategy', ['I'], [s.breakStrategy]); step('setHyphenationFrequency', ['I'], [s.hyphenationFrequency]); step('setJustificationMode', ['I'], [s.justificationMode]);
+    // An optimal strategy the constructor read (the layout XML, or the default TextView style, which asks for high_quality) needs the ICU line-break iterator; where it is
+    // not loaded the text is broken greedily, which the measure pass reports (view-layout-host.js). A strategy the app set from code is not replaced: it fails by name.
+    const fromXml = s.xmlBreakStrategy === s.breakStrategy && !!s.xmlGiven?.get('breakStrategy'), strategy = s.breakStrategy > 0 && fromXml && typeof r.icuBreakBackend?.breaks !== 'function' ? 0 : s.breakStrategy;
+    step('setBreakStrategy', ['I'], [strategy]); step('setHyphenationFrequency', ['I'], [s.hyphenationFrequency]); step('setJustificationMode', ['I'], [s.justificationMode]);
+    if ((s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0) && !s.layoutLineBreakOff && r.classes.has(CONFIG)) step('setLineBreakConfig', [CONFIG], [callStatic(r, CONFIG, 'getLineBreakConfig', ['I', 'I'], CONFIG, [s.lineBreakStyle, s.lineBreakWordStyle])]);
     step('setTextDirection', ['Landroid/text/TextDirectionHeuristic;'], [call(r, self, TEXT, 'getTextDirectionHeuristic', [], 'Landroid/text/TextDirectionHeuristic;')]);
-    if (s.ellipsize) { step('setEllipsize', ['Landroid/text/TextUtils$TruncateAt;'], [s.ellipsize]); step('setEllipsizedWidth', ['I'], [Math.max(0, layoutWidth(r, self))]); }
-    const maxLines = singleLine ? 1 : view.maxLines; if (maxLines != null) step('setMaxLines', ['I'], [maxLines]);
+    if (s.ellipsize) {
+      // TextView.makeNewLayout: a marquee that switches to an ellipsis at rest (MARQUEE_FADE_SWITCH_SHOW_ELLIPSIS, a device without the fading marquee) is laid out with END_SMALL
+      const TRUNCATE = 'Landroid/text/TextUtils$TruncateAt;', effective = r.object(s.ellipsize).enumName === 'MARQUEE' && s.marqueeFadeMode === 1 ? staticField(r, TRUNCATE, 'END_SMALL') : s.ellipsize;
+      step('setEllipsize', [TRUNCATE], [effective]); step('setEllipsizedWidth', ['I'], [ellipsisWidth]);
+    }
+    const maxLines = view.singleLine ? 1 : view.maxLines; if (maxLines != null) step('setMaxLines', ['I'], [maxLines]);
     s.layout = call(r, b, BUILDER, 'build', [], STATIC_LAYOUT); s.layoutKey = key; return s.layout;
+  };
+  registry.layoutFor = layoutFor; registry.layoutGravity = layoutGravity;
+  /** The TextView's TextPaint with the TextView's current size, typeface, colour, spacing, scale, font features and shadow. */
+  registry.syncedPaint = (r, self) => { syncPaint(r, self); return paintOf(r, self); };
+  def(TEXT, 'getLayout', `()${LAYOUT}`, (r, _m, [self]) => {
+    if (!r.object(self).measuredDimensionSet) return null;                       // TextView builds its layout in onMeasure: before that getLayout() is null
+    return layoutFor(r, self, layoutWidth(r, self));
   });
   def(TEXT, 'getLineCount', '()I', (r, _m, [self]) => { const layout = call(r, self, TEXT, 'getLayout', [], LAYOUT); return nullish(layout) ? 0 : call(r, layout, LAYOUT, 'getLineCount', [], 'I'); });
   def(TEXT, 'getLineBounds', `(I${RECT})I`, (r, _m, [self, line, bounds]) => {
@@ -602,7 +671,7 @@ export function createTextViewApiHost(platform) {
       if (has(TA.fontVariationSettings)) call(r, self, TEXT, 'setFontVariationSettings', [STRING], 'Z', [call(r, a, TYPED_ARRAY, 'getString', ['I'], STRING, [TA.fontVariationSettings])]);
     } finally { call(r, a, TYPED_ARRAY, 'recycle'); }
   });
-  // auto-size (TextView.setAutoSizeText*): the configuration is validated and kept like AOSP's AutoSizeTextViewParams; the size search runs in the layout path, which the native text path does not use yet
+  // auto-size (TextView.setAutoSizeText*): the configuration is validated and kept like AOSP's AutoSizeTextViewParams; the size search (TextView.autoSizeText) runs in the native measure (view-layout-host.js)
   const AUTOSIZE = { type: 0, min: -1, max: -1, step: -1, presets: null };
   const autoSize = (r, self) => tv(r, self).autoSize ??= { ...AUTOSIZE };
   def(TEXT, 'getAutoSizeTextType', '()I', (r, _m, [self]) => autoSize(r, self).type);
@@ -627,11 +696,36 @@ export function createTextViewApiHost(platform) {
     if (values.length > 0) { for (const v of values) if (v <= 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `All preset sizes must be > 0: ${v}`); }
     Object.assign(autoSize(r, self), { type: values.length ? 1 : 0, min: -1, max: -1, step: -1, presets: values.length ? [...new Set(values)].sort((a, b) => a - b) : null }); relayout(r, self);
   });
-  def(TEXT, 'getAutoSizeMinTextSize', '()I', (r, _m, [self]) => { const a = autoSize(r, self); return a.presets ? a.presets[0] : a.min; });
-  def(TEXT, 'getAutoSizeMaxTextSize', '()I', (r, _m, [self]) => { const a = autoSize(r, self); return a.presets ? a.presets.at(-1) : a.max; });
-  def(TEXT, 'getAutoSizeStepGranularity', '()I', (r, _m, [self]) => autoSize(r, self).step);
+  def(TEXT, 'getAutoSizeMinTextSize', '()I', (r, _m, [self]) => { const a = autoSize(r, self); return a.presets ? a.presets[0] : Math.round(a.min); });
+  def(TEXT, 'getAutoSizeMaxTextSize', '()I', (r, _m, [self]) => { const a = autoSize(r, self); return a.presets ? a.presets.at(-1) : Math.round(a.max); });
+  def(TEXT, 'getAutoSizeStepGranularity', '()I', (r, _m, [self]) => Math.round(autoSize(r, self).step));
+  /**
+   * The auto-size part of the TextView constructor: android:autoSizePresetSizes (cleanupAutoSizePresetSizes: sorted, positive, without duplicates) or the uniform configuration,
+   * where what the attributes left out is 12sp, 112sp and 1px (validateAndSetAutoSizeTextTypeUniformConfiguration: the original's IllegalArgumentExceptions). An EditText does
+   * not auto-size (supportsAutoSizeText).
+   */
+  registry.autoSizeFromAttributes = (r, self, { type, min, max, step, presets }) => {
+    const a = autoSize(r, self);
+    if (isEditText(r, self)) { Object.assign(a, AUTOSIZE); return; }
+    const cleaned = presets ? [...new Set(presets.filter(size => size > 0))].sort((x, y) => x - y) : [];
+    if (cleaned.length) { Object.assign(a, { type: 1, min: -1, max: -1, step: -1, presets: cleaned }); return; }
+    if (type !== 1) { a.type = type; return; }
+    const metrics = call(r, resources(r, self), 'Landroid/content/res/Resources;', 'getDisplayMetrics', [], 'Landroid/util/DisplayMetrics;'), scaled = i2f(r.object(metrics).fields.get('Landroid/util/DisplayMetrics;->scaledDensity:F') ?? f2i(1));
+    if (min === -1) min = 12 * scaled; if (max === -1) max = 112 * scaled; if (step === -1) step = 1;
+    const px = value => Number.isInteger(value) ? value.toFixed(1) : String(value);
+    if (min <= 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `Minimum auto-size text size (${px(min)}px) is less or equal to (0px)`);
+    if (max <= min) r.throwJava('Ljava/lang/IllegalArgumentException;', `Maximum auto-size text size (${px(max)}px) is less or equal to minimum auto-size text size (${px(min)}px)`);
+    if (step <= 0) r.throwJava('Ljava/lang/IllegalArgumentException;', `The auto-size step granularity (${px(step)}px) is less or equal to (0px)`);
+    Object.assign(a, { type: 1, min, max, step, presets: null });
+  };
+  /** The sizes the auto-size search chooses among (TextView.mAutoSizeTextSizesInPx), ascending, or null when the TextView does not auto-size (an EditText never does). */
+  registry.autoSizeSizes = (r, self) => {
+    const a = r.object(self).tv?.autoSize; if (!a || a.type !== 1 || isEditText(r, self)) return null;
+    const sizes = a.presets ?? (a.step > 0 ? Array.from({ length: Math.floor((a.max - a.min) / a.step) + 1 }, (_, i) => Math.round(a.min + i * a.step)) : []);
+    return sizes.filter(size => size > 0 && size <= 512);   // the text backend's largest font
+  };
   def(TEXT, 'getAutoSizeTextAvailableSizes', '()[I', (r, _m, [self]) => {
-    const a = autoSize(r, self), sizes = a.presets ?? (a.type === 1 && a.step > 0 ? Array.from({ length: Math.floor((a.max - a.min) / a.step) + 1 }, (_, i) => a.min + i * a.step) : []);
+    const a = autoSize(r, self), sizes = a.presets ?? (a.type === 1 && a.step > 0 ? Array.from({ length: Math.floor((a.max - a.min) / a.step) + 1 }, (_, i) => Math.round(a.min + i * a.step)) : []);
     const array = r.newArray('[I', sizes.length); r.array(array).elements = sizes; return array;
   });
   def(TEXT, 'getTextSize', '()F', (r, _m, [self]) => f2i(r.object(self).textSize ?? 14));   // the native text path's default size (the theme's 14) when none was set
@@ -643,17 +737,24 @@ export function createTextViewApiHost(platform) {
   const visiblePasswordType = type => (type & 0xfff) === (1 | 0x90);
   const multilineType = type => (type & (0xf | 0x20000)) === (1 | 0x20000);
   const KL = 'Landroid/text/method/KeyListener;', TM = 'Landroid/text/method/TransformationMethod;';
-  def(TEXT, 'setInputType', '(I)V', (r, _m, [self, type]) => {   // TextView.setInputType: the key listener the type implies, password handling, single-line mode
-    const before = call(r, self, TEXT, 'getInputType', [], 'I'), wasPassword = passwordType(before), wasVisiblePassword = visiblePasswordType(before);
+  /** TextView.setInputType(type, direct): the KeyListener the input class implies. */
+  const keyListenerFor = (r, type) => {
     const cls = type & 0xf, keyListenerOf = (owner, name, parameters = [], args = []) => callStatic(r, owner, name, parameters, owner, args);
-    let input;
     if (cls === 1) {
       const cap = (type & 0x1000) ? 'CHARACTERS' : (type & 0x2000) ? 'WORDS' : (type & 0x4000) ? 'SENTENCES' : 'NONE', C = 'Landroid/text/method/TextKeyListener$Capitalize;';
-      input = callStatic(r, 'Landroid/text/method/TextKeyListener;', 'getInstance', ['Z', C], 'Landroid/text/method/TextKeyListener;', [(type & 0x8000) ? 1 : 0, staticField(r, C, cap)]);
-    } else if (cls === 2) input = callStatic(r, 'Landroid/text/method/DigitsKeyListener;', 'getInstance', ['Z', 'Z'], 'Landroid/text/method/DigitsKeyListener;', [(type & 0x1000) ? 1 : 0, (type & 0x2000) ? 1 : 0]);
-    else if (cls === 4) { const v = type & 0xff0; input = v === 0x10 ? keyListenerOf('Landroid/text/method/DateKeyListener;', 'getInstance') : v === 0x20 ? keyListenerOf('Landroid/text/method/TimeKeyListener;', 'getInstance') : keyListenerOf('Landroid/text/method/DateTimeKeyListener;', 'getInstance'); }
-    else if (cls === 3) input = keyListenerOf('Landroid/text/method/DialerKeyListener;', 'getInstance');
-    else input = callStatic(r, 'Landroid/text/method/TextKeyListener;', 'getInstance', [], 'Landroid/text/method/TextKeyListener;');
+      return callStatic(r, 'Landroid/text/method/TextKeyListener;', 'getInstance', ['Z', C], 'Landroid/text/method/TextKeyListener;', [(type & 0x8000) ? 1 : 0, staticField(r, C, cap)]);
+    }
+    if (cls === 2) return callStatic(r, 'Landroid/text/method/DigitsKeyListener;', 'getInstance', ['Z', 'Z'], 'Landroid/text/method/DigitsKeyListener;', [(type & 0x1000) ? 1 : 0, (type & 0x2000) ? 1 : 0]);
+    if (cls === 4) { const v = type & 0xff0; return v === 0x10 ? keyListenerOf('Landroid/text/method/DateKeyListener;', 'getInstance') : v === 0x20 ? keyListenerOf('Landroid/text/method/TimeKeyListener;', 'getInstance') : keyListenerOf('Landroid/text/method/DateTimeKeyListener;', 'getInstance'); }
+    if (cls === 3) return keyListenerOf('Landroid/text/method/DialerKeyListener;', 'getInstance');
+    return callStatic(r, 'Landroid/text/method/TextKeyListener;', 'getInstance', [], 'Landroid/text/method/TextKeyListener;');
+  };
+  /** For the constructor pass: the listener and the input type that setInputType(type, true) leaves on the Editor. */
+  registry.keyListenerFor = (r, _self, type) => ({ listener: keyListenerFor(r, type), type });
+  registry.state = (r, self) => tv(r, self);
+  def(TEXT, 'setInputType', '(I)V', (r, _m, [self, type]) => {   // TextView.setInputType: the key listener the type implies, password handling, single-line mode
+    const before = call(r, self, TEXT, 'getInputType', [], 'I'), wasPassword = passwordType(before), wasVisiblePassword = visiblePasswordType(before);
+    const input = keyListenerFor(r, type);
     call(r, self, TEXT, 'setKeyListener', [KL], 'V', [input]); call(r, self, TEXT, 'setRawInputType', ['I'], 'V', [type]);   // setKeyListener derives an input type from the listener; the requested one is what stays
     const isPassword = passwordType(type), isVisiblePassword = visiblePasswordType(type), view = r.object(self);
     const password = callStatic(r, 'Landroid/text/method/PasswordTransformationMethod;', 'getInstance', [], 'Landroid/text/method/PasswordTransformationMethod;');
@@ -675,21 +776,81 @@ export function createTextViewApiHost(platform) {
   /** Why the native text path cannot draw this TextView as AOSP would (a property set to a non-default value it has no support for), or null. */
   /** 'START' | 'MIDDLE' | 'END' | 'MARQUEE' or null: the TruncateAt the native text path ellipsizes with. */
   registry.ellipsizeKind = (r, self) => { const e = r.object(self).tv?.ellipsize; return nullish(e) ? null : r.object(e).enumName ?? null; };
-  const ellipsizeUnsupported = (r, self, s) => {
-    if (nullish(s.ellipsize)) return false;
-    const where = r.object(s.ellipsize).enumName, view = r.object(self), single = view.singleLine || view.maxLines === 1;
-    // MARQUEE at rest lays the line out unbounded and clips it at the view (the fading edge is not drawn); only the running scroll (the view is selected or focused) needs an animation.
-    return (where === 'MARQUEE' && !!(view.selected || view.focused)) || (where !== 'MARQUEE' && !single && where !== 'END');
+  /**
+   * TextView.startMarquee: a marquee runs while the view is focused or selected, has one line, and that line is wider than the view (canMarquee). `overflows` is null before
+   * the text was measured. The scroll is an animation on the Choreographer (TextView.Marquee) that the native text path does not run: at rest, and for a text that fits,
+   * the line is laid out unbounded and clipped at the view, as on a device.
+   */
+  registry.marqueeWouldRun = (r, self, overflows) => {
+    const view = r.object(self), s = view.tv; if (!s || nullish(s.ellipsize) || r.object(s.ellipsize).enumName !== 'MARQUEE') return false;
+    return !!(view.selected || view.focused) && nullish(view.keyListener) && overflows === true;
   };
   registry.breakStrategy = (r, self) => r.object(self).tv?.breakStrategy ?? 0;
   registry.hyphenationFrequency = (r, self) => r.object(self).tv?.hyphenationFrequency ?? 0;
-  registry.unsupportedRendering = (r, self) => {
+  /**
+   * What the native paragraph draws beyond the plain text: letter spacing (pixels), the shadow layer and the line spacing, or null when the TextView sets none of them or is
+   * not drawn as a paragraph (an EditText is a page text field; a single-line, horizontally scrolling or ellipsized text is one measured run).
+   */
+  const paragraphOnly = (r, self) => { const view = r.object(self); return isEditText(r, self) || !!view.singleLine || !!view.horizontallyScrolling || !nullish(view.tv?.ellipsize); };
+  /**
+   * Why this TextView is measured and drawn by its original Layout (StaticLayout over the native measured text, Layout.draw on the Canvas) instead of the plain run or the
+   * native paragraph, or null. The Layout applies what those two paths do not have: a horizontal text scale, OpenType feature settings, justification, a line-break
+   * configuration, and letter spacing, a shadow layer, line spacing or an app / system font on a text that is single-line, horizontally scrolling or ellipsized.
+   * An EditText and the label of a compound button are measured the same way; on the page they are the page's own elements, which draw the text themselves (pageTextStyle
+   * below; unsupportedRendering names what they cannot).
+   */
+  /** The texts the page draws with its own elements: an EditText (the page's text field) and the label of a CheckBox, RadioButton or Switch. */
+  const pageDrawn = (r, self) => isEditText(r, self) || r.isSubtype(r.object(self).type, 'Landroid/widget/CompoundButton;');
+  registry.layoutDrawn = (r, self) => {
+    const view = r.object(self), s = view.tv; if (!s || !r.classes.has(STATIC_LAYOUT)) return null;
+    const edit = pageDrawn(r, self);
+    if (s.textScaleX !== 1 && !edit) return 'textScaleX';
+    if (!nullish(s.fontFeatureSettings) && csString(r, s.fontFeatureSettings) !== '') return 'fontFeatureSettings';
+    if (s.justificationMode !== 0 && !edit) return 'justificationMode';
+    if ((s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0) && !edit) return 'lineBreak';
+    if (!paragraphOnly(r, self)) return null;
+    if (s.letterSpacing !== 0) return 'letterSpacing';
+    if (s.shadowRadius !== 0) return 'shadowLayer';
+    if ((s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1) && !view.singleLine && !isEditText(r, self)) return 'lineSpacing';
+    if (!nullish(view.typeface) && r.skiaHost?.resolveTypeface?.(view.typeface).custom) return 'typeface';
+    return null;
+  };
+  /**
+   * What the page's text field shows of an EditText's text properties (and the page's label of a compound button's), with the CSS property of the same meaning: letter spacing (Paint.setLetterSpacing is in ems, as CSS
+   * letter-spacing in em), the shadow layer (text-shadow), the OpenType feature settings (font-feature-settings) and the generic family of a serif or monospace system font.
+   * null for every other View and for an EditText that sets none of them.
+   */
+  registry.pageTextStyle = (r, self) => {
+    const view = r.object(self), s = view.tv; if (!s || !pageDrawn(r, self)) return null;
+    const features = nullish(s.fontFeatureSettings) ? [] : parseFontFeatureSettings(csString(r, s.fontFeatureSettings)).filter(feature => /^[A-Za-z0-9 ]{4}$/.test(feature.name));
+    const face = !nullish(view.typeface) && r.skiaHost?.resolveTypeface ? r.skiaHost.resolveTypeface(view.typeface) : null, family = face?.system ? (face.family === 'serif' ? 'serif' : /monospace$/.test(face.family) ? 'monospace' : null) : null;
+    if (s.letterSpacing === 0 && s.shadowRadius === 0 && !features.length && !family) return null;
+    return { letterSpacing: s.letterSpacing, shadow: s.shadowRadius > 0 ? { radius: s.shadowRadius, dx: s.shadowDx, dy: s.shadowDy, color: s.shadowColor >>> 0 } : null, features, family };
+  };
+  registry.paragraphStyle = (r, self) => {
+    const view = r.object(self), s = view.tv; if (!s || (s.letterSpacing === 0 && s.shadowRadius === 0 && s.lineSpacingExtra === 0 && s.lineSpacingMult === 1) || paragraphOnly(r, self)) return null;
+    return { letterSpacing: s.letterSpacing * (view.textSize || 14), letterSpacingEm: s.letterSpacing, shadow: s.shadowRadius > 0 ? { radius: s.shadowRadius, dx: s.shadowDx, dy: s.shadowDy, color: s.shadowColor >>> 0 } : null,
+      lineSpacing: s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1 ? { add: s.lineSpacingExtra, mult: s.lineSpacingMult } : null };
+  };
+  /**
+   * Why the native text path cannot draw this TextView as AOSP would (a property set to a non-default value it has no support for), or null. A property the XML gave
+   * (s.xmlGiven, kept by the constructor pass) never stops a pass: `tolerate(attribute, what)` is told and the text is drawn without it.
+   */
+  registry.unsupportedRendering = (r, self, tolerate = null) => {
     const s = r.object(self).tv; if (!s) return null;
-    const checks = [[s.letterSpacing !== 0, 'letterSpacing'], [s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1, 'lineSpacing'], [s.shadowRadius !== 0, 'shadowLayer'], [ellipsizeUnsupported(r, self, s), 'ellipsize (a running marquee, or start / middle on more than one line)'],
-      [s.justificationMode !== 0, 'justificationMode'], [s.fontFeatureSettings !== null, 'fontFeatureSettings'],
-      [s.fontVariationSettings !== null, 'fontVariationSettings'], [s.textScaleX !== 1, 'textScaleX'], [s.paint && (call(r, s.paint, PAINT, 'getFlags', [], 'I') & 0x38) !== 0, 'paintFlags (underline / strike-through / fake bold)'],
-      [s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0, 'lineBreak']];
-    const hit = checks.find(([on]) => on); return hit ? hit[1] : null;
+    // An EditText is the page's text field, a one-line HTML input: it has no horizontal glyph scale, and nothing that needs more than one line (line spacing, justification, a
+    // line-break configuration). Letter spacing, the shadow layer and font features it draws (pageTextStyle); every other text is drawn by its Layout (layoutDrawn).
+    const field = isEditText(r, self), edit = pageDrawn(r, self), where = field ? ' on an EditText (the page text field is a one-line input)' : ' on the label of a CheckBox, RadioButton or Switch (the page draws the label itself)';
+    const checks = [[(s.lineSpacingExtra !== 0 || s.lineSpacingMult !== 1) && field && !r.object(self).singleLine, 'lineSpacing' + where, ['lineSpacingExtra', 'lineSpacingMult']],
+      [s.justificationMode !== 0 && edit, 'justificationMode' + where, ['justificationMode']],
+      [s.textScaleX !== 1 && edit, 'textScaleX' + where, ['textScaleX']], [s.paint && (call(r, s.paint, PAINT, 'getFlags', [], 'I') & 0x38) !== 0, 'paintFlags (underline / strike-through / fake bold)', []],
+      [(s.lineBreakStyle !== 0 || s.lineBreakWordStyle !== 0) && edit, 'lineBreak' + where, ['lineBreakStyle', 'lineBreakWordStyle']]];
+    for (const [on, what, keys] of checks) {
+      if (!on) continue;
+      const given = tolerate ? keys.map(key => s.xmlGiven?.get(key)).find(Boolean) : null;
+      if (given) tolerate(given, what); else return what;
+    }
+    return null;
   };
   const supports = registry.supports ? registry.supports.bind(registry) : null;
   registry.supports = key => !blocked.includes(key) && (supports ? supports(key) : true);

@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=12145e24651e';
-import { cellBytes } from './java-arrays.js?v=12145e24651e';
-import { storedFieldCount } from './object-shapes.js?v=12145e24651e';
+import { BUCKET } from './time-breakdown.js?v=9b79f2cfbe27';
+import { cellBytes } from './java-arrays.js?v=9b79f2cfbe27';
+import { storedFieldCount } from './object-shapes.js?v=9b79f2cfbe27';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.

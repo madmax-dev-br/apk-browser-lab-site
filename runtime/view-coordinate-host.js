@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const keys = new Set(['getLocationOnScreen([I)V', 'getLocationOnScreen()[I', 'getLocationInWindow([I)V', 'transformFromViewToWindowSpace([I)V', 'transformMatrixToGlobal(Landroid/graphics/Matrix;)V'].map(signature => VIEW + '->' + signature));
@@ -33,7 +33,7 @@ export function createViewCoordinateHost(platform) {
   };
   const windowState = (runtime, chain) => {
     // A WindowManager root (Dialog/Popup) owns its own screen offset, computed from its real LayoutParams gravity/x/y.
-    const surface = platform.dialogWindowHost?.surfaceOffset(runtime, chain[chain.length - 1]);
+    const surface = platform.dialogWindowHost?.locationOnScreen(runtime, chain[chain.length - 1]);
     if (surface) return { left: surface.x, top: surface.y, rootScrollY: 0 };
     const ids = new Set(chain.map(value => value.ref));
     const frame = platform.allFrames().find(frame => ids.has(frame.root?.ref) || frame.window && ids.has(runtime.object(frame.window).decor?.ref));

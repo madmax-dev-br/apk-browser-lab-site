@@ -1,7 +1,8 @@
-import {APKError} from './apk-error.js?v=12145e24651e';
-import {getVectorGraphics} from './vector-native.js?v=12145e24651e';
-import {getSolidPaintByHandle} from './paint-host.js?v=12145e24651e';
-import {createMatrixNativeBindings} from './matrix-native.js?v=12145e24651e';
+import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=9b79f2cfbe27';
+import {APKError} from './apk-error.js?v=9b79f2cfbe27';
+import {getVectorGraphics} from './vector-native.js?v=9b79f2cfbe27';
+import {getSolidPaintByHandle} from './paint-host.js?v=9b79f2cfbe27';
+import {createMatrixNativeBindings} from './matrix-native.js?v=9b79f2cfbe27';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -32,7 +33,7 @@ function restoreToBase(r,h,c){while(c.stack.length){const previous=c.stack.pop()
 function finish(r,h){const c=canvas(r,h);restoreToBase(r,h,c);const s=stateFor(r);if(s.recordings.size>=8192)fail('RenderNode display-list limit exceeded');let total=storageBytes(c.draws);for(const n of s.nodes.values())total+=storageBytes(n.displayList??[]);for(const list of s.recordings.values())total+=storageBytes(list);if(total>32*1024*1024)fail('RenderNode aggregate display-list storage limit32MiB exceeded');const id=s.next++;s.recordings.set(id,c.draws.map(copyCommand));return id;}
 function set(r,h,key,value){const n=node(r,h),old=n[key];n[key]=value;return old!==value?1:0;}
 function matrixFromHandle(r,h){if(!h)return null;const arr=r.newArray('[F',9);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nGetValues(J[F)V')(r,[h,arr]);return r.array(arr).elements.map(decode);}
-export function renderNodeTransform(r,n){const CK=r.skia?.CanvasKit;if(!CK)fail('RenderNode requires verified Skia');const surface=CK.MakeSurface(1,1);if(!surface)fail('RenderNode matrix scratch allocation failed');try{const c=surface.getCanvas(),px=n.pivotExplicit?n.pivotX:(n.right-n.left)/2,py=n.pivotExplicit?n.pivotY:(n.bottom-n.top)/2;c.translate(n.translationX,n.translationY);c.rotate(n.rotation,px,py);c.translate(px,py);c.scale(n.scaleX,n.scaleY);c.translate(-px,-py);return Array.from(c.getTotalMatrix());}finally{surface.dispose();}}
+export function renderNodeTransform(r,n){const CK=r.skia?.CanvasKit;if(!CK)fail('RenderNode requires verified Skia');const surface=CK.MakeSurface(1,1);if(!surface)fail('RenderNode matrix scratch allocation failed');try{const c=surface.getCanvas(),px=n.pivotExplicit?n.pivotX:(n.right-n.left)/2,py=n.pivotExplicit?n.pivotY:(n.bottom-n.top)/2;if(hasCameraRotation(n.rotationX,n.rotationY))return cameraTransform({...n,pivotX:px,pivotY:py});c.translate(n.translationX,n.translationY);c.rotate(n.rotation,px,py);c.translate(px,py);c.scale(n.scaleX,n.scaleY);c.translate(-px,-py);return Array.from(c.getTotalMatrix());}finally{surface.dispose();}}
 /** Matrix (in the node's own coordinates, applied to its content inside the bounds clip) for the node's recorded stretch, or null.
  * APPROXIMATION of hwui StretchEffect (effects/StretchEffect.cpp): hwui runs a per-pixel runtime shader that displaces each pixel non-linearly
  * (strongest at the overscrolled edge, easing to none at the opposite edge). Here each axis is a UNIFORM scale anchored at the edge opposite to the
@@ -101,7 +102,7 @@ export function createRenderNodeNativeBindings(){const map=new Map();
   n('nSet'+suffix,['J','F'],'Z',(r,[h,v])=>set(r,h,key,suffix==='Alpha'?Math.max(0,Math.min(1,finite([v])[0])):finite([v])[0]));n('nGet'+suffix,['J'],'F',(r,[h])=>node(r,h)[key]);
  }
  for(const [suffix,key]of[['TranslationZ','translationZ'],['Elevation','elevation']])n('nSet'+suffix,['J','F'],'Z',(r,[h,v])=>set(r,h,key,finite([v])[0]));
- for(const [suffix,key]of[['RotationX','rotationX'],['RotationY','rotationY']])n('nSet'+suffix,['J','F'],'Z',(r,[h,v])=>{if(v!==0)fail(`RenderNode ${suffix} requires a 3D perspective backend`);return set(r,h,key,0);});
+ for(const [suffix,key]of[['RotationX','rotationX'],['RotationY','rotationY']])n('nSet'+suffix,['J','F'],'Z',(r,[h,v])=>set(r,h,key,finite([v])[0]));   // RenderProperties::updateMatrix, 3D branch (camera-transform.js)
  for(const key of ['TranslationZ','Elevation','RotationX','RotationY'])n('nGet'+key,['J'],'F',(r,[h])=>node(r,h)[key[0].toLowerCase()+key.slice(1)]);
  for(const [suffix,key]of[['PivotX','pivotX'],['PivotY','pivotY']]){n('nSet'+suffix,['J','F'],'Z',(r,[h,v])=>{const x=node(r,h),old=x[key];x[key]=finite([v])[0];const changed=!x.pivotExplicit||old!==v;x.pivotExplicit=true;return changed?1:0;});n('nGet'+suffix,['J'],'F',(r,[h])=>{const x=node(r,h);return x.pivotExplicit?x[key]:(suffix==='PivotX'?x.right-x.left:x.bottom-x.top)/2;});}
  n('nResetPivot',['J'],'Z',(r,[h])=>set(r,h,'pivotExplicit',false));n('nIsPivotExplicitlySet',['J'],'Z',(r,[h])=>node(r,h).pivotExplicit?1:0);

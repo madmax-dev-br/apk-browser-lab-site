@@ -1,8 +1,14 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=12145e24651e';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=12145e24651e';
-import { isTrustedRasterURL } from './raster-cache.js?v=12145e24651e';
+import { updateWebViewSlot } from './webview-slot.js?v=9b79f2cfbe27';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=9b79f2cfbe27';
+import { isTrustedRasterURL } from './raster-cache.js?v=9b79f2cfbe27';
+/** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
+ *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
+export function cssTransform(m) {
+  if (m[6] === 0 && m[7] === 0 && m[8] === 1) return `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})`;
+  return `matrix3d(${m[0]},${m[3]},0,${m[6]},${m[1]},${m[4]},0,${m[7]},0,0,1,0,${m[2]},${m[5]},0,${m[8]})`;
+}
 /** Per-instance render state (DOM element maps and pending input queues) shared with the host page's own `state` object. */
 export function createViewState() {
   return { viewElements: new Map(), shadowElements: new Map(), windowSurfaceElements: new Map(), viewSession: 0, pendingInputs: new Map(), pendingFocus: [], pendingPointers: [], pendingScrollBys: new Map(), inputPromise: null, inputInFlight: null, pendingComposeActions: [], composeElements: new Map(), nativeOverlayElements: new Map(), composeInFlight: null, pendingScrolls: new Map(), scrollInFlight: null, scrollAcknowledging: null };
@@ -136,7 +142,7 @@ function renderNativeCanvasOverlays(views) {
       activeWrappers.add(key);
       element.style.cssText = `position:absolute;left:${b.left}px;top:${b.top}px;width:${b.right-b.left}px;height:${b.bottom-b.top}px;margin:0;padding:0;border:0;pointer-events:none`;
       if (parent.clipChildren !== false) element.style.clipPath = 'inset(0)';
-      if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value)) || m[6] !== 0 || m[7] !== 0 || m[8] !== 1) throw new Error('Invalid matrix in the AndroidView overlay.'); element.style.transformOrigin = '0 0'; element.style.transform = `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})`; }
+      if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value))) throw new Error('Invalid matrix in the AndroidView overlay.'); element.style.transformOrigin = '0 0'; element.style.transform = cssTransform(m); }
       if (view.visibility === 8) element.style.display = 'none'; else if (view.visibility === 4) element.style.visibility = 'hidden';
     }
     if (!interactive || ['linear','frame','scroll','group'].includes(view.kind)) {
@@ -305,7 +311,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   // ViewGroup.clipChildren clips each child's RenderNode to its own bounds.
   if (clipOwnBounds) element.style.clipPath = 'inset(0)';
   if (Number.isFinite(view.renderAlpha)) element.style.opacity = String(view.renderAlpha);
-  if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value)) || m[6] !== 0 || m[7] !== 0 || m[8] !== 1) throw new Error('Invalid planar View transformation'); element.style.transformOrigin = '0 0'; element.style.transform = `matrix(${m[0]},${m[3]},${m[1]},${m[4]},${m[2]},${m[5]})`; }
+  if (view.transformMatrix) { const m = view.transformMatrix; if (!Array.isArray(m) || m.length !== 9 || m.some(value => !Number.isFinite(value))) throw new Error('Invalid View transformation'); element.style.transformOrigin = '0 0'; element.style.transform = cssTransform(m); }   // a rotation about the X or Y axis gives a perspective row: matrix3d
   if (view.defaultFocusHighlightEnabled === false) element.style.outline = 'none';
   if (kind === 'linear') element.style.flexDirection = view.orientation === 'horizontal' ? 'row' : 'column';
   if (view.laidOut && view.bounds) { element.style.width = `${view.bounds.right - view.bounds.left}px`; element.style.height = `${view.bounds.bottom - view.bounds.top}px`; if (parentLaidOut) { element.style.position = 'absolute'; element.style.left = `${view.bounds.left}px`; element.style.top = `${view.bounds.top}px`; } }
@@ -323,6 +329,17 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (Number.isFinite(view.textFontWeight)) { element.style.fontFamily = 'AndroidSkiaRoboto, AndroidRoboto, sans-serif'; element.style.fontWeight = String(view.textFontWeight); element.style.fontStyle = view.textFontItalic ? 'italic' : 'normal'; }
   if (view.textStyle & 1) element.style.fontWeight = '700'; if (view.textStyle & 2) element.style.fontStyle = 'italic';
   if (view.textAllCaps !== undefined) element.style.textTransform = view.textAllCaps ? 'uppercase' : 'none';
+  // The text properties of an EditText, or of a compound button's label, that the page's own element draws (textViewApi.pageTextStyle): Paint letter spacing is in ems like
+  // CSS letter-spacing, the shadow layer is a text-shadow, the OpenType feature settings are font-feature-settings, a serif or monospace system family is the browser's
+  // generic family of that name.
+  if (kind === 'input' || kind === 'check') {
+    const css = view.textCss ?? null, finite = values => values.every(value => Number.isFinite(value));
+    if (css && (typeof css !== 'object' || !finite([css.letterSpacing]) || Math.abs(css.letterSpacing) > 8 || (css.shadow && (!finite([css.shadow.radius, css.shadow.dx, css.shadow.dy, css.shadow.color]) || css.shadow.radius < 0 || css.shadow.radius > 512 || Math.abs(css.shadow.dx) > 4096 || Math.abs(css.shadow.dy) > 4096)) || !Array.isArray(css.features) || css.features.length > 64 || css.features.some(feature => !/^[A-Za-z0-9 ]{4}$/.test(feature?.name) || !Number.isInteger(feature.value) || feature.value < 0 || feature.value > 65535) || ![null, 'serif', 'monospace'].includes(css.family ?? null))) throw new Error('Invalid text field style received from the VM.');
+    element.style.letterSpacing = css?.letterSpacing ? `${css.letterSpacing}em` : '';
+    element.style.textShadow = css?.shadow ? `${css.shadow.dx}px ${css.shadow.dy}px ${css.shadow.radius}px rgba(${css.shadow.color >>> 16 & 255}, ${css.shadow.color >>> 8 & 255}, ${css.shadow.color & 255}, ${(css.shadow.color >>> 24) / 255})` : '';
+    element.style.fontFeatureSettings = css?.features.length ? css.features.map(feature => `"${feature.name}" ${feature.value}`).join(', ') : '';
+    if (css?.family) element.style.fontFamily = css.family;
+  }
   if (kind === 'progress') { const tint = cssColor(view.progressTint) || '#009688'; element.style.setProperty('--android-progress-color', tint); element.style.accentColor = tint; }
   if (kind === 'scroll') { element.style.overflow = 'auto'; element.style.overscrollBehavior = 'contain'; }
   if (kind === 'scroll' && view.fillViewport) element.dataset.fillViewport = 'true'; else delete element.dataset.fillViewport;
@@ -362,8 +379,12 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   element._signature = signature;
   }
   if (['linear', 'frame', 'scroll', 'group'].includes(kind)) {
-    element.dataset.clickable = String(!!view.clickable && view.enabled !== false);
-    if (view.clickable) { element.setAttribute('role', 'button'); element.tabIndex = view.enabled !== false ? 0 : -1; } else { element.removeAttribute('role'); element.removeAttribute('tabindex'); }
+    // An original list (ListView, a menu popup's list, an AlertDialog's list) is "clickable" for its own touch handling, not for an OnClickListener: the page sends it the pointer
+    // as real MotionEvents and the list decides which row was tapped; controls inside a row keep their own click.
+    const touchInput = !!view.touchInput, clickable = !!view.clickable && !touchInput;
+    element.dataset.clickable = String(clickable && view.enabled !== false);
+    if (clickable) { element.setAttribute('role', 'button'); element.tabIndex = view.enabled !== false ? 0 : -1; } else { element.removeAttribute('role'); element.removeAttribute('tabindex'); }
+    if (touchInput && view.bounds) bindPointerInput(element, { ownerViewId: view.id, width: view.bounds.right - view.bounds.left, height: view.bounds.bottom - view.bounds.top }, { skipControls: true });
     if (!element._groupClickInstalled) {
       element._groupClickInstalled = true;
       element.addEventListener('click', event => { if (element.dataset.clickable !== 'true' || element._session !== state.viewSession) return; const control = event.target.closest('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== element) return; if (insideComposeHost(event.target, element)) return; event.stopPropagation(); clickView(view.id); });
@@ -493,7 +514,7 @@ function echoEdit(control, op) {
 const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvents (the press ripple animates under them); ?pointerClicks=semantic on the player frame selects the OnClick path
   const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
 /** Mouse/touch/pen on a Compose view -> VM pointer samples (real MotionEvents). Overlay controls are descendants, so their events bubble here too. */
-function bindPointerInput(host, owner) {
+function bindPointerInput(host, owner, { skipControls = false } = {}) {
   host._composeOwner = owner;   // refreshed on every render: width/height/ids may change
   if (host._pointerBound) return; host._pointerBound = true;
   const session = state.viewSession, local = event => {
@@ -517,6 +538,7 @@ function bindPointerInput(host, owner) {
     // Interim: taps on clickable controls keep the semantic OnClick path until the press ripple (RippleHostView/RenderNode recording) runs under real MotionEvents;
     // gestures that semantics cannot express (slider drags, touch scrolling and flings, anything on non-clickable content) are real pointer input.
     if (!pointerClicks() && event.target.closest?.('button,textarea,input,[role=button],[role=switch],[role=checkbox]')) return;
+    if (skipControls) { const control = event.target.closest?.('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== host && host.contains(control)) return; }   // a View control inside a list row is clicked through its own element
     active = event.pointerId; markTouch(event);
     win.addEventListener('pointermove', track, true); win.addEventListener('pointerup', onUp, true); win.addEventListener('pointercancel', onCancel, true);
     send(0, event);
@@ -772,7 +794,20 @@ function renderWindowSurfaces(surfaces) {
     const window = view.windowSurface, id = String(window.id);
     if (!Number.isFinite(window.id) || !['x', 'y', 'width', 'height', 'dimAmount'].every(name => Number.isFinite(window[name]))) throw new Error('The VM returned an invalid Android window.');
     seen.add(id); let entry = state.windowSurfaceElements.get(id);
-    if (!entry) { entry = { scrim: document.createElement('div'), box: document.createElement('div') }; entry.scrim.className = 'android-window-scrim'; entry.box.className = 'android-window-surface'; state.windowSurfaceElements.set(id, entry); }
+    if (!entry) {
+      entry = { scrim: document.createElement('div'), box: document.createElement('div'), rootId: view.id }; entry.scrim.className = 'android-window-scrim'; entry.box.className = 'android-window-surface'; state.windowSurfaceElements.set(id, entry);
+      // A touch on the scrim of a popup window is a touch outside it: the window gets it as real MotionEvents with coordinates outside its bounds (a PopupWindow or a Compose
+      // Popup dismisses itself on it when it is meant to). Dialog windows keep the scrim as a plain blocker.
+      const session = state.viewSession, owner = entry;
+      for (const [name, action] of [['pointerdown', 0], ['pointerup', 1], ['pointercancel', 3]]) owner.scrim.addEventListener(name, event => {
+        if (session !== state.viewSession || !state.runtime || state.lastAPKError || owner.box.dataset.windowKind !== 'popup' || event.button > 0 || state.pendingPointers.length >= 512) return;
+        if (action === 0) owner.outsidePointer = event.pointerId; else if (owner.outsidePointer !== event.pointerId) return; else owner.outsidePointer = null;
+        const rect = owner.box.getBoundingClientRect(), scale = rect.width / (owner.box.offsetWidth || rect.width || 1) || 1;
+        state.pendingPointers.push({ ownerViewId: owner.rootId, action, x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale, t: event.timeStamp, outside: true });
+        flushPendingInputs();
+      });
+    }
+    entry.rootId = view.id;
     entry.scrim.hidden = window.visible === false || !window.modal; entry.scrim.style.background = `rgba(0,0,0,${Math.max(0, Math.min(1, window.dimAmount))})`; entry.scrim.dataset.windowId = id;
     entry.box.hidden = window.visible === false; entry.box.dataset.windowId = id; entry.box.dataset.windowKind = String(window.kind); entry.box.dataset.modal = String(!!window.modal); entry.box.dataset.focused = String(!!window.focused);
     entry.box.style.left = `${window.x}px`; entry.box.style.top = `${window.y}px`; entry.box.style.width = `${window.width}px`; entry.box.style.height = `${window.height}px`;

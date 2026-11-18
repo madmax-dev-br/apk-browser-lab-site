@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
 const KEY_LISTENER = 'Landroid/text/method/KeyListener;', TEXT_KEYS = 'Landroid/text/method/TextKeyListener;', CAPITALIZE = 'Landroid/text/method/TextKeyListener$Capitalize;';
 const SINGLE_LINE = 'Landroid/text/method/SingleLineTransformationMethod;', TRANSFORM = 'Landroid/text/method/TransformationMethod;';
 const FACTORY = 'Landroid/text/Editable$Factory;', EDITABLE = 'Landroid/text/Editable;', TEXT = 'Landroid/widget/TextView;';
@@ -50,12 +50,13 @@ export function createEditableTextHost(platform) {
       if (method.name === 'setHorizontallyScrolling') {
         const value = !!args[1]; if (value !== !!view.horizontallyScrolling) { view.horizontallyScrolling = value; field(runtime, view, 'mHorizontallyScrolling', 'Z', value ? 1 : 0); relayout(runtime, receiver); } return;
       }
-      if (method.name === 'getMinLines') return view.minLines ?? 0;
-      if (method.name === 'getMaxLines') return view.maxLines ?? 0x7fffffff;
+      // TextView keeps one limit per side with a mode (LINES or PIXELS): after setMinHeight / setMaxHeight (textview-api-host.js) the line getter of that side answers -1.
+      if (method.name === 'getMinLines') return view.tv?.minHeightMode === 'px' ? -1 : view.minLines ?? 0;
+      if (method.name === 'getMaxLines') return view.tv?.maxHeightMode === 'px' ? -1 : view.maxLines ?? 0x7fffffff;
       if (['setLines', 'setMinLines', 'setMaxLines'].includes(method.name)) {
         const lines = args[1] | 0;
-        if (method.name !== 'setMaxLines') { view.minLines = lines; field(runtime, view, 'mMinimum', 'I', lines); field(runtime, view, 'mMinMode', 'I', 1); }
-        if (method.name !== 'setMinLines') { view.maxLines = lines; field(runtime, view, 'mMaximum', 'I', lines); field(runtime, view, 'mMaxMode', 'I', 1); }
+        if (method.name !== 'setMaxLines') { view.minLines = lines; if (view.tv) view.tv.minHeightMode = 'lines'; field(runtime, view, 'mMinimum', 'I', lines); field(runtime, view, 'mMinMode', 'I', 1); }
+        if (method.name !== 'setMinLines') { view.maxLines = lines; if (view.tv) view.tv.maxHeightMode = 'lines'; field(runtime, view, 'mMaximum', 'I', lines); field(runtime, view, 'mMaxMode', 'I', 1); }
         relayout(runtime, receiver); return;
       }
       if (method.name === 'setSingleLine') {

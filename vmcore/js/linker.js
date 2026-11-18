@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=12145e24651e';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=12145e24651e';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=12145e24651e';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=9b79f2cfbe27';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=9b79f2cfbe27';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=9b79f2cfbe27';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };
@@ -147,10 +147,13 @@ export class Linker {
   // ---- classes
   /** The laid-out class `type` (a descriptor), laying it out (and its supertypes) on first use. */
   classOf(type) {
-    const known = this.classes.get(type); if (known !== undefined) return known;
+    const known = this.classes.get(type); if (known !== undefined) { if (known.failed !== null) throw known.failed; return known; }
     if (type[0] === '[') return this.arrayClass(type);
     if (type.length === 1) return this.primitiveClass(type);
-    const cls = this.r.classes.get(type), info = cls ? this.dexClass(type, cls) : this.hostClass(type);
+    const cls = this.r.classes.get(type); let info;
+    // A layout that fails after its record was registered (newClass) leaves a record without methods or vtable. It stays failed: whoever asks for the class again -- the app's
+    // own first use after a preparation ahead of it (src/prepare-ahead.js), a subclass, a later event -- gets the same explicit error, never the half-made record.
+    try { info = cls ? this.dexClass(type, cls) : this.hostClass(type); } catch (error) { const partial = this.classes.get(type); if (partial !== undefined && partial.failed === null) partial.failed = error; throw error; }
     if (type === OBJECT) this.classOf(CLASS_TYPE);   // java.lang.Class exists (VM.classClass) as soon as any class does, so that Object.getClass and const-class have it
     return info;
   }
@@ -178,7 +181,7 @@ export class Linker {
   takeLinkError(thread) { const message = this.linkErrors.get(thread >>> 0) ?? null; this.linkErrors.delete(thread >>> 0); return message; }
   newClass(type, fields) {
     if (this.classList.length >= this.maxClasses) throw new Error('vmcore linker: class table full');
-    const info = { id: this.classList.length, address: this.alloc(CLASS.SIZE), type, cls: null, superInfo: null, interfaces: [], isInterface: false, instanceSize: OBJECT_HEADER, refs: [],
+    const info = { id: this.classList.length, address: this.alloc(CLASS.SIZE), type, failed: null, cls: null, superInfo: null, interfaces: [], isInterface: false, instanceSize: OBJECT_HEADER, refs: [],
       fields: new Map(), statics: new Map(), methods: new Map(), interfaceMethods: [], vtable: [], vmap: new Map(), allInterfaces: [], display: [], hasDefaults: false, ...fields };
     this.classList.push(info); this.w32(this.classTable + 4 * info.id, info.address); this.classes.set(type, info);
     Atomics.store(this.u32, (this.vm + VM_RECORD.classCount) >>> 2, this.classList.length);   // a collection run by any thread walks VM.classes (vmcore/threads.h)

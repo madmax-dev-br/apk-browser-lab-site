@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
 
 const OBSERVER = 'Landroid/view/ViewTreeObserver;';
 const GET_OBSERVER = 'Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;';
@@ -87,7 +87,9 @@ export function createViewTreeHost(platform) {
       if (!runtime.classes.has(OBSERVER) || !root || !runtime.object(root).attached) return false;
       const observer = windowFor(runtime, runtime.object(root));
       call(runtime, observer, 'dispatchOnGlobalLayout');
-      if (call(runtime, observer, 'dispatchOnPreDraw', [], 'Z')) return false;
+      // ViewRootImpl.performTraversals: the pending LayoutTransitions start their changing animations before the draw; a cancelled draw ends them
+      if (call(runtime, observer, 'dispatchOnPreDraw', [], 'Z')) { runtime.platform?.viewGroupApi?.servePendingTransitions(runtime, true); return false; }
+      runtime.platform?.viewGroupApi?.servePendingTransitions(runtime, false);
       // AOSP ViewRootImpl.draw clears the window scroll flag before notifying,
       // after a successful preDraw and before OnDraw; reentrant scrolling stays queued.
       if(runtime.object(observer).hostScrollChanged){runtime.object(observer).hostScrollChanged=false;call(runtime,observer,'dispatchOnScrollChanged');}

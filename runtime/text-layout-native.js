@@ -1,7 +1,8 @@
-import {APKError} from './apk-error.js?v=12145e24651e';
-import {getPaintStateByHandle} from './paint-host.js?v=12145e24651e';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=12145e24651e';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=12145e24651e';
+import {APKError} from './apk-error.js?v=9b79f2cfbe27';
+import {getPaintStateByHandle} from './paint-host.js?v=9b79f2cfbe27';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=9b79f2cfbe27';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=9b79f2cfbe27';
+import { runTextStyle, shapingFace } from './skia-paragraph.js?v=9b79f2cfbe27';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -29,26 +30,25 @@ const validateText=text=>{
 const bounds=(m,start,end)=>{if(!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>m.text.length)fail('Invalid measured-text UTF16 range');};
 function paintSnapshot(r,handle){
  const p={...getPaintStateByHandle(r,handle)},face=r.skiaHost.resolveTypeface(p.typefaceRef);
- if(![p.textSize,p.textScaleX,p.textSkewX,p.letterSpacing,p.wordSpacing].every(Number.isFinite)||p.textSize<0||p.textSize>512||p.textScaleX!==1||p.textSkewX!==0)fail('Paragraph font state requires finite size0..512, scaleX1 and skewX0');
+ if(![p.textSize,p.textScaleX,p.textSkewX,p.letterSpacing,p.wordSpacing].every(Number.isFinite)||p.textSize<0||p.textSize>512||!(p.textScaleX>0&&p.textScaleX<=16)||p.textSkewX!==0)fail('Paragraph font state requires finite size0..512, scaleX in (0,16] and skewX0');
  if(p.flags&0x20||p.flags&0x800||p.hyphenEdit)fail('Paragraph synthetic bold, forced auto-hinting and hyphen edits require a separate backend');
  backend(r).selectTypeface(face.weight,face.italic);return{...p,...r.skiaHost.faceState(face)};
 }
 function nativeParagraph(r,m,width){
- const b=backend(r),c=b.CanvasKit,first=m.runs[0]?.paint??{hinting:1};
+ const b=backend(r),c=b.CanvasKit,first=m.runs[0]?.paint??{hinting:1},scale=m.scaleX??1;
+ // Paint.setTextScaleX: the paragraph is shaped at scale 1 in a box 1/scale as wide, and every horizontal measure read from it is multiplied by the scale (rangeWidth, the line widths, inkBounds).
  // Minikin itemization: runs Roboto covers keep the original single-family path; the others are split per fallback font (HarfBuzz shapes each run).
- const itemized=m.runs.map(run=>b.fallback?.itemize(m.text.slice(run.start,run.end),{weight:run.paint.weight,italic:run.paint.italic})??null),anyFallback=itemized.some(Boolean);m.fallbackUsed=anyFallback;
- const style=new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),builder=anyFallback||m.runs.some(run=>run.paint.families)?b.fallback.makeBuilder(style):c.ParagraphBuilder.Make(style,b.fontManager);
+ const itemized=m.runs.map(run=>b.fallback?.itemize(m.text.slice(run.start,run.end),{weight:run.paint.weight,italic:run.paint.italic,typeface:run.paint.families?.length?run.paint.nativeTypeface??null:null})??null),anyFallback=itemized.some(Boolean);m.fallbackUsed=anyFallback;
+ const style=new c.ParagraphStyle({textDirection:c.TextDirection.LTR,textAlign:c.TextAlign.Left,textStyle:{},disableHinting:first.hinting===0}),builder=anyFallback||m.runs.some(run=>shapingFace(b,run.paint).families)?b.fallback.makeBuilder(style):c.ParagraphBuilder.Make(style,b.fontManager);
  let paragraph;
  try{
   for(const [index,run] of m.runs.entries()){
    const p=run.paint;if(p.hinting!==first.hinting)fail('Mixed font hinting inside a paragraph is unavailable');
-   const textStyle={fontFamilies:p.families?.length?[...p.families,'Roboto']:['Roboto'],...(p.fontVariations?.length?{fontVariations:p.fontVariations}:{}),fontSize:p.textSize,locale:p.textLocaleTag??'en-US',letterSpacing:p.letterSpacing*p.textSize,wordSpacing:p.wordSpacing,
-    fontStyle:{weight:{value:p.weight},width:c.FontWidth.Normal,slant:p.italic?c.FontSlant.Italic:c.FontSlant.Upright},
-    fontFeatures:[{name:'kern',value:p.flags&0x100?1:0}]};
+   const textStyle=runTextStyle(b,c,p,p.textSize);
    if(itemized[index])b.fallback.addRuns(builder,m.text.slice(run.start,run.end),textStyle,itemized[index]);
    else{builder.pushStyle(new c.TextStyle(textStyle));builder.addText(m.text.slice(run.start,run.end));builder.pop();}
   }
-  paragraph=builder.build();paragraph.layout(width);
+  paragraph=builder.build();paragraph.layout(width/scale);
   const missing=paragraph.unresolvedCodepoints().filter(code=>!(code===10||code===13||code===0xad||code===0x34f||code===0x61c||(code>=0x200b&&code<=0x200f)||(code>=0x202a&&code<=0x202e)||(code>=0x2060&&code<=0x206f)||code===0xfeff||(code>=0xfe00&&code<=0xfe0f)||(code>=0xe0100&&code<=0xe01ef)));if(missing.length)fail('Pinned Roboto and Android fallback fonts lack paragraph glyphs: '+missing.slice(0,8).join(','));
   if(paragraph.getNumberOfLines()>4096)fail('Paragraph exceeds4096 native lines');
   return paragraph;
@@ -56,7 +56,7 @@ function nativeParagraph(r,m,width){
 }
 function rangeWidth(r,m,start,end){
  bounds(m,start,end);if(start===end)return 0;const c=backend(r).CanvasKit;
- return Math.fround(m.paragraph.getRectsForRange(start,end,c.RectHeightStyle.Tight,c.RectWidthStyle.Tight).reduce((sum,box)=>sum+box.rect[2]-box.rect[0],0));
+ return Math.fround(m.paragraph.getRectsForRange(start,end,c.RectHeightStyle.Tight,c.RectWidthStyle.Tight).reduce((sum,box)=>sum+box.rect[2]-box.rect[0],0)*(m.scaleX??1));
 }
 /** SkParagraph cluster offsets are UTF-8 byte offsets: map each one back to its UTF-16 index. */
 function utf16Offsets(text){const map=[];let byte=0;for(let i=0;i<text.length;){const cp=text.codePointAt(i),n=cp>0xffff?2:1,size=cp<0x80?1:cp<0x800?2:cp<0x10000?3:4;for(let k=0;k<size;k++)map[byte+k]=i;byte+=size;i+=n;}map[byte]=text.length;return map;}
@@ -74,7 +74,7 @@ function metrics(r,m,start,end){
  return{ascent,descent};
 }
 function inkBounds(r,m,start,end){
- bounds(m,start,end);if(start===end)return[0,0,0,0];const c=backend(r).CanvasKit,origin=rangeWidth(r,m,0,start),toU16=utf16Offsets(m.text);
+ bounds(m,start,end);if(start===end)return[0,0,0,0];const c=backend(r).CanvasKit,scale=m.scaleX??1,origin=rangeWidth(r,m,0,start)/scale,toU16=utf16Offsets(m.text);
  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
  for(const line of m.paragraph.getShapedLines())for(const run of line.runs){
   const font=new c.Font(run.typeface,run.size);
@@ -85,7 +85,7 @@ function inkBounds(r,m,start,end){
     if(clusterStart>=end||clusterEnd<=start)continue;
     const box=boxes.slice(i*4,i*4+4);if(Array.from(box).every(v=>v===0))continue;
     const x=run.positions[i*2]-origin,y=run.positions[i*2+1]-line.baseline;
-    left=Math.min(left,x+box[0]);top=Math.min(top,y+box[1]);right=Math.max(right,x+box[2]);bottom=Math.max(bottom,y+box[3]);
+    left=Math.min(left,(x+box[0])*scale);top=Math.min(top,y+box[1]);right=Math.max(right,(x+box[2])*scale);bottom=Math.max(bottom,y+box[3]);
    }
   }finally{font.delete();run.typeface.delete();}
  }
@@ -101,15 +101,21 @@ export function createTextLayoutNativeBindings(){
  add(MT,'nGetReleaseFunc',[],'J',()=>0x5445585401n);add(LB,'nGetReleaseFunc',[],'J',()=>0x5445585402n);add(LB,'nGetReleaseResultFunc',[],'J',()=>0x5445585403n);
  add(BUILDER,'nInitBuilder',[],'J',r=>{backend(r);return allocate(r,'builder',{runs:[]});});
  add(BUILDER,'nAddStyleRun',['J','J','I','I','I','I','Z'],'V',(r,[h,p,style,word,start,end,rtl])=>{
-  const b=get(r,h,'builder');if((style!==0&&style!==2)||word)fail(`Configured line-break style requires a separate text backend (lineBreakStyle=${style} wordStyle=${word})`);
+  const b=get(r,h,'builder');if(![0,1,2,3].includes(style)||![0,1].includes(word))fail(`Invalid line-break configuration (lineBreakStyle=${style} wordStyle=${word})`);
   if(start!==(b.runs.at(-1)?.end??0)||end<=start||end>65536||b.runs.length>=4096)fail('Invalid or excessive measured-text style runs');
-  b.runs.push({start,end,paint:paintSnapshot(r,p),rtl:!!rtl});
+  const paint=paintSnapshot(r,p);
+  // LineBreakConfig.LINE_BREAK_WORD_STYLE_PHRASE: Minikin asks ICU for the phrase-based rules (the lw=phrase locale keyword), which exist for Japanese and Korean text and are
+  // an Android addition to ICU 70; the ICU of the virtual device is the upstream release without them. For any other locale the word style changes nothing, as on a device.
+  if(word===1&&/^(ja|ko)\b/i.test(paint.textLocaleTag??'en-US'))fail('LineBreakConfig.LINE_BREAK_WORD_STYLE_PHRASE for Japanese or Korean text needs the phrase-based line-break rules of Android\'s ICU (lw=phrase), which the ICU 70.1 of the virtual device does not have');
+  b.runs.push({start,end,paint,rtl:!!rtl,lineBreakStyle:style});
  });
  add(BUILDER,'nAddReplacementRun',['J','J','I','I','F'],'V',()=>fail('ReplacementSpan native measured-text runs are unavailable'));
  add(BUILDER,'nBuildMeasuredText',['J','J','[C','Z','Z','Z'],'J',(r,[h,hint,buffer,hyphenation,layout,fast])=>{
   const b=get(r,h,'builder'),text=chars(r,buffer);validateText(text);if(fast)fail('MeasuredText without kerning (fast mode) is unavailable');   // hyphenation points would come from Minikin's pattern files, which the virtual device does not have: computing them finds noneif(hint)get(r,hint,'measured');
   if((b.runs.at(-1)?.end??0)!==text.length)fail('Measured-text styles do not cover the actual text');
-  const m={text,runs:b.runs.map(run=>({...run,paint:{...run.paint}})),computeLayout:!!layout};m.paragraph=nativeParagraph(r,m,1073741824);
+  const m={text,runs:b.runs.map(run=>({...run,paint:{...run.paint}})),computeLayout:!!layout};
+  m.scaleX=m.runs[0]?.paint.textScaleX??1;if(m.runs.some(run=>run.paint.textScaleX!==m.scaleX))fail('Text runs with different Paint.getTextScaleX() values in one paragraph (ScaleXSpan) are not available: the paragraph shaper has one horizontal scale');
+  m.paragraph=nativeParagraph(r,m,1073741824);
   try{return allocate(r,'measured',m);}catch(error){m.paragraph.delete();throw error;}
  });
  add(BUILDER,'nFreeBuilder',['J'],'V',(r,[h])=>{get(r,h,'builder');release(r,h);});
@@ -125,10 +131,11 @@ export function createTextLayoutNativeBindings(){
   const values=inkBounds(r,m,start,end);for(const [i,name]of ['left','top','right','bottom'].entries())r.storeField(r.object(rect).fields,`Landroid/graphics/Rect;->${name}:I`,values[i]);
  });
  add(LB,'nInit',['I','I','Z','[I'],'J',(r,[strategy,hyphenation,justify,indents])=>{
-  backend(r);if(justify||(indents&&r.array(indents).elements.some(Boolean)))fail('Justified line breaking and paragraph indents are not available');
+  backend(r);if(indents&&r.array(indents).elements.some(Boolean))fail('Paragraph indents (LineBreaker.Builder.setIndents) are not available');
   if(![0,1,2].includes(strategy)||![0,1,2].includes(hyphenation))fail('Invalid line-break strategy or hyphenation frequency');
   // SIMPLE is the SkParagraph greedy breaker; HIGH_QUALITY and BALANCED are Minikin's optimal breaker (src/minikin-line-breaker.js). No hyphenation patterns exist on the virtual device, so the frequency only scales penalties.
-  return allocate(r,'breaker',{strategy,hyphenation});
+  // Justification (Layout.JUSTIFICATION_MODE_INTER_WORD): Minikin's optimal breaker lets the spaces of a line shrink and stops penalising short lines; its greedy breaker breaks the same lines either way. The spaces are stretched when a line is drawn (android.text.TextLine.justify).
+  return allocate(r,'breaker',{strategy,hyphenation,justify:!!justify});
  });
  add(LB,'nComputeLineBreaks',['J','[C','J','I','F','I','F','[F','F','I'],'J',(r,[h,buffer,mh,length,first,count,rest,tabs])=>{
   const breaker=get(r,h,'breaker');const m=get(r,mh,'measured');
@@ -141,9 +148,11 @@ export function createTextLayoutNativeBindings(){
   if(![first,rest].every(v=>Number.isFinite(v)&&v>=0&&v<=2147483648))fail('Line-break width must be finite and within0..2^31 (including Android UNSPECIFIED width)');
   if(count>0&&first!==rest)fail('Different first/rest widths require a native leading-margin backend');
   if(tabs&&r.array(tabs).elements.length)fail('Variable tab stops are outside the Latin text backend');
+  // The greedy breaker here is SkParagraph's own, which breaks at its default line-break opportunities: it has no strict or loose style.
+  if(m.runs.some(run=>run.lineBreakStyle===1||run.lineBreakStyle===3))fail('LineBreakConfig.LINE_BREAK_STYLE_STRICT / LOOSE with Layout.BREAK_STRATEGY_SIMPLE needs Minikin\'s greedy breaker over the ICU line-break iterator; the styles are applied by the optimal breaker (BREAK_STRATEGY_HIGH_QUALITY / BALANCED)');
   const paragraph=nativeParagraph(r,m,count>0?first:rest);
   try{
-   const lines=paragraph.getLineMetrics().filter(line=>line.startIndex<m.text.length).map(line=>({offset:line.endIncludingNewline,width:line.width,ascent:-line.ascent,descent:line.descent,flags:0}));
+   const lines=paragraph.getLineMetrics().filter(line=>line.startIndex<m.text.length).map(line=>({offset:line.endIncludingNewline,width:line.width*(m.scaleX??1),ascent:-line.ascent,descent:line.descent,flags:0}));
    return allocate(r,'result',{lines});
   }finally{paragraph.delete();}
  });
@@ -157,9 +166,10 @@ function optimalLines(r,m,breaker,first,count,rest){
  const icu=r.icuBreakBackend;if(typeof icu?.breaks!=='function')fail('Optimal line breaking needs the original ICU line-break iterator');
  const widths=new Array(m.text.length).fill(0);
  for(const {index,segment} of new Intl.Segmenter(undefined,{granularity:'grapheme'}).segment(m.text))widths[index]=rangeWidth(r,m,index,index+segment.length);
- const runs=m.runs.map(run=>({start:run.start,end:run.end,size:run.paint.textSize,scaleX:run.paint.textScaleX??1,locale:run.paint.textLocaleTag??'en-US',canBreak:true}));
- const cache=new Map(),boundariesFor=locale=>{if(!cache.has(locale))cache.set(locale,icu.breaks(m.text,String(locale).replace('-','_'),'line'));return cache.get(locale);};
- const result=breakLineOptimal(m.text,{widths,runs,extent:(start,end)=>metrics(r,m,start,end)},lineWidthOf(first,count,rest),breaker.strategy,breaker.hyphenation,false,boundariesFor);
+ // LineBreakConfig's style is the lb keyword of the ICU line-break iterator's locale (Minikin WordBreaker: lb=loose / normal / strict); a run without a style keeps the plain locale.
+ const STYLE=[null,'loose','normal','strict'],runs=m.runs.map(run=>({start:run.start,end:run.end,size:run.paint.textSize,scaleX:run.paint.textScaleX??1,locale:String(run.paint.textLocaleTag??'en-US').replace('-','_')+(STYLE[run.lineBreakStyle]?'@lb='+STYLE[run.lineBreakStyle]:''),canBreak:true}));
+ const cache=new Map(),boundariesFor=locale=>{if(!cache.has(locale))cache.set(locale,icu.breaks(m.text,locale,'line'));return cache.get(locale);};
+ const result=breakLineOptimal(m.text,{widths,runs,extent:(start,end)=>metrics(r,m,start,end)},lineWidthOf(first,count,rest),breaker.strategy,breaker.hyphenation,!!breaker.justify,boundariesFor);
  return result.breakPoints.map((offset,i)=>({offset,width:result.widths[i],ascent:result.ascents[i],descent:result.descents[i],flags:result.flags[i]}));
 }
 

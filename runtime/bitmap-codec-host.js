@@ -1,10 +1,10 @@
-import { gcRoot } from './heap-gc.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { createHostRegistry } from './host-contract.js?v=12145e24651e';
-import { getVectorGraphics } from './vector-native.js?v=12145e24651e';
-import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=12145e24651e';
-import { createBitmapOps } from './bitmap-ops-host.js?v=12145e24651e';
-import { encodeOpaqueStoredPng } from './png-store.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
+import { getVectorGraphics } from './vector-native.js?v=9b79f2cfbe27';
+import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=9b79f2cfbe27';
+import { createBitmapOps } from './bitmap-ops-host.js?v=9b79f2cfbe27';
+import { encodeOpaqueStoredPng } from './png-store.js?v=9b79f2cfbe27';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -231,7 +231,15 @@ export function createBitmapCodecHost(platform) {
     const density = value === null ? 0 : r.object(value).fields.get(`${TYPED_VALUE}->density:I`) ?? 0;
     return decode(r, bytes, options, padding, { inDensity: density === 0 ? (value === null ? 0 : DENSITY_DEFAULT) : density === DENSITY_NONE ? 0 : density, inTargetDensity: DENSITY_DEFAULT });
   }, { static: true });
-  def(FACTORY, 'decodeFileDescriptor', `(Ljava/io/FileDescriptor;${RECT}${OPTIONS})${BITMAP}`, () => fail('BitmapFactory.decodeFileDescriptor: file descriptors are not implemented'), { static: true });
+  // decodeFileDescriptor(fd[, outPadding, opts]): the bytes from the descriptor's current position, read through a FileInputStream of it (what BitmapFactory.java does for a descriptor
+  // it cannot seek; for a seekable one the native reads the same bytes).
+  const decodeDescriptor = (r, fd, padding, options) => {
+    if (fd === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const FIS = 'Ljava/io/FileInputStream;', stream = r.allocate(FIS); r.dispatch({ owner: FIS, name: '<init>', parameters: ['Ljava/io/FileDescriptor;'], result: 'V', signature: '(Ljava/io/FileDescriptor;)V' }, [stream, fd], 'direct');
+    const bytes = streamBytes(r, stream); return bytes === null ? null : decode(r, bytes, options, padding);
+  };
+  def(FACTORY, 'decodeFileDescriptor', `(Ljava/io/FileDescriptor;${RECT}${OPTIONS})${BITMAP}`, (r, _m, [fd, padding, options]) => decodeDescriptor(r, fd, padding, options), { static: true });
+  def(FACTORY, 'decodeFileDescriptor', `(Ljava/io/FileDescriptor;)${BITMAP}`, (r, _m, [fd]) => decodeDescriptor(r, fd, null, null), { static: true });
 
   // ---- Bitmap operations (the public android.graphics.Bitmap API: src/bitmap-ops-host.js) -------------------------------------------------------
   createBitmapOps(registry, { bitmaps, CK, vcall });

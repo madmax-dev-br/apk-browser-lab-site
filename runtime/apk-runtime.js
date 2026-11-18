@@ -1,32 +1,33 @@
-import { VMClock } from './vm-clock.js?v=12145e24651e';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=12145e24651e';
-import { OperationMonitor } from './operation-monitor.js?v=12145e24651e';
-import { ExecutionProfile } from './execution-profile.js?v=12145e24651e';
-import { SamplingProfiler } from './sampling-profiler.js?v=12145e24651e';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=12145e24651e';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=12145e24651e';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=12145e24651e';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=12145e24651e';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=12145e24651e';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=12145e24651e';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=12145e24651e';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=12145e24651e';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=12145e24651e';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=12145e24651e';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=12145e24651e';
-import { APKError } from './apk-error.js?v=12145e24651e';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=12145e24651e';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=12145e24651e';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=12145e24651e';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=12145e24651e';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=12145e24651e';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=12145e24651e';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=12145e24651e';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=12145e24651e';
+import { VMClock } from './vm-clock.js?v=9b79f2cfbe27';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=9b79f2cfbe27';
+import { OperationMonitor } from './operation-monitor.js?v=9b79f2cfbe27';
+import { ExecutionProfile } from './execution-profile.js?v=9b79f2cfbe27';
+import { SamplingProfiler } from './sampling-profiler.js?v=9b79f2cfbe27';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9b79f2cfbe27';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=9b79f2cfbe27';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=9b79f2cfbe27';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=9b79f2cfbe27';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=9b79f2cfbe27';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=9b79f2cfbe27';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=9b79f2cfbe27';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=9b79f2cfbe27';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=9b79f2cfbe27';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=9b79f2cfbe27';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=9b79f2cfbe27';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=9b79f2cfbe27';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=9b79f2cfbe27';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=9b79f2cfbe27';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=9b79f2cfbe27';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=9b79f2cfbe27';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=9b79f2cfbe27';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=9b79f2cfbe27';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=9b79f2cfbe27';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=12145e24651e';
-import { bootClassLacksMember } from './boot-class-members.js?v=12145e24651e';
-export { APKError } from './apk-error.js?v=12145e24651e';
+import { Scheduler, Blocked } from './scheduler.js?v=9b79f2cfbe27';
+import { bootClassLacksMember } from './boot-class-members.js?v=9b79f2cfbe27';
+export { APKError } from './apk-error.js?v=9b79f2cfbe27';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -610,6 +611,9 @@ addBridge(COLOR_FILTER_CLEANER.slice(1,-1),['run()V']);
 EXTERNAL_PARENTS.set(RENDER_NODE_CLEANER,'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set(RENDER_NODE_CLEANER,['Ljava/lang/Runnable;']);
 addBridge(RENDER_NODE_CLEANER.slice(1,-1),['run()V']);
+EXTERNAL_PARENTS.set(HARDWARE_BUFFER_CLEANER,'Ljava/lang/Object;');
+EXTERNAL_INTERFACES.set(HARDWARE_BUFFER_CLEANER,['Ljava/lang/Runnable;']);
+addBridge(HARDWARE_BUFFER_CLEANER.slice(1,-1),['run()V']);
 EXTERNAL_PARENTS.set(REGEX_CLEANER,'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set(REGEX_CLEANER,['Ljava/lang/Runnable;']);
 addBridge(REGEX_CLEANER.slice(1,-1),['run()V']);
@@ -834,7 +838,11 @@ for (const name of ['Throwable', 'Error', 'LinkageError', 'UnsatisfiedLinkError'
 }
 for(const name of ['ConcurrentModificationException','NoSuchElementException'])addBridge('java/util/'+name,['<init>()V','<init>(Ljava/lang/String;)V','<init>(Ljava/lang/Throwable;)V','<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
 addBridge('java/lang/ArrayIndexOutOfBoundsException',['<init>(I)V']);
-addBridge('java/lang/AssertionError', ['<init>()V', '<init>(Ljava/lang/Object;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
+addBridge('java/lang/AssertionError', ['<init>()V', '<init>(Ljava/lang/Object;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V', '<init>(I)V', '<init>(J)V', '<init>(Z)V', '<init>(C)V']);
+addBridge('java/lang/reflect/InvocationTargetException', ['<init>(Ljava/lang/Throwable;Ljava/lang/String;)V']);
+addBridge('java/lang/Short', ['decode(Ljava/lang/String;)Ljava/lang/Short;']); addBridge('java/lang/Byte', ['decode(Ljava/lang/String;)Ljava/lang/Byte;']);
+addBridge('java/lang/IllegalThreadStateException', ['<init>()V', '<init>(Ljava/lang/String;)V']);
+addBridge('java/lang/reflect/AccessibleObject', ['setAccessible([Ljava/lang/reflect/AccessibleObject;Z)V']);
 // Further platform exception types with the four standard Throwable constructors (parents declared by their hosts or EXTERNAL_PARENTS above).
 for (const name of ['java/util/concurrent/ExecutionException', 'java/util/concurrent/TimeoutException', 'java/util/concurrent/CancellationException', 'java/util/concurrent/RejectedExecutionException', 'java/io/IOException', 'java/io/FileNotFoundException', 'java/io/EOFException', 'java/io/UnsupportedEncodingException', 'java/util/zip/ZipException', 'java/net/MalformedURLException', 'java/lang/SecurityException',
   'java/lang/ReflectiveOperationException', 'java/lang/ClassNotFoundException', 'java/lang/NoSuchMethodException', 'java/lang/NoSuchFieldException', 'java/lang/InstantiationException', 'java/lang/IllegalAccessException', 'java/lang/InterruptedException', 'java/lang/CloneNotSupportedException',
@@ -916,6 +924,7 @@ addBridge('java/util/concurrent/Executors', ['newFixedThreadPool(I)Ljava/util/co
 addBridge('java/util/concurrent/ThreadPoolExecutor', ['execute(Ljava/lang/Runnable;)V', 'shutdown()V', 'isShutdown()Z']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
 addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
+addBridge('android/util/Log', ['println_native(IILjava/lang/String;Ljava/lang/String;)I']);   // the native every Log method ends in (bufID, priority, tag, msg): android.util.LogPrinter calls it directly
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
 const descriptor = name => name.startsWith('L') && name.endsWith(';') ? name : `L${name.replaceAll('.', '/')};`;
 // Classes redefined by a second ClassLoader live under an internal alias descriptor (Lfoo/Bar$$ldr2;); every user-visible name is the original.
@@ -1795,6 +1804,7 @@ export class APKRuntime {
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
       && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;'].includes(type)
+      && type !== 'Llibcore/util/NativeAllocationRegistry;'   // `new NativeAllocationRegistry(loader, finalizer, size)`: its constructor is bridged per native finalizer (an unknown one fails by name)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
   }
@@ -1855,7 +1865,14 @@ export class APKRuntime {
     if (view.enabled === false) fail('Cannot click a disabled View');
     this.steps = 0;
     if (this.platform?.performClick?.(this, ref(id)) === true) { this.clicks++; return this.snapshot(); }
-    if (!view.listener) fail('View has no OnClickListener');
+    if (!view.listener) {
+      // A tap is View.performClick(), which a class may override without any OnClickListener (the Toolbar's overflow button opens its menu there; custom Views do the same).
+      let overridden = false; for (let type = view.type, depth = 0; type && depth < 64 && type !== 'Landroid/view/View;'; type = this.parent(type), depth++) if (this.classes.get(type)?.methods.has('performClick()Z')) { overridden = true; break; }
+      if (!overridden) fail('View has no OnClickListener');
+      this.dispatch({ owner: 'Landroid/view/View;', name: 'performClick', signature: '()Z', parameters: [], result: 'Z' }, [ref(id)], 'virtual');
+      this.clicks++;
+      return this.snapshot();
+    }
     const target = this.object(view.listener);
     this.dispatch({ owner: target.type, name: 'onClick', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [view.listener, ref(id)], 'virtual');
     this.clicks++;
@@ -1897,7 +1914,7 @@ export class APKRuntime {
       if (!kind) fail(`Unsupported renderer view: ${v.type}`);
       if (['text', 'button', 'input', 'check'].includes(kind)) texts.push(v.text);
       return { id: v.id, type: v.type, kind, text: v.text, orientation: v.orientation === 1 ? 'vertical' : 'horizontal',
-        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, androidId: v.androidId ?? null, enabled: v.enabled !== false,
+        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;') ? { touchInput: true } : {}) /* an original list: the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
         padding: v.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }, layoutWidth: v.layoutWidth ?? null,
         clipChildren: v.clipChildren !== false, clipToPadding: v.clipToPadding !== false,
         layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? null,
@@ -1923,8 +1940,11 @@ export class APKRuntime {
         contentDescription: v.contentDescription ?? null,
         focused: !!v.focused, displayText: v.displayText ?? v.text,
         textFontWeight: v.textFontWeight ?? null, textFontItalic: !!v.textFontItalic,
+        textCss: kind === 'input' || kind === 'check' ? this.platform?.textViewApi?.pageTextStyle?.(this, value) ?? null : null,   // the letter spacing, shadow layer and font features of an EditText or a compound button's label, for the page's own element
         bounds: v.bounds ?? null, laidOut: !!v.laidOut, textLineHeight: v.textLineHeight ?? null, textMetrics: v.textMetrics ?? null, textRaster: v.textRaster ?? null, textParagraph: v.textParagraph ?? null,
-        children: v.children.map(child => build(child, depth + 1)) };
+        // after the children: a group's disappearing children (removed, still animated) and the Views of the View's overlay (View.getOverlay(): the list fast scroller's
+        // thumb, track and preview), in the View's coordinates
+        children: (v.overlay || v.vg?.disappearing?.length ? [...v.children, ...(this.platform?.extraChildren?.(this, value) ?? [])] : v.children).map(child => build(child, depth + 1)) };
     };
     const roots = this.platform?.viewRoots?.(this) ?? [{ root: this.root, window: null }];
     const views = roots.map(({root, window, windowBackground}) => ({ ...build(root), ...(window ? { windowSurface: window } : {}), ...(windowBackground ? { windowBackground } : {}) })), counters = Object.create(null), activity = this.object(this.activity), seenClasses = new Set();
@@ -2331,6 +2351,7 @@ export class APKRuntime {
       const type = queue.shift();
       for (const child of this.descendantIndex.children.get(type) ?? []) {
         if (seen.has(child)) continue;
+        if (this.dex.classes.has(child) && !this.dex.bootClasses?.has(child)) continue;   // an APK / library subclass inherits the gap: it provides nothing the platform lacks
         seen.add(child); queue.push(child);
         if (((this.classes.get(child)?.flags ?? 0) & 0x600) === 0) {   // concrete: neither abstract nor interface
           const available = this.methodAvailability({ owner: child, name, signature });
@@ -2360,6 +2381,9 @@ export class APKRuntime {
       owner = this.parent(owner);
     }
     if (EXTERNAL_INTERFACE_NAMES.has(method.owner) || (this.classes.get(method.owner)?.flags ?? 0) & 0x200) return 'interface';
+    // resolveInvoke's last two steps: a Java 8 default method inherited from a superinterface, and the platform's body of an interface default method added in a later API level
+    if (this.findInterfaceDefault(method.owner, method)?.code) return 'framework-dex';
+    if (this.platformInterfaceDefault(method.owner, method)) return 'platform-default';
     return null;
   }
   findInterfaceDefault(startType, method) {
@@ -2640,6 +2664,7 @@ export class APKRuntime {
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
     }
     if (!this.classResolvable(component)) {   // Class.forName: ClassNotFoundException(name) caused by the class loader's Didn't find class ... on path message
+      { const widget = this.platform?.unimplementedWidgetMessage?.(component, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // a widget of a framework profile that is not loaded: Android has the class
       const value = this.makeObject('Ljava/lang/ClassNotFoundException;'), obj = this.object(value); obj.message = name; obj.cause = this.classNotFound(component); obj.causeInitialized = true; obj.stack = this.captureStack();
       throw new JavaException(value, name);
     }
@@ -2683,6 +2708,9 @@ export class APKRuntime {
     return this.array(value).elements.map(element => { const type = this.object(element).classType; if (!type) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Expected Class[]'); return type; });
   }
   reflectionLookup(type, kind, name, parameters, publicOnly) {
+    // A widget class the lab only declares has no constructor of its own, and a superclass constructor is not a constructor of the class (Class.getConstructor never inherits):
+    // LayoutInflater.createView of such a tag fails naming the class instead of building its nearest implemented ancestor under the tag's name.
+    if (kind === 'constructor') { const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }
     const seen = new Set(), pending = [type];
     while (pending.length) {
       const owner = pending.shift(); if (!owner || seen.has(owner)) continue;
@@ -2791,6 +2819,8 @@ export class APKRuntime {
     // The target runs as a continuation of the calling green thread (an Invoke), not through a nested dispatch on the JavaScript stack: a reflective call that blocks (a lock, a
     // Future.get, a park) then parks only this thread, and the scheduler can resume every other one, including the thread that holds what this one waits for.
     const wrapError = error => {
+      // A framework View constructor that an attribute value of its tag made throw is run again without that attribute (AndroidPlatform.recoverViewConstruction).
+      if (constructor && (error instanceof JavaException || error instanceof APKError)) { const recovered = this.platform?.recoverViewConstruction?.(this, method, words, error); if (recovered !== undefined) return recovered; }
       if (!wrap || !(error instanceof JavaException)) throw error;
       const value = this.makeObject('Ljava/lang/reflect/InvocationTargetException;'), obj = this.object(value);
       obj.cause = error.value; obj.message = error.message; obj.exceptionDetails = error.details;
@@ -2835,6 +2865,7 @@ export class APKRuntime {
     if(name==='createMalloced'||name==='registerNativeAllocation'||name==='run'||name==='<init>'){
       const charsetRegistry=charsetRegistryCreation(this,method,args)??charsetRegistryRegistration(this,method,args);if(charsetRegistry)return charsetRegistry.value;
       const nodeRegistry=renderNodeRegistryBridge(this,method,args);if(nodeRegistry)return nodeRegistry.value;
+      const bufferRegistry=hardwareBufferRegistryBridge(this,method,args);if(bufferRegistry)return bufferRegistry.value;
       const regexRegistry=regexRegistryBridge(this,method,args);if(regexRegistry)return regexRegistry.value;
       const colorRegistry=colorFilterRegistryBridge(this,method,args);if(colorRegistry)return colorRegistry.value;
       const textRegistry=textLayoutRegistryBridge(this,method,args);if(textRegistry)return textRegistry.value;
@@ -3088,6 +3119,13 @@ export class APKRuntime {
       const number=BigInt((match[3]?'0x':match[5]?'0o':'')+digits)*(match[1]==='-'?-1n:1n);
       return number<-(1n<<63n)||number>(1n<<63n)-1n?invalid():this.boxPrimitive('J',number);
     }
+    // Short.decode / Byte.decode: Integer.decode, then the range of the type (java.lang.Short / java.lang.Byte)
+    if((method.owner==='Ljava/lang/Short;'||method.owner==='Ljava/lang/Byte;')&&staticCall&&name==='decode'){
+      const short=method.owner==='Ljava/lang/Short;',limit=short?32768:128;
+      const value=this.object(this.dispatch({owner:'Ljava/lang/Integer;',name:'decode',parameters:['Ljava/lang/String;'],result:'Ljava/lang/Integer;',signature:'(Ljava/lang/String;)Ljava/lang/Integer;'},[args[0]],'static')).boxed;
+      if(value<-limit||value>=limit)this.throwJava('Ljava/lang/NumberFormatException;',`Value ${value} out of range from input ${args[0]}`);
+      return this.boxPrimitive(short?'S':'B',value);
+    }
     // Integer.getInteger / Integer.decode (java.lang.Integer): a system property decoded like Integer.decode ("0x", "#", leading-0 octal,
     // sign); a missing or malformed property yields the default (boxed), decode throws NumberFormatException instead.
     if(method.owner==='Ljava/lang/Integer;'&&staticCall&&(name==='getInteger'||name==='decode')){
@@ -3260,6 +3298,11 @@ export class APKRuntime {
     return BRIDGE_NEXT;
   }
   bridgeA2(method, args, staticCall, key, name) {
+    if (staticCall && name === 'setAccessible' && method.owner === 'Ljava/lang/reflect/AccessibleObject;') {   // AccessibleObject.setAccessible(AccessibleObject[] array, boolean flag): the flag on every element
+      if (isNull(args[0])) this.throwJava('Ljava/lang/NullPointerException;', null);
+      for (const element of this.object(args[0]).elements) { if (isNull(element)) this.throwJava('Ljava/lang/NullPointerException;', null); this.object(element).accessible = !!args[1]; }
+      return undefined;
+    }
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;' && staticCall) {
       const constant = name => this.readStatic({ owner: method.owner, name, type: method.owner, key: `${method.owner}->${name}:${method.owner}` });
       if (name === 'values') { const array = this.newArray(`[${method.owner}`, TIME_UNITS.length); this.object(array).elements = TIME_UNITS.map(constant); return array; }
@@ -3498,7 +3541,9 @@ export class APKRuntime {
         }
         return lines.join('\n') + '\n';
       }
+      if (name === 'println_native') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[1])] ?? 'V', text = `${args[2]}: ${args[3] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }
       if (name === 'println') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[0])] ?? 'V', text = `${args[1]}: ${args[2] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }
+      if (name === 'println_native') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[1])] ?? 'V', text = `${args[2]}: ${args[3] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }   // Log.println_native(bufID, priority, tag, msg) (hidden; android.util.LogPrinter writes through it): every log buffer is the one logcat of the lab
       // Log.x(tag, msg, tr) logs msg + '\n' + getStackTraceString(tr); Log.w(tag, tr) / Log.wtf(tag, tr) log just the stack trace string.
       const trace = throwable => this.dispatch({ owner: 'Landroid/util/Log;', name: 'getStackTraceString', parameters: ['Ljava/lang/Throwable;'], result: 'Ljava/lang/String;', signature: '(Ljava/lang/Throwable;)Ljava/lang/String;' }, [throwable], 'static');
       const text = method.parameters.length === 3 ? `${args[1] ?? ''}\n${trace(args[2])}` : method.parameters[1] === 'Ljava/lang/Throwable;' ? trace(args[1]) : (args[1] ?? '');
@@ -3894,6 +3939,13 @@ export class APKRuntime {
       if (name === '<init>' && method.owner === 'Ljava/lang/AssertionError;' && method.parameters[0] === 'Ljava/lang/Object;') {   // AssertionError(Object detail): message = String.valueOf(detail); a Throwable detail is also the cause
         obj.stack = this.captureStack(); obj.message = this.javaString(args[1]); obj.causeInitialized = true; obj.cause = !isNull(args[1]) && this.isSubtype(this.typeOf(args[1]), 'Ljava/lang/Throwable;') ? args[1] : null; return undefined;
       }
+      if (name === '<init>' && method.owner === 'Ljava/lang/AssertionError;' && ['I', 'J', 'Z', 'C'].includes(method.parameters[0])) {   // AssertionError(int|long|boolean|char detail): message = String.valueOf(detail), no cause
+        const kind = method.parameters[0]; obj.stack = this.captureStack(); obj.causeInitialized = false; obj.cause = null;
+        obj.message = kind === 'J' ? String(wide(args[1])) : kind === 'Z' ? (args[1] ? 'true' : 'false') : kind === 'C' ? String.fromCharCode(args[1] & 0xffff) : String(int(args[1])); return undefined;
+      }
+      if (name === '<init>' && method.owner === 'Ljava/lang/reflect/InvocationTargetException;' && method.parameters[0] === 'Ljava/lang/Throwable;') {   // InvocationTargetException(Throwable target[, String s]): super((Throwable) null) or super(s, null); getCause() answers the target
+        obj.stack = this.captureStack(); obj.message = typeof args[2] === 'string' ? args[2] : null; obj.cause = isNull(args[1]) ? null : args[1]; obj.causeInitialized = true; return undefined;
+      }
       if (name === '<init>') { obj.stack = this.captureStack(); obj.message = method.owner==='Ljava/lang/ArrayIndexOutOfBoundsException;'&&method.parameters[0]==='I'?'Array index out of range: '+int(args[1]):method.parameters[0]==='Ljava/lang/Throwable;'&&!isNull(args[1])?this.javaString(args[1]):typeof args[1] === 'string' ? args[1] : null;obj.causeInitialized=method.parameters.includes('Ljava/lang/Throwable;');obj.cause=method.parameters[0]==='Ljava/lang/Throwable;'?args[1]:obj.causeInitialized?args[2]:null;return undefined; }
       if(name==='initCause'){if(obj.causeInitialized)this.throwJava('Ljava/lang/IllegalStateException;','Cause already initialized');if(equal(args[0],args[1]))this.throwJava('Ljava/lang/IllegalArgumentException;','Self-causation not permitted');obj.cause=args[1];obj.causeInitialized=true;return args[0];}
       if (name === 'getMessage') return obj.message ?? null;
@@ -4125,6 +4177,9 @@ export class APKRuntime {
       if (['getDeclaredMethod', 'getMethod', 'getDeclaredConstructor', 'getConstructor', 'getDeclaredField', 'getField'].includes(name)) {
         const kind = name.includes('Constructor') ? 'constructor' : name.includes('Field') ? 'field' : 'method';
         const memberName = kind === 'constructor' ? '<init>' : args[1];
+        // A declared-only widget (hierarchy without a body) has no constructor of its own: the lookup would answer its superclass's and LayoutInflater.createView would build that class
+        // under the widget's tag. The explicit error of `new` applies to the reflective path too.
+        if (kind === 'constructor') { const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }
         const parameters = kind === 'field' ? null : this.reflectionParameterTypes(args[kind === 'constructor' ? 1 : 2]);
         const member = this.reflectionLookup(type, kind, memberName, parameters, !name.startsWith('getDeclared'));
         return this.reflectionObject(kind, member);

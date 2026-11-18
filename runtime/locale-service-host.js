@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
 const ULOCALE = 'Landroid/icu/util/ULocale;', OPTIONAL = 'Ljava/util/Optional;', DISPLAY = 'Landroid/sysprop/DisplayProperties;';
 const keys = new Set([`${ULOCALE}->forLocale(Ljava/util/Locale;)Landroid/icu/util/ULocale;`, `${ULOCALE}->isRightToLeft()Z`, `${DISPLAY}->debug_force_rtl()Ljava/util/Optional;`]);
 const fail = message => { throw new APKError(message, { kind: 'locale-service-unsupported' }); };
@@ -28,9 +28,12 @@ export function createLocaleServiceHost(platform) {
         const ref = runtime.makeObject(ULOCALE);
         try { runtime.object(ref).intlLocale = new Intl.Locale(locale.localeData.tag); }
         catch { fail('The browser CLDR boundary cannot represent this VM locale'); }
+        runtime.object(ref).locale = args[0]; runtime.object(ref).keywords = {};   // the java.util.Locale every other ULocale method reads (src/misc-platform-host.js)
         return ref;
       }
-      const locale = runtime.object(args[0]).intlLocale;
+      const receiver = runtime.object(args[0]);
+      if (!receiver.intlLocale && receiver.locale) { const tag = runtime.object(receiver.locale).localeData?.tag; try { if (tag) receiver.intlLocale = new Intl.Locale(tag); } catch { /* reported below */ } }   // a ULocale built another way (constructor, forLanguageTag, addLikelySubtags)
+      const locale = receiver.intlLocale;
       if (!locale) fail('ULocale used before forLocale initialization');
       const info = typeof locale.getTextInfo === 'function' ? locale.getTextInfo() : locale.textInfo;
       if (!info || !['ltr', 'rtl'].includes(info.direction)) fail('Intl.Locale text direction data is unavailable in this browser');
