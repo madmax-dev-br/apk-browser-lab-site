@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { getSolidPaint } from './paint-host.js?v=9b79f2cfbe27';
-import { getMatrixValues } from './matrix-native.js?v=9b79f2cfbe27';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { getSolidPaint } from './paint-host.js?v=12145e24651e';
+import { getMatrixValues } from './matrix-native.js?v=12145e24651e';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=12145e24651e';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -30,15 +30,6 @@ const pathString=commands=>commands.map(c=>c.verb+c.values.join(' ')).join(' ');
 const sameShape=(a,b)=>a.length===b.length&&a.every((c,i)=>c.verb===b[i].verb&&c.values.length===b[i].values.length);
 const clone=value=>structuredClone(value);
 const FULL_DEFAULTS={strokeWidth:0,strokeColor:0,strokeAlpha:1,fillColor:0,fillAlpha:1,trimPathStart:0,trimPathEnd:1,trimPathOffset:0,strokeLineCap:0,strokeLineJoin:0,strokeMiterLimit:4,fillType:0};
-/**
- * The matrix of a software Canvas is [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f). Under a perspective transform (Canvas.concat / setMatrix with a matrix whose
- * third row is not 0 0 1: a View rotated about its X or Y axis drawn by its parent) it carries that row as a tail, [.., p0, p1, p2]; every consumer that hands the matrix to
- * Skia reads the tail when it is there. M := M * N for an affine N in the same layout, in place.
- */
-export function preConcatCanvasMatrix(m,n){
- const [a0,b0,c0,d0,e0,f0]=m;m[0]=a0*n[0]+c0*n[1];m[1]=b0*n[0]+d0*n[1];m[2]=a0*n[2]+c0*n[3];m[3]=b0*n[2]+d0*n[3];m[4]=a0*n[4]+c0*n[5]+e0;m[5]=b0*n[4]+d0*n[5]+f0;
- if(m.length>6){const p0=m[6],p1=m[7],p2=m[8];m[6]=p0*n[0]+p1*n[1];m[7]=p0*n[2]+p1*n[3];m[8]=p0*n[4]+p1*n[5]+p2;}
-}
 const GROUP_DEFAULTS={rotation:0,pivotX:0,pivotY:0,scaleX:1,scaleY:1,translateX:0,translateY:0};
 const groupKeys=Object.keys(GROUP_DEFAULTS), propertyKeys=Object.keys(FULL_DEFAULTS);
 const states=new WeakMap();
@@ -112,7 +103,6 @@ export class VectorGraphics {
   if(!(width>0&&height>0&&width*height<=16*1024*1024))problem('Invalid canvas snapshot extent');
   if(this.runtime.skia?.rasterizeCanvas)return this.runtime.skia.rasterizeCanvas(this.runtime,this,receiver,width,height,options);
   const handle=this.runtime.object(receiver).nativeCanvasHandle,draws=this.get(handle,'canvas').draws;
-  if(draws.some(draw=>draw.matrix.length>6))problem('A perspective Canvas transform needs the Skia raster backend (the SVG canvas snapshot is affine)');
   const body=draws.map(draw=>`<g transform="matrix(${draw.matrix.join(' ')})"><g transform="translate(${draw.x} ${draw.y})">${draw.svg}</g></g>`).join('');
   return {kind:'svg',svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`,width,height,drawCalls:draws.length,source:'original-Drawable.draw/web-software-canvas'};
  }
@@ -211,23 +201,18 @@ export function createVectorCanvasHost(){
     const count=name==='restore'?canvas.stack.length:args[1];if(count<1||count>canvas.stack.length+1)runtime.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
     while(canvas.stack.length+1>count){const state=canvas.stack.pop();canvas.matrix=state.matrix??state;canvas.clips=state.clips??[];}return;
    }
-   if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix keeps its third row (see preConcatCanvasMatrix)
-    canvas.matrix.length=6;
+   if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix needs a projective canvas-state backend
     if(args[1]===null||args[1]===0){canvas.matrix[0]=1;canvas.matrix[1]=0;canvas.matrix[2]=0;canvas.matrix[3]=1;canvas.matrix[4]=0;canvas.matrix[5]=0;return;}
-    const v=getMatrixValues(runtime,args[1]);
-    canvas.matrix[0]=finite(v[0]);canvas.matrix[1]=finite(v[3]);canvas.matrix[2]=finite(v[1]);canvas.matrix[3]=finite(v[4]);canvas.matrix[4]=finite(v[2]);canvas.matrix[5]=finite(v[5]);
-    if(v[6]!==0||v[7]!==0||v[8]!==1)canvas.matrix.push(finite(v[6]),finite(v[7]),finite(v[8]));return;
+    const v=getMatrixValues(runtime,args[1]);if(v[6]!==0||v[7]!==0||v[8]!==1)problem('Perspective Canvas transforms require a projective canvas-state backend');
+    canvas.matrix[0]=finite(v[0]);canvas.matrix[1]=finite(v[3]);canvas.matrix[2]=finite(v[1]);canvas.matrix[3]=finite(v[4]);canvas.matrix[4]=finite(v[2]);canvas.matrix[5]=finite(v[5]);return;
    }
    if((name==='rotate'&&method.parameters.length===3)||(name==='scale'&&method.parameters.length===4)){   // about a pivot: M * T(px,py) * op * T(-px,-py)
     const v=args.slice(1).map(w=>finite(f32(w))),m=canvas.matrix;let n;
     if(name==='rotate'){const radians=v[0]*Math.PI/180,s=Math.sin(radians),k=Math.cos(radians);n=[k,s,-s,k,v[1]-k*v[1]+s*v[2],v[2]-s*v[1]-k*v[2]];}
     else n=[v[0],0,0,v[1],v[2]-v[0]*v[2],v[3]-v[1]*v[3]];
-    preConcatCanvasMatrix(m,n);return;
+    const [a0,b0,c0,d0,e0,f0]=m;m[0]=a0*n[0]+c0*n[1];m[1]=b0*n[0]+d0*n[1];m[2]=a0*n[2]+c0*n[3];m[3]=b0*n[2]+d0*n[3];m[4]=a0*n[4]+c0*n[5]+e0;m[5]=b0*n[4]+d0*n[5]+f0;return;
    }
    const matrix=canvas.matrix,[a,b,c,d,e,f]=matrix,x=finite(f32(args[1])),y=method.parameters.length>1?finite(f32(args[2])):0;
-   if(matrix.length>6&&['translate','scale','skew','rotate'].includes(name)){   // a canvas under a perspective transform: the same operation with the third row carried along
-    const radians=x*Math.PI/180;preConcatCanvasMatrix(matrix,name==='translate'?[1,0,0,1,x,y]:name==='scale'?[x,0,0,y,0,0]:name==='skew'?[1,y,x,1,0,0]:[Math.cos(radians),Math.sin(radians),-Math.sin(radians),Math.cos(radians),0,0]);return;
-   }
    if(name==='translate'){matrix[4]=a*x+c*y+e;matrix[5]=b*x+d*y+f;return;}
    if(name==='scale'){matrix[0]=a*x;matrix[1]=b*x;matrix[2]=c*y;matrix[3]=d*y;return;}
    if(name==='skew'){matrix[0]=a+c*y;matrix[1]=b+d*y;matrix[2]=a*x+c;matrix[3]=b*x+d;return;}   // M x [1 sx 0; sy 1 0]: Canvas.skew(sx, sy)

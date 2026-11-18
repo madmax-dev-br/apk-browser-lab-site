@@ -1,8 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=9b79f2cfbe27';
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { Blocked } from './scheduler.js?v=9b79f2cfbe27';
-import { networkOf } from './network-native.js?v=9b79f2cfbe27';
-import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=9b79f2cfbe27';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { Blocked } from './scheduler.js?v=12145e24651e';
+import { networkOf } from './network-native.js?v=12145e24651e';
+import { installTlsSockets, TRUST_KEY } from './tls-socket-host.js?v=12145e24651e';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -137,27 +137,6 @@ export function createSecurityHost(platform) {
   def(KMF, 'getDefaultAlgorithm', `()${STRING}`, () => 'PKIX', { static: true });
   def(KMF, 'getInstance', `(${STRING})${KMF}`, (r, _m, [name]) => { const ref = r.allocate(KMF); r.object(ref).algorithm = algorithm(r, name, ['PKIX', 'X509'], 'KeyManagerFactory'); return ref; }, { static: true });
   def(KMF, 'getAlgorithm', `()${STRING}`, (r, _m, [self]) => r.object(self).algorithm);
-  // getInstance(algorithm, provider) of both factories: on the device their only provider is HarmonyJSSE (libcore JSSEProvider: PKIX, alias X509). As the JCA's GetInstance:
-  // a missing provider is IllegalArgumentException, an unknown provider name NoSuchProviderException, any other provider NoSuchAlgorithmException.
-  const JSSE_PROVIDER = 'HarmonyJSSE';
-  const jsseFactory = (r, owner, name, pname) => {
-    if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'algorithm == null');
-    const wanted = r.stringCharacters(name);
-    if (pname !== JSSE_PROVIDER || !['PKIX', 'X509'].some(a => a.toLowerCase() === wanted.toLowerCase())) r.throwJava('Ljava/security/NoSuchAlgorithmException;', `no such algorithm: ${wanted} for provider ${pname}`);
-    const ref = r.allocate(owner); r.object(ref).algorithm = wanted; return ref;
-  };
-  for (const owner of [TMF, KMF]) {
-    def(owner, 'getInstance', `(${STRING}${STRING})${owner}`, (r, _m, [name, pname]) => {
-      if (pname === null || r.stringCharacters(pname).length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'missing provider');
-      const wanted = r.stringCharacters(pname);
-      if (wanted !== JSSE_PROVIDER && r.dispatch({ owner: 'Ljava/security/Security;', name: 'getProvider', parameters: [STRING], result: 'Ljava/security/Provider;', signature: `(${STRING})Ljava/security/Provider;` }, [pname], 'static') === null) r.throwJava('Ljava/security/NoSuchProviderException;', `no such provider: ${wanted}`);
-      return jsseFactory(r, owner, name, wanted);
-    }, { static: true });
-    def(owner, 'getInstance', `(${STRING}Ljava/security/Provider;)${owner}`, (r, _m, [name, provider]) => {
-      if (provider === null) r.throwJava('Ljava/lang/IllegalArgumentException;', 'missing provider');
-      return jsseFactory(r, owner, name, r.stringCharacters(r.dispatch({ owner: 'Ljava/security/Provider;', name: 'getName', parameters: [], result: STRING, signature: `()${STRING}` }, [provider], 'virtual')));
-    }, { static: true });
-  }
   def(KMF, 'init', `(${KEYSTORE}${CHARS})V`, (r, _m, [self]) => { r.object(self).ready = true; });
   def(KMF, 'getKeyManagers', `()[${KM}`, (r, _m, [self]) => { if (!r.object(self).ready) r.throwJava('Ljava/lang/IllegalStateException;', 'KeyManagerFactory is not initialized'); return array(r, KM, []); });
 

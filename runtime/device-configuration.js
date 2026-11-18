@@ -17,5 +17,5 @@ export function configurationFor(device, insets = { top: 0, bottom: 0, left: 0, 
 /** ResourceConfigProvider profile (original ResTable_config matching) for the same device state. */
 export function resourceProfileFor(device, insets) {
   const value = configurationFor(device, insets), [language, region] = [value.language, value.region || 'US'];
-  return { sdkVersion: 33, density: value.densityDpi, widthDp: value.screenWidthDp, heightDp: value.screenHeightDp, smallestWidthDp: value.smallestScreenWidthDp, orientation: value.orientation, uiMode: value.uiMode, screenLayout: value.screenLayout, language, region };
+  return { sdkVersion: 28, density: value.densityDpi, widthDp: value.screenWidthDp, heightDp: value.screenHeightDp, smallestWidthDp: value.smallestScreenWidthDp, orientation: value.orientation, uiMode: value.uiMode, screenLayout: value.screenLayout, language, region };
 }

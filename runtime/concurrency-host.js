@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
-import { Blocked, VMThread } from './scheduler.js?v=9b79f2cfbe27';
-import { Invoke } from './interpreter.js?v=9b79f2cfbe27';
-import { GC_ROOTS } from './heap-gc.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { Blocked, VMThread } from './scheduler.js?v=12145e24651e';
+import { Invoke } from './interpreter.js?v=12145e24651e';
+import { GC_ROOTS } from './heap-gc.js?v=12145e24651e';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -298,16 +298,6 @@ export function createConcurrencyHost(platform) {
     return block(r, { reason: `Thread.join(${st.name})`, ready: () => st.finished, timeoutMs: ms === 0 ? Infinity : ms, finish: () => { if (me.interrupted) { me.interrupted = false; throwNew(r, 'Ljava/lang/InterruptedException;'); } } });
   };
   def(THREAD, 'join', '()V', (r, _m, [self]) => join(r, self, 0)); def(THREAD, 'join', '(J)V', (r, _m, [self, ms]) => join(r, self, Number(ms)));
-  // Thread.dumpStack(): new Exception("Stack trace").printStackTrace()
-  def(THREAD, 'dumpStack', '()V', r => { const e = newObject(r, 'Ljava/lang/Exception;', [STRING], ['Stack trace']); vcall(r, e, THROWABLE, 'printStackTrace', [], 'V'); }, { static: true });
-  // TimeUnit.sleep / timedWait / timedJoin (java.util.concurrent.TimeUnit): nothing for a timeout that is not positive, else Thread.sleep / Object.wait / Thread.join with the
-  // milliseconds and the excess nanoseconds of the timeout in this unit.
-  const unitTimeout = (r, unit, timeout) => { const ms = vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [timeout]), nanos = vcall(r, unit, UNIT, 'toNanos', ['J'], 'J', [timeout]); return { ms, nanos: Number(nanos - ms * 1000000n > 0n && nanos - ms * 1000000n < 1000000n ? nanos - ms * 1000000n : 0n) }; };
-  def(UNIT, 'sleep', '(J)V', (r, _m, [self, timeout]) => { if (timeout <= 0n) return undefined; const { ms } = unitTimeout(r, self, timeout); return sleep(r, Number(ms)); });
-  def(UNIT, 'timedWait', `(${OBJECT}J)V`, (r, _m, [self, target, timeout]) => { if (timeout <= 0n) return undefined; const { ms, nanos } = unitTimeout(r, self, timeout); return vcall(r, target, OBJECT, 'wait', ['J', 'I'], 'V', [ms, nanos]); });
-  def(UNIT, 'timedJoin', `(${THREAD}J)V`, (r, _m, [self, thread, timeout]) => { if (timeout <= 0n) return undefined; if (thread === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const { ms, nanos } = unitTimeout(r, self, timeout); return join(r, thread, Number(ms) + (nanos ? 1 : 0)); });
-  // Runtime.exit / halt: as System.exit, the app ends its own virtual process
-  for (const name of ['exit', 'halt']) def(RUNTIME, name, '(I)V', (_r, _m, [, status]) => { throw new APKError(`Runtime.${name}(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); });
 
   // ---- futures -------------------------------------------------------------------------------------------------------------------------------
   const FUTURE = 'Ljava/util/concurrent/Future;';
@@ -320,9 +310,6 @@ export function createConcurrencyHost(platform) {
   def(FUTURE_TASK, '<init>', `(${RUNNABLE}${OBJECT})V`, (r, _m, [self, run, result]) => { if (run === null) throwNew(r, 'Ljava/lang/NullPointerException;'); r.object(self).future = { callable: null, runnable: run, result, value: result, state: 'new' }; });
   const finish = (r, self, f, state, extra) => { Object.assign(f, extra, { state }); vcall(r, self, FUTURE_TASK, 'done', [], 'V'); };
   def(FUTURE_TASK, 'done', '()V', () => {});
-  // FutureTask.set / setException (protected; a subclass or an AbstractFuture-style wrapper completes the task itself): only a task that is still new takes the outcome, then done() runs
-  def(FUTURE_TASK, 'set', `(${OBJECT})V`, (r, _m, [self, value]) => { const f = ft(r, self); if (f.state === 'new') finish(r, self, f, 'normal', { value }); });
-  def(FUTURE_TASK, 'setException', `(${THROWABLE})V`, (r, _m, [self, failure]) => { const f = ft(r, self); if (f.state === 'new') finish(r, self, f, 'failed', { failure }); });
   // FutureTask.run(): the callable/runnable executes as Java frames (an Invoke), so a task that blocks parks its worker thread instead of the whole run loop.
   def(FUTURE_TASK, 'run', '()V', (r, _m, [self]) => {
     const f = ft(r, self); if (f.state !== 'new') return; f.runner = currentThread(r);

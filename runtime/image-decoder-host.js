@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { declaredFrameCount } from './animated-image.js?v=9b79f2cfbe27';
+import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { declaredFrameCount } from './animated-image.js?v=12145e24651e';
 
 // android.graphics.ImageDecoder (API 28+, android-13.0.0_r1 ImageDecoder.java) over the lab's bitmap codec: a Source is the encoded bytes (byte[], ByteBuffer, File, raw resource, asset, content Uri,
 // Callable<AssetFileDescriptor> is not modelled); decodeBitmap / decodeDrawable decode with BitmapFactory, call the OnHeaderDecodedListener with the decoder and the ImageInfo (size, mime type,

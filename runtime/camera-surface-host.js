@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { bitsFloat, floatBits } from './host-contract.js?v=9b79f2cfbe27';
-import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=9b79f2cfbe27';
-import { ByteCells, IntCells } from './java-arrays.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { bitsFloat, floatBits } from './host-contract.js?v=12145e24651e';
+import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=12145e24651e';
+import { ByteCells, IntCells } from './java-arrays.js?v=12145e24651e';
 
 // The consumers a camera stream ends in (android-13.0.0_r1 TextureView.java, SurfaceView.java, SurfaceHolder.java, ImageReader.java, Image.java), over the lab's frame path:
 //

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { floatBits } from './host-contract.js?v=9b79f2cfbe27';
-import { getSolidPaint } from './paint-host.js?v=9b79f2cfbe27';
-import { premultiply, unpremultiply } from './image-codecs.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { floatBits } from './host-contract.js?v=12145e24651e';
+import { getSolidPaint } from './paint-host.js?v=12145e24651e';
+import { premultiply, unpremultiply } from './image-codecs.js?v=12145e24651e';
 
 // The public android.graphics.Bitmap API (API 33) over the Skia-backed bitmap model of bitmap-host.js: construction (createBitmap overloads, createScaledBitmap, copy, extractAlpha), pixel access
 // (getPixel(s)/setPixel(s)/getColor/copyPixelsTo|FromBuffer/eraseColor), reconfiguration, density, color space and compress(). Validation, messages and exceptions follow Bitmap.java / Bitmap.cpp of
@@ -339,13 +339,6 @@ export function createBitmapOps(registry, { bitmaps, CK, vcall }) {
   def(BITMAP, 'setConfig', `(${CONFIG})V`, (r, _m, [self, config]) => { const s = st(r, self); reconfigure(r, self, s.width, s.height, config ?? r.throwJava('Ljava/lang/NullPointerException;', null)); });
   def(BITMAP, 'asShared', `()${BITMAP}`, () => fail('Bitmap.asShared: ashmem-shared bitmaps are not modeled by the lab'));
   def(BITMAP, 'wrapHardwareBuffer', `(Landroid/hardware/HardwareBuffer;${SPACE})${BITMAP}`, () => fail('Bitmap.wrapHardwareBuffer: HardwareBuffer is not modeled by the lab'), { static: true });
-  // Bitmap.getHardwareBuffer (Bitmap.java, libs/hwui/jni/Bitmap.cpp Bitmap_getHardwareBuffer): only a HARDWARE bitmap has one; any other config is IllegalStateException.
-  // A HARDWARE bitmap of the lab keeps its pixels in the host store, with no gralloc buffer behind it: that case fails by name.
-  def(BITMAP, 'getHardwareBuffer', '()Landroid/hardware/HardwareBuffer;', (r, _m, [self]) => {
-    const s = live(r, self, "Can't getHardwareBuffer from a recycled bitmap");
-    if (!s.hardware) ise(r, 'Hardware config is only supported config in Bitmap_getHardwareBuffer');
-    return fail('Bitmap.getHardwareBuffer: a HARDWARE bitmap of the lab has no gralloc buffer behind it');
-  });
   def(BITMAP, 'describeContents', '()I', () => 0);
   def(BITMAP, 'writeToParcel', '(Landroid/os/Parcel;I)V', () => fail('Bitmap.writeToParcel: bitmaps are not parceled in the lab (no Parcel with ashmem/blob support)'));
   registry.staticField(BITMAP, 'CREATOR', 'Landroid/os/Parcelable$Creator;', () => fail('Bitmap.CREATOR: bitmaps are not parceled in the lab (no Parcel with ashmem/blob support)'));

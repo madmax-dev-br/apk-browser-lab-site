@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=9b79f2cfbe27';
+import { APKError } from './apk-runtime.js?v=12145e24651e';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=12145e24651e';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', INSETS = 'Landroid/view/WindowInsets;', RECT = 'Landroid/graphics/Rect;';
 const LISTENER = 'Landroid/view/View$OnApplyWindowInsetsListener;';
@@ -61,7 +61,6 @@ export function createWindowInsetsHost(platform) {
     if (!windows.has(token.ref)) {
       const info = runtime.makeObject(ATTACH_INFO), root = runtime.makeObject(ROOT_IMPL), source = initial(runtime, rootOf(runtime, receiver));
       runtime.storeField(runtime.object(root).fields, `${ROOT_IMPL}->mAttachInfo:${ATTACH_INFO}`, info);
-      runtime.object(root).windowRootView = rootOf(runtime, receiver);   // ViewRootImpl.mView: what its ViewParent methods act on (src/popup-window-needs.js)
       runtime.storeField(runtime.object(info).fields, `${ATTACH_INFO}->mViewRootImpl:${ROOT_IMPL}`, root);
       for (const name of ['mContentInsets', 'mVisibleInsets', 'mStableInsets']) {
         const rect = newRect(runtime);

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
+import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=12145e24651e';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -242,11 +242,9 @@ export function createViewApiHost(platform) {
   def(VIEW, 'setTextAlignment', '(I)V', (r, _m, [self, value]) => { const view = r.object(self); if ((view.textAlignment ?? 0) !== value) { view.textAlignment = value; viewCall(r, self, 'requestLayout'); platform.requestDraw?.(r, self); } });
   plain(`setPreferKeepClearRects(${LIST})V`, `getPreferKeepClearRects()${LIST}`, 'preferKeepClearRects', LIST, null);
   plain('setTransitionVisibility(I)V', 'getTransitionVisibility()I', 'transitionVisibility', 'I', 0);
-  // View.setCameraDistance(distance): "mRenderNode.setCameraDistance(Math.abs(distance) / dpi)"; getCameraDistance(): "mRenderNode.getCameraDistance() * dpi" (android-13.0.0_r1).
-  // The RenderNode's camera starts 8 inches away (Skia's Sk3DView); it is the camera of android:rotationX / rotationY (view-transform-host.js).
-  const densityDpi = () => Math.fround(platform.device?.densityDpi ?? 160);
-  def(VIEW, 'setCameraDistance', '(F)V', (r, _m, [self, distance]) => { platform.viewTransformHost.setCameraDistance(r, self, Math.fround(Math.abs(i2f(distance)) / densityDpi())); });
-  def(VIEW, 'getCameraDistance', '()F', (r, _m, [self]) => f2i(Math.fround(platform.viewTransformHost.cameraDistance(r, self) * densityDpi())));
+  // View.setCameraDistance stores abs(distance) / dpi on the RenderNode and getCameraDistance returns -(stored * dpi): the dpi cancels, the sign is AOSP's. The camera only feeds rotationX / rotationY, which the transform host refuses.
+  def(VIEW, 'setCameraDistance', '(F)V', (r, _m, [self, distance]) => { r.object(self).cameraDistance = f2i(Math.abs(i2f(distance))); platform.requestDraw?.(r, self); });
+  def(VIEW, 'getCameraDistance', '()F', (r, _m, [self]) => { const stored = i2f(r.object(self).cameraDistance ?? 0); return stored === 0 ? 0 : f2i(-stored); });
   plain(`setPointerIcon(${'Landroid/view/PointerIcon;'})V`, `getPointerIcon()${'Landroid/view/PointerIcon;'}`, 'pointerIcon', 'Landroid/view/PointerIcon;', null);
   plain(`setTouchDelegate(${'Landroid/view/TouchDelegate;'})V`, `getTouchDelegate()${'Landroid/view/TouchDelegate;'}`, 'touchDelegate', 'Landroid/view/TouchDelegate;', null);
 
@@ -476,26 +474,10 @@ export function createViewApiHost(platform) {
   def(VIEW, 'postInvalidateDelayed', '(J)V', (r, _m, [self, delay]) => { platform.queueTask(() => platform.requestDraw?.(r, self), Number(delay), [self]); });
   def(VIEW, 'postInvalidateDelayed', '(JIIII)V', (r, _m, [self, delay]) => { platform.queueTask(() => platform.requestDraw?.(r, self), Number(delay), [self]); });
   def(VIEW, 'postInvalidateOnAnimation', '(IIII)V', (r, _m, [self]) => { platform.queueTask(() => platform.requestDraw?.(r, self), 16, [self]); });
-  def(VIEW, 'bringToFront', '()V', (r, _m, [self]) => {   // View.bringToFront: mParent.bringChildToFront(this), so a group that overrides it is asked
+  def(VIEW, 'bringToFront', '()V', (r, _m, [self]) => {   // ViewGroup.bringChildToFront: the child moves to the end of the children array (drawn last, hit first)
     const parent = r.object(self).parent; if (!isGroup(r, parent)) return;
-    r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'bringChildToFront', parameters: [VIEW], result: 'V', signature: `(${VIEW})V` }, [parent, self], 'virtual');
-  });
-  def('Landroid/view/ViewGroup;', 'bringChildToFront', `(${VIEW})V`, (r, _m, [self, child]) => {   // ViewGroup.bringChildToFront: the child moves to the end of the children array (drawn last, hit first); a view that is not a child changes nothing
-    const group = r.object(self), index = nullish(child) ? -1 : (group.children ?? []).findIndex(other => ref(other) === ref(child)); if (index < 0) return;
-    group.children.splice(index, 1); group.children.push(child); viewCall(r, self, 'requestLayout'); platform.requestDraw?.(r, self);
-  });
-  // ViewGroup.requestChildFocus(child, focused), as ViewGroup.java: nothing when the group blocks its descendants' focus; else the group gives up its own focus (super.unFocus), the
-  // child that held the focus before gives it up (mFocused.unFocus) and the request goes up to the parent. Which child holds the focus is not kept per group here (no mFocused):
-  // getFocusedChild / hasFocus find the focused view in the subtree, so the "previous" child is any other child with the focus in its subtree. unFocus is hidden API that no app
-  // class overrides, so the focus is cleared through View's own clearFocus, not through an override. The lab's focus change does not make this call itself; it serves a caller that
-  // names it (a group that overrides it and calls super, a child that reports its focus).
-  def('Landroid/view/ViewGroup;', 'requestChildFocus', `(${VIEW}${VIEW})V`, (r, _m, [self, child, focused]) => {
-    if (r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'getDescendantFocusability', parameters: [], result: 'I', signature: '()I' }, [self], 'virtual') === 0x60000) return;   // FOCUS_BLOCK_DESCENDANTS
-    const group = r.object(self), unFocus = view => r.dispatch({ owner: VIEW, name: 'clearFocus', parameters: [], result: 'V', signature: '()V' }, [view], 'direct');
-    if (group.focused) unFocus(self);
-    for (const other of [...(group.children ?? [])]) if (nullish(child) || ref(other) !== ref(child)) unFocus(other);
-    const parent = group.parent;
-    if (isGroup(r, parent)) r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'requestChildFocus', parameters: [VIEW, VIEW], result: 'V', signature: `(${VIEW}${VIEW})V` }, [parent, self, focused], 'virtual');
+    const group = r.object(parent), index = group.children.findIndex(child => ref(child) === ref(self)); if (index < 0) return;
+    group.children.splice(index, 1); group.children.push(self); viewCall(r, parent, 'requestLayout'); platform.requestDraw?.(r, parent);
   });
   // The drawing cache (deprecated since API 28): a bitmap of the view drawn into it, built on demand and kept until destroyDrawingCache / the next build
   def(VIEW, 'setDrawingCacheEnabled', '(Z)V', (r, _m, [self, enabled]) => { const view = r.object(self); view.drawingCacheEnabled = flag(enabled); if (!view.drawingCacheEnabled) viewCall(r, self, 'destroyDrawingCache'); });
@@ -524,10 +506,11 @@ export function createViewApiHost(platform) {
   // ================================================================================== padding, layout direction, text direction / alignment resolution
   def(VIEW, 'setPaddingRelative', '(IIII)V', (r, _m, [self, start, top, end, bottom]) => {
     const rtl = viewCall(r, self, 'getLayoutDirection', [], 'I') === 1, view = r.object(self);
+    view.paddingRelative = true; view.userPaddingStart = start; view.userPaddingEnd = end;
     viewCall(r, self, 'setPadding', ['I', 'I', 'I', 'I'], 'V', [rtl ? end : start, top, rtl ? start : end, bottom]);
-    view.userPaddingStart = start; view.userPaddingEnd = end;   // after setPadding, which makes the relative padding undefined; kept: a later change of the layout direction resolves them again (viewXmlAttributes.resolveRelativePadding)
+    view.paddingRelative = true;
   });
-  def(VIEW, 'isPaddingRelative', '()Z', (r, _m, [self]) => { const view = r.object(self), defined = platform.viewXmlAttributes.definedPadding; return defined(view.userPaddingStart) || defined(view.userPaddingEnd) ? 1 : 0; });   // mUserPaddingStart / End != UNDEFINED_PADDING (in RTL compatibility mode they are kept but never resolved)
+  def(VIEW, 'isPaddingRelative', '()Z', (r, _m, [self]) => r.object(self).paddingRelative ? 1 : 0);
   def(VIEW, 'isPaddingOffsetRequired', '()Z', () => 0);
   for (const name of ['getLeftPaddingOffset', 'getTopPaddingOffset', 'getRightPaddingOffset', 'getBottomPaddingOffset']) def(VIEW, name, '()I', () => 0);
   def(VIEW, 'getSolidColor', '()I', () => 0);
@@ -1035,56 +1018,8 @@ export function createViewApiHost(platform) {
   def(VIEW, 'dispatchScrollCaptureSearch', '(Landroid/graphics/Rect;Landroid/graphics/Point;Ljava/util/function/Consumer;)V', (r, _m, [self, rect, point, consumer]) => viewCall(r, self, 'onScrollCaptureSearch', [RECT, POINT, 'Ljava/util/function/Consumer;'], 'V', [rect, point, consumer]));
   def(VIEW, 'generateDisplayHash', `(${STRING}${RECT}Ljava/util/concurrent/Executor;Landroid/view/displayhash/DisplayHashResultCallback;)V`, () => unsupported('View.generateDisplayHash needs the system DisplayHashManager', 'display-hash-unsupported'));
   def(VIEW, 'getRootSurfaceControl', '()Landroid/view/AttachedSurfaceControl;', (r, _m, [self]) => r.object(self).attached ? unsupported('An attached View\'s AttachedSurfaceControl needs a SurfaceControl, which the virtual window does not have', 'surface-control-unsupported') : null);
-  // View.getWindowId: the WindowId of the window the View is attached to (null when detached). One WindowId per window root; two are equal when they name the same window
-  // (WindowId.equals compares the IWindowId binders), which is what the transition framework asks. Focus observers need the window session and fail naming it.
-  const WINDOW_ID = 'Landroid/view/WindowId;';
-  registry.type(WINDOW_ID, 'Ljava/lang/Object;', [], { allocatable: true });
-  def(VIEW, 'getWindowId', `()${WINDOW_ID}`, (r, _m, [self]) => {
-    if (!r.object(self).attached) return null;
-    let root = self; for (let depth = 0; depth < 4096; depth++) { const parent = r.object(root).parent; if (nullish(parent) || typeof parent !== 'object' || !r.isSubtype(r.object(parent).type, VIEW)) break; root = parent; }
-    const state = r.object(root);
-    if (nullish(state.windowId)) { state.windowId = r.allocate(WINDOW_ID); r.object(state.windowId).windowRoot = root; }
-    return state.windowId;
-  });
-  def(WINDOW_ID, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => !nullish(other) && typeof other === 'object' && r.object(other).type === WINDOW_ID && r.object(other).windowRoot?.ref === r.object(self).windowRoot?.ref ? 1 : 0);
-  def(WINDOW_ID, 'hashCode', '()I', (r, _m, [self]) => r.object(self).windowRoot?.ref | 0);
-  def(WINDOW_ID, 'isFocused', '()Z', (r, _m, [self]) => viewCall(r, r.object(self).windowRoot, 'hasWindowFocus', [], 'Z'));
-  def(WINDOW_ID, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => `IntentSender{${(r.object(self).windowRoot?.ref >>> 0).toString(16)}: virtual window}`);
-  for (const name of ['registerFocusObserver', 'unregisterFocusObserver']) def(WINDOW_ID, name, '(Landroid/view/WindowId$FocusObserver;)V', () => unsupported(`WindowId.${name} needs the window session's IWindowId focus callbacks, which the virtual window does not have`, 'window-id-unsupported'));
-  // View.getOverlay / ViewGroup.getOverlay: the original android.view.ViewOverlay / ViewGroupOverlay (layouts profile), made on first use with the View's Context. Its
-  // OverlayViewGroup is not a child of the View: View.draw draws it after the children (compose-canvas-host.js), the page shows its Views over the host View's box
-  // (APKRuntime.snapshot), and it is attached to and detached from the window with the host View (AndroidPlatform.attachTree).
-  const overlayOf = (r, self, type) => {
-    const view = r.object(self); if (view.overlay) return view.overlay;
-    if (!r.classes.has(type)) unsupported(`${type === 'Landroid/view/ViewOverlay;' ? 'View' : 'ViewGroup'}.getOverlay: android.view.ViewOverlay / ViewGroupOverlay are original classes of the layouts profile, which is not loaded for this APK (the loader brings the profile for an APK whose code names them)`, 'view-overlay-unsupported');
-    const overlay = r.allocate(type); r.dispatch({ owner: type, name: '<init>', parameters: [CONTEXT, VIEW], result: 'V', signature: `(${CONTEXT}${VIEW})V` }, [overlay, view.context ?? null, self], 'direct');
-    view.overlay = overlay; platform.viewOverlayCreated?.(r, self); return overlay;
-  };
-  registry.overlayOf = overlayOf;
-  /** View's constructor for a ViewOverlay.OverlayViewGroup: mRenderNode, which the overlay's constructor positions itself (RenderNode.setLeftTopRightBottom) because it never goes through setFrame. */
-  // View.ALPHA, TRANSLATION_X .. SCALE_Y: the FloatProperty<View> constants of View.java (anonymous subclasses there: setValue calls the View's setter, get its getter). Here
-  // one host class under the original android.util.FloatProperty, an instance per constant, made on first read. ObjectAnimator.ofFloat(view, View.ALPHA, ..) and the original
-  // FastScroller / transitions animate through them.
-  const VIEW_PROPERTY = 'Ldev/apkweb/view/ViewFloatProperty;', FLOAT_PROPERTY = 'Landroid/util/FloatProperty;', PROPERTY = 'Landroid/util/Property;';
-  registry.type(VIEW_PROPERTY, FLOAT_PROPERTY, [], { allocatable: true });
-  for (const [field, name] of Object.entries({ ALPHA: 'alpha', TRANSLATION_X: 'translationX', TRANSLATION_Y: 'translationY', TRANSLATION_Z: 'translationZ', X: 'x', Y: 'y', Z: 'z', ROTATION: 'rotation', ROTATION_X: 'rotationX', ROTATION_Y: 'rotationY', SCALE_X: 'scaleX', SCALE_Y: 'scaleY' })) {
-    registry.staticField(VIEW, field, PROPERTY, r => {
-      if (!r.classes.has(FLOAT_PROPERTY)) unsupported(`View.${field} needs the original android.util.FloatProperty`, 'view-property-unsupported');
-      const property = r.allocate(VIEW_PROPERTY); r.dispatch({ owner: FLOAT_PROPERTY, name: '<init>', parameters: ['Ljava/lang/String;'], result: 'V', signature: '(Ljava/lang/String;)V' }, [property, name], 'direct');
-      r.object(property).viewProperty = name[0].toUpperCase() + name.slice(1); (r.hostStaticValues ??= []).push(property); return property;
-    });
-  }
-  def(VIEW_PROPERTY, 'setValue', '(Ljava/lang/Object;F)V', (r, _m, [self, target, value]) => { r.dispatch({ owner: VIEW, name: `set${r.object(self).viewProperty}`, parameters: ['F'], result: 'V', signature: '(F)V' }, [target, value], 'virtual'); });
-  def(VIEW_PROPERTY, 'get', '(Ljava/lang/Object;)Ljava/lang/Object;', (r, _m, [self, target]) => r.dispatch({ owner: 'Ljava/lang/Float;', name: 'valueOf', parameters: ['F'], result: 'Ljava/lang/Float;', signature: '(F)Ljava/lang/Float;' }, [r.dispatch({ owner: VIEW, name: `get${r.object(self).viewProperty}`, parameters: [], result: 'F', signature: '()F' }, [target], 'virtual')], 'static'));
-  registry.instanceField(VIEW, 'mRenderNode', 'Landroid/graphics/RenderNode;');   // read by ViewOverlay.OverlayViewGroup through its own class
-  registry.initOverlayGroup = (r, self) => {
-    const NODE = 'Landroid/graphics/RenderNode;', HOST = 'Landroid/graphics/RenderNode$AnimationHost;', view = r.object(self);
-    if (!r.classes.has(NODE) || !r.skiaHost) unsupported('ViewOverlay needs the original android.graphics.RenderNode and the Skia backend', 'view-overlay-unsupported');
-    r.storeField(view.fields, `${VIEW}->mRenderNode:${NODE}`, r.dispatch({ owner: NODE, name: 'create', parameters: ['Ljava/lang/String;', HOST], result: NODE, signature: `(Ljava/lang/String;${HOST})${NODE}` }, [view.type.slice(1, -1).replaceAll('/', '.'), null], 'static'));
-  };
-  /** The OverlayViewGroup of a View that has an overlay, or null. */
-  registry.overlayView = (r, self) => { const overlay = r.object(self).overlay; return overlay ? r.object(overlay).fields.get('Landroid/view/ViewOverlay;->mOverlayViewGroup:Landroid/view/ViewOverlay$OverlayViewGroup;') ?? null : null; };
-  def(VIEW, 'getOverlay', '()Landroid/view/ViewOverlay;', (r, _m, [self]) => overlayOf(r, self, r.isSubtype(r.object(self).type, 'Landroid/view/ViewGroup;') && r.classes.has('Landroid/view/ViewGroupOverlay;') ? 'Landroid/view/ViewGroupOverlay;' : 'Landroid/view/ViewOverlay;'));
+  def(VIEW, 'getWindowId', '()Landroid/view/WindowId;', (r, _m, [self]) => r.object(self).attached ? unsupported('View.getWindowId needs the window session\'s IWindowId binder, which the virtual window does not have', 'window-id-unsupported') : null);
+  def(VIEW, 'getOverlay', '()Landroid/view/ViewOverlay;', () => unsupported('View.getOverlay needs ViewOverlay, which is not part of the framework yet', 'view-overlay-unsupported'));
   def(VIEW, 'getAnimationMatrix', '()Landroid/graphics/Matrix;', (r, _m, [self]) => r.object(self).animationMatrix ?? null);
   def(VIEW, 'setAnimationMatrix', '(Landroid/graphics/Matrix;)V', (r, _m, [self, matrix]) => {
     if (nullish(matrix)) { r.object(self).animationMatrix = null; platform.requestDraw?.(r, self); return; }

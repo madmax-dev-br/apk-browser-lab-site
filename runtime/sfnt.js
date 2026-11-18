@@ -69,10 +69,3 @@ export function sfntMember(bytes, index) {
 /** FontVariationAxis tag <-> four-character string. */
 export const tagToInt = tag => ((tag.charCodeAt(0) << 24) | (tag.charCodeAt(1) << 16) | (tag.charCodeAt(2) << 8) | tag.charCodeAt(3)) | 0;
 export const intToTag = value => String.fromCharCode((value >>> 24) & 255, (value >>> 16) & 255, (value >>> 8) & 255, value & 255);
-
-/** head.unitsPerEm and the font bounding box (xMin, yMin, xMax, yMax, in font units) of an sfnt; null when the data has no head table. */
-export function sfntBounds(bytes, ttcIndex = 0) {
-  const head = sfntDirectory(bytes, ttcIndex)?.tables.get('head'); if (!head || head.length < 44) return null;
-  const view = new DataView(bytes.buffer, bytes.byteOffset + head.offset, head.length), unitsPerEm = view.getUint16(18);
-  return unitsPerEm ? { unitsPerEm, xMin: view.getInt16(36), yMin: view.getInt16(38), xMax: view.getInt16(40), yMax: view.getInt16(42) } : null;
-}

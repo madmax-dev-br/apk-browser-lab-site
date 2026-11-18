@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
+import { APKError } from './apk-runtime.js?v=12145e24651e';
 const PARSER = 'Landroid/content/res/XmlBlock$Parser;', PULL = 'Lorg/xmlpull/v1/XmlPullParser;', ATTRS = 'Landroid/util/AttributeSet;', RES_PARSER = 'Landroid/content/res/XmlResourceParser;';
 const ANDROID = 'http://schemas.android.com/apk/res/android';
 const methods = [
@@ -16,18 +16,13 @@ function floatBits(value) { const data = new DataView(new ArrayBuffer(4)); data.
 
 /** Pull-parser boundary over actual compiled AXML events. App navigation code is never reconstructed. */
 export class AndroidXmlHost {
-  constructor(platform) { this.platform = platform; this.layoutNodes = new WeakSet(); }
-  /** The tags of a layout (or menu) tree: the ones whose android: attributes never fail an inflation (AndroidStyleBackend.unreadable). A drawable, animation or preference XML is not one. */
-  markLayout(tree) { const visit = node => { this.layoutNodes.add(node); node.children?.forEach(visit); }; if (tree) visit(tree); return tree; }
-  isLayoutNode(node) { return this.layoutNodes.has(node); }
+  constructor(platform) { this.platform = platform; }
   interfaces(type) { return type === PARSER ? [PULL, ATTRS, RES_PARSER, 'Ljava/lang/AutoCloseable;'] : type === RES_PARSER ? [PULL, ATTRS, 'Ljava/lang/AutoCloseable;'] : []; }
   create(runtime, tree, resourceId) {
-    this.serial = (this.serial ?? 0) + 1;   // one per parser: what is reported once per parse of a layout is counted once per inflation
-    const layout = this.layoutNodes;
     const value = runtime.makeObject(PARSER), parser = runtime.object(value), events = [{ type: 0, depth: 0, node: null }], strings = new Map();
     const visit = (node, depth, parentScopes = [[]]) => {
       if (depth > 64 || events.length > 32768) fail('compiled XML event bounds exceeded');
-      const scopes = [...parentScopes, node.namespaces || []]; events.push({ type: 2, depth, node, scopes }); if (this.parsingLayout) layout.add(node);
+      const scopes = [...parentScopes, node.namespaces || []]; events.push({ type: 2, depth, node, scopes });
       for (const attr of node.attributes) if (attr.dataType === 3) strings.set(attr.rawData, attr.value);
       if (node.text && node.children.length) fail('mixed text/element ordering is not retained by this binary tree profile');
       if (node.text) events.push({ type: 4, depth, node, text: node.text, scopes });
@@ -47,8 +42,7 @@ export class AndroidXmlHost {
     const name = method.name;
     if (method.owner === 'Landroid/util/Xml;') { const value = args[0]; if (!value || !runtime.object(value).events) fail('asAttributeSet requires the real prepared binary parser'); return value; }
     if (method.owner === 'Landroid/content/res/Resources;' && name === 'getAttributeSetSourceResId') return args[0]?.ref ? runtime.object(args[0]).resourceId || 0 : 0;
-    // Resources.getLayout is what LayoutInflater and MenuInflater parse: the tags of such a tree are Views, LayoutParams and menu entries (markLayout).
-    if (method.owner === 'Landroid/content/res/Resources;') { this.parsingLayout = name === 'getLayout'; try { return this.create(runtime, this.platform.resources.getXml(args[1]), args[1]); } finally { this.parsingLayout = false; } }
+    if (method.owner === 'Landroid/content/res/Resources;') return this.create(runtime, this.platform.resources.getXml(args[1]), args[1]);
     const parser = runtime.object(args[0]);
     if (name === 'getPooledString') { const text = parser.pooledStrings?.get(args[1]); if (text === undefined) fail(`pool index ${args[1]} is not prepared`); return text; }
     if (name === 'close') { parser.closed = true; return; }

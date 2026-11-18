@@ -1,8 +1,7 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=9b79f2cfbe27';
-import { APKError } from './apk-runtime.js?v=9b79f2cfbe27';
-import { ephemeronMap } from './heap-gc.js?v=9b79f2cfbe27';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=9b79f2cfbe27';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=9b79f2cfbe27';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=12145e24651e';
+import { APKError } from './apk-runtime.js?v=12145e24651e';
+import { ephemeronMap } from './heap-gc.js?v=12145e24651e';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=12145e24651e';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -18,67 +17,7 @@ add(ASSETS, ['getPooledStringForCookie(II)Ljava/lang/CharSequence;']);
 add(XML, ['getPooledString(I)Ljava/lang/CharSequence;']);
 add('Landroid/view/ContextThemeWrapper;', ['getThemeResId()I']);
 
-// ---- a value of a tag's attribute that no TypedArray getter of the attribute can read ---------------------------------------------------------------------------------------
-// TypedArray.java (android-13.0.0_r1) reads a value by its type: a getter given a type it does not take throws (UnsupportedOperationException, NumberFormatException,
-// Resources.NotFoundException), which on a device ends the inflation of the whole screen. The lab keeps such a value out of the TypedArray a tag is read with (the attribute
-// is then absent, as if the tag did not carry it) and reports it under "XML attributes NOT APPLIED": an android: attribute never fails an inflation here, whatever its value
-// (owner's rule; docs/XML-ATTRIBUTES.md, "A value of the wrong kind"). What a getter reads by coercion (getText and getString of any value, getBoolean, getInt of a string
-// XmlUtils.convertValueToInt parses, a colour where a drawable is asked) is read as Android reads it.
-const ANDROID_NS = 'http://schemas.android.com/apk/res/android';
-const isInt = type => type >= 0x10 && type <= 0x1f, isColor = type => type >= 0x1c && type <= 0x1f;
-/**
- * What TypedArray.getInt makes of the text of a string value: com.android.internal.util.XmlUtils.convertValueToInt (android-13.0.0_r1), which the getter gives the text to.
- * `fallback` for an empty text (the getter's default); a leading '-', then "0x" / "0X" or '#' (hexadecimal), a leading '0' (octal), else decimal; the digits go to
- * Integer.parseInt(text, radix), which takes one more sign, only digits of the radix and only the range of an int. null where the original throws: "0xffffffff", "09",
- * " 5 " and "99999999999" are a NumberFormatException, a lone "-" a StringIndexOutOfBoundsException.
- */
-export function convertValueToInt(text, fallback = 0) {
-  const nm = String(text ?? ''); if (nm.length === 0) return fallback;
-  let index = 0, base = 10, sign = 1;
-  if (nm[0] === '-') { sign = -1; index++; }
-  if (index >= nm.length) return null;
-  if (nm[index] === '0') { if (index === nm.length - 1) return 0; const c = nm[index + 1]; if (c === 'x' || c === 'X') { index += 2; base = 16; } else { index++; base = 8; } }
-  else if (nm[index] === '#') { index++; base = 16; }
-  const digits = /^([+-]?)([0-9a-zA-Z]+)$/.exec(nm.slice(index)); if (!digits) return null;
-  let value = 0n; for (const c of digits[2].toLowerCase()) { const digit = parseInt(c, 36); if (digit >= base) return null; value = value * BigInt(base) + BigInt(digit); if (value > 2147483648n) return null; }
-  if (digits[1] === '-') value = -value; else if (value > 2147483647n) return null;
-  return Math.imul(Number(value), sign);
-}
-const intText = value => convertValueToInt(value.value) !== null, FLOAT_TEXT = /^\s*[-+]?(?:\d+\.?\d*(?:[eE][-+]?\d+)?|\.\d+(?:[eE][-+]?\d+)?|NaN|Infinity)[fFdD]?\s*$/;
-/** getter -> whether it reads a value of this type without throwing (type: Res_value dataType after the reference was followed; file: the value is a resource file path). */
-const READS = {
-  getDrawable: (type, value) => isColor(type) || type === 3 && !!value.resourceId, getColorStateList: (type, value) => isColor(type) || type === 3 && !!value.resourceId,
-  getColor: (type, value) => isInt(type) || type === 3 && !!value.resourceId,
-  getDimension: type => type === 5, getDimensionPixelOffset: type => type === 5, getDimensionPixelSize: type => type === 5, getLayoutDimension: type => type === 5 || isInt(type),
-  getInt: (type, value) => isInt(type) || type === 3 && intText(value), getInteger: type => isInt(type),
-  getFloat: (type, value) => type === 4 || isInt(type) || type === 3 && FLOAT_TEXT.test(String(value.value ?? '')), getFraction: type => type === 6,
-  getTextArray: (type, value, bag) => bag,
-  // View's pointerIcon: a.getResourceId, and when that is 0 a.getInt (a system icon type)
-  getResourceIdOrInt: (type, value) => !!value.resourceId || isInt(type) || type === 3 && intText(value),
-};
-const THROWS = { getDrawable: 'Resources.NotFoundException', getColorStateList: 'UnsupportedOperationException', getColor: 'UnsupportedOperationException', getDimension: 'UnsupportedOperationException',
-  getDimensionPixelOffset: 'UnsupportedOperationException', getDimensionPixelSize: 'UnsupportedOperationException', getLayoutDimension: 'UnsupportedOperationException', getInt: 'NumberFormatException',
-  getInteger: 'UnsupportedOperationException', getFloat: 'NumberFormatException', getFraction: 'UnsupportedOperationException', getTextArray: 'Resources.NotFoundException', getResourceIdOrInt: 'NumberFormatException' };
-const TYPE_NAMES = { 1: 'a reference', 2: 'a theme attribute', 3: 'a string', 4: 'a float', 5: 'a dimension', 6: 'a fraction', 0x10: 'an integer', 0x11: 'an integer', 0x12: 'a boolean' };
-
-// ---- a value a getter reads, and what Android does with it next throws -----------------------------------------------------------------------------------------------------
-// A menu is built by the original MenuInflater and MenuBuilder in one pass over the XML, so a value they refuse cannot be found by building the item again without one
-// attribute (as a View or its LayoutParams are: AndroidPlatform.recoverViewConstruction / recoverLayoutParams). These are the checks of that code, made before it reads.
-const numberOf = (type, value) => isInt(type) ? value.rawData | 0 : type === 3 ? convertValueToInt(value.value, null) : null;
-const emptyShortcut = (type, value) => type === 3 && String(value.value ?? '') === '' ? 'the value is an empty text, and MenuInflater.getShortcut reads its first character (StringIndexOutOfBoundsException on a device, where the menu fails to inflate); the lab leaves the attribute out' : null;
-const REFUSED = {
-  // MenuBuilder.getOrdering: (category & CATEGORY_MASK) >> CATEGORY_SHIFT indexes sCategoryToOrder, which has six entries (none, container, system, secondary, alternative, selected alternative)
-  menuCategory: (type, value) => { const number = numberOf(type, value), index = number === null ? 0 : (number & 0xffff0000) >> 16; return index < 0 || index >= 6 ? `the value ${number} is no menu category: MenuBuilder.getOrdering throws IllegalArgumentException "order does not contain a valid category" (on a device the menu fails to inflate); the lab leaves the attribute out` : null; },
-  alphabeticShortcut: emptyShortcut, numericShortcut: emptyShortcut,
-};
-
 /** Native resource-data boundary. TypedArray/TypedValue/Pools algorithms stay in original AOSP DEX. */
-// Attributes an original framework constructor acts on with a class the framework build does not have (AndroidStyleBackend.withheld).
-const WITHHELD = [
-  // AbsListView(Context, AttributeSet, ..): setFastScrollEnabled(true) / setFastScrollAlwaysVisible(true) create the FastScroller, whose views live in ViewGroup.getOverlay()
-  { attributes: ['fastScrollEnabled', 'fastScrollAlwaysVisible'], when: value => value.dataType === 0x12 && (value.rawData | 0) !== 0, missing: ['Landroid/view/ViewGroupOverlay;'],
-    reason: "the list's fast scroller is drawn in ViewGroup.getOverlay(), and this framework has no ViewOverlay / ViewGroupOverlay (original classes of the layouts profile, which every framework with the list widgets has: this only happens with a reduced build)" },
-];
 export class AndroidStyleBackend {
   constructor(platform) { this.platform = platform; this.poolStrings = new Map(); this.xmlCookieSequence = 0; }
   put(runtime, ref, owner, name, type, value) { const field = runtime.resolveField({ owner, name, type, key: `${owner}->${name}:${type}` }); runtime.storeField(runtime.object(ref).fields, field.key, value); }
@@ -142,9 +81,7 @@ export class AndroidStyleBackend {
   }
   applyStyle(runtime, theme, id, force) {
     const table = this.platform.resources?.table; if (!table) fail('APK resources are unavailable');
-    // Theme.applyStyle of a style that cannot be read (AssetManager2::GetBag fails) leaves the theme as it was, without an exception: reported, as obtain does for a style.
-    let bag; try { bag = table.resolveBag(id); } catch (failure) { if (failure?.name !== 'AndroidResourceError') throw failure; this.platform.noteResourceUnresolved(runtime, `style 0x${(id >>> 0).toString(16)} applied to a theme`, `not readable, the theme is left without it: ${failure.message}`); bag = new Map(); }
-    const object = runtime.object(theme);
+    const bag = table.resolveBag(id), object = runtime.object(theme);
     if(object.appliedStyles.length>=4096)fail('Theme applied-style history exceeds4096 entries');
     for (const [attribute, value] of bag) if (force || !object.themeValues.has(attribute)) object.themeValues.set(attribute, value);
     object.appliedStyles.push({ id, force });
@@ -166,90 +103,28 @@ export class AndroidStyleBackend {
   typedValue(runtime, ref, value) {
     for (const [name, type, data] of [['type', 'I', value.dataType || 0], ['data', 'I', value.rawData | 0], ['assetCookie', 'I', value.sourceCookie || 0], ['resourceId', 'I', value.resourceId || 0], ['changingConfigurations', 'I', value.changingConfigurations || 0], ['density', 'I', value.density || 0], ['sourceResourceId', 'I', value.sourceResourceId || 0], ['string', 'Ljava/lang/CharSequence;', value.kind === 'string' ? value.value : null]]) this.put(runtime, ref, VALUE, name, type, data);
   }
-  /**
-   * Whether the value of an attribute is kept out of the TypedArray an original constructor reads from a tag. Only for what the constructor could not survive: it would call
-   * into a part of Android that is not in the virtual device and fail the whole inflation. The attribute is reported under "XML attributes NOT APPLIED" with what is missing;
-   * the same call from the app's code still fails explicitly.
-   */
-  withheld(runtime, id, value, node) {
-    const names = this.withheldIds ??= (() => { const table = this.platform.resources?.frameworkTable, map = new Map(); if (table) for (const rule of WITHHELD) for (const name of rule.attributes) { const found = this.platform.viewXmlAttributes?.kit.attributeId(name) || table.findId('attr/' + name); if (found) map.set(found >>> 0, { name, rule }); } /* the public id, which a compiled layout carries */ return map; })();
-    const entry = names.get(id); if (!entry || !entry.rule.when(value) || entry.rule.missing.every(type => runtime.classes.has(type))) return false;
-    this.platform.noteXmlAttributeNotApplied(runtime, entry.name, node.name, entry.rule.reason);
-    return true;
-  }
-  /** The type name of a resource id ("layout", "id", "drawable"), from the names of the resource table: known for an id whose own entry is missing as long as its type has any entry. */
-  resourceTypeName(id) {
-    const types = this.resourceTypes ??= (() => { const map = new Map(); try { for (const [name, value] of this.platform.resources.table.names) { const key = value >>> 16; if (!map.has(key)) map.set(key, name.slice(0, name.indexOf('/'))); } } catch { /* an unreadable name table: no type is known */ } return map; })();
-    return types.get(id >>> 16) ?? null;
-  }
-  /**
-   * Why the value a tag gives an attribute cannot be read by any getter the original constructors read that attribute with, or null when one reads it (or nothing is known
-   * about how the attribute is read). `original` is the attribute as the tag has it, `value` what following its reference gave, `missing` why that stopped short.
-   */
-  unreadable(original, value, missing) {
-    const name = original.name; if (!name || original.namespace && original.namespace !== ANDROID_NS) return null;
-    const type = value.dataType || 0;
-    if (type === 0) return null;   // @null, or no value: absent for every getter
-    // A reference to a resource that is not there cannot be loaded by anything (TypedArray.getResourceId still answers the id, and the layout, animation, style or drawable it names
-    // then fails to load). An id is the exception: it is a number to compare with, whether or not the table has an entry for it.
-    if (type === 1 && missing && this.resourceTypeName(value.reference >>> 0) !== 'id') return `the value refers to resource 0x${(value.reference >>> 0).toString(16)}, which cannot be read: ${String(missing).replace(/\s+/g, ' ').slice(0, 200)}`;
-    const legal = XML_ATTRIBUTE_ENUMS[name];
-    if (legal && isInt(type) && type !== 0x12 && !legal.includes(value.rawData | 0)) return `the value ${value.rawData | 0} is not one of the numbers android-13 declares for the attribute (${legal.join(', ')}): a value of a newer release, or not a value at all`;
-    const refused = REFUSED[name]?.(type, value); if (refused) return refused;
-    const getters = XML_ATTRIBUTE_GETTERS[name]?.split(','); if (!getters) return null;
-    let bag = false; if (type === 1 && !missing) { try { let entry = this.platform.resources.resolve(value.reference >>> 0); for (let guard = 0; entry?.resolved && guard < 20; guard++) entry = entry.resolved; bag = entry?.kind === 'bag'; } catch { bag = false; } }
-    if (getters.some(getter => !READS[getter] || READS[getter](type, value, bag))) return null;
-    const what = type === 1 ? (bag ? `a reference to a style or an array (0x${(value.reference >>> 0).toString(16)})` : `a reference to resource 0x${(value.reference >>> 0).toString(16)}, which is not in the resource table${(value.reference >>> 24) === 0x7f ? ' (a resource of a configuration split that is not loaded, or removed by a resource shrinker)' : ''}`)
-      : type === 2 ? `the theme attribute 0x${(value.reference >>> 0).toString(16)}, which the theme gives no value` : isColor(type) ? 'a colour' : TYPE_NAMES[type] ?? `a value of type 0x${type.toString(16)}`;
-    return `the value is ${what}, which TypedArray.${getters[0]} does not read (${THROWS[getters[0]]} on a device, where the layout fails to inflate); the lab leaves the attribute out`;
-  }
   obtain(runtime, themeRef, attrsRef, requestedRef, defStyleAttr = 0, defStyleRes = 0, styleId = 0, useTheme = true) {
     if (!runtime.classes.has(TYPED_ARRAY)) fail('Original AOSP TypedArray DEX is required; no JS getter substitute is installed');
     const requested = runtime.array(requestedRef).elements;
     if (requested.length > 4096) fail('Styled attribute request exceeds 4096 IDs');
     const theme = themeRef ? runtime.object(themeRef).themeValues : new Map();
     const values = useTheme ? new Map(theme) : new Map();
-    const table = this.platform.resources.table;
-    // AssetManager2::GetBag fails for a style that cannot be read (it does not exist, or a parent of its chain does not): ApplyStyle then reads the attributes without that style. Reported.
-    // The report names the tag being read, or the class of a View built in code (readingFor, set by the constructor passes).
-    const node = empty(attrsRef) ? null : runtime.object(attrsRef).node, reader = node?.name ?? this.readingFor ?? null;
-    const merge = (id, role) => { if (!id) return; let bag; try { bag = table.resolveBag(id); } catch (failure) { if (failure?.name !== 'AndroidResourceError') throw failure; this.platform.noteResourceUnresolved(runtime, `${role} 0x${(id >>> 0).toString(16)}${reader ? ` of <${reader}>` : ''}`, `not readable, read without it: ${failure.message}`); return; } for (const [attr, value] of bag) values.set(attr, value); };
+    const merge = id => { if (id) for (const [attr, value] of this.platform.resources.table.resolveBag(id)) values.set(attr, value); };
     let defaultStyle = defStyleRes;
-    if (defStyleAttr) { const found = table.getThemeAttribute(theme, defStyleAttr, false); if (found?.value.kind === 'reference' && found.value.reference) defaultStyle = found.value.reference; }   // ApplyStyle: theme->GetAttribute(def_style_attr), a TYPE_REFERENCE names the default style
-    if (defaultStyle) merge(defaultStyle, 'default style');
-    if (styleId) merge(styleId, 'style');
+    if (defStyleAttr && theme.has(defStyleAttr)) { const value = this.resolved(theme.get(defStyleAttr), theme, false); if (value.kind === 'reference' && value.reference) defaultStyle = value.reference; }
+    if (defaultStyle) merge(defaultStyle);
+    if (styleId) merge(styleId);
+    const node = empty(attrsRef) ? null : runtime.object(attrsRef).node;
     const xmlStyle = node?.attributes.find(attribute => attribute.name === 'style');
-    if (xmlStyle) {   // ApplyStyle: the style="" attribute is a @style reference or a ?attr the theme resolves to one; anything else is no style
-      const id = xmlStyle.kind === 'attribute' ? (found => (found?.value.kind === 'reference' ? found.value.reference : 0))(table.getThemeAttribute(theme, xmlStyle.reference, false)) : xmlStyle.kind === 'reference' ? xmlStyle.reference : 0;
-      if (!id && xmlStyle.kind === 'attribute') this.platform.noteResourceUnresolved(runtime, `style="?attr" 0x${(xmlStyle.reference >>> 0).toString(16)} on <${node.name}>`, 'the theme has no style reference for it');
-      merge(id, 'style');
-    }
-    const held = node ? this.platform.withheldFor?.(node) : null;   // attributes a failed constructor is being run again without
-    const direct = new Map(); for (const attr of node?.attributes || []) if (attr.resourceId && !held?.has(attr)) direct.set(attr.resourceId >>> 0, { ...attr, nameResourceId: attr.resourceId, resourceId: attr.dataType === 1 ? attr.reference : 0, sourceCookie: attr.kind === 'string' ? -1 : attr.sourceCookie, fromXml: true });
+    if (xmlStyle) { const value = this.resolved(xmlStyle, theme, false); const id = value.kind === 'attribute' ? this.resolved(theme.get(value.reference), theme, false).reference : value.reference; merge(id); }
+    const direct = new Map(); for (const attr of node?.attributes || []) if (attr.resourceId) direct.set(attr.resourceId >>> 0, { ...attr, nameResourceId: attr.resourceId, resourceId: attr.dataType === 1 ? attr.reference : 0, sourceCookie: attr.kind === 'string' ? -1 : attr.sourceCookie, fromXml: true });
     const resources = this.resourceObject(runtime);
     const array = runtime.dispatch({ owner: TYPED_ARRAY, name: 'obtain', signature: '(Landroid/content/res/Resources;I)Landroid/content/res/TypedArray;', parameters: [RESOURCES, 'I'], result: TYPED_ARRAY }, [resources, requested.length], 'static');
     const data = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mData', '[I')).elements, indices = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mIndices', '[I')).elements;
     data.fill(0); indices.fill(0); const xmlStrings = new Map();
     requested.forEach((id, index) => {
-      let original = direct.get(id >>> 0) || values.get(id >>> 0); if (!original) return;
-      let { value, missing } = table.resolveAttributeReference(original, useTheme ? theme : null);
-      // A value of the tag that no getter of the attribute reads (a string where a dimension is read, a resource that is not there) is left out and reported, once per parse:
-      // the attribute is then what the tag's style, the default style or the theme gives it, as for a tag that does not carry it.
-      if (node && original.fromXml && this.platform.xmlHost?.isLayoutNode(node)) {
-        const reason = this.unreadable(original, value, missing);
-        if (reason) {
-          const size = original.name === 'layout_width' || original.name === 'layout_height', seen = this.unreadableNoted ??= new WeakMap(), mark = `${this.platform.xmlHost?.serial ?? 0}:${id}`;
-          if (!seen.get(node)?.includes(mark)) { seen.set(node, [...(seen.get(node) ?? []).filter(entry => entry.startsWith(mark.split(':')[0] + ':')), mark]); this.platform.noteXmlAttributeNotApplied(runtime, original.name, node.name, size ? `${reason}; a View needs the two sizes, so it is given wrap_content` : reason); }
-          // LayoutParams.setBaseAttributes fails without a size ("You must supply a layout_width attribute"): an unreadable size is wrap_content.
-          if (size) { const at = index * 7; data[at] = 0x10; data[at + 1] = -2; data[at + 2] = -1; indices[++indices[0]] = index; return; }
-          original = values.get(id >>> 0); if (!original) return;
-          ({ value, missing } = table.resolveAttributeReference(original, useTheme ? theme : null));
-        }
-      }
-      if (missing) this.platform.noteResourceUnresolved(runtime, `attribute 0x${(id >>> 0).toString(16)}${node ? ` on <${node.name}>` : ''}`, missing);
-      // An attribute of a tag that an original constructor would act on with something the virtual device does not have is withheld from the constructor's TypedArray and
-      // reported as not applied (an android: attribute never fails the inflation): see WITHHELD.
-      if (node && this.withheld(runtime, id >>> 0, value, node)) return;
+      const original = direct.get(id >>> 0) || values.get(id >>> 0); if (!original) return;
+      const value = !useTheme && original.kind === 'attribute' ? original : this.resolved(original, theme, true);
       const at = index * 7, cookie = value.sourceCookie ?? original.sourceCookie ?? 1;
       data[at] = value.dataType || 0; data[at + 1] = value.rawData | 0; data[at + 2] = cookie; data[at + 3] = value.resourceId || 0; data[at + 4] = value.changingConfigurations || 0; data[at + 5] = value.density || 0; data[at + 6] = value.sourceResourceId || original.sourceResourceId || 0;
       if (value.dataType === 3) { if (cookie < 0) xmlStrings.set(value.rawData, value.value); else { if (!this.poolStrings.has(cookie)) this.poolStrings.set(cookie, new Map()); this.poolStrings.get(cookie).set(value.rawData, value.value); } }
@@ -263,16 +138,14 @@ export class AndroidStyleBackend {
   /** Resources.obtainTypedArray(id) over an <array> / <string-array> / <integer-array> / <array> of @references bag (ResourcesImpl.obtainTypedArray): one 7-int record per item, references resolved. */
   obtainResourceArray(runtime, id) {
     if (!runtime.classes.has(TYPED_ARRAY)) fail('Original AOSP TypedArray DEX is required; no JS getter substitute is installed');
-    let bag = this.platform.resources.resolve(id); while (bag.resolved) bag = bag.resolved;   // an <item type="array"> alias names another array
+    const bag = this.platform.resources.resolve(id);
     if (bag.kind !== 'bag') runtime.throwJava('Landroid/content/res/Resources$NotFoundException;', `Array resource ID #0x${(id >>> 0).toString(16)}`);
     const resources = this.resourceObject(runtime), items = bag.items;
     const array = runtime.dispatch({ owner: TYPED_ARRAY, name: 'obtain', signature: '(Landroid/content/res/Resources;I)Landroid/content/res/TypedArray;', parameters: [RESOURCES, 'I'], result: TYPED_ARRAY }, [resources, items.length], 'static');
     const data = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mData', '[I')).elements, indices = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mIndices', '[I')).elements;
     data.fill(0); indices.fill(0);
     items.forEach((original, index) => {
-      const { value, missing } = this.platform.resources.table.resolveAttributeReference(original, null);
-      if (missing) this.platform.noteResourceUnresolved(runtime, `item ${index} of array 0x${(id >>> 0).toString(16)}`, missing);
-      const at = index * 7, cookie = value.sourceCookie ?? original.sourceCookie ?? 1;
+      const value = this.resolved(original, new Map(), true), at = index * 7, cookie = value.sourceCookie ?? original.sourceCookie ?? 1;
       data[at] = value.dataType || 0; data[at + 1] = value.rawData | 0; data[at + 2] = cookie; data[at + 3] = value.resourceId || 0; data[at + 4] = value.changingConfigurations || 0; data[at + 5] = value.density || 0; data[at + 6] = value.sourceResourceId || 0;
       if (value.dataType === 3) { if (!this.poolStrings.has(cookie)) this.poolStrings.set(cookie, new Map()); this.poolStrings.get(cookie).set(value.rawData, value.value); }
       if (value.dataType || value.rawData === 1) indices[++indices[0]] = index;

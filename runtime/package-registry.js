@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=9b79f2cfbe27';
-import { AndroidResources } from './android-resources.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=12145e24651e';
+import { AndroidResources } from './android-resources.js?v=12145e24651e';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -165,7 +165,7 @@ export function createPackageRegistry(platform) {
     put('targetSdkVersion', 'I', targetSdk(entry)); put('minSdkVersion', 'I', Number(entry.manifest.usesSdk?.minSdkVersion || 1)); put('uid', 'I', entry.uid);
     const data = `/data/user/0/${entry.name}`, process = processOf(entry);
     for (const [name, value] of Object.entries({ sourceDir: `${entry.codePath}/base.apk`, publicSourceDir: `${entry.codePath}/base.apk`, dataDir: data, deviceProtectedDataDir: `/data/user_de/0/${entry.name}`, credentialProtectedDataDir: data, nativeLibraryDir: `${entry.codePath}/lib/wasm32`, processName: process, taskAffinity: entry.name })) put(name, STRING, value);
-    put('flags', 'I', (isTrue(app.debuggable) ? 2 : 0) | (isFalse(app.hasCode) ? 0 : 4) | 0x40 | (isTrue(app.supportsRtl) ? 1 << 22 : 0) | (1 << 23) | (isFalse(app.extractNativeLibs) ? 0 : (1 << 28)));
+    put('flags', 'I', (isTrue(app.debuggable) ? 2 : 0) | (isFalse(app.hasCode) ? 0 : 4) | 0x40 | (1 << 23) | (isFalse(app.extractNativeLibs) ? 0 : (1 << 28)));
     put('enabled', 'Z', isFalse(app.enabled) ? 0 : 1); put('category', 'I', Number.isInteger(app.appCategory) ? app.appCategory : -1);
     appInfos.set(key, info); return info;
   }

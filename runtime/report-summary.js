@@ -1,12 +1,12 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=9b79f2cfbe27';
-import { staticRetentionLines } from './heap-gc.js?v=9b79f2cfbe27';
-import { overrideSummaryLines } from './method-overrides.js?v=9b79f2cfbe27';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=9b79f2cfbe27';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=9b79f2cfbe27';
-import { hostMapSummaryLines } from './host-map.js?v=9b79f2cfbe27';
-import { attributeGap } from './worker-task-log.js?v=9b79f2cfbe27';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=12145e24651e';
+import { staticRetentionLines } from './heap-gc.js?v=12145e24651e';
+import { overrideSummaryLines } from './method-overrides.js?v=12145e24651e';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=12145e24651e';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=12145e24651e';
+import { hostMapSummaryLines } from './host-map.js?v=12145e24651e';
+import { attributeGap } from './worker-task-log.js?v=12145e24651e';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -136,31 +136,10 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
         out.push(`${overdue.length} overdue main Looper messages, the oldest for ${(oldest / 1000).toFixed(1)} s, waiting for the main thread to leave: ${top}`);
       } }
   });
-  // XML attributes the lab did not apply while inflating layouts (android-platform.js noteXmlAttributeNotApplied): the screens were built without them. Every kind is listed,
-  // one per line, with what a gap is found by: the attribute, the tag, how often, why, where the value came from (the tag itself, its style="", the default style) and the class
-  // that was built for the tag (a factory may build another class than the tag names). Nothing is cut here: the only bound is the 400 kinds the platform records, and the uses
-  // of kinds beyond it are counted and said.
+  // XML attributes the lab did not apply while inflating layouts (android-platform.js noteXmlAttributeNotApplied): the screens were built without them
   part(() => { const notes = runtime.platform?.xmlAttributesNotApplied; if (!notes?.size) return;
     const rows = [...notes].sort((a, b) => b[1] - a[1]), total = rows.reduce((sum, row) => sum + row[1], 0);
-    const dropped = runtime.platform.xmlAttributesNotAppliedDropped ?? 0, details = runtime.platform.xmlAttributesNotAppliedDetails;
-    const row = ([key, n]) => { const detail = details?.get(key), origin = detail?.origin === 'style' ? 'its style=""' : detail?.origin === 'default style' ? 'the default style' : detail?.origin ? detail.origin : 'the tag';
-      return `${key} ×${n} (${detail?.reason ?? "the lab's View classes do not implement it yet"}) [given by ${origin}${detail?.className ? `; built as ${detail.className}` : ''}]`; };
-    out.push(`XML attributes NOT APPLIED: ${rows.length} kinds, ${total} uses (screens were inflated without them)${dropped ? `, and ${dropped} further uses of kinds that were not recorded (more than 400 kinds: those are counted, not listed)` : ''}:\n  ${rows.map(row).join('\n  ')}`);
-  });
-  // XML attributes the lab kept (their getter returns the value) but that change nothing a user of this VM can see (view-xml-attributes.js): said once per attribute and tag, with the reason; all of them
-  part(() => { const notes = runtime.platform?.xmlAttributesNoEffect; if (!notes?.size) return;
-    const rows = [...notes].sort((a, b) => b[1].count - a[1].count), total = rows.reduce((sum, row) => sum + row[1].count, 0);
-    const dropped = runtime.platform.xmlAttributesNoEffectDropped ?? 0;
-    out.push(`XML attributes accepted, no effect in this VM: ${rows.length} kinds, ${total} uses${dropped ? `, and ${dropped} further uses of kinds that were not recorded (more than 400 kinds: those are counted, not listed)` : ''}:\n  ${rows.map(([key, note]) => `${key} ×${note.count} (${note.reason})`).join('\n  ')}`);
-  });
-  // resources Android would not resolve either (android-platform.js noteResourceUnresolved): a style that cannot be read, a theme attribute without a value, a package that is not loaded
-  part(() => { const notes = runtime.platform?.resourcesUnresolved; if (!notes?.size) return;
-    const rows = [...notes].sort((a, b) => b[1].count - a[1].count);
-    out.push(`Resources NOT RESOLVED: ${rows.length} kinds (read without them, as AssetManager does): ${rows.slice(0, 8).map(([what, note]) => `${what} ×${note.count} (${note.reason})`).join('; ')}${rows.length > 8 ? `; +${rows.length - 8} more` : ''}`);
-  });
-  // framework behaviour the lab tolerates without implementing it (android-platform.js noteFrameworkGap)
-  part(() => { const notes = runtime.platform?.frameworkGaps; if (!notes?.size) return;
-    out.push(`Framework behaviour NOT IMPLEMENTED (the app went on without it): ${[...notes.values()].slice(0, 8).map(note => `${note.text}${note.count > 1 ? ` ×${note.count}` : ''}`).join('; ')}${notes.size > 8 ? `; +${notes.size - 8} more` : ''}`);
+    out.push(`XML attributes NOT APPLIED: ${rows.length} kinds, ${total} uses (the lab's View classes do not implement them yet; screens were inflated without them): ${rows.slice(0, 12).map(([key, n]) => `${key} ×${n}`).join(', ')}${rows.length > 12 ? `, +${rows.length - 12} more` : ''}`);
   });
   // the last interaction (a tap, a drag, typing): how long the main thread ran, how much background work ran in between and why (android-platform.js drainEvents), the longest of each
   part(() => { const it = runtime.platform?.interactionStats?.(); if (!it) return;

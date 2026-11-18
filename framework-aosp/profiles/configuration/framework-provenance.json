@@ -56,7 +56,7 @@
       "role": "candidate-configuration-profile"
     }
   ],
-  "requiresDefaultFrameworkSha256": "bb87ee17a3cb9f55f791bbe2c7de9104fe4f0f6532c8c6f4be48abaae640666b",
+  "requiresDefaultFrameworkSha256": "59c7cd3c77018c7d96b37e7d7e9f7e30d2b9b48fb81b6580e59601d5a8cfd69f",
   "compileOnlyDeclarationsPackaged": false,
   "sourceExtractions": [],
   "integrationStatus": "Validated source configuration and locale-direction profile; loaded by actual APK Configuration references",

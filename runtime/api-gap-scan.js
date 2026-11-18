@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=9b79f2cfbe27';
-import { describeNativeLibrary } from './native-library-hints.js?v=9b79f2cfbe27';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=12145e24651e';
+import { describeNativeLibrary } from './native-library-hints.js?v=12145e24651e';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -34,11 +34,9 @@ const dotted = type => type.slice(1, -1).replaceAll('/', '.');
 
 /**
  * scanApiGaps(runtime, { archive, nativeLibraries, yieldFn, sliceMs, cancelled }) -> report (see formatApiGapReport).
- * `attribute(appClassType)` (optional, used by scripts/api-gap-census.mjs) names the source of each call site (a library); the class and method entries then carry `sources: { label: sites }`.
- * `observe(ref, verdict)` (optional, used by scripts/api-gap-verify.mjs) sees every referenced method and the scan's verdict: 'gap', 'ok' (the runtime provides it), 'on-subclass' (a concrete subclass provides it), 'app' (an app/library method) or 'non-framework'.
  * `yieldFn` (async) is awaited about every `sliceMs` of work so a Worker keeps serving the VM's events; `cancelled()` aborts early with null.
  */
-export async function scanApiGaps(runtime, { archive = null, nativeLibraries = null, yieldFn = null, sliceMs = 8, cancelled = () => false, attribute = null, observe = null } = {}) {
+export async function scanApiGaps(runtime, { archive = null, nativeLibraries = null, yieldFn = null, sliceMs = 8, cancelled = () => false } = {}) {
   const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
   let sliceStart = now();
   const tick = async () => { if (yieldFn && now() - sliceStart >= sliceMs) { await yieldFn(); sliceStart = now(); } };
@@ -49,7 +47,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   const perDex = new Map();   // dex -> { methodCounts: Map(idx -> [direct, sdk, unknown]), typeCounts: Map(`${kind}:${idx}` -> [..]) , sdkFields: Set }
   const dexState = dex => {
     let state = perDex.get(dex);
-    if (!state) { const sdkFields = new Set(); for (const f of dex.fieldsNamed('SDK_INT')) if (f.key === SDK_INT_FIELD) sdkFields.add(f.index); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields, nonVirtual: new Set(), sourceCounts: new Map() }); }
+    if (!state) { const sdkFields = new Set(); for (const f of dex.fieldsNamed('SDK_INT')) if (f.key === SDK_INT_FIELD) sdkFields.add(f.index); perDex.set(dex, state = { methodCounts: new Map(), typeCounts: new Map(), sdkFields, nonVirtual: new Set() }); }
     return state;
   };
   let scannedMethods = 0, interfaceSites = 0;
@@ -57,7 +55,6 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
     if (cancelled()) return null;
     const cls = runtime.classes.get(name); if (!cls?.dex) continue;
     const state = dexState(cls.dex), view = cls.dex.reader.view, holder = API_HOLDER.test(name);
-    const label = attribute ? attribute(name) : null;
     const sites = [];   // per class: [kind, idx, guarded-by-position?] collected before the class-level SDK_INT knowledge is complete
     let classReadsSdk = false;
     for (const def of cls.methods.values()) {
@@ -73,11 +70,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
           i += unit === 0x0100 ? 4 + size * 2 : unit === 0x0200 ? 2 + size * 4 : unit === 0x0300 ? 4 + Math.ceil(view.getUint32(base + (i + 2) * 2, true) * size / 2) : 1;
           continue;
         }
-        if (op >= 0x52 && op <= 0x6d) {   // iget..iput, sget..sput: a field of a framework class the VM lacks fails to resolve (the field itself is never checked: resolution does not fail for an unknown field)
-          const fieldIdx = view.getUint16(base + (i + 1) * 2, true);
-          if (op >= 0x60 && sdkAt < 0 && state.sdkFields.has(fieldIdx)) sdkAt = i;
-          if (op >= 0x60) local.push([0x60, view.getUint16(cls.dex.fieldIdsOffset + fieldIdx * 8, true), i]);   // field_id_item.class_idx
-        }
+        if (op >= 0x60 && op <= 0x6d) { if (sdkAt < 0 && state.sdkFields.has(view.getUint16(base + (i + 1) * 2, true))) sdkAt = i; }
         else if (op === 0x72 || op === 0x78) interfaceSites++;   // invoke-interface dispatches on the receiver's class, not on the named interface: not assessable statically
         else if ((op >= 0x6e && op <= 0x71) || (op >= 0x74 && op <= 0x77)) { const idx = view.getUint16(base + (i + 1) * 2, true); if (op !== 0x6e && op !== 0x74) state.nonVirtual.add(idx); local.push([0, idx, i]); }
         else if (op === 0x22 || op === 0x1c) local.push([op, view.getUint16(base + (i + 1) * 2, true), i]);   // check-cast/instance-of compare types and resolve no class
@@ -91,18 +84,13 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
       const table = kind === 0 ? state.methodCounts : state.typeCounts, key = kind === 0 ? idx : `${kind}:${idx}`;
       let counts = table.get(key); if (!counts) table.set(key, counts = [0, 0, 0]);
       counts[slot]++;
-      if (label !== null) {   // the same count per source: idx -> label -> counts
-        let by = state.sourceCounts.get(key); if (!by) state.sourceCounts.set(key, by = new Map());
-        let c = by.get(label); if (!c) by.set(label, c = [0, 0, 0]);
-        c[slot]++;
-      }
     }
     await tick();
   }
 
   // ---- phase 2: ask the runtime about each referenced framework method / class
   const framework = type => FRAMEWORK.test(type) && !isApp(type);
-  const classKnown = (type, kind = 0) => { try { return kind === 0x22 ? runtime.allocatable(type) : runtime.classResolvable(type); } catch { return true; } };   // a field site and a const-class site resolve the class
+  const classKnown = (type, kind = 0) => { try { return kind === 0x22 ? runtime.allocatable(type) : runtime.classResolvable(type); } catch { return true; } };
   // every method name some framework class declares: an app-owner reference is reportable only under such a name (an app-defined name never is); built in slices, a class at a time
   const frameworkNames = new Set();
   for (const [type, cls] of runtime.classes) { if (cancelled()) return null; if (isApp(type)) continue; for (const key of cls.methods.keys()) frameworkNames.add(key.slice(0, key.indexOf('('))); await tick(); }
@@ -129,33 +117,29 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
   };
   const byClass = new Map();   // framework class -> { methods: Map(key -> entry), classSites: [0,0,0], missingClass }
   let referenced = 0, rejectedRefs = 0, omitted = 0, resolvedOnSubclass = 0;
-  const entry = owner => { let e = byClass.get(owner); if (!e) byClass.set(owner, e = { methods: new Map(), sites: [0, 0, 0], classSites: [0, 0, 0], kinds: new Set(), missingClass: false, sources: new Map() }); return e; };
+  const entry = owner => { let e = byClass.get(owner); if (!e) byClass.set(owner, e = { methods: new Map(), sites: [0, 0, 0], classSites: [0, 0, 0], kinds: new Set(), missingClass: false }); return e; };
   for (const [dex, state] of perDex) {
     if (cancelled()) return null;
     for (const [idx, counts] of state.methodCounts) {
       await tick();   // a large app references tens of thousands of methods: one slice per DEX file was one long task (~150 ms) right when the app's first screen is scrolled
       const ref = idx < dex.methods.length ? dex.method(idx) : null; if (!ref) continue;
       referenced++;
-      const owner = rejected(ref); if (!owner) { observe?.(ref, isApp(ref.owner) ? 'app' : FRAMEWORK.test(ref.owner) ? 'ok' : 'non-framework', state.nonVirtual.has(idx)); continue; }
+      const owner = rejected(ref); if (!owner) continue;
       // a virtual call on a base class dispatches on the receiver: a concrete framework subclass that provides the method makes it runnable (DateFormat.format -> SimpleDateFormat)
-      if (!state.nonVirtual.has(idx) && framework(owner) && runtime.virtualProvider?.(owner, ref.name, ref.signature)) { resolvedOnSubclass++; observe?.(ref, 'on-subclass', false); continue; }
+      if (!state.nonVirtual.has(idx) && framework(owner) && runtime.virtualProvider?.(owner, ref.name, ref.signature)) { resolvedOnSubclass++; continue; }
       rejectedRefs++;
-      if (!framework(owner)) { omitted++; observe?.(ref, 'non-framework', state.nonVirtual.has(idx)); continue; }
-      observe?.({ ...ref, owner, viaOwner: ref.owner }, 'gap', state.nonVirtual.has(idx));
+      if (!framework(owner)) { omitted++; continue; }
       const e = entry(owner), key = ref.name + ref.signature;
-      let m = e.methods.get(key); if (!m) e.methods.set(key, m = { name: ref.name, signature: ref.signature, sites: [0, 0, 0], sources: new Map(), nonVirtual: false });
+      let m = e.methods.get(key); if (!m) e.methods.set(key, m = { name: ref.name, signature: ref.signature, sites: [0, 0, 0] });
       for (let k = 0; k < 3; k++) { m.sites[k] += counts[k]; e.sites[k] += counts[k]; }
-      if (state.nonVirtual.has(idx)) m.nonVirtual = true;
-      for (const [label, c] of state.sourceCounts.get(idx) ?? []) { const n = c[0] + c[1] + c[2]; m.sources.set(label, (m.sources.get(label) ?? 0) + n); e.sources.set(label, (e.sources.get(label) ?? 0) + n); }
       if (!classKnown(owner)) e.missingClass = true;
     }
     for (const [key, counts] of state.typeCounts) {
       await tick();
       const [kind, idx] = key.split(':').map(Number), type = dex.types[idx];
       if (!type || type[0] === '[' || !framework(type) || classKnown(type, kind)) continue;
-      const e = entry(type); e.missingClass = true; e.kinds.add({ 0x22: 'new', 0x1c: 'class', 0x60: 'static field' }[kind]);
+      const e = entry(type); e.missingClass = true; e.kinds.add({ 0x22: 'new', 0x1c: 'class' }[kind]);
       for (let k = 0; k < 3; k++) e.classSites[k] += counts[k];
-      for (const [label, c] of state.sourceCounts.get(key) ?? []) e.sources.set(label, (e.sources.get(label) ?? 0) + c[0] + c[1] + c[2]);
     }
     await tick();
   }
@@ -166,9 +150,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
     name: dotted(type), missingClass: e.missingClass, kinds: [...e.kinds].sort(),
     sites: total(e.sites) + total(e.classSites), methodCount: e.methods.size,
     classSites: { direct: e.classSites[0], sdk: e.classSites[1], unknown: e.classSites[2] },
-    ...(attribute ? { sources: Object.fromEntries(e.sources) } : {}),
-    methods: [...e.methods.values()].map(m => ({ name: m.name, params: parameters(m.signature), sites: total(m.sites), mark: mark(m.sites), by: { direct: m.sites[0], sdk: m.sites[1], unknown: m.sites[2] },
-      ...(attribute ? { signature: m.signature, virtual: !m.nonVirtual, sources: Object.fromEntries(m.sources) } : {}) }))
+    methods: [...e.methods.values()].map(m => ({ name: m.name, params: parameters(m.signature), sites: total(m.sites), mark: mark(m.sites), by: { direct: m.sites[0], sdk: m.sites[1], unknown: m.sites[2] } }))
       .sort((a, b) => b.sites - a.sites || a.name.localeCompare(b.name)),
   })).sort((a, b) => b.sites - a.sites || a.name.localeCompare(b.name));
 

@@ -1,8 +1,7 @@
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=9b79f2cfbe27';
-import { JavaException } from './apk-runtime.js?v=9b79f2cfbe27';
-import { bestDateTimePattern } from './date-skeleton.js?v=9b79f2cfbe27';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=12145e24651e';
+import { JavaException } from './apk-runtime.js?v=12145e24651e';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -183,22 +182,6 @@ export function createDateTimeHost(platform) {
   def('Ljava/text/DateFormat;', 'getAvailableLocales', `()[${LOCALE_TYPE}`, r => r.dispatch({ owner: DFS, name: 'getAvailableLocales', parameters: [], result: `[${LOCALE_TYPE}`, signature: `()[${LOCALE_TYPE}` }, [], 'static'), { static: true });
   def(DFS, 'getAvailableLocales', `()[${LOCALE_TYPE}`, r => { const tags = Intl.DateTimeFormat.supportedLocalesOf(['en-US', 'pt-BR', 'es-ES', 'fr-FR', 'de-DE', 'it-IT', 'ja-JP']), array = r.newArray(`[${LOCALE_TYPE}`, tags.length); r.array(array).elements = tags.map(tag => r.dispatch({ owner: LOCALE_TYPE, name: 'forLanguageTag', parameters: [STRING], result: LOCALE_TYPE, signature: `(${STRING})${LOCALE_TYPE}` }, [tag], 'static')); return array; }, { static: true });
   for (const [name, key] of [['getMonths', 'months'], ['getShortMonths', 'shortMonths'], ['getWeekdays', 'weekdays'], ['getShortWeekdays', 'shortWeekdays'], ['getAmPmStrings', 'amPm'], ['getEras', 'eras']]) def(DFS, name, `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self)[key]));   // a fresh copy each call, like the real getters
-  // ---- android.icu.text.DateFormatSymbols: the same CLDR names by context (FORMAT 0 / STANDALONE 1) and width (ABBREVIATED 0 / WIDE 1 / NARROW 2), which android.text.format.DateFormat.format reads.
-  // A name "in format context" is the one Intl uses next to a day number; the standalone one is the name alone. Months have 12 entries, weekdays are indexed 1..7 from Sunday (ICU4J).
-  const ICU_DFS = 'Landroid/icu/text/DateFormatSymbols;'; type(ICU_DFS, OBJECT, ['Ljava/io/Serializable;', 'Ljava/lang/Cloneable;'], { allocatable: true });
-  const icuWidth = (r, width) => ['short', 'long', 'narrow'][width] ?? (() => { throw new APKError(`android.icu.text.DateFormatSymbols width ${width} (SHORT and above) has no Intl equivalent and is not modelled`, { kind: 'icu-text-unsupported' }); })();
-  const icuNames = (r, self, field, context, width) => {
-    if (context !== 0 && context !== 1) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Bad context or width argument');
-    const tag = r.object(self).symbolsTag ?? r.throwJava('Ljava/lang/IllegalStateException;', 'DateFormatSymbols used before construction'), style = icuWidth(r, width);
-    const name = date => { const options = field === 'month' ? { month: style, ...(context === 0 ? { day: 'numeric' } : {}) } : { weekday: style, ...(context === 0 ? { day: 'numeric', month: 'long' } : {}) }; return new Intl.DateTimeFormat(tag, { timeZone: 'UTC', ...options }).formatToParts(date).find(p => p.type === field)?.value ?? ''; };
-    return field === 'month' ? Array.from({ length: 12 }, (_, i) => name(new Date(Date.UTC(2021, i, 15)))) : [''].concat(Array.from({ length: 7 }, (_, i) => name(new Date(Date.UTC(2021, 7, 1 + i)))));
-  };
-  for (const [signature, at] of [['()V', -1], [`(${LOCALE_TYPE})V`, 1], [`(Ljava/lang/Class;${LOCALE_TYPE})V`, 2]]) def(ICU_DFS, '<init>', signature, (r, _m, args) => { if (at > 0 && args[at] === null) r.throwJava('Ljava/lang/NullPointerException;', null); const made = makeSymbols(r, at > 0 ? args[at] : null); r.object(args[0]).symbols = made; r.object(args[0]).symbolsTag = made.tag; });
-  for (const [signature, at] of [[`()${ICU_DFS}`, -1], [`(${LOCALE_TYPE})${ICU_DFS}`, 0]]) def(ICU_DFS, 'getInstance', signature, (r, _m, args) => { const o = r.allocate(ICU_DFS), made = makeSymbols(r, at >= 0 ? args[at] : null); r.object(o).symbols = made; r.object(o).symbolsTag = made.tag; return o; }, { static: true });
-  def(ICU_DFS, 'getAmPmStrings', `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self).amPm)); def(ICU_DFS, 'getEras', `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self).eras));
-  def(ICU_DFS, 'getMonths', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'month', 0, 1))); def(ICU_DFS, 'getShortMonths', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'month', 0, 0)));
-  def(ICU_DFS, 'getWeekdays', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'weekday', 0, 1))); def(ICU_DFS, 'getShortWeekdays', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'weekday', 0, 0)));
-  def(ICU_DFS, 'getMonths', `(II)[${STRING}`, (r, _m, [self, context, width]) => stringArray(r, icuNames(r, self, 'month', context, width))); def(ICU_DFS, 'getWeekdays', `(II)[${STRING}`, (r, _m, [self, context, width]) => stringArray(r, icuNames(r, self, 'weekday', context, width)));
   def(DFS, 'getZoneStrings', '()[[Ljava/lang/String;', () => { throw new APKError('DateFormatSymbols.getZoneStrings: the per-zone name table is not modelled (SimpleDateFormat z / zzzz use the platform names)', { kind: 'zone-strings-unsupported' }); });
 
   // ---- DateFormat.getDateInstance / getTimeInstance / getDateTimeInstance / getInstance: the locale's pattern for a style, taken from the platform's CLDR data (Intl) and turned into the
@@ -245,17 +228,6 @@ export function createDateTimeHost(platform) {
   def(SDF, 'setTimeZone', `(${ZONE})V`, (r, _m, [self, z]) => { sdf(r, self).zone = zid(r, z); }); def(SDF, 'getTimeZone', `()${ZONE}`, (r, _m, [self]) => zone(r, sdf(r, self).zone));
   def(SDF, 'setLenient', '(Z)V', (r, _m, [self, v]) => { sdf(r, self).lenient = !!v; }); def(SDF, 'isLenient', '()Z', (r, _m, [self]) => sdf(r, self).lenient ? 1 : 0);
   def(SDF, 'toPattern', `()${STRING}`, (r, _m, [self]) => sdf(r, self).pattern);
-  // applyPattern compiles the new pattern before it replaces the old one (an illegal pattern letter is IllegalArgumentException and the format keeps its pattern). The localized
-  // pattern letters of every locale are the standard ones on Android (libcore DateFormatSymbols.localPatternChars is ICU's pattern character set), so the localized forms are the plain ones.
-  const applyPattern = (r, self, pattern) => { if (pattern === null) r.throwJava('Ljava/lang/NullPointerException;', null); const state = sdf(r, self), text = r.stringCharacters(pattern), compiled = tokens(r, text); state.pattern = text; state.tokens = compiled; };
-  def(SDF, 'applyPattern', `(${STRING})V`, (r, _m, [self, pattern]) => applyPattern(r, self, pattern));
-  def(SDF, 'applyLocalizedPattern', `(${STRING})V`, (r, _m, [self, pattern]) => applyPattern(r, self, pattern));
-  def(SDF, 'toLocalizedPattern', `()${STRING}`, (r, _m, [self]) => sdf(r, self).pattern);
-  // android.text.format.DateFormat.getBestDateTimePattern(locale, skeleton): the locale's pattern for the skeleton (src/date-skeleton.js)
-  def('Landroid/text/format/DateFormat;', 'getBestDateTimePattern', `(${LOCALE}${STRING})${STRING}`, (r, _m, [locale, skeleton]) => {
-    if (locale === null || skeleton === null) r.throwJava('Ljava/lang/NullPointerException;', null);
-    return bestDateTimePattern(localeTag(r, locale), r.stringCharacters(skeleton));
-  }, { static: true });
   // SimpleDateFormat.equals / hashCode / clone: same pattern, locale data, zone and leniency (hashCode is the pattern's, as in the original); clone copies the state
   def(SDF, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => { if (self === o) return 1; if (o === null || typeof o !== 'object' || !r.object(o).sdf || r.typeOf(o) !== r.typeOf(self)) return 0; const a = sdf(r, self), b = sdf(r, o); return a.pattern === b.pattern && a.zone === b.zone && a.lenient === b.lenient && a.tag === b.tag ? 1 : 0; });
   def(SDF, 'hashCode', '()I', (r, _m, [self]) => { let h = 0; for (const ch of sdf(r, self).pattern) h = (Math.imul(31, h) + ch.charCodeAt(0)) | 0; return h; });

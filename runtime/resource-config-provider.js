@@ -1,6 +1,6 @@
 const SIZE = 64, LIMIT = 1024 * 1024;
 const fail = message => { throw new Error(`AOSP resource configuration: ${message}`); };
-export const WEB_DEVICE_CONFIGURATION = Object.freeze({ sdkVersion: 33, density: 160, widthDp: 411, heightDp: 840, smallestWidthDp: 411, orientation: 1, uiMode: 0x11, screenLayout: 0x62, language: 'en', region: 'US', touchscreen: 3, keyboard: 1, navigation: 1, inputFlags: 0x0b, screenLayout2: 1, colorMode: 5 });
+export const WEB_DEVICE_CONFIGURATION = Object.freeze({ sdkVersion: 28, density: 160, widthDp: 411, heightDp: 840, smallestWidthDp: 411, orientation: 1, uiMode: 0x11, screenLayout: 0x62, language: 'en', region: 'US', touchscreen: 3, keyboard: 1, navigation: 1, inputFlags: 0x0b, screenLayout2: 1, colorMode: 5 });
 const sha256 = async bytes => [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('');
 async function readBounded(fetchImpl, url) {
   const response = await fetchImpl(url); if (!response.ok) fail(`HTTP ${response.status}`);

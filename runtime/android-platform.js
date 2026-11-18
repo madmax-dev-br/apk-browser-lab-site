@@ -1,135 +1,132 @@
-import { createPackageRegistry } from './package-registry.js?v=9b79f2cfbe27';
-import { describeMicrogEntryPoints } from './microg-device.js?v=9b79f2cfbe27';
-import { hostDefinitions } from './host-contract.js?v=9b79f2cfbe27';
-import { Invoke } from './interpreter.js?v=9b79f2cfbe27';
-import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=9b79f2cfbe27';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=9b79f2cfbe27';
-import { createViewTransformHost } from './view-transform-host.js?v=9b79f2cfbe27';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=9b79f2cfbe27';
-import { createViewOutlineHost } from './view-outline-host.js?v=9b79f2cfbe27';
-import { createShaderHost } from './shader-host.js?v=9b79f2cfbe27';
-import { createSystemBarsHost } from './system-bars-host.js?v=9b79f2cfbe27';
-import { createDeviceStateHost } from './device-state-host.js?v=9b79f2cfbe27';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=9b79f2cfbe27';
-import { createPendingIntentHost } from './pending-intent-host.js?v=9b79f2cfbe27';
-import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=9b79f2cfbe27';
-import { ignoreActivityStart } from './ignored-activities.js?v=9b79f2cfbe27';
-import { resolveIntentFields } from './intent-resolver.js?v=9b79f2cfbe27';
-import { createBinderHost } from './binder-host.js?v=9b79f2cfbe27';
-import { createInputManagerHost } from './input-native.js?v=9b79f2cfbe27';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=9b79f2cfbe27';
-import { createRenderThreadAnimators } from './rt-animators.js?v=9b79f2cfbe27';
-import { renderNodeByHandle } from './rendernode-native.js?v=9b79f2cfbe27';
-import { resolveDevice } from './device-profile.js?v=9b79f2cfbe27';
-import { configurationFor } from './device-configuration.js?v=9b79f2cfbe27';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=9b79f2cfbe27';
-import { createEditableTextHost } from './editable-text-host.js?v=9b79f2cfbe27';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=9b79f2cfbe27';
-import { createViewStateHost } from './view-state-host.js?v=9b79f2cfbe27';
-import { createLocaleServiceHost } from './locale-service-host.js?v=9b79f2cfbe27';
-import { APKError, dottedName } from './apk-runtime.js?v=9b79f2cfbe27';
-import { HOST_STYLEABLES, LAYOUTS_PROFILE_ATTRIBUTES, ANDROID_13_LAST_ATTRIBUTE_ID } from './host-styleables.js?v=9b79f2cfbe27';
-import { ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT } from './original-attribute-page-gaps.js?v=9b79f2cfbe27';
-export { ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT };
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=9b79f2cfbe27';
-import { createViewTreeHost } from './view-tree-host.js?v=9b79f2cfbe27';
-import { createDialogWindowHost } from './dialog-window-host.js?v=9b79f2cfbe27';
-import { createStrictModeHost } from './strictmode-host.js?v=9b79f2cfbe27';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=9b79f2cfbe27';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=9b79f2cfbe27';
-import { createViewInternalsHost } from './view-internals-host.js?v=9b79f2cfbe27';
-import { createViewWindowHost } from './view-window-host.js?v=9b79f2cfbe27';
-import { createVectorCanvasHost } from './vector-native.js?v=9b79f2cfbe27';
-import { createPaintHost, BLUR_STYLE, BLUR_STYLE_NAMES } from './paint-host.js?v=9b79f2cfbe27';
-import { createContentResolverHost } from './content-resolver-host.js?v=9b79f2cfbe27';
-import { createDrawableViewHost } from './drawable-view-host.js?v=9b79f2cfbe27';
-import { createDeviceServicesHost } from './device-services-host.js?v=9b79f2cfbe27';
-import { createSystemServicesHost } from './system-services-host.js?v=9b79f2cfbe27';
-import { createJavaIoHost } from './java-io-host.js?v=9b79f2cfbe27';
-import { createClassLoaderHost } from './class-loader-host.js?v=9b79f2cfbe27';
-import { createAppServicesHost } from './app-services-host.js?v=9b79f2cfbe27';
-import { createConcurrencyHost } from './concurrency-host.js?v=9b79f2cfbe27';
-import { createLooperHost } from './looper-host.js?v=9b79f2cfbe27';
-import { createDateTimeHost } from './datetime-host.js?v=9b79f2cfbe27';
+import { createPackageRegistry } from './package-registry.js?v=12145e24651e';
+import { describeMicrogEntryPoints } from './microg-device.js?v=12145e24651e';
+import { hostDefinitions } from './host-contract.js?v=12145e24651e';
+import { Invoke } from './interpreter.js?v=12145e24651e';
+import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=12145e24651e';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=12145e24651e';
+import { createViewTransformHost } from './view-transform-host.js?v=12145e24651e';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=12145e24651e';
+import { createViewOutlineHost } from './view-outline-host.js?v=12145e24651e';
+import { createShaderHost } from './shader-host.js?v=12145e24651e';
+import { createSystemBarsHost } from './system-bars-host.js?v=12145e24651e';
+import { createDeviceStateHost } from './device-state-host.js?v=12145e24651e';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=12145e24651e';
+import { createPendingIntentHost } from './pending-intent-host.js?v=12145e24651e';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=12145e24651e';
+import { ignoreActivityStart } from './ignored-activities.js?v=12145e24651e';
+import { resolveIntentFields } from './intent-resolver.js?v=12145e24651e';
+import { createBinderHost } from './binder-host.js?v=12145e24651e';
+import { createInputManagerHost } from './input-native.js?v=12145e24651e';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=12145e24651e';
+import { createRenderThreadAnimators } from './rt-animators.js?v=12145e24651e';
+import { renderNodeByHandle } from './rendernode-native.js?v=12145e24651e';
+import { resolveDevice } from './device-profile.js?v=12145e24651e';
+import { configurationFor } from './device-configuration.js?v=12145e24651e';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=12145e24651e';
+import { createEditableTextHost } from './editable-text-host.js?v=12145e24651e';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=12145e24651e';
+import { createViewStateHost } from './view-state-host.js?v=12145e24651e';
+import { createLocaleServiceHost } from './locale-service-host.js?v=12145e24651e';
+import { APKError, dottedName } from './apk-runtime.js?v=12145e24651e';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=12145e24651e';
+import { createViewTreeHost } from './view-tree-host.js?v=12145e24651e';
+import { createDialogWindowHost } from './dialog-window-host.js?v=12145e24651e';
+import { createStrictModeHost } from './strictmode-host.js?v=12145e24651e';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=12145e24651e';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=12145e24651e';
+import { createViewInternalsHost } from './view-internals-host.js?v=12145e24651e';
+import { createViewWindowHost } from './view-window-host.js?v=12145e24651e';
+import { createVectorCanvasHost } from './vector-native.js?v=12145e24651e';
+import { createPaintHost, BLUR_STYLE, BLUR_STYLE_NAMES } from './paint-host.js?v=12145e24651e';
+import { createContentResolverHost } from './content-resolver-host.js?v=12145e24651e';
+import { createDrawableViewHost } from './drawable-view-host.js?v=12145e24651e';
+import { createDeviceServicesHost } from './device-services-host.js?v=12145e24651e';
+import { createSystemServicesHost } from './system-services-host.js?v=12145e24651e';
+import { createJavaIoHost } from './java-io-host.js?v=12145e24651e';
+import { createClassLoaderHost } from './class-loader-host.js?v=12145e24651e';
+import { createAppServicesHost } from './app-services-host.js?v=12145e24651e';
+import { createConcurrencyHost } from './concurrency-host.js?v=12145e24651e';
+import { createLooperHost } from './looper-host.js?v=12145e24651e';
+import { createDateTimeHost } from './datetime-host.js?v=12145e24651e';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=9b79f2cfbe27';
-import { createCookieHost } from './cookie-host.js?v=9b79f2cfbe27';
-import { createViewApiHost } from './view-api-host.js?v=9b79f2cfbe27';
-import { createActionModeHost } from './action-mode-host.js?v=9b79f2cfbe27';
-import { createTextViewApiHost } from './textview-api-host.js?v=9b79f2cfbe27';
-import { createIntentApiHost } from './intent-api-host.js?v=9b79f2cfbe27';
-import { createImageDecoderHost } from './image-decoder-host.js?v=9b79f2cfbe27';
-import { createAnimatedImageHost } from './animated-image-host.js?v=9b79f2cfbe27';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=9b79f2cfbe27';
-import { createToastHost } from './toast-host.js?v=9b79f2cfbe27';
-import { createIcuTextHost } from './icu-text-host.js?v=9b79f2cfbe27';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=9b79f2cfbe27';
-import { createRemoteViewsHost } from './remote-views-host.js?v=9b79f2cfbe27';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=9b79f2cfbe27';
-import { createPackageValueObjectsHost } from './package-value-objects.js?v=9b79f2cfbe27';
-import { createNetworkInfoHost } from './network-info-host.js?v=9b79f2cfbe27';
-import { createApkChecksumsHost } from './apk-checksums-host.js?v=9b79f2cfbe27';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=9b79f2cfbe27';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=9b79f2cfbe27';
-import { createImageViewApiHost } from './image-view-api-host.js?v=9b79f2cfbe27';
-import { createUriApiHost } from './uri-api-host.js?v=9b79f2cfbe27';
-import { createFormatterHost } from './formatter-host.js?v=9b79f2cfbe27';
-import { createJcaHost } from './jca-host.js?v=9b79f2cfbe27';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=9b79f2cfbe27';
-import { createSecurityHost } from './security-host.js?v=9b79f2cfbe27';
-import { createReflectionHost } from './reflection-host.js?v=9b79f2cfbe27';
-import { createSerializationHost } from './serialization-host.js?v=9b79f2cfbe27';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=9b79f2cfbe27';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=9b79f2cfbe27';
-import { createImageViewHost } from './image-view-host.js?v=9b79f2cfbe27';
-import { createWebViewHost } from './webview-host.js?v=9b79f2cfbe27';
-import { createContentExtrasHost } from './content-extras-host.js?v=9b79f2cfbe27';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=9b79f2cfbe27';
-import { createProcessHost } from './process-host.js?v=9b79f2cfbe27';
-import { createStatsHost } from './stats-host.js?v=9b79f2cfbe27';
-import { createTelephonyHost } from './telephony-host.js?v=9b79f2cfbe27';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=9b79f2cfbe27';
-import { createCameraHost } from './camera-host.js?v=9b79f2cfbe27';
-import { createScaleGestureHost } from './scale-gesture-host.js?v=9b79f2cfbe27';
-import { createBuildHost } from './build-host.js?v=9b79f2cfbe27';
-import { createSensorHost } from './sensor-host.js?v=9b79f2cfbe27';
-import { createGeocoderHost } from './geocoder-host.js?v=9b79f2cfbe27';
-import { createCoreLangHost } from './core-lang-host.js?v=9b79f2cfbe27';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=9b79f2cfbe27';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=9b79f2cfbe27';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=9b79f2cfbe27';
-import { createManagersExtrasHost } from './managers-extras-host.js?v=9b79f2cfbe27';
-import { createStrictMathHost } from './strict-math-host.js?v=9b79f2cfbe27';
-import { createLocaleExtrasHost } from './locale-extras-host.js?v=9b79f2cfbe27';
-import { createUnicodeHost } from './unicode-host.js?v=9b79f2cfbe27';
-import { createMessageFormatHost } from './message-format-host.js?v=9b79f2cfbe27';
-import { createSettingsHost } from './settings-host.js?v=9b79f2cfbe27';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=9b79f2cfbe27';
-import { createPermissionHost } from './permission-host.js?v=9b79f2cfbe27';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=9b79f2cfbe27';
-import { createStorageServicesHost } from './storage-services-host.js?v=9b79f2cfbe27';
-import { createSharedStorageHost } from './shared-storage-host.js?v=9b79f2cfbe27';
-import { createSystemManagersHost } from './system-managers-host.js?v=9b79f2cfbe27';
-import { createJavaServicesHost } from './java-services-host.js?v=9b79f2cfbe27';
-import { DEVICE_FEATURES } from './service-kit.js?v=9b79f2cfbe27';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=9b79f2cfbe27';
-import { createViewTouchHost } from './view-touch-host.js?v=9b79f2cfbe27';
-import { createMagnifierHost } from './magnifier-host.js?v=9b79f2cfbe27';
-import { createDisplayHost } from './display-host.js?v=9b79f2cfbe27';
-import { createNotificationHost } from './notification-host.js?v=9b79f2cfbe27';
-import { createDatabaseSupportHost } from './database-support-host.js?v=9b79f2cfbe27';
-import { VMClock } from './vm-clock.js?v=9b79f2cfbe27';
-import { createWindowInsetsHost } from './window-insets-host.js?v=9b79f2cfbe27';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=9b79f2cfbe27';
-import { createViewLayoutHost } from './view-layout-host.js?v=9b79f2cfbe27';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=9b79f2cfbe27';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=9b79f2cfbe27';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=9b79f2cfbe27';
-import { createViewInputHost } from './view-input-host.js?v=9b79f2cfbe27';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=9b79f2cfbe27';
-import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=9b79f2cfbe27';
-import { maybeCollect, ephemeronMap } from './heap-gc.js?v=9b79f2cfbe27';
-import { BackgroundFloor, BACKGROUND_FLOOR_SLICE_MAX_MS } from './background-floor.js?v=9b79f2cfbe27';
+import { createNumberFormatHost } from './number-format-host.js?v=12145e24651e';
+import { createCookieHost } from './cookie-host.js?v=12145e24651e';
+import { createViewApiHost } from './view-api-host.js?v=12145e24651e';
+import { createActionModeHost } from './action-mode-host.js?v=12145e24651e';
+import { createTextViewApiHost } from './textview-api-host.js?v=12145e24651e';
+import { createIntentApiHost } from './intent-api-host.js?v=12145e24651e';
+import { createImageDecoderHost } from './image-decoder-host.js?v=12145e24651e';
+import { createAnimatedImageHost } from './animated-image-host.js?v=12145e24651e';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=12145e24651e';
+import { createToastHost } from './toast-host.js?v=12145e24651e';
+import { createIcuTextHost } from './icu-text-host.js?v=12145e24651e';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=12145e24651e';
+import { createRemoteViewsHost } from './remote-views-host.js?v=12145e24651e';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=12145e24651e';
+import { createPackageValueObjectsHost } from './package-value-objects.js?v=12145e24651e';
+import { createNetworkInfoHost } from './network-info-host.js?v=12145e24651e';
+import { createApkChecksumsHost } from './apk-checksums-host.js?v=12145e24651e';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=12145e24651e';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=12145e24651e';
+import { createImageViewApiHost } from './image-view-api-host.js?v=12145e24651e';
+import { createUriApiHost } from './uri-api-host.js?v=12145e24651e';
+import { createFormatterHost } from './formatter-host.js?v=12145e24651e';
+import { createJcaHost } from './jca-host.js?v=12145e24651e';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=12145e24651e';
+import { createSecurityHost } from './security-host.js?v=12145e24651e';
+import { createReflectionHost } from './reflection-host.js?v=12145e24651e';
+import { createSerializationHost } from './serialization-host.js?v=12145e24651e';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=12145e24651e';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=12145e24651e';
+import { createImageViewHost } from './image-view-host.js?v=12145e24651e';
+import { createWebViewHost } from './webview-host.js?v=12145e24651e';
+import { createContentExtrasHost } from './content-extras-host.js?v=12145e24651e';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=12145e24651e';
+import { createProcessHost } from './process-host.js?v=12145e24651e';
+import { createStatsHost } from './stats-host.js?v=12145e24651e';
+import { createTelephonyHost } from './telephony-host.js?v=12145e24651e';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=12145e24651e';
+import { createCameraHost } from './camera-host.js?v=12145e24651e';
+import { createScaleGestureHost } from './scale-gesture-host.js?v=12145e24651e';
+import { createBuildHost } from './build-host.js?v=12145e24651e';
+import { createSensorHost } from './sensor-host.js?v=12145e24651e';
+import { createGeocoderHost } from './geocoder-host.js?v=12145e24651e';
+import { createCoreLangHost } from './core-lang-host.js?v=12145e24651e';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=12145e24651e';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=12145e24651e';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=12145e24651e';
+import { createManagersExtrasHost } from './managers-extras-host.js?v=12145e24651e';
+import { createStrictMathHost } from './strict-math-host.js?v=12145e24651e';
+import { createLocaleExtrasHost } from './locale-extras-host.js?v=12145e24651e';
+import { createUnicodeHost } from './unicode-host.js?v=12145e24651e';
+import { createMessageFormatHost } from './message-format-host.js?v=12145e24651e';
+import { createSettingsHost } from './settings-host.js?v=12145e24651e';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=12145e24651e';
+import { createPermissionHost } from './permission-host.js?v=12145e24651e';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=12145e24651e';
+import { createStorageServicesHost } from './storage-services-host.js?v=12145e24651e';
+import { createSharedStorageHost } from './shared-storage-host.js?v=12145e24651e';
+import { createSystemManagersHost } from './system-managers-host.js?v=12145e24651e';
+import { createJavaServicesHost } from './java-services-host.js?v=12145e24651e';
+import { DEVICE_FEATURES } from './service-kit.js?v=12145e24651e';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=12145e24651e';
+import { createViewTouchHost } from './view-touch-host.js?v=12145e24651e';
+import { createMagnifierHost } from './magnifier-host.js?v=12145e24651e';
+import { createDisplayHost } from './display-host.js?v=12145e24651e';
+import { createNotificationHost } from './notification-host.js?v=12145e24651e';
+import { createDatabaseSupportHost } from './database-support-host.js?v=12145e24651e';
+import { VMClock } from './vm-clock.js?v=12145e24651e';
+import { createWindowInsetsHost } from './window-insets-host.js?v=12145e24651e';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=12145e24651e';
+import { createViewLayoutHost } from './view-layout-host.js?v=12145e24651e';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=12145e24651e';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=12145e24651e';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=12145e24651e';
+import { createViewInputHost } from './view-input-host.js?v=12145e24651e';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=12145e24651e';
+import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=12145e24651e';
+import { maybeCollect, ephemeronMap } from './heap-gc.js?v=12145e24651e';
+import { BackgroundFloor, BACKGROUND_FLOOR_SLICE_MAX_MS } from './background-floor.js?v=12145e24651e';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -175,8 +172,7 @@ const CHAIN_HOSTS = [
   chainEntry('viewTreeHost'),
   Object.assign(function (runtime, method, args) { return this.styleBackend.invoke(runtime, method, args); }, { claims: (platform, key) => STYLE_METHODS.has(key) }),
 ];
-const LAYOUT_PARAMS = 'Landroid/view/ViewGroup$LayoutParams;', MARGIN_PARAMS = 'Landroid/view/ViewGroup$MarginLayoutParams;', RELATIVE_PARAMS = 'Landroid/widget/RelativeLayout$LayoutParams;';
-const RTL_NEEDS_PROFILE = 'right-to-left layout by the host FrameLayout / LinearLayout: a View resolved to right-to-left (its own direction, padding and margins follow), but mirroring the children of a container needs the original FrameLayout / LinearLayout of the layouts profile; the host containers loaded for this APK place them left-to-right';
+const LAYOUT_PARAMS = 'Landroid/view/ViewGroup$LayoutParams;', MARGIN_PARAMS = 'Landroid/view/ViewGroup$MarginLayoutParams;';
 const EDITABLE = 'Lapkweb/bridge/Editable;';
 const PROCESS_INFO = 'Landroid/app/ActivityManager$RunningAppProcessInfo;';
 const KEY_SET = 'Lapkweb/bridge/BundleKeySet;', KEY_ITERATOR = 'Lapkweb/bridge/BundleKeyIterator;';
@@ -202,7 +198,7 @@ add(INTENT, ['getCategories()Ljava/util/Set;', 'resolveTypeIfNeeded(Landroid/con
 add(PROCESS_INFO, ['<init>()V', '<init>(Ljava/lang/String;I[Ljava/lang/String;)V']);
 add('Landroid/app/ActivityManager;', ['getMyMemoryState(Landroid/app/ActivityManager$RunningAppProcessInfo;)V']);
 add(ACTIVITY, ['getLocalClassName()Ljava/lang/String;', 'getComponentName()Landroid/content/ComponentName;', 'getLayoutInflater()Landroid/view/LayoutInflater;']);
-for (const owner of ['Landroid/view/View;', 'Landroid/view/ViewGroup;', ...['LinearLayout', 'FrameLayout', 'ScrollView', 'TextView', 'Button', 'EditText', 'CompoundButton', 'CheckBox', 'Switch', 'ProgressBar'].map(name => `Landroid/widget/${name};`)]) add(owner, ['<init>(Landroid/content/Context;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V']);
+for (const owner of ['Landroid/view/View;', 'Landroid/view/ViewGroup;', ...['LinearLayout', 'FrameLayout', 'ScrollView', 'TextView', 'Button', 'EditText', 'CheckBox', 'Switch', 'ProgressBar'].map(name => `Landroid/widget/${name};`)]) add(owner, ['<init>(Landroid/content/Context;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;I)V', '<init>(Landroid/content/Context;Landroid/util/AttributeSet;II)V']);
 add('Landroid/content/res/Resources;', ['getConfiguration()Landroid/content/res/Configuration;', 'getDisplayMetrics()Landroid/util/DisplayMetrics;', 'updateConfiguration(Landroid/content/res/Configuration;Landroid/util/DisplayMetrics;)V']);
 add(PACKAGE_MANAGER, ['getServiceInfo(Landroid/content/ComponentName;I)Landroid/content/pm/ServiceInfo;', 'getActivityInfo(Landroid/content/ComponentName;I)Landroid/content/pm/ActivityInfo;', 'getApplicationInfo(Ljava/lang/String;I)Landroid/content/pm/ApplicationInfo;', 'hasSystemFeature(Ljava/lang/String;)Z', 'hasSystemFeature(Ljava/lang/String;I)Z']);
 add(COMPONENT, ['<init>(Landroid/content/Context;Ljava/lang/Class;)V', '<init>(Landroid/content/Context;Ljava/lang/String;)V', '<init>(Ljava/lang/String;Ljava/lang/String;)V', 'getClassName()Ljava/lang/String;', 'getPackageName()Ljava/lang/String;', 'flattenToString()Ljava/lang/String;', 'flattenToShortString()Ljava/lang/String;']);
@@ -210,12 +206,12 @@ add('Landroid/view/ViewGroup;', ['onViewAdded(Landroid/view/View;)V', 'onViewRem
 add('Landroid/view/View;', ['onFinishInflate()V']);
 add('Landroid/view/ViewGroup;', ['setClipChildren(Z)V', 'getClipChildren()Z', 'setClipToPadding(Z)V', 'getClipToPadding()Z']);
 add('Landroid/view/View;', ['setWillNotDraw(Z)V', 'willNotDraw()Z', 'getParent()Landroid/view/ViewParent;', 'setImportantForAccessibility(I)V', 'getImportantForAccessibility()I', 'isInEditMode()Z', 'setForceDarkAllowed(Z)V', 'isForceDarkAllowed()Z', 'setImportantForContentCapture(I)V', 'getImportantForContentCapture()I', 'getContentCaptureSession()Landroid/view/contentcapture/ContentCaptureSession;', 'setViewTranslationCallback(Landroid/view/translation/ViewTranslationCallback;)V', 'clearViewTranslationCallback()V', 'getViewTranslationCallback()Landroid/view/translation/ViewTranslationCallback;', 'setWindowInsetsAnimationCallback(Landroid/view/WindowInsetsAnimation$Callback;)V', 'getUniqueDrawingId()J', 'awakenScrollBars()Z', 'awakenScrollBars(I)Z', 'awakenScrollBars(IZ)Z', 'addOnAttachStateChangeListener(Landroid/view/View$OnAttachStateChangeListener;)V', 'removeOnAttachStateChangeListener(Landroid/view/View$OnAttachStateChangeListener;)V', 'isAttachedToWindow()Z', 'onAttachedToWindow()V', 'onDetachedFromWindow()V', 'onVisibilityChanged(Landroid/view/View;I)V', 'onWindowVisibilityChanged(I)V']);
-add(CONFIGURATION, ['equals(Landroid/content/res/Configuration;)Z', 'equals(Ljava/lang/Object;)Z', 'getLayoutDirection()I', 'getLocales()Landroid/os/LocaleList;', 'setLocales(Landroid/os/LocaleList;)V', 'setLocale(Ljava/util/Locale;)V']);
+add(CONFIGURATION, ['getLayoutDirection()I', 'getLocales()Landroid/os/LocaleList;', 'setLocales(Landroid/os/LocaleList;)V', 'setLocale(Ljava/util/Locale;)V']);
 add(LOCALE, ['clone()Ljava/lang/Object;', 'getScript()Ljava/lang/String;', '<init>(Ljava/lang/String;)V', '<init>(Ljava/lang/String;Ljava/lang/String;)V', '<init>(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V', 'getDefault()Ljava/util/Locale;', 'forLanguageTag(Ljava/lang/String;)Ljava/util/Locale;', 'getLanguage()Ljava/lang/String;', 'getCountry()Ljava/lang/String;', 'getVariant()Ljava/lang/String;', 'toLanguageTag()Ljava/lang/String;', 'toString()Ljava/lang/String;', 'equals(Ljava/lang/Object;)Z']);
 add(LOCALES, ['<init>([Ljava/util/Locale;)V', 'get(I)Ljava/util/Locale;', 'size()I', 'isEmpty()Z', 'indexOf(Ljava/util/Locale;)I', 'toLanguageTags()Ljava/lang/String;', 'getDefault()Landroid/os/LocaleList;', 'getAdjustedDefault()Landroid/os/LocaleList;', 'getEmptyLocaleList()Landroid/os/LocaleList;', 'forLanguageTags(Ljava/lang/String;)Landroid/os/LocaleList;', 'getFirstMatch([Ljava/lang/String;)Ljava/util/Locale;']);
 add(CONFIGURATION, ['<init>()V', '<init>(Landroid/content/res/Configuration;)V']);
 add(INFLATER, ['from(Landroid/content/Context;)Landroid/view/LayoutInflater;', 'getContext()Landroid/content/Context;', 'getFactory()Landroid/view/LayoutInflater$Factory;', 'getFactory2()Landroid/view/LayoutInflater$Factory2;', 'setFactory(Landroid/view/LayoutInflater$Factory;)V', 'setFactory2(Landroid/view/LayoutInflater$Factory2;)V', 'cloneInContext(Landroid/content/Context;)Landroid/view/LayoutInflater;', 'inflate(ILandroid/view/ViewGroup;)Landroid/view/View;', 'inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;']);
-for (const owner of ['Landroid/view/ViewGroup;', 'Landroid/widget/LinearLayout;', 'Landroid/widget/FrameLayout;', 'Landroid/widget/ScrollView;']) add(owner, ['getChildAt(I)Landroid/view/View;', 'getChildCount()I', 'indexOfChild(Landroid/view/View;)I', 'removeViewAt(I)V', 'removeViews(II)V', 'addView(Landroid/view/View;)V', 'addView(Landroid/view/View;I)V', 'addView(Landroid/view/View;II)V', 'addView(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V', 'addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V', 'removeView(Landroid/view/View;)V', 'removeAllViews()V']);
+for (const owner of ['Landroid/view/ViewGroup;', 'Landroid/widget/LinearLayout;', 'Landroid/widget/FrameLayout;', 'Landroid/widget/ScrollView;']) add(owner, ['getChildAt(I)Landroid/view/View;', 'getChildCount()I', 'indexOfChild(Landroid/view/View;)I', 'removeViewAt(I)V', 'removeViews(II)V', 'addView(Landroid/view/View;)V', 'addView(Landroid/view/View;I)V', 'addView(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V', 'addView(Landroid/view/View;Landroid/view/ViewGroup$LayoutParams;)V', 'removeView(Landroid/view/View;)V', 'removeAllViews()V']);
 add(ATTRIBUTES, ['getAttributeCount()I', 'getAttributeName(I)Ljava/lang/String;', 'getAttributeNameResource(I)I', 'getAttributeValue(I)Ljava/lang/String;', 'getAttributeValue(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;', 'getAttributeResourceValue(II)I', 'getAttributeResourceValue(Ljava/lang/String;Ljava/lang/String;I)I', 'getAttributeIntValue(II)I', 'getAttributeIntValue(Ljava/lang/String;Ljava/lang/String;I)I', 'getAttributeBooleanValue(IZ)Z', 'getAttributeBooleanValue(Ljava/lang/String;Ljava/lang/String;Z)Z', 'getStyleAttribute()I', 'getPositionDescription()Ljava/lang/String;']);
 add(WINDOW, ['getDecorView()Landroid/view/View;', 'peekDecorView()Landroid/view/View;', 'getCallback()Landroid/view/Window$Callback;', 'setCallback(Landroid/view/Window$Callback;)V', 'findViewById(I)Landroid/view/View;', 'setContentView(Landroid/view/View;)V', 'setContentView(I)V', 'requestFeature(I)Z', 'hasFeature(I)Z']);
 const PARAM_TYPES = [LAYOUT_PARAMS, MARGIN_PARAMS, 'Landroid/widget/LinearLayout$LayoutParams;', 'Landroid/widget/FrameLayout$LayoutParams;'];
@@ -226,13 +222,6 @@ add('Landroid/view/View;', ['setLayoutParams(Landroid/view/ViewGroup$LayoutParam
 // The android.widget / android.view class hierarchy the host views do not implement (android-13.0.0_r1 declarations): the classes exist with their real superclass chain, so an APK or
 // library class that extends one loads, reflection and isAssignableFrom see View, and any use of an unimplemented widget fails on its own missing constructor or method instead of on a
 // broken hierarchy. Widgets with host behaviour are in WIDGET_PARENTS below; HorizontalScrollView is the original AOSP class of the layouts profile.
-// A class of this table whose original AOSP source is in a framework DEX is implemented (unimplementedWidgetMessage looks at runtime.classes): docs/WIDGET-ORIGINALS.md has the status of each.
-/** The concrete android.widget classes that are original AOSP classes of the layouts profile only (docs/WIDGET-ORIGINALS.md): an APK that uses one, in code or as a layout tag, loads the profile (src/apk-loader.js). */
-export const LAYOUTS_PROFILE_WIDGETS = ['RelativeLayout', 'GridLayout', 'TableLayout', 'TableRow', 'AbsoluteLayout', 'HorizontalScrollView', 'CheckedTextView', 'ViewAnimator', 'ViewFlipper', 'ViewSwitcher', 'TextSwitcher', 'ImageSwitcher', 'ListView', 'GridView', 'ExpandableListView', 'Spinner', 'Gallery', 'AdapterViewFlipper',
-  'TabHost', 'TabWidget', 'AutoCompleteTextView', 'MultiAutoCompleteTextView', 'NumberPicker', 'SearchView', 'DatePicker', 'TimePicker', 'CalendarView', 'MediaController'];
-const LAYOUTS_PROFILE_CLASSES = new Set([...LAYOUTS_PROFILE_WIDGETS, 'AdapterView', 'AbsListView', 'AbsSpinner', 'AdapterViewAnimator'].map(name => `Landroid/widget/${name};`));
-const READS_PARENT_FIELD = ['Landroid/widget/AbsSeekBar;', 'Landroid/widget/Gallery;'];   // see syncViewFields
-const ORIGINAL_CLASS_STYLEABLES = { AbsSeekBar: ['SeekBar'], Spinner: ['ListPopupWindow', 'PopupWindow'], AutoCompleteTextView: ['ListPopupWindow', 'PopupWindow'], DayPickerView: ['CalendarView'] };   // CalendarViewMaterialDelegate builds its DayPickerView with the CalendarView's own AttributeSet   // see ownedByOriginalClass
 const UNIMPLEMENTED_WIDGET_PARENTS = Object.fromEntries(Object.entries({
   'android/widget/HorizontalScrollView': 'android/widget/FrameLayout', 'android/widget/AbsoluteLayout': 'android/view/ViewGroup', 'android/widget/RelativeLayout': 'android/view/ViewGroup',
   'android/widget/GridLayout': 'android/view/ViewGroup', 'android/widget/TableLayout': 'android/widget/LinearLayout', 'android/widget/TableRow': 'android/widget/LinearLayout', 'android/widget/RadioGroup': 'android/widget/LinearLayout',
@@ -247,21 +236,13 @@ const UNIMPLEMENTED_WIDGET_PARENTS = Object.fromEntries(Object.entries({
   'android/widget/TextClock': 'android/widget/TextView', 'android/widget/AbsSeekBar': 'android/widget/ProgressBar', 'android/widget/SeekBar': 'android/widget/AbsSeekBar', 'android/widget/RatingBar': 'android/widget/AbsSeekBar',
   'android/widget/Space': 'android/view/View', 'android/view/ViewStub': 'android/view/View', 'android/widget/VideoView': 'android/view/SurfaceView',
 }).map(([name, parent]) => [`L${name};`, `L${parent};`]));
-/** What the original class of a still declared-only widget needs that the lab does not have (docs/WIDGET-ORIGINALS.md has the detail); named in the "Unsupported widget" error. */
-const WIDGET_BLOCKERS = {
-  'android/widget/VideoView': 'android.media.MediaPlayer, which the lab does not have, and the android.media subtitle classes (SubtitleController and its renderers)',
-  'android/widget/QuickContactBadge': 'android.content.AsyncQueryHandler and com.android.internal.R.styleable.Theme (private theme attributes absent from the framework resource table)',
-  'android/widget/Toolbar': 'android.widget.ActionMenuView and the internal menu classes (com.android.internal.view.menu)',
-};
-/** The declared widget classes (android-13.0.0_r1 names with '/'), for the test that tracks which of them are original classes and which are still blocked. */
-export const DECLARED_WIDGET_CLASSES = Object.freeze(Object.keys(UNIMPLEMENTED_WIDGET_PARENTS).map(type => type.slice(1, -1)));
 const WIDGET_PARENTS = { FrameLayout: 'Landroid/view/ViewGroup;', ScrollView: 'Landroid/widget/FrameLayout;', EditText: 'Landroid/widget/TextView;', CompoundButton: 'Landroid/widget/Button;', CheckBox: 'Landroid/widget/CompoundButton;', Switch: 'Landroid/widget/CompoundButton;', ProgressBar: 'Landroid/view/View;' };
 add('Landroid/view/ViewGroup;', ['addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)Z', 'addViewInLayout(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;Z)Z', 'removeViewInLayout(Landroid/view/View;)V', 'removeAllViewsInLayout()V', 'detachViewFromParent(I)V', 'detachViewFromParent(Landroid/view/View;)V', 'detachViewsFromParent(II)V', 'detachAllViewsFromParent()V', 'attachViewToParent(Landroid/view/View;ILandroid/view/ViewGroup$LayoutParams;)V', 'removeDetachedView(Landroid/view/View;Z)V']);
 for (const owner of ['Landroid/view/ViewParent;', 'Landroid/view/ViewGroup;']) add(owner, ['onDescendantInvalidated(Landroid/view/View;Landroid/view/View;)V', 'requestDisallowInterceptTouchEvent(Z)V']);
 for (const name of Object.keys(WIDGET_PARENTS)) add(`Landroid/widget/${name};`, ['<init>(Landroid/content/Context;)V']);
 add('Landroid/widget/EditText;', ['getText()Landroid/text/Editable;']);
 add('Landroid/widget/TextView;', ['setText(Ljava/lang/CharSequence;)V', 'addTextChangedListener(Landroid/text/TextWatcher;)V', 'removeTextChangedListener(Landroid/text/TextWatcher;)V', 'setHint(Ljava/lang/CharSequence;)V', 'getHint()Ljava/lang/CharSequence;']);
-add('Landroid/widget/CompoundButton;', ['setChecked(Z)V', 'isChecked()Z', 'toggle()V', 'setOnCheckedChangeListener(Landroid/widget/CompoundButton$OnCheckedChangeListener;)V', 'setOnCheckedChangeWidgetListener(Landroid/widget/CompoundButton$OnCheckedChangeListener;)V', 'setDefaultStateDescription()V', 'getButtonStateDescription()Ljava/lang/CharSequence;', 'setStateDescription(Ljava/lang/CharSequence;)V', 'getStateDescription()Ljava/lang/CharSequence;']);
+add('Landroid/widget/CompoundButton;', ['setChecked(Z)V', 'isChecked()Z', 'toggle()V', 'setOnCheckedChangeListener(Landroid/widget/CompoundButton$OnCheckedChangeListener;)V']);
 add('Landroid/widget/ProgressBar;', ['setProgress(I)V', 'getProgress()I', 'setMax(I)V', 'getMax()I', 'setIndeterminate(Z)V', 'isIndeterminate()Z']);
 add('Landroid/view/View;', ['setVisibility(I)V', 'getVisibility()I', 'setBackgroundColor(I)V']);
 add(EDITABLE, ['toString()Ljava/lang/String;', 'length()I', 'charAt(I)C', 'subSequence(II)Ljava/lang/CharSequence;']);
@@ -284,7 +265,6 @@ add(KEY_ITERATOR, ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
 const PARENTS = new Map([['Landroid/content/pm/PackageManager$NameNotFoundException;','Landroid/util/AndroidException;'],['Landroid/util/AndroidException;','Ljava/lang/Exception;'],[ACTIVITY, 'Landroid/view/ContextThemeWrapper;'], ['Landroid/view/ContextThemeWrapper;', 'Landroid/content/ContextWrapper;'], ['Landroid/content/ContextWrapper;', 'Landroid/content/Context;'], ['Landroid/content/Context;', 'Ljava/lang/Object;'], [INTENT, 'Ljava/lang/Object;'], [BUNDLE, 'Landroid/os/BaseBundle;'], ['Landroid/os/PersistableBundle;', 'Landroid/os/BaseBundle;'], ['Landroid/os/BaseBundle;', 'Ljava/lang/Object;'], ['Landroid/content/res/Resources;', 'Ljava/lang/Object;']]);
 PARENTS.set(APPLICATION, 'Landroid/content/ContextWrapper;'); PARENTS.set(APP_CONTEXT, 'Landroid/content/Context;');
 for (const type of [FRAGMENT, FRAGMENT_MANAGER, TRANSACTION]) PARENTS.set(type, 'Ljava/lang/Object;');
-PARENTS.set('Landroid/content/res/Resources$Theme;', 'Ljava/lang/Object;');   // the theme objects of android-style-backend.js: Resources.Theme.class resolves (final class Theme, no superclass but Object)
 for (const [type, parent] of Object.entries(UNIMPLEMENTED_WIDGET_PARENTS)) PARENTS.set(type, parent);
 for (const [name, parent] of Object.entries(WIDGET_PARENTS)) PARENTS.set(`Landroid/widget/${name};`, parent); PARENTS.set(LOCALE, 'Ljava/lang/Object;'); PARENTS.set(LOCALES, 'Ljava/lang/Object;'); PARENTS.set('Landroid/os/Parcelable$ClassLoaderCreator;', 'Landroid/os/Parcelable$Creator;');
 PARENTS.set('Landroid/content/pm/ComponentInfo;', 'Landroid/content/pm/PackageItemInfo;'); PARENTS.set('Landroid/content/pm/PackageItemInfo;', 'Ljava/lang/Object;');
@@ -302,8 +282,6 @@ const descriptor = (name) => name?.startsWith('L') ? name : `L${name.replaceAll(
 const sameRef = (a, b) => a != null && b != null && typeof a.ref === 'number' && a.ref === b.ref;
 const nullish = (value) => value == null || value === 0;
 const nullishString = (runtime, value) => nullish(value) ? null : typeof value === 'string' ? value : runtime.stringCharacters(value);
-// How many attributes of one tag a failed constructor or LayoutParams check is run again without, one at a time, before the failure is taken as not about an attribute.
-const RECOVERY_CANDIDATES = 32;
 function error(message, details = {}) { throw new APKError(`Android platform: ${message}`, { kind: 'android-platform-unsupported', ...details }); }
 function floatBits(value) { const bits = new DataView(new ArrayBuffer(4)); bits.setFloat32(0, value, true); return bits.getInt32(0, true); }
 function bitsFloat(value) { const bits = new DataView(new ArrayBuffer(4)); bits.setInt32(0, value, true); return bits.getFloat32(0, true); }
@@ -324,12 +302,6 @@ export class AndroidPlatform {
     if (field.owner === 'Landroid/view/View;' && field.type === 'Z' && ['sUseBrokenMakeMeasureSpec', 'sUseZeroUnspecifiedMeasureSpec'].includes(field.name)) { const target = Number(this.manifest?.usesSdk?.targetSdkVersion ?? this.manifest?.usesSdk?.minSdkVersion ?? 1); return { handled: true, value: field.name === 'sUseBrokenMakeMeasureSpec' ? (target <= 17 ? 1 : 0) : (target < 23 ? 1 : 0) }; } // Original AOSP View.java compatibility assignments, derived from actual manifest target.
     if (field.owner === 'Landroid/provider/Settings$Secure;' && field.type === 'Ljava/lang/String;' && ['LONG_PRESS_TIMEOUT', 'MULTI_PRESS_TIMEOUT'].includes(field.name)) return { handled: true, value: field.name.toLowerCase() }; // Original Settings.Secure key names; values live in the VM core-settings store.
     if (field.owner === 'Landroid/os/Trace;' && field.name === 'TRACE_TAG_VIEW' && field.type === 'J') return { handled: true, value: 8n }; // AOSP Trace.java: 1L << 3
-    // View.EMPTY_STATE_SET ... PRESSED_ENABLED_FOCUSED_SELECTED_WINDOW_FOCUSED_STATE_SET (View.java: each is StateSet.get(the OR of its VIEW_STATE_* bits)), read through View or a subclass
-    if (field.type === '[I' && field.name.endsWith('_STATE_SET') && runtime.isSubtype(field.owner, 'Landroid/view/View;')) {
-      let rest = field.name.slice(0, -'_STATE_SET'.length), mask = 0;
-      if (rest !== 'EMPTY') for (const [token, bit] of [['WINDOW_FOCUSED', 1], ['PRESSED', 16], ['ENABLED', 8], ['FOCUSED', 4], ['SELECTED', 2]]) { const next = rest.replace(new RegExp(`(^|_)${token}(?=_|$)`), ''); if (next !== rest) { mask |= bit; rest = next; } }
-      if (rest === 'EMPTY' || rest.replaceAll('_', '') === '') return { handled: true, value: runtime.dispatch({ owner: 'Landroid/util/StateSet;', name: 'get', parameters: ['I'], result: '[I', signature: '(I)[I' }, [mask], 'static') };
-    }
     if (field.owner === 'Landroid/view/View;' && field.type === 'Z' && field.name === 'sPreserveMarginParamsInLayoutParamConversion') return { handled: true, value: Number(this.manifest?.usesSdk?.targetSdkVersion ?? this.manifest?.usesSdk?.minSdkVersion ?? 1) >= 24 ? 1 : 0 };
     if (field.owner === LOCALE && Object.hasOwn(LOCALE_CONSTANTS, field.name)) return { handled: true, value: this.locale(runtime, LOCALE_CONSTANTS[field.name]) };
     // android.graphics.BlurMaskFilter.Blur: NORMAL, SOLID, OUTER, INNER (BlurMaskFilter.java; the ordinal is its native_int, the SkBlurStyle of BlurMaskFilter(radius, style))
@@ -377,13 +349,8 @@ export class AndroidPlatform {
   }
   /** Why an android.widget/android.view class that only exists as a hierarchy declaration (UNIMPLEMENTED_WIDGET_PARENTS) cannot be constructed; null for every other class. */
   unimplementedWidgetMessage(type, runtime) {
-    if (runtime.classes.has(type)) return null;
-    // An original class of the layouts profile: the class exists, the profile was not loaded for this APK (the load found no use of the widget, or the profile was switched off).
-    // (AdapterViewFlipper is one the lab never declared: without the profile its name resolves to nothing, and Class.forName says this instead of ClassNotFoundException.)
-    if (!Object.hasOwn(UNIMPLEMENTED_WIDGET_PARENTS, type) && !LAYOUTS_PROFILE_CLASSES.has(type)) return null;
-    if (LAYOUTS_PROFILE_CLASSES.has(type)) return `Unsupported widget ${type.slice(1, -1).replaceAll('/', '.')}: its original class is in the layouts profile, which is not loaded for this APK (the profile is loaded when the APK's code or a layout names the widget; docs/WIDGET-ORIGINALS.md)`;
-    const blocker = WIDGET_BLOCKERS[type.slice(1, -1)];
-    return `Unsupported widget ${type.slice(1, -1).replaceAll('/', '.')}: the lab declares the class but does not implement it, so constructing it would yield a View that cannot measure, draw or take input${blocker ? ` (it needs ${blocker}; docs/WIDGET-ORIGINALS.md)` : ''}`;
+    if (!Object.hasOwn(UNIMPLEMENTED_WIDGET_PARENTS, type) || runtime.classes.has(type)) return null;
+    return `Unsupported widget ${type.slice(1, -1).replaceAll('/', '.')}: the lab declares the class but does not implement it, so constructing it would yield a View that cannot measure, draw or take input`;
   }
   /** SystemServiceRegistry's class -> Context.*_SERVICE name table, over every service host. */
   serviceNameForClass(type) { return CORE_SERVICE_CLASSES[type] ?? this.javaServices.serviceNameForClass(type) ?? this.appServices.serviceNameForClass(type) ?? this.hardwareServices.serviceNameForClass(type) ?? this.peripheralServices.serviceNameForClass(type) ?? this.storageServices.serviceNameForClass(type) ?? this.systemManagers.serviceNameForClass(type); }
@@ -650,22 +617,6 @@ export class AndroidPlatform {
   canAllocate(type) { if (type === 'Landroid/view/View;') return true; return this.contractHosts.some(host => host.canAllocate(type)) || this.dialogWindowHost.canAllocate(type) || this.canvasHost.canAllocate(type) || this.paintHost.canAllocate(type) || this.contentHost.canAllocate(type) || this.drawableViewHost.canAllocate(type) || [LOCALE, LOCALES, PACKAGE_MANAGER, COMPONENT, APPLICATION_INFO, ACTIVITY_INFO, CONFIGURATION, METRICS, INFLATER, ATTRIBUTES, ...PARAM_TYPES, EDITABLE, ...Object.keys(WIDGET_PARENTS).map(name => `Landroid/widget/${name};`), FRAGMENT, FRAGMENT_MANAGER, TRANSACTION, APPLICATION, APP_CONTEXT, PROCESS_INFO, INTENT, BUNDLE, 'Landroid/os/BaseBundle;', 'Landroid/os/PersistableBundle;', 'Landroid/content/res/Resources;'].includes(type); }
   supports(key) { return this.supportsUncached(key); }
   supportsUncached(key) { return this.contractHosts.some(host => host.supports(key)) || this.systemBarsHost.supports(key) || this.dialogWindowHost.supports(key) || this.viewOutlineHost.supports(key) || this.composeCanvasHost.supports(key) || this.viewTransformHost.supports(key) || this.viewPropertyAnimatorHost.supports(key) || this.viewCoordinateHost.supports(key) || this.editableTextHost.supports(key) || this.componentCallbacksHost.supports(key) || this.viewStateHost.supports(key) || this.localeService.supports(key) || this.viewWindowHost.supports(key) || this.canvasHost.supports(key) || this.paintHost.supports(key) || this.contentHost.supports(key) || this.drawableViewHost.supports(key) || this.deviceServices.supports(key) || this.insetsHost.supports(key) || this.accessibilityService.supports(key) || this.viewLayoutHost.supports(key) || this.autofillService.supports(key) || this.inputMethodService.supports(key) || this.clipboardService.supports(key) || this.viewInputHost.supports(key) || KEYS.has(key) || STYLE_METHODS.has(key) || this.viewTreeHost.supports(key) || XML_METHODS.has(key); }
-  /** What the page shows in a View's box besides its children, in drawing order: the disappearing children of a group (a removed child whose Animation or LayoutTransition
-   *  still runs: ViewGroup.dispatchDraw draws them after the children) and the Views of its overlay. */
-  extraChildren(runtime, ref) {
-    const view = runtime.object(ref), gone = view.vg?.disappearing?.length ? this.viewGroupApi.disappearing(runtime, ref).filter(child => !view.children.some(own => sameRef(own, child))) : [];
-    return view.overlay ? [...gone, ...this.overlayChildren(runtime, ref)] : gone;
-  }
-  /** The child Views of a View's overlay (ViewOverlay.OverlayViewGroup), for the page: they are shown over the View's own children. Overlay drawables are drawn where the VM draws
-   *  the View through a Canvas; the page has no element for them, which is said once. */
-  overlayChildren(runtime, ref) {
-    const group = this.viewApi.overlayView(runtime, ref); if (!group) return [];
-    const object = runtime.object(group), drawables = object.fields.get('Landroid/view/ViewOverlay$OverlayViewGroup;->mDrawables:Ljava/util/ArrayList;');
-    if (drawables && runtime.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'size', signature: '()I', parameters: [], result: 'I' }, [drawables], 'virtual') > 0) this.noteFrameworkGap(runtime, 'overlay-drawables-page', 'ViewOverlay.add(Drawable): the drawables of a View overlay are drawn where the VM draws the View through a Canvas; the page shows the overlay\'s Views only');
-    return [...(object.children ?? [])];
-  }
-  /** A View got its overlay (View.getOverlay()): the OverlayViewGroup takes the host View's attachment, as its constructor takes mAttachInfo. */
-  viewOverlayCreated(runtime, ref) { const view = runtime.object(ref), group = this.viewApi.overlayView(runtime, ref); if (group && view.attached) this.attachTree(runtime, group, true, new Set(), view.visibility ?? 0); }
   viewKind(runtime, object) {
     const kind = this.drawableViewHost.viewKind(runtime, object) ?? this.webView.viewKind(runtime, object) ?? this.camera.viewKind(runtime, object); if (kind) return kind;
     for (const [name, containerKind] of [['ScrollView', 'scroll'], ['LinearLayout', 'linear'], ['FrameLayout', 'frame']]) if (runtime.isSubtype(object.type, `Landroid/widget/${name};`)) return containerKind;
@@ -700,7 +651,7 @@ export class AndroidPlatform {
         (field.name === 'mNativeCanvasWrapper' && field.type === 'J' || ['mDensity', 'mScreenDensity'].includes(field.name) && field.type === 'I'))
       return { ...field, owner: 'Landroid/graphics/Canvas;', key: `Landroid/graphics/Canvas;->${field.name}:${field.type}` };
     if (runtime.isSubtype(field.owner, 'Landroid/view/View;')) {
-      if (field.type === 'Z' && ['sUseBrokenMakeMeasureSpec', 'sUseZeroUnspecifiedMeasureSpec', 'sPreserveMarginParamsInLayoutParamConversion'].includes(field.name) || field.type === 'I' && ['mPaddingLeft', 'mPaddingTop', 'mPaddingRight', 'mPaddingBottom', 'mLeft', 'mTop', 'mRight', 'mBottom', 'mMinWidth', 'mMinHeight', 'mMeasuredWidth', 'mMeasuredHeight', 'mLayoutDirection', 'mID'].includes(field.name) || field.type === 'Landroid/content/Context;' && field.name === 'mContext' || field.type === 'Landroid/view/ViewGroup$LayoutParams;' && field.name === 'mLayoutParams' || field.type === 'Landroid/view/ViewParent;' && field.name === 'mParent') return { ...field, owner: 'Landroid/view/View;', key: `Landroid/view/View;->${field.name}:${field.type}` };
+      if (field.type === 'Z' && ['sUseBrokenMakeMeasureSpec', 'sUseZeroUnspecifiedMeasureSpec', 'sPreserveMarginParamsInLayoutParamConversion'].includes(field.name) || field.type === 'I' && ['mPaddingLeft', 'mPaddingTop', 'mPaddingRight', 'mPaddingBottom', 'mLeft', 'mTop', 'mRight', 'mBottom', 'mMinWidth', 'mMinHeight', 'mMeasuredWidth', 'mMeasuredHeight', 'mLayoutDirection'].includes(field.name) || field.type === 'Landroid/content/Context;' && field.name === 'mContext') return { ...field, owner: 'Landroid/view/View;', key: `Landroid/view/View;->${field.name}:${field.type}` };
     }
     if (runtime.isSubtype(field.owner, LAYOUT_PARAMS) && field.type === 'I') {
       const owner = ['width', 'height'].includes(field.name) ? LAYOUT_PARAMS : ['leftMargin', 'topMargin', 'rightMargin', 'bottomMargin'].includes(field.name) ? MARGIN_PARAMS : null;
@@ -713,14 +664,9 @@ export class AndroidPlatform {
     if (!view.nativeFieldAccessors) {
       const initialPadding = { ...(view.padding || {}) }, initialContext = view.context, minimumWidth = view.minimumWidth || 0, minimumHeight = view.minimumHeight || 0;
       const padding = {}; for (const edge of ['left', 'top', 'right', 'bottom']) { const key = `Landroid/view/View;->mPadding${edge[0].toUpperCase() + edge.slice(1)}:I`; Object.defineProperty(padding, edge, { enumerable: true, get: () => fields.get(key) || 0, set: value => runtime.storeField(fields, key, value) }); }
-      Object.defineProperty(view, 'padding', { enumerable: true, configurable: true, get: () => padding, set: value => { for (const edge of ['left', 'top', 'right', 'bottom']) padding[edge] = value?.[edge] || 0; view.userPaddingLeftInitial = padding.left; view.userPaddingRightInitial = padding.right; } });   // a whole padding is what setPadding / the XML / the background gave (View.mUserPaddingLeftInitial / RightInitial); a resolved padding (View.internalSetPadding: viewXmlAttributes.writePadding) and a subclass write single mPadding* fields over it
+      Object.defineProperty(view, 'padding', { enumerable: true, configurable: true, get: () => padding, set: value => { for (const edge of ['left', 'top', 'right', 'bottom']) padding[edge] = value?.[edge] || 0; } });
       for (const [property, name, type, initial] of [['context', 'mContext', 'Landroid/content/Context;', initialContext], ['minimumWidth', 'mMinWidth', 'I', minimumWidth], ['minimumHeight', 'mMinHeight', 'I', minimumHeight]]) { const key = `Landroid/view/View;->${name}:${type}`; Object.defineProperty(view, property, { enumerable: true, configurable: true, get: () => fields.get(key) ?? (type === 'I' ? 0 : null), set: value => runtime.storeField(fields, key, value) }); view[property] = initial; }
-      // View.mID is the id itself: ViewStub's constructor assigns it directly (it calls View(Context), which reads no attribute). NO_ID is "no id".
-      { const key = 'Landroid/view/View;->mID:I', initialId = view.androidId; Object.defineProperty(view, 'androidId', { enumerable: true, configurable: true, get: () => { const id = fields.get(key); return id === undefined || id === -1 ? undefined : id >>> 0; }, set: value => { if (value === undefined || value === null) fields.delete(key); else runtime.storeField(fields, key, value | 0); } }); if (initialId !== undefined) view.androidId = initialId; }
-      // View.mParent, for the originals that read the field (AbsSeekBar and Gallery tell the parent not to intercept a drag): it is the view's parent whenever that is a View.
-      if (READS_PARENT_FIELD.some(type => runtime.isSubtype(view.type, type))) { const key = 'Landroid/view/View;->mParent:Landroid/view/ViewParent;', initialParent = view.parent ?? null; Object.defineProperty(view, 'parent', { enumerable: true, configurable: true, get: () => fields.get(key) ?? null, set: value => { if (value === undefined || value === null) fields.delete(key); else runtime.storeField(fields, key, value); } }); view.parent = initialParent; }
-      { const left = view.userPaddingLeftInitial, right = view.userPaddingRightInitial; view.padding = initialPadding; if (left !== undefined) view.userPaddingLeftInitial = left; if (right !== undefined) view.userPaddingRightInitial = right; }   // installing the accessors keeps the initial values a constructor pass already gave
-      view.nativeFieldAccessors = true;
+      view.padding = initialPadding; view.nativeFieldAccessors = true;
     }
     for (const edge of ['left', 'top', 'right', 'bottom']) runtime.storeField(fields, `Landroid/view/View;->mPadding${edge[0].toUpperCase() + edge.slice(1)}:I`, view.padding?.[edge] || 0);
     if (view.context) runtime.storeField(fields, 'Landroid/view/View;->mContext:Landroid/content/Context;', view.context);
@@ -739,177 +685,11 @@ export class AndroidPlatform {
     return value;
   }
   /** An android: attribute of a layout tag that the lab did not apply (applyXMLAttributes default): counted per attribute and tag for the diagnostics summary, traced once each. */
-  noteXmlAttributeNotApplied(runtime, name, tag, reason = null, type = null, origin = null) {
-    const notes = this.xmlAttributesNotApplied ??= new Map(), key = `android:${name} on <${tag}>${origin ? ` (${origin})` : ''}`;
-    const seen = notes.get(key) ?? 0;
-    if (seen === 0 && notes.size >= 400) { if ((this.xmlAttributesNotAppliedDropped = (this.xmlAttributesNotAppliedDropped ?? 0) + 1) === 1) runtime.record('XML attributes not applied: more than 400 kinds (attribute and tag); the further ones are counted, not listed'); return; }   // bounded, never silent
+  noteXmlAttributeNotApplied(runtime, name, tag) {
+    const notes = this.xmlAttributesNotApplied ??= new Map(), key = `android:${name} on <${tag}>`;
+    const seen = notes.get(key) ?? 0; if (seen === 0 && notes.size >= 400) return;
     notes.set(key, seen + 1);
-    if (seen !== 0) return;
-    // What the diagnostics summary says about the attribute besides its name and tag: the class of the View that was built for the tag (a factory may build another class than
-    // the tag names) and why the attribute was not applied, so that the gap can be found from the summary alone.
-    const className = type ? type.slice(1, -1).replaceAll('/', '.') : null;
-    (this.xmlAttributesNotAppliedDetails ??= new Map()).set(key, { className, reason: reason ?? null, origin: origin ?? null });
-    runtime.record(`XML attribute not applied: ${key}${className ? ` [${className}]` : ''} (${reason ?? "the lab's View classes do not implement it yet"}; the screen is inflated without it)`);
-  }
-  /** Whether a failure is the lab's own explicit refusal of an attribute value (an APKError naming what is unsupported), as opposed to a Java exception of the app or the framework, a limit of the VM or a defect. */
-  isAttributeRefusal(failure) {
-    return failure?.name === 'APKError' && failure.details?.kind !== 'instruction-budget' && !/budget|heap|limit exceeded|aborted|cancell?ed/i.test(String(failure.message));
-  }
-  /**
-   * Whether a failure of the lab names a widget class, a method or a system service the virtual device does not have. The rule about attributes (an android: attribute is
-   * reported and never ends an inflation) covers attributes only: when a whole constructor stops at one of these it fails by name and is not run again (recoverViewConstruction).
-   * Where one attribute is being applied on its own (a constructor pass), the missing setter is that attribute not being implemented, which is a report.
-   */
-  namesMissingCode(failure) {
-    return failure?.name === 'APKError' && (failure.details?.kind === 'unsupported-widget' || /^Unsupported API\/method: |System service class \S+ is not installed/.test(String(failure.message)));
-  }
-  /** Whether a Java exception was thrown by code of the app (the method that threw is of a class the APK defines), as opposed to the framework's. */
-  thrownByAppCode(runtime, failure) {
-    if (failure?.name !== 'JavaException') return false;
-    try { const owner = runtime.object(failure.value).stack?.[0]?.owner, cls = owner ? runtime.classes.get(owner) : null; return !!cls?.dex && !runtime.dex.bootDexes?.has(cls.dex); } catch { return false; }
-  }
-  /** How a report words a RuntimeException that applying an attribute's value threw: the exception Android's own code throws for it, which on a device ends the inflation. */
-  javaRefusalReason(runtime, failure) {
-    let type = 'java.lang.RuntimeException', message = ''; try { const object = runtime.object(failure.value); type = object.type.slice(1, -1).replaceAll('/', '.'); message = typeof object.message === 'string' ? object.message : object.message ? runtime.javaString(object.message) : ''; } catch { /* the wording only */ }
-    return `applying the value throws ${type}${message ? `: ${String(message).replace(/\s+/g, ' ').slice(0, 140)}` : ''} (on a device this ends the inflation of the layout; the lab leaves the attribute out)`;
-  }
-  /** The attributes of a tag that are kept from every TypedArray read of it while the parser that met them is open (recoverViewConstruction); the parsed tree itself is shared between inflations. */
-  withheldFor(node) { const entry = this.withheldAttributes?.get(node); return entry && !entry.owner.closed ? entry.set : null; }
-  /**
-   * LayoutInflater.createView: the constructor of a framework View class threw a RuntimeException while it read the tag. When leaving one android: attribute of the tag out
-   * makes the same constructor succeed, that attribute's value is what it could not take: the View is built without it and the attribute is reported with the exception (the
-   * owner's rule: an android: attribute never fails an inflation). When no single attribute explains the failure it is not about an attribute value, and it propagates as it was.
-   * Only for framework classes (their constructors are the originals, or the lab's passes written from them): an app's own View constructor is run once, as on a device.
-   */
-  recoverViewConstruction(runtime, method, words, failure) {
-    const CONTEXT = 'Landroid/content/Context;', ATTRS = 'Landroid/util/AttributeSet;';
-    if (method.name !== '<init>' || method.parameters[0] !== CONTEXT || method.parameters[1] !== ATTRS || !/^L(?:android|com\/android\/internal)\//.test(method.owner)) return undefined;
-    // A RuntimeException of the constructor, or the lab's own explicit refusal of something the value led to (a framework resource the virtual device does not have).
-    const java = failure?.name === 'JavaException' && runtime.isSubtype(runtime.typeOf(failure.value), 'Ljava/lang/RuntimeException;');
-    if (!java && !(this.isAttributeRefusal(failure) && !this.namesMissingCode(failure)) || !runtime.isSubtype(method.owner, 'Landroid/view/View;')) return undefined;
-    if (java && this.thrownByAppCode(runtime, failure)) return undefined;   // an exception of the app's own code (a method of its subclass that the constructor called) is the app's: as on a device
-    const attrs = words[2]; if (!attrs?.ref) return undefined;
-    const node = runtime.object(attrs).node; if (!node?.attributes || this.recoveringView) return undefined;
-    const owner = runtime.object(attrs), held = this.withheldAttributes ??= new WeakMap(), before = this.withheldFor(node) ?? new Set();
-    const candidates = node.attributes.filter(attribute => attribute.resourceId && attribute.namespace === 'http://schemas.android.com/apk/res/android' && !before.has(attribute) && !attribute.name?.startsWith('layout_')).slice(0, RECOVERY_CANDIDATES);   // a layout_* attribute is the parent's, no View constructor reads it
-    this.recoveringView = true;
-    try {
-      for (const attribute of candidates) {
-        held.set(node, { owner, set: new Set([...before, attribute]) });
-        const receiver = runtime.allocate(method.owner);
-        try { runtime.dispatch(method, [receiver, ...words.slice(1)], 'direct'); }
-        catch (retry) { if (retry?.name !== 'JavaException' && retry?.name !== 'APKError') throw retry; continue; }
-        this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, `the constructor of ${method.owner.slice(1, -1).replaceAll('/', '.')} fails with this value: ${java ? this.javaRefusalReason(runtime, failure) : `${this.refusalReason(failure)} (the lab builds the View without the attribute)`}`, method.owner);
-        return receiver;
-      }
-      if (before.size) held.set(node, { owner, set: before }); else held.delete(node);
-      return undefined;
-    } finally { this.recoveringView = false; }
-  }
-  /**
-   * ViewGroup.addViewInner: the parent's checkLayoutParams threw a RuntimeException for LayoutParams that were read from the child's tag (GridLayout refuses a negative
-   * layout_row or layout_column, which aapt2 compiles). As for a constructor (recoverViewConstruction): when the LayoutParams read again without one layout_* attribute of the
-   * tag are accepted, that attribute's value is what the parent could not take; the child is added with those LayoutParams and the attribute is reported with the exception.
-   * When no single attribute explains it, or the exception is of the app's own code, it propagates as it was.
-   */
-  recoverLayoutParams(runtime, group, params, failure) {
-    if (failure?.name !== 'JavaException' || this.recoveringParams || !runtime.isSubtype(runtime.typeOf(failure.value), 'Ljava/lang/RuntimeException;') || this.thrownByAppCode(runtime, failure)) return undefined;
-    const source = this.layoutParamsSource?.get(runtime.object(params)); if (!source || source.parser.closed || !this.xmlHost?.isLayoutNode(source.node)) return undefined;
-    const node = source.node, held = this.withheldAttributes ??= new WeakMap(), before = this.withheldFor(node) ?? new Set(), ATTRS = 'Landroid/util/AttributeSet;';
-    const candidates = node.attributes.filter(attribute => attribute.resourceId && attribute.namespace === 'http://schemas.android.com/apk/res/android' && attribute.name?.startsWith('layout_') && !before.has(attribute)).slice(0, RECOVERY_CANDIDATES);
-    const attrs = this.viewXmlAttributes.kit.attributeSet(runtime, node);   // the parser has moved on from the tag: the same tag, as an AttributeSet of its own
-    this.recoveringParams = true;
-    try {
-      for (const attribute of candidates) {
-        held.set(node, { owner: source.parser, set: new Set([...before, attribute]) });
-        let again;
-        try {
-          again = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateLayoutParams', signature: `(${ATTRS})${LAYOUT_PARAMS}`, parameters: [ATTRS], result: LAYOUT_PARAMS }, [group, attrs], 'virtual');
-          if (!again?.ref || !runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'checkLayoutParams', signature: `(${LAYOUT_PARAMS})Z`, parameters: [LAYOUT_PARAMS], result: 'Z' }, [group, again], 'virtual')) continue;
-        } catch (retry) { if (retry?.name !== 'JavaException') throw retry; continue; }
-        this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, `${runtime.typeOf(group).slice(1, -1).replaceAll('/', '.')} refuses the LayoutParams with this value: ${this.javaRefusalReason(runtime, failure)}`);
-        return again;
-      }
-      if (before.size) held.set(node, { owner: source.parser, set: before }); else held.delete(node);
-      return undefined;
-    } finally { this.recoveringParams = false; }
-  }
-  /** A lab failure as the reason of a report: without the chain of methods it passed through ("Lowner;->name(..) [file.dex] at PC 0x..: "), which would use up the reason. */
-  refusalReason(failure) { return String(failure?.message ?? failure).replace(/\s+/g, ' ').replace(/^(?:L[^ ]+ \[[^\]]*\] at PC 0x[\da-f]+: )+/i, '').replace(/^Android platform: /, '').slice(0, 200); }
-  /** Context.getApplicationInfo() of the Context a View or LayoutParams is built with: its targetSdkVersion and ApplicationInfo.hasRtlSupport (the Context may belong to a second package). */
-  contextApplication(runtime, context) {
-    const fallback = () => { const app = this.manifest?.application ?? {}, rtl = app.supportsRtl; return { targetSdk: Number(this.manifest?.usesSdk?.targetSdkVersion ?? this.manifest?.usesSdk?.minSdkVersion ?? 1), supportsRtl: rtl === true || rtl === 'true' || (Number.isInteger(rtl) && rtl !== 0) }; };
-    if (nullish(context)) return fallback();
-    let info; try { info = runtime.dispatch({ owner: 'Landroid/content/Context;', name: 'getApplicationInfo', signature: `()${APPLICATION_INFO}`, parameters: [], result: APPLICATION_INFO }, [context], 'virtual'); } catch (failure) { if (!(failure instanceof APKError)) throw failure; return fallback(); }
-    if (nullish(info)) return fallback();
-    const fields = runtime.object(info).fields;
-    return { targetSdk: Number(fields.get(`${APPLICATION_INFO}->targetSdkVersion:I`) ?? 0), supportsRtl: (Number(fields.get(`${APPLICATION_INFO}->flags:I`) ?? 0) & 0x400000) !== 0 };
-  }
-  targetSdkOf(runtime, context) { return this.contextApplication(runtime, context).targetSdk; }
-  /** A resource lookup that found nothing where Android would also find nothing (a style that cannot be read, a ?attr the theme does not define, a reference to a package that is not loaded): counted for the diagnostics summary, traced once each. The value is read without it, as AssetManager2 does. */
-  noteResourceUnresolved(runtime, what, reason) {
-    const notes = this.resourcesUnresolved ??= new Map(), seen = notes.get(what)?.count ?? 0; if (seen === 0 && notes.size >= 400) return;
-    notes.set(what, { count: seen + 1, reason });
-    if (seen === 0) runtime.record(`Resource not resolved: ${what} (${reason})`);
-  }
-  /** A framework behaviour the lab does not implement and tolerates (the screen goes on without it): recorded once per key in the trace and listed in the diagnostics summary. */
-  noteFrameworkGap(runtime, key, text) {
-    const notes = this.frameworkGaps ??= new Map(), seen = notes.get(key)?.count ?? 0; if (seen === 0 && notes.size >= 200) return;
-    notes.set(key, { count: seen + 1, text });
-    if (seen === 0) runtime.record(`Not implemented: ${text}`);
-  }
-  /** Whether the attribute's value is a reference to a style / array / plurals resource (a bag), which has no scalar value. */
-  isBagReference(attribute) {
-    if (attribute.kind !== 'reference' || !attribute.reference) return false;
-    let entry = attribute.resolved ?? this.resources?.resolve(attribute.reference); for (let guard = 0; entry?.resolved && guard < 20; guard++) entry = entry.resolved;
-    return entry?.kind === 'bag';
-  }
-  /**
-   * An android: attribute that no case of the lab's attribute pass applies (or whose value a case could not take: `reason`).
-   *  - An attribute of the styleable of an original (DEX) widget class in the view's ancestry (AbsListView, ListView, Toolbar, ...) is read by that class's own constructor.
-   *  - A layout_* attribute is never the View's: the parent's generateLayoutParams(AttributeSet) reads the ones its LayoutParams class knows and ignores the rest (a
-   *    layout_alignParentTop under a parent that is not a RelativeLayout does nothing on Android).
-   *  - An attribute a constructor pass has read (`handled`: the View part of a name another class's styleable shares, android:backgroundTint) is applied.
-   *  - An attribute that came from a style (the default style or style="") and belongs to no styleable of the view's classes is another class's: styles are shared between
-   *    classes, and no constructor of this View reads it.
-   *  - Anything else is an attribute the lab's View classes do not apply yet. On Android a View's constructor reads the attributes of its own styleables and ignores every other
-   *    one, so the inflation never fails for an attribute. The lab keeps inflating too and reports it (owner's decision of 2026-11-17, CLAUDE.md): the attribute, the tag and how
-   *    often, with the reason and, for an attribute a style gave, where it came from ("style" or "default style"), in the trace once and in the diagnostics summary, never
-   *    silently. What it would have changed on a device (a look, a limit) is not applied.
-   */
-  leaveAttributeToClass(runtime, type, attribute, node, handled = null, reason = null) {
-    if (this.ownedByOriginalClass(runtime, type, attribute)) {
-      if (!attribute.fromStyle) { const gap = ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT.find(entry => entry.names.includes(attribute.name) && runtime.isSubtype(type, entry.owner)); if (gap) this.viewXmlAttributes?.kit.noteNoEffect(runtime, attribute.name, node.name, gap.reason); }
-      return;
-    }
-    if (attribute.name.startsWith('layout_') || handled?.has(attribute.name)) return;
-    if (attribute.fromStyle && !this.ownedByAncestryStyleable(runtime, type, attribute)) return;
-    // An attribute of a host container that only the original class applies (LinearLayout's weight sum, dividers and baseline alignment, FrameLayout's measureAllChildren):
-    // the loader brings the layouts profile for an APK whose layouts or styles give one (src/apk-loader.js), so this is a run with the profile switched off.
-    const profileOwner = !reason && LAYOUTS_PROFILE_ATTRIBUTES[attribute.name]?.owner;
-    if (profileOwner && runtime.isSubtype(type, `Landroid/widget/${profileOwner};`) && !runtime.classes.has(`Landroid/widget/${profileOwner};`)) reason = `it is applied by the original android.widget.${profileOwner}, a class of the layouts profile, which is not loaded for this APK (the loader brings the profile for an APK whose layouts or styles give the attribute; this run has it switched off)`;
-    // An attribute Android 13 does not have (an APK compiled against a newer platform carries the attributes of that platform; a device of API 33 ignores what it does not know).
-    if (!reason && attribute.resourceId >>> 16 === 0x0101 && attribute.resourceId >>> 0 > ANDROID_13_LAST_ATTRIBUTE_ID) {
-      const id = `0x${(attribute.resourceId >>> 0).toString(16).padStart(8, '0')}`, known = !!this.resources?.frameworkTable?.entries?.has(attribute.resourceId >>> 0);   // the table is the SDK's of a later release: it names the newer attributes
-      reason = known ? `the attribute (${id}) was added to Android after API 33: Android 13, the release of the virtual device, does not have it and ignores it`
-        : `no Android release the virtual device knows declares attribute ${id}: a device ignores an attribute it does not know, and so does the lab`;
-    }
-    this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, reason, type, attribute.fromStyle ?? null);
-  }
-  /**
-   * Whether the attribute belongs to R.styleable.<Class> of a class in the view's ancestry, original or host-modeled: the R.styleable arrays of the framework DEX, and for the
-   * classes the lab models in its hosts the memberships of the pinned attrs.xml (src/host-styleables.js).
-   */
-  ownedByAncestryStyleable(runtime, type, attribute) {
-    for (let current = type, guard = 0; current && guard < 32; current = runtime.parent(current), guard++) {
-      if (!current.startsWith('Landroid/') && !current.startsWith('Lcom/android/internal/')) continue;
-      const simple = current.slice(current.lastIndexOf('/') + 1, -1).split('$').pop();
-      if (HOST_STYLEABLES[simple]?.includes(attribute.name)) return true;
-      if (!attribute.resourceId) continue;
-      let array; try { array = runtime.readStatic({ owner: 'Lcom/android/internal/R$styleable;', name: simple, type: '[I', key: `Lcom/android/internal/R$styleable;->${simple}:[I` }); } catch (failure) { if (failure?.name !== 'APKError' && failure?.name !== 'JavaException') throw failure; continue; }   // a class without a styleable of its own
-      if (array && runtime.array(array).elements.includes(attribute.resourceId | 0)) return true;
-    }
-    return false;
+    if (seen === 0) runtime.record(`XML attribute not applied: ${key} (the lab's View classes do not implement it yet; the screen is inflated without it)`);
   }
   /** Whether the attribute belongs to R.styleable.<Class> of a class in the view's ancestry that is original framework bytecode rather than a host-modeled class. */
   ownedByOriginalClass(runtime, type, attribute) {
@@ -917,108 +697,10 @@ export class AndroidPlatform {
     for (let current = type, guard = 0; current && guard < 32; current = runtime.parent(current), guard++) {
       if (!runtime.classes.get(current) || !current.startsWith('Landroid/') && !current.startsWith('Lcom/android/internal/')) continue;
       const simple = current.slice(current.lastIndexOf('/') + 1, -1).split('$').pop();
-      // Besides R.styleable.<Class>, the styleables the class's constructor reads from the same AttributeSet under another name: AbsSeekBar reads SeekBar; Spinner hands the set to its
-      // dropdown (ListPopupWindow, PopupWindow: dropDownVerticalOffset, popupBackground, overlapAnchor, ...).
-      for (const name of [simple, ...(ORIGINAL_CLASS_STYLEABLES[simple] ?? [])]) {
-        let array; try { array = runtime.readStatic({ owner: 'Lcom/android/internal/R$styleable;', name, type: '[I', key: `Lcom/android/internal/R$styleable;->${name}:[I` }); } catch (failure) { if (failure?.name !== 'APKError' && failure?.name !== 'JavaException') throw failure; continue; }   // a class without a styleable of its own
-        if (array && runtime.array(array).elements.includes(attribute.resourceId | 0)) return true;
-      }
+      let array; try { array = runtime.readStatic({ owner: 'Lcom/android/internal/R$styleable;', name: simple, type: '[I' }); } catch { continue; }
+      if (array && runtime.array(array).elements.includes(attribute.resourceId | 0)) return true;
     }
     return false;
-  }
-  /**
-   * The attributes of ImageView and ProgressBar that their constructors hand to a setter of the class (android-13.0.0_r1 ImageView.java, ProgressBar.java), read as the
-   * constructor reads them: through a TypedArray over the one attribute (the tag's own value or the one its style gives). Returns whether the attribute was one of them.
-   */
-  widgetAttribute(runtime, self, type, node, context, attribute) {
-    const IMAGE = 'Landroid/widget/ImageView;', BAR = 'Landroid/widget/ProgressBar;', BLEND = 'Landroid/graphics/BlendMode;', TINT = 'Landroid/content/res/ColorStateList;', name = attribute.name, kit = this.viewXmlAttributes?.kit;
-    const image = runtime.isSubtype(type, IMAGE) && ['adjustViewBounds', 'maxWidth', 'maxHeight', 'baseline', 'baselineAlignBottom', 'cropToPadding', 'tint', 'tintMode', 'drawableAlpha'].includes(name);
-    const tint = !image && runtime.isSubtype(type, BAR) ? /^(progress|progressBackground|secondaryProgress|indeterminate)Tint(Mode)?$/.exec(name) : null;
-    if (!(image || tint) || !kit || !runtime.classes.has('Landroid/content/res/TypedArray;') || !this.styleBackend) return false;
-    const list = kit.styleable(runtime, `one:${name}`, [name]); if (!list.ids.length) return false;
-    const ids = runtime.newArray('[I', 1); runtime.object(ids).elements = [...list.ids];
-    // The one-attribute tag is read with the rule of its layout: a value the getter cannot read is left out and reported (AndroidStyleBackend.unreadable).
-    const single = { name: node.name, attributes: [attribute] }; if (this.xmlHost.isLayoutNode(node) && !attribute.fromStyle) this.xmlHost.layoutNodes.add(single);
-    const attrs = kit.attributeSet(runtime, single), a = kit.reader(runtime, this.styleBackend.obtain(runtime, this.styleBackend.theme(runtime, context), attrs, ids, 0, 0), list);
-    const set = (owner, method, signature, values) => kit.call(runtime, 'virtual', owner, method, signature, [self, ...values]);
-    try {
-      if (!a.has(name)) return true;
-      if (tint) {   // ProgressBar: mProgressTintInfo, then applyProgressTints / applyIndeterminateTint
-        const part = tint[1][0].toUpperCase() + tint[1].slice(1);
-        if (tint[2]) set(BAR, `set${part}TintBlendMode`, `(${BLEND})V`, [kit.parseBlendMode(runtime, a.int(name, -1))]);
-        else { const colors = a.colors(name); set(BAR, `set${part}TintList`, `(${TINT})V`, [colors]); if (name === 'progressTint') runtime.object(self).progressTint = kit.colorText(kit.call(runtime, 'virtual', TINT, 'getDefaultColor', '()I', [colors])); }   // the page's progress colour in the flow mode
-        return true;
-      }
-      switch (name) {
-        case 'adjustViewBounds': {   // setAdjustViewBounds(true) sets FIT_CENTER, and android:scaleType is applied after it in the constructor: a scale type the XML gave stays
-          const SCALE = 'Landroid/widget/ImageView$ScaleType;', given = runtime.object(self).imageScaleType != null ? set(IMAGE, 'getScaleType', `()${SCALE}`, []) : null;
-          set(IMAGE, 'setAdjustViewBounds', '(Z)V', [a.bool(name, false) ? 1 : 0]); if (given) set(IMAGE, 'setScaleType', `(${SCALE})V`, [given]); break;
-        }
-        case 'maxWidth': set(IMAGE, 'setMaxWidth', '(I)V', [a.size(name, 0x7fffffff)]); break;
-        case 'maxHeight': set(IMAGE, 'setMaxHeight', '(I)V', [a.size(name, 0x7fffffff)]); break;
-        case 'baseline': set(IMAGE, 'setBaseline', '(I)V', [a.size(name, -1)]); break;
-        case 'baselineAlignBottom': set(IMAGE, 'setBaselineAlignBottom', '(Z)V', [a.bool(name, false) ? 1 : 0]); break;
-        case 'cropToPadding': set(IMAGE, 'setCropToPadding', '(Z)V', [a.bool(name, false) ? 1 : 0]); break;
-        case 'tint':   // "Prior to L, this attribute would always set a color filter with blending mode SRC_ATOP. Preserve that default behavior."
-          if (kit.call(runtime, 'virtual', IMAGE, 'getImageTintBlendMode', `()${BLEND}`, [self]) == null) set(IMAGE, 'setImageTintBlendMode', `(${BLEND})V`, [runtime.readStatic({ owner: BLEND, name: 'SRC_ATOP', type: BLEND, key: `${BLEND}->SRC_ATOP:${BLEND}` })]);
-          set(IMAGE, 'setImageTintList', `(${TINT})V`, [a.colors(name)]); break;
-        case 'tintMode': { const mode = kit.parseBlendMode(runtime, a.int(name, -1)); if (mode != null) set(IMAGE, 'setImageTintBlendMode', `(${BLEND})V`, [mode]); break; }
-        case 'drawableAlpha': { const alpha = a.int(name, 255); if (alpha !== 255) set(IMAGE, 'setImageAlpha', '(I)V', [alpha]); break; }
-      }
-      return true;
-    } finally { a.recycle(); }
-  }
-  /**
-   * The android: attributes a tag's style="" and the View's default style give the classes without a constructor pass of their own (ImageView, ProgressBar, the host
-   * LinearLayout / FrameLayout / ScrollView), as attribute records of the tag. Android reads the tag, its style and the default style through one TypedArray
-   * (Resources.Theme.obtainStyledAttributes: XML attribute > style="" > the default style, which is theme -> defStyleAttr, or defStyleRes when that attribute is 0 or absent
-   * from the theme), so what a class reads inline it reads from the styles too. The constructor passes (view-xml-attributes.js, textview-xml-attributes.js) read their own
-   * styleables that way through the style backend; this gives the rest to the cases of inflate(), each record marked with where it came from (`fromStyle`: "style" or
-   * "default style"). The default style is the one the constructor was called with, read where the passes read it (where the VM measures and draws the View itself).
-   * Left out: what the tag gives itself, what a constructor pass or an original class reads from the AttributeSet on its own (`handled`, R.styleable of an original class),
-   * the LayoutParams attributes (their own pass reads the style), and for a ProgressBar the items a framework style contributes (android:style/Widget.*ProgressBar*: the stock
-   * look of the widget, which the lab's model of it draws itself). A style that cannot be read is no style (AssetManager2::GetBag fails, ApplyStyle goes on): the pass that
-   * read it through the style backend has reported it.
-   */
-  styleAttributes(runtime, node, context, type, handled, view = null) {
-    const ANDROID = 'http://schemas.android.com/apk/res/android', style = node.attributes.find(attribute => attribute.namespace === null && attribute.name === 'style'), table = this.resources?.table;
-    if (!this.viewXmlAttributes || !this.styleBackend || !table?.resolveBag || !context) return [];
-    const styled = !!runtime.skia && !!this.resources.frameworkXml, defStyleAttr = styled && view?.defStyleExplicit ? view.defStyleAttr | 0 : 0, defStyleRes = styled ? (view?.defStyleRes ?? 0) | 0 : 0;
-    if (!style && !defStyleAttr && !defStyleRes) return [];
-    const theme = runtime.object(this.styleBackend.theme(runtime, context)).themeValues;
-    const themed = attr => { const found = table.getThemeAttribute(theme, attr >>> 0, false); return found?.value.kind === 'reference' && found.value.reference ? found.value.reference >>> 0 : 0; };   // ApplyStyle: a TYPE_REFERENCE names the style
-    const styleId = !style ? 0 : style.kind === 'attribute' ? themed(style.reference) : style.kind === 'reference' ? style.reference >>> 0 : 0;
-    const defaultId = (defStyleAttr ? themed(defStyleAttr) : 0) || defStyleRes >>> 0;
-    if (!styleId && !defaultId) return [];
-    const bag = id => { try { return table.resolveBag(id); } catch (failure) { if (failure?.name !== 'AndroidResourceError') throw failure; return []; } };
-    const inline = new Set(node.attributes.filter(attribute => attribute.namespace === ANDROID).map(attribute => attribute.name)), given = new Map(), stockLook = runtime.isSubtype(type, 'Landroid/widget/ProgressBar;');
-    const add = (id, origin) => {
-      for (const [attributeId, value] of bag(id)) {
-        if ((attributeId >>> 24) !== 0x01) continue;   // an attribute of the app or a library: its own View class reads it
-        const name = this.viewXmlAttributes.kit.attributeName(attributeId >>> 0); if (!name) continue;
-        given.delete(name);   // the style="" value of an attribute hides the default style's, whatever becomes of it below
-        if (stockLook && ((value.sourceResourceId ?? 0) >>> 24) === 0x01) continue;
-        if (inline.has(name) || handled?.has(name) || name.startsWith('layout_') || name === 'id' || name === 'textAppearance' || name === 'theme') continue;
-        const attribute = { ...value, name, namespace: ANDROID, resourceId: attributeId >>> 0, fromStyle: origin };
-        if (!this.ownedByOriginalClass(runtime, type, attribute)) given.set(name, attribute);
-      }
-    };
-    if (defaultId) add(defaultId, 'default style');
-    if (styleId) add(styleId, 'style');
-    return [...given.values()];
-  }
-  /**
-   * A View built in code with a default style (new ImageButton(context, null, 0, style), a constructor that passes defStyleAttr): the constructor passes have read their
-   * styleables; what the default style gives the other classes goes through the cases of inflate() as the attributes of a tag without attributes (styleAttributes).
-   */
-  applyDefaultStyleInCode(runtime, receiver) {
-    const view = runtime.object(receiver);
-    if (!view.defStyleExplicit || !(view.defStyleAttr || view.defStyleRes) || !view.viewAttributesHandled || view.viewAttributesNode) return;
-    const node = { name: view.type.slice(view.type.lastIndexOf('/') + 1, -1), attributes: [], children: [] }, previousTag = view.xmlTag;
-    if (!this.styleAttributes(runtime, node, view.context, view.type, view.viewAttributesHandled, view).length) return;
-    view.viewAttributesNode = node;   // the passes have run for this View: inflate() only applies the rest
-    try { this.inflate(runtime, node, view.context, 0, { existing: receiver, applyOnly: true }); }
-    finally { view.viewAttributesNode = null; view.appliedNode = null; view.xmlTag = previousTag; }
   }
   dimension(attribute, runtime, floating = false) {
     // ?attr/ references resolve against the theme of the context being inflated (set by inflate()).
@@ -1043,38 +725,17 @@ export class AndroidPlatform {
     if (!type) error(`Unsupported XML View tag <${node.name}>; custom/AndroidX Views require their real implementation`, { kind: 'xml-view-unsupported', tag: node.name });
     const value = factoryView || runtime.makeObject(type), view = runtime.object(value);
     view.max ??= 100; view.progress ??= 0; view.checked ??= false; view.visibility ??= 0; view.context = context; view.enabled ??= true; view.xmlTag = node.name; view.padding ??= { left: 0, top: 0, right: 0, bottom: 0 };
-    // The View and ViewGroup constructor passes (view-xml-attributes.js): every attribute of R.styleable.View / ViewGroup, from the tag, its style="" and the default style. A View built
-    // through its constructor has run them already for this node; the loop below applies the attributes of the other classes and skips the ones those passes own.
-    if (view.appliedNode !== node && view.viewAttributesNode !== node) this.viewXmlAttributes?.construct(runtime, value, node, context);
-    const constructed = view.viewAttributesNode === node ? view.viewAttributesExclusive : null, constructedAll = view.viewAttributesNode === node ? view.viewAttributesHandled : null;
-    // With the constructor passes run (they read the style and the default style for their own styleables), what those styles give the other classes (ImageView, ProgressBar) goes
-    // through the same cases as the tag's own attributes, under them.
-    const styleGiven = view.appliedNode !== node && constructedAll ? this.styleAttributes(runtime, node, context, type, constructedAll, view) : [];
-    if (view.appliedNode !== node) for (const attribute of styleGiven.length ? [...styleGiven, ...node.attributes] : node.attributes) {
+    if (view.appliedNode !== node) for (const attribute of node.attributes) {
       this.inflateContext = context;
       if (attribute.namespace === null && attribute.name === 'style' && type === names.ProgressBar && attribute.kind === 'attribute' && attribute.reference === 16842872) { view.progressStyle = 'horizontal'; continue; }
       // Other namespaces belong to subclass DEX constructors, not the framework View attributes.
       if (attribute.namespace !== 'http://schemas.android.com/apk/res/android') continue;
-      // View(Context, AttributeSet): mID = a.getResourceId(R.styleable.View_id, NO_ID), which answers NO_ID for a value that is not a reference. Said, since a layout cannot be compiled that way.
-      if (attribute.name === 'id') { if (attribute.kind !== 'reference') { if (!this.withheldFor(node)?.has(attribute)) this.noteXmlAttributeNotApplied(runtime, 'id', node.name, 'the value is not a resource reference: TypedArray.getResourceId reads no id from it and the View has none (View.NO_ID)', type); continue; } view.androidId = attribute.reference; continue; }
+      if (attribute.name === 'id') { if (attribute.kind !== 'reference') error('XML android:id must be a resource reference'); view.androidId = attribute.reference; continue; }
       // android:textAppearance names a style (a bag of attributes), not a scalar: TextView's size, colour and typeface read that style where the text style is resolved
       // (applyStyledTextSize, the canvas text style lookups), so it is not typed here; typing it failed with "unresolved resource: Bag retained".
       if (attribute.name === 'textAppearance') continue;
-      if (constructed?.has(attribute.name)) continue;   // applied by the View / ViewGroup constructor pass
-      if (attribute.name === 'theme') continue;   // android:theme names a style (a bag): LayoutInflater.createViewFromTag wraps the Context with it, View never reads it
-      // The value as a scalar. A reference to a style or an array (a bag) has none: the class that owns such an attribute reads it from the AttributeSet itself (an original
-      // constructor, a constructor pass), so it only matters when a case below wants the scalar, and then the attribute is reported, not thrown.
-      // android:entries, android:titleTextAppearance, android:popupTheme: known to be a bag without typing it.
-      if (this.isBagReference(attribute)) { this.leaveAttributeToClass(runtime, type, attribute, node, constructedAll, 'its value is a style or an array, which only the class that owns the attribute reads'); continue; }
-      let typed;
-      try { typed = attribute.kind === 'attribute' ? this.styleBackend.resolved(attribute, runtime.object(this.styleBackend.theme(runtime, context)).themeValues) : this.typedAttribute(attribute); }
-      catch (failure) {
-        if (!this.isAttributeRefusal(failure)) throw failure;
-        this.leaveAttributeToClass(runtime, type, attribute, node, constructedAll, this.refusalReason(failure));
-        continue;
-      }
-      // An android: attribute never fails the inflation (CLAUDE.md): a case that refuses the value (an explicit error of the lab) reports the attribute and the tag is inflated without it.
-      try { if (this.widgetAttribute(runtime, value, type, node, context, attribute)) continue; switch (attribute.name) {
+      const typed = attribute.kind === 'attribute' ? this.styleBackend.resolved(attribute, runtime.object(this.styleBackend.theme(runtime, context)).themeValues) : this.typedAttribute(attribute);
+      switch (attribute.name) {
         case 'layout_width': view.layoutWidth = this.dimension(attribute, runtime); break;
         case 'layout_height': view.layoutHeight = this.dimension(attribute, runtime); break;
         case 'layout': case 'inflatedId': case 'name': if (!runtime.classes.has(type)) error(`XML ${attribute.name} requires its actual View subclass DEX`); break; // ViewStub/custom constructor consumes these through original TypedArray.
@@ -1103,9 +764,7 @@ export class AndroidPlatform {
         case 'includeFontPadding': view.includeFontPadding = !!typed.value; break;
         case 'hint': view.hint = typed.value; break;
         case 'inputType': view.inputType = typed.value; if (runtime.isSubtype(type, 'Landroid/widget/EditText;')) view.singleLine = (typed.value & 0x0002000f) !== 0x00020001; break;
-        case 'checked':   // CompoundButton_checked is the host's; any other class with the attribute (CheckedTextView) reads it in its own constructor, and View's drawable state must not see it
-          if (runtime.isSubtype(type, 'Landroid/widget/CompoundButton;')) view.checked = !!typed.value; else if (!this.ownedByOriginalClass(runtime, type, attribute)) this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name);
-          break;
+        case 'checked': view.checked = !!typed.value; break;
         case 'progress': view.progress = typed.value; break;
         case 'max': view.max = typed.value; break;
         case 'min': if (!runtime.isSubtype(type, 'Landroid/widget/ProgressBar;')) error('XML min requires a ProgressBar'); view.xmlMin = typed.value; break;
@@ -1135,7 +794,7 @@ export class AndroidPlatform {
         case 'paddingLeft': case 'paddingRight': case 'paddingTop': case 'paddingBottom': view.padding[attribute.name.slice(7).toLowerCase()] = this.dimension(attribute, runtime); break;
         // Start/end insets: the lab lays out left-to-right (a right-to-left device locale fails at the layout direction check below), so start is left and end is right, as for layout_marginStart/End.
         case 'paddingStart': case 'paddingEnd': view.padding[attribute.name === 'paddingStart' ? 'left' : 'right'] = this.dimension(attribute, runtime); break;
-        case 'layoutDirection': if (![0, 2, 3].includes(typed.value)) { this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, 'right-to-left layout needs the styled-attribute path (the framework TypedArray), which this run does not have'); break; } view.layoutDirectionAttribute = typed.value; break;
+        case 'layoutDirection': if (![0, 2, 3].includes(typed.value)) error('XML layoutDirection="rtl" needs right-to-left layout, which the lab does not run', { kind: 'xml-attribute-unsupported', attribute: 'layoutDirection', tag: node.name }); view.layoutDirectionAttribute = typed.value; break;
         case 'textAppearance': break;   // resolved with the style: TextView size / colour / typeface read the textAppearance resource (see applyStyledTextSize and the canvas text style lookups)
         case 'scrollIndicators': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setScrollIndicators', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value], 'virtual'); break;
         case 'scrollbarAlwaysDrawVerticalTrack': case 'scrollbarAlwaysDrawHorizontalTrack': view[attribute.name] = !!typed.value; break;   // scroll bars are not drawn by the lab; the flags are kept for the View API
@@ -1164,10 +823,6 @@ export class AndroidPlatform {
         }
         case 'importantForAccessibility': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setImportantForAccessibility', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value | 0], 'virtual'); break;
         case 'tooltipText': { if (!['string', 'null'].includes(typed.kind)) error('XML tooltipText must resolve to a string'); runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setTooltipText', signature: '(Ljava/lang/CharSequence;)V', parameters: ['Ljava/lang/CharSequence;'], result: 'V' }, [value, typed.value ?? null], 'virtual'); break; }
-        case 'fadingEdge': {   // View(Context, AttributeSet): "Ignore the attribute starting with ICS" (targetSdk >= 14; android:requiresFadingEdge replaced it). Older apps would get fading edges, which the lab does not draw: reported.
-          if (this.targetSdkOf(runtime, context) < 14) this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, 'fading edges are not drawn', type, attribute.fromStyle ?? null);
-          break;
-        }
         case 'theme': break;   // android:theme on a tag is LayoutInflater's: createViewFromTag wraps the context in a ContextThemeWrapper before the View is built (the original AOSP inflater does); View's constructor never reads it
         case 'keyboardNavigationCluster': if (typed.kind !== 'boolean') error('XML keyboardNavigationCluster must resolve to a boolean');   // View(Context, AttributeSet): R.styleable.View_keyboardNavigationCluster
           runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setKeyboardNavigationCluster', signature: '(Z)V', parameters: ['Z'], result: 'V' }, [value, typed.value ? 1 : 0], 'virtual'); break;
@@ -1183,12 +838,16 @@ export class AndroidPlatform {
           if (typed.kind !== 'boolean') error('XML touchscreenBlocksFocus must resolve to a boolean'); runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'setTouchscreenBlocksFocus', signature: '(Z)V', parameters: ['Z'], result: 'V' }, [value, typed.value ? 1 : 0], 'virtual'); break;
         case 'overScrollMode': runtime.dispatch({ owner: 'Landroid/view/View;', name: 'setOverScrollMode', signature: '(I)V', parameters: ['I'], result: 'V' }, [value, typed.value], 'virtual'); break;
         default:
-          this.leaveAttributeToClass(runtime, type, attribute, node, constructedAll);   // read by its own class, another class's, or reported
+          // An attribute of the styleable of an original (DEX) widget class in this view's ancestry (AbsListView, ListView, RecycleListView, ...) is read by that class's own constructor from the AttributeSet.
+          if (this.ownedByOriginalClass(runtime, type, attribute)) break;
+          // A layout_* attribute is never the View's: the parent's generateLayoutParams(AttributeSet) reads the ones its LayoutParams class knows and ignores the rest (a
+          // layout_alignParentTop under a parent that is not a RelativeLayout does nothing on Android). The ones the lab models for its own containers are the cases above.
+          if (attribute.name.startsWith('layout_')) break;
+          // An android: attribute the lab's View classes do not apply yet. On Android a View's constructor reads the attributes of its own styleables and ignores every other one,
+          // so the inflation never fails for an attribute. The lab keeps inflating too and reports it (owner's decision of 2026-11-17, CLAUDE.md): the attribute, the tag and how
+          // often, in the trace once and in the diagnostics summary, never silently. What it would have changed on a device (a look, a limit) is not applied.
+          this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name);
           break;
-      } } catch (failure) {
-        if (!this.isAttributeRefusal(failure)) throw failure;
-        // an item of a style that is not an attribute of this View's classes is another class's (styles are shared: the tab strip's style carries the text attributes of its labels): nothing reads it
-        if (!(attribute.fromStyle && !this.ownedByAncestryStyleable(runtime, type, attribute))) this.noteXmlAttributeNotApplied(runtime, attribute.name, node.name, this.refusalReason(failure), type, attribute.fromStyle ?? null);
       }
     }
     // View constructor order: a background Drawable's padding is applied first; explicit android:padding* attributes win.
@@ -1510,18 +1169,6 @@ export class AndroidPlatform {
     }
     if (owner === CONFIGURATION) {
       const fields = runtime.object(receiver).fields;
-      // Configuration.equals: the same values in every field (compareTo() == 0); the locale lists compare by their locales.
-      if (name === 'equals') {
-        if (nullish(args[1])) return 0; if (sameRef(args[1], receiver)) return 1;
-        const other = runtime.object(args[1]); if (other.type !== runtime.object(receiver).type) return 0;
-        const tags = ref => { const o = nullish(ref) ? null : runtime.object(ref); return o?.locales ? o.locales.map(locale => runtime.object(locale).localeData?.tag).join(',') : o?.localeData ? o.localeData.tag : undefined; };
-        for (const key of new Set([...fields.keys(), ...other.fields.keys()])) {
-          const mine = fields.get(key) ?? 0, theirs = other.fields.get(key) ?? 0; if (mine === theirs || nullish(mine) && nullish(theirs)) continue;
-          if (typeof mine === 'object' && typeof theirs === 'object' && mine && theirs && (sameRef(mine, theirs) || tags(mine) !== undefined && tags(mine) === tags(theirs))) continue;
-          return 0;
-        }
-        return 1;
-      }
       if (name === 'getLayoutDirection') return (fields.get(`${CONFIGURATION}->screenLayout:I`) & 0xc0) === 0x80 ? 1 : 0;
       if (name === 'getLocales') return fields.get(`${CONFIGURATION}->mLocaleList:${LOCALES}`) || this.localeList(runtime, [this.locale(runtime, 'en-US')]);
       if (name === 'setLocales' || name === 'setLocale') { const list = name === 'setLocale' ? this.localeList(runtime, [args[1]]) : args[1]; runtime.storeField(fields, `${CONFIGURATION}->mLocaleList:${LOCALES}`, list); runtime.storeField(fields, `${CONFIGURATION}->locale:${LOCALE}`, runtime.object(list).locales?.[0] || null); return; }
@@ -1548,7 +1195,7 @@ export class AndroidPlatform {
       if (name === 'setFactory' || name === 'setFactory2') { if (object.factory && !sameRef(object.factory, args[1])) error('LayoutInflater factory is already set'); object.factory = args[1]; object.factory2 = name === 'setFactory2'; return; }
       if (name === 'cloneInContext') { const clone = runtime.makeObject(INFLATER); Object.assign(runtime.object(clone), { context: args[1], factory: object.factory, factory2: object.factory2 }); return clone; }
       const root = args[2], attach = method.parameters.length === 2 ? !nullish(root) : !!args[3];
-      const view = this.inflate(runtime, this.xmlHost.markLayout(this.resources?.getLayout(args[1])) ?? error('XML resources unavailable'), object.context);
+      const view = this.inflate(runtime, this.resources?.getLayout(args[1]) ?? error('XML resources unavailable'), object.context);
       if (attach && !nullish(root)) { runtime.object(root).children.push(view); runtime.object(view).parent = root; return root; } return view;
     }
     if (owner === WINDOW) {
@@ -1564,10 +1211,8 @@ export class AndroidPlatform {
     }
     if (PARAM_TYPES.includes(owner)) {
       const object = runtime.object(receiver), fields = object.fields;
-      if (name === '<init>') { if (method.parameters[0] === 'Landroid/content/Context;') { this.layoutParamsFromAttributes(runtime, null, args[2], receiver, args[1], owner); return; } if (method.parameters[0] === 'I') { runtime.storeField(fields, `${LAYOUT_PARAMS}->width:I`, args[1]); runtime.storeField(fields, `${LAYOUT_PARAMS}->height:I`, args[2]); if (method.parameters.length === 3) runtime.storeField(fields, 'Landroid/widget/LinearLayout$LayoutParams;->weight:F', args[3]); } else { for (const [key, value] of runtime.object(args[1]).fields) runtime.storeField(fields, key, value); const state = runtime.object(args[1]).marginState; if (state) object.marginState = { ...state }; /* MarginLayoutParams(MarginLayoutParams): the relative margins and their flags are copied too */ } return; }
-      for (const [index, edge] of ['left', 'top', 'right', 'bottom'].entries()) runtime.storeField(fields, `${MARGIN_PARAMS}->${edge}Margin:I`, args[index + 1]);
-      if (object.marginState) { object.marginState.leftUndefined = false; object.marginState.rightUndefined = false; }   // MarginLayoutParams.setMargins
-      return;
+      if (name === '<init>') { if (method.parameters[0] === 'Landroid/content/Context;') { this.layoutParamsFromAttributes(runtime, null, args[2], receiver, args[1], owner); return; } if (method.parameters[0] === 'I') { runtime.storeField(fields, `${LAYOUT_PARAMS}->width:I`, args[1]); runtime.storeField(fields, `${LAYOUT_PARAMS}->height:I`, args[2]); if (method.parameters.length === 3) runtime.storeField(fields, 'Landroid/widget/LinearLayout$LayoutParams;->weight:F', args[3]); } else for (const [key, value] of runtime.object(args[1]).fields) runtime.storeField(fields, key, value); return; }
+      for (const [index, edge] of ['left', 'top', 'right', 'bottom'].entries()) runtime.storeField(fields, `${MARGIN_PARAMS}->${edge}Margin:I`, args[index + 1]); return;
     }
     if (owner === EDITABLE) { const text = runtime.object(runtime.object(receiver).sourceView).text; if (name === 'toString') return text; if (name === 'length') return text.length; if (name === 'charAt') { if (args[1] < 0 || args[1] >= text.length) error('Editable charAt index out of bounds'); return text.charCodeAt(args[1]); } return text.slice(args[1], args[2]); }
     if ([FRAGMENT, FRAGMENT_MANAGER, TRANSACTION].includes(owner)) return this.fragmentInvoke(runtime, method, args);
@@ -1659,7 +1304,7 @@ export class AndroidPlatform {
     if (name === 'generateDefaultLayoutParams') { const linear = runtime.isSubtype(object.type, 'Landroid/widget/LinearLayout;'), frame = runtime.isSubtype(object.type, 'Landroid/widget/FrameLayout;'), type = linear ? 'Landroid/widget/LinearLayout$LayoutParams;' : frame ? 'Landroid/widget/FrameLayout$LayoutParams;' : LAYOUT_PARAMS, width = linear ? object.orientation === 1 ? -1 : -2 : frame ? -1 : -2, height = frame ? -1 : -2, ref = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: '(II)V', parameters: ['I', 'I'], result: 'V' }, [ref, width, height], 'direct'); return ref; }
     if (name === 'generateLayoutParams') return this.layoutParamsFromAttributes(runtime, receiver, args[1]);
     if (name === 'onFinishInflate') return; // AOSP View.onFinishInflate() has an empty base body.
-    if (name === '<init>' && method.parameters[0] === 'Landroid/content/Context;') { object.context = args[1]; object.enabled = true; if (object.type === 'Landroid/view/ViewOverlay$OverlayViewGroup;') this.viewApi.initOverlayGroup(runtime, receiver); if(method.parameters[2]==='I'){object.defStyleAttr=args[3];object.defStyleExplicit=true;if(method.parameters[3]==='I')object.defStyleRes=args[4];} if (runtime.isSubtype(object.type, 'Landroid/widget/TextView;')) object.textSize = Math.fround((runtime.isSubtype(object.type, 'Landroid/widget/EditText;') ? 18 : 14) * (this.device.fontScale || 1)); /* these defaults are sp values (scaledDensity = density * fontScale) */ this.viewXmlAttributes?.construct(runtime, receiver, args[2] ? runtime.object(args[2]).node ?? null : null, args[1]); /* View(Context, AttributeSet, int, int) and ViewGroup.initFromAttributes: R.styleable.View / ViewGroup from the tag, its style, the default style and the theme (view-xml-attributes.js) */ this.drawableViewHost.applyThemeDefaults(runtime, receiver, args[2]); if (!object.textViewAttributesApplied) { this.drawableViewHost.applyStyledTextSize(runtime, receiver, args[2]); this.drawableViewHost.applyStyledTextAppearance(runtime, receiver, args[2]); } /* else the TextView constructor pass (textview-xml-attributes.js) read the text size and the text appearance with every other attribute */ if (args[2] && runtime.object(args[2]).node) this.inflate(runtime, runtime.object(args[2]).node, args[1], 0, { existing: receiver, applyOnly: true }); else this.applyDefaultStyleInCode(runtime, receiver); /* a View built in code: what its default style gives the classes without a constructor pass */ this.syncViewFields(runtime, receiver); return; }
+    if (name === '<init>' && method.parameters[0] === 'Landroid/content/Context;') { object.context = args[1]; object.enabled = true; if(method.parameters[2]==='I')object.defStyleAttr=args[3]; if (runtime.isSubtype(object.type, 'Landroid/widget/TextView;')) object.textSize = Math.fround((runtime.isSubtype(object.type, 'Landroid/widget/EditText;') ? 18 : 14) * (this.device.fontScale || 1)); /* these defaults are sp values (scaledDensity = density * fontScale) */ this.drawableViewHost.applyThemeDefaults(runtime, receiver, args[2]); this.drawableViewHost.applyStyledTextSize(runtime, receiver, args[2]); this.drawableViewHost.applyStyledTextAppearance(runtime, receiver, args[2]); if (args[2] && runtime.object(args[2]).node) this.inflate(runtime, runtime.object(args[2]).node, args[1], 0, { existing: receiver, applyOnly: true }); this.syncViewFields(runtime, receiver); return; }
     if (owner === 'Landroid/content/res/Resources;') {
       if (name === 'getConfiguration') return this.resourceConfiguration(runtime,receiver);
       if (name === 'updateConfiguration' && this.overrideResources(runtime, receiver)) return this.updateOverrideConfiguration(runtime, receiver, args[1], args[2]);
@@ -1752,7 +1397,6 @@ export class AndroidPlatform {
       }
       if (name === 'removeView' || name === 'removeViewInLayout') {
         if (!object.children.some(child => sameRef(child, args[1]))) return;
-        this.viewGroupApi.transitionRemoveChild(runtime, receiver, args[1]);   // "if (mTransition != null) mTransition.removeChild(this, view)": its DISAPPEARING animation keeps the view as a transitioning one
         const child = runtime.object(args[1]), disappearing = this.viewGroupApi.keepsDisappearing(runtime, receiver, args[1]);   // ViewGroup.removeViewInternal: a running Animation / view transition keeps the child attached and drawn until it ends
         if (child.attached) { this.viewWindowHost.unfocusSubtree(runtime, args[1]); if (!disappearing) this.attachTree(runtime, args[1], false); }
         const index = object.children.findIndex(value => sameRef(value, args[1])); if (index < 0) return; object.children.splice(index, 1); if (disappearing) this.viewGroupApi.addDisappearing(runtime, receiver, args[1]);
@@ -1761,39 +1405,14 @@ export class AndroidPlatform {
       }
       if (name === 'addView' || name === 'addViewInLayout') {
         const inLayout = name === 'addViewInLayout', preventLayout = inLayout && !!args[4];
-        // ViewGroup.addView(View, int width, int height): generateDefaultLayoutParams() with that size, then the virtual addView(View, -1, LayoutParams).
-        if (!inLayout && method.signature === '(Landroid/view/View;II)V') {
-          const params = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateDefaultLayoutParams', signature: '()Landroid/view/ViewGroup$LayoutParams;', parameters: [], result: LAYOUT_PARAMS }, [receiver], 'virtual');
-          if (nullish(params)) runtime.throwJava('Ljava/lang/NullPointerException;', 'generateDefaultLayoutParams() returned null');
-          const fields = runtime.object(params).fields; runtime.storeField(fields, `${LAYOUT_PARAMS}->width:I`, args[2]); runtime.storeField(fields, `${LAYOUT_PARAMS}->height:I`, args[3]);
-          runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: `(Landroid/view/View;I${LAYOUT_PARAMS})V`, parameters: ['Landroid/view/View;', 'I', LAYOUT_PARAMS], result: 'V' }, [receiver, args[1], -1, params], 'virtual'); return;
-        }
-        // ViewGroup.addView(View) / (View, int) / (View, LayoutParams) end in the virtual addView(View, int, LayoutParams): a subclass that overrides it (RadioGroup tracks a checked
-        // child there, ScrollView refuses a second one, an app's own container) sees every child. The layout params are the child's own or generateDefaultLayoutParams().
-        if (!inLayout && method.parameters && method.parameters.length <= 2 && runtime.objectOverride(object.type, `addView(Landroid/view/View;I${LAYOUT_PARAMS})V`)) {
-          const byIndex = method.parameters?.[1] === 'I', index = byIndex ? args[2] : -1; let params = method.parameters?.[1] === LAYOUT_PARAMS ? args[2] : null;
-          if (method.parameters?.[1] !== LAYOUT_PARAMS) {
-            if (nullish(args[1])) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Cannot add a null child view to a ViewGroup');
-            params = runtime.object(args[1]).layoutParams ?? null;
-            if (nullish(params)) params = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateDefaultLayoutParams', signature: '()Landroid/view/ViewGroup$LayoutParams;', parameters: [], result: LAYOUT_PARAMS }, [receiver], 'virtual');
-            if (nullish(params)) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'generateDefaultLayoutParams() cannot return null  ');
-          }
-          runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'addView', signature: `(Landroid/view/View;I${LAYOUT_PARAMS})V`, parameters: ['Landroid/view/View;', 'I', LAYOUT_PARAMS], result: 'V' }, [receiver, args[1], index, params], 'virtual'); return;
-        }
         if (inLayout && nullish(args[1])) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'Cannot add a null child view to a ViewGroup');
         if (inLayout) runtime.object(args[1]).parent = null;
-        this.viewGroupApi.transitionCancelDisappearing(runtime, receiver);   // ViewGroup.addViewInner: "cancel remove transitions to let them complete the process before we add to the container"
         const child = runtime.object(args[1]); if (child.parent) runtime.throwJava('Ljava/lang/IllegalStateException;', 'View already has a parent');
         const indexed = method.parameters?.[1] === 'I', at = indexed && args[2] >= 0 ? args[2] : object.children.length; if (at > object.children.length) runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'Invalid ViewGroup child index');
         let params = indexed ? args[3] : args[2]; params ||= child.layoutParams;
         if (!params) params = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateDefaultLayoutParams', signature: '()Landroid/view/ViewGroup$LayoutParams;', parameters: [], result: LAYOUT_PARAMS }, [receiver], 'virtual');
-        let fits; try { fits = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'checkLayoutParams', signature: `(${LAYOUT_PARAMS})Z`, parameters: [LAYOUT_PARAMS], result: 'Z' }, [receiver, params], 'virtual'); }
-        catch (failure) { const recovered = this.recoverLayoutParams(runtime, receiver, params, failure); if (recovered === undefined) throw failure; params = recovered; fits = true; }   // a layout_* value of the child's tag that the parent refuses
-        if (!fits) params = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateLayoutParams', signature: `(${LAYOUT_PARAMS})${LAYOUT_PARAMS}`, parameters: [LAYOUT_PARAMS], result: LAYOUT_PARAMS }, [receiver, params], 'virtual');   // ViewGroup.addViewInner
-        this.invoke(runtime, { owner: 'Landroid/view/View;', name: 'setLayoutParams' }, [args[1], params]);
-        this.viewGroupApi.transitionAddChild(runtime, receiver, args[1]);   // ViewGroup.addViewInner: "mTransition.addChild(this, child)" before the child joins mChildren
-        child.parent = receiver; object.children.splice(at, 0, args[1]);
-        if (object.attached) this.attachTree(runtime, args[1], true);
+        if (!runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'checkLayoutParams', signature: `(${LAYOUT_PARAMS})Z`, parameters: [LAYOUT_PARAMS], result: 'Z' }, [receiver, params], 'virtual')) params = runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'generateLayoutParams', signature: `(${LAYOUT_PARAMS})${LAYOUT_PARAMS}`, parameters: [LAYOUT_PARAMS], result: LAYOUT_PARAMS }, [receiver, params], 'virtual');   // ViewGroup.addViewInner
+        this.invoke(runtime, { owner: 'Landroid/view/View;', name: 'setLayoutParams' }, [args[1], params]); child.parent = receiver; object.children.splice(at, 0, args[1]); if (object.attached) this.attachTree(runtime, args[1], true);
         runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onViewAdded', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [receiver, args[1]], 'virtual'); this.notifyHierarchyChange(runtime, receiver, args[1], true); this.requestDraw(runtime, receiver);
         if (inLayout && !preventLayout) this.viewLayoutHost.invoke(runtime, { name: 'requestLayout' }, [args[1]]);
         else if (!inLayout && runtime.objectOverride(object.type, 'requestLayout()V')) runtime.dispatch({ owner: object.type, name: 'requestLayout', signature: '()V', parameters: [], result: 'V' }, [receiver], 'virtual');   // a Java ViewGroup (RelativeLayout) learns of the change through its own requestLayout, laid out yet or not
@@ -1805,16 +1424,7 @@ export class AndroidPlatform {
     if (name === 'removeOnAttachStateChangeListener') { const listeners = object.attachListeners || [], index = listeners.findIndex(ref => sameRef(ref, args[1])); if (index >= 0) listeners.splice(index, 1); return; }
     if (name === 'isAttachedToWindow') return object.attached ? 1 : 0;
     if (name === 'onAttachedToWindow' || name === 'onDetachedFromWindow' || name === 'onVisibilityChanged' || name === 'onWindowVisibilityChanged') return;   // View's own bodies are empty hooks (onWindowVisibilityChanged only wakes scroll bars)
-    if (name === 'getParent') {
-      if (object.parent) return object.parent;
-      // The root View of a window added through WindowManager.addView has its ViewRootImpl as parent (a ViewParent that is not a View) while the window exists; PopupWindow
-      // tells an added decor from a removed one by it (dismissImmediate: "if (decorView.getParent() != null) removeViewImmediate").
-      const record = object.attached ? this.dialogWindowHost.recordFor(runtime, receiver) : null;
-      if (!record?.attached || !sameRef(record.root, receiver)) return null;
-      const impl = runtime.dispatch({ owner: 'Landroid/view/View;', name: 'getViewRootImpl', parameters: [], result: 'Landroid/view/ViewRootImpl;', signature: '()Landroid/view/ViewRootImpl;' }, [receiver], 'virtual');
-      if (impl) runtime.object(impl).windowRootView = receiver;
-      return impl ?? null;
-    }
+    if (name === 'getParent') return object.parent ?? null;
     if (name === 'setWillNotDraw') { object.willNotDraw = !!args[1]; return; } if (name === 'willNotDraw') return object.willNotDraw ? 1 : 0;
     if (name === 'setImportantForAutofill') { object.importantForAutofill = args[1]; return; } if (name === 'getImportantForAutofill') return object.importantForAutofill || 0;
     if (name === 'setImportantForAccessibility') { object.importantForAccessibility = args[1]; return; } if (name === 'getImportantForAccessibility') return object.importantForAccessibility || 0;
@@ -1826,14 +1436,7 @@ export class AndroidPlatform {
     if (name === 'getUniqueDrawingId') return BigInt(object.uniqueDrawingId ??= (this.nextUniqueDrawingId = (this.nextUniqueDrawingId ?? 0) + 1));
     if (name === 'setForceDarkAllowed') { object.forceDarkAllowed = !!args[1]; return; } if (name === 'isForceDarkAllowed') return object.forceDarkAllowed === false ? 0 : 1;
     if (name === 'awakenScrollBars') return 0;   // View.awakenScrollBars: the virtual window draws no scroll bars (returns false like a View with scroll bars disabled)
-    if (name === 'setLayoutParams') { if (nullish(args[1])) runtime.throwJava('Ljava/lang/NullPointerException;', 'Layout parameters cannot be null'); object.layoutParams = args[1]; runtime.storeField(object.fields, 'Landroid/view/View;->mLayoutParams:Landroid/view/ViewGroup$LayoutParams;', args[1]);
-      const params = runtime.object(args[1]); if ((params.marginState && (object.layoutDirection || 0) !== params.marginState.dir) || (runtime.classes.has(RELATIVE_PARAMS) && runtime.isSubtype(params.type, RELATIVE_PARAMS) /* the original RelativeLayout.LayoutParams.resolveLayoutDirection resolves its start / end rules into left / right ones (resolveRules) */)) { runtime.dispatch({ owner: MARGIN_PARAMS, name: 'resolveLayoutDirection', signature: '(I)V', parameters: ['I'], result: 'V' }, [args[1], object.layoutDirection || 0], 'virtual'); params.resolvedDirection = object.layoutDirection || 0; }   // View.resolveLayoutParams
-      const fields = params.fields; const read = (name, type, fallback) => [...fields].find(([key]) => key.endsWith(`->${name}:${type}`))?.[1] ?? fallback; object.layoutWidth = read('width', 'I', -2); object.layoutHeight = read('height', 'I', -2); object.weight = bitsFloat(read('weight', 'F', 0)); object.layoutGravity = read('gravity', 'I', 0); object.margin = Object.fromEntries(['left', 'top', 'right', 'bottom'].map(edge => [edge, read(`${edge}Margin`, 'I', 0)])); this.drawableViewHost.afterLayout(runtime, receiver);
-      // View.setLayoutParams: "if (mParent instanceof ViewGroup) ((ViewGroup) mParent).onSetLayoutParams(this, params)" -- GridLayout drops its cached structure there. ViewGroup's own body
-      // only requests a layout; the dispatch is made for a parent class that overrides it.
-      if (method.parameters && object.parent && runtime.objectOverride(runtime.object(object.parent).type, `onSetLayoutParams(Landroid/view/View;${LAYOUT_PARAMS})V`)) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onSetLayoutParams', signature: `(Landroid/view/View;${LAYOUT_PARAMS})V`, parameters: ['Landroid/view/View;', LAYOUT_PARAMS], result: 'V' }, [object.parent, receiver, args[1]], 'virtual');
-      if (method.parameters) runtime.dispatch({ owner: 'Landroid/view/View;', name: 'requestLayout', signature: '()V', parameters: [], result: 'V' }, [receiver], 'virtual');   // View.setLayoutParams ends in requestLayout()
-      return; }
+    if (name === 'setLayoutParams') { object.layoutParams = args[1]; const fields = runtime.object(args[1]).fields; const read = (name, type, fallback) => [...fields].find(([key]) => key.endsWith(`->${name}:${type}`))?.[1] ?? fallback; object.layoutWidth = read('width', 'I', -2); object.layoutHeight = read('height', 'I', -2); object.weight = bitsFloat(read('weight', 'F', 0)); object.layoutGravity = read('gravity', 'I', 0); object.margin = Object.fromEntries(['left', 'top', 'right', 'bottom'].map(edge => [edge, read(`${edge}Margin`, 'I', 0)])); this.drawableViewHost.afterLayout(runtime, receiver); return; }
     if (name === 'getLayoutParams') return object.layoutParams ?? null;
     if (name === 'setTag') { if (method.parameters.length === 1) object.tag = args[1]; else (object.keyedTags ||= new Map()).set(args[1], args[2]); return; }
     if (name === 'getTag') return method.parameters.length ? object.keyedTags?.get(args[1]) ?? null : object.tag ?? null;
@@ -1841,45 +1444,17 @@ export class AndroidPlatform {
     if (name === 'setVisibility') {
       if (![0, 4, 8].includes(args[1])) error('Invalid View visibility');
       const before = object.visibility ?? 0; object.visibility = args[1]; if (before === args[1]) return;
-      // View.setFlags: "((ViewGroup) mParent).onChildVisibilityChanged(this, old, new)" -- GridLayout drops its cached structure when a child crosses GONE. ViewGroup's own body serves
-      // its LayoutTransition (showChild / hideChild); the dispatch is made for a parent class that overrides it or a parent with a transition.
-      if (object.parent && runtime.isSubtype(runtime.object(object.parent).type, 'Landroid/view/ViewGroup;') && (runtime.objectOverride(runtime.object(object.parent).type, 'onChildVisibilityChanged(Landroid/view/View;II)V') || this.viewGroupApi.hasTransition(runtime, object.parent))) runtime.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'onChildVisibilityChanged', signature: '(Landroid/view/View;II)V', parameters: ['Landroid/view/View;', 'I', 'I'], result: 'V' }, [object.parent, receiver, before, args[1]], 'virtual');
       // AOSP View.setVisibility: crossing GONE changes measured size, so the whole ancestor chain must re-measure/re-layout (a view that was GONE was never laid out); any change redraws.
       if ((before === 8) !== (args[1] === 8)) { // only under a hierarchy the original layout engine has already laid out (framework-less legacy rendering has no layout pass)
         let up = receiver, managed = false; for (let depth = 0; up && depth < 4096 && !managed; depth++) { managed = !!runtime.object(up).laidOut; up = runtime.object(up).parent; }
         if (managed) this.viewLayoutHost.invoke(runtime, { name: 'requestLayout' }, [receiver]);
       }
-      this.drawableViewHost.imageVisibility(runtime, receiver); this.requestDraw(runtime, receiver); this.dialogWindowHost.visibilityChanged(runtime, receiver);
-      // View.setFlags on an attached view: dispatchVisibilityChanged(this, visibility), then dispatchVisibilityAggregated when the parent is shown.
-      if (object.attached) { this.dispatchVisibilityChanged(runtime, receiver, receiver, args[1]); const parent = object.parent; if (parent && (!runtime.isSubtype(runtime.object(parent).type, 'Landroid/view/View;') || this.viewShown(runtime, parent))) this.dispatchVisibilityAggregated(runtime, receiver, args[1] === 0); }
-      return;
+      this.drawableViewHost.imageVisibility(runtime, receiver); this.requestDraw(runtime, receiver); this.dialogWindowHost.visibilityChanged(runtime, receiver); return;
     }
-    if (name === 'setBackgroundColor') {   // View.setBackgroundColor: a ColorDrawable background takes the colour, anything else is replaced by the colour
-      const color = 'Landroid/graphics/drawable/ColorDrawable;', held = object.backgroundDrawable || object.backgroundColorDrawable || null;
-      if (held && runtime.isSubtype(runtime.typeOf(held), color)) runtime.dispatch({ owner: color, name: 'setColor', signature: '(I)V', parameters: ['I'], result: 'V' }, [held, args[1]], 'virtual');
-      if (object.backgroundDrawable && runtime.isSubtype(runtime.typeOf(object.backgroundDrawable), color)) return;
-      if (object.backgroundDrawable) this.drawableViewHost.invoke(runtime, { owner: 'Landroid/view/View;', name: 'setBackground' }, [receiver, null]);
-      object.background = `#${(args[1] >>> 0).toString(16).padStart(8, '0')}`; return;
-    }
+    if (name === 'setBackgroundColor') { object.background = `#${(args[1] >>> 0).toString(16).padStart(8, '0')}`; return; }
     if (owner === 'Landroid/widget/ProgressBar;') { if (name === 'setMax') { object.max = Math.max(0, args[1]); object.progress = Math.min(object.progress || 0, object.max); return; } if (name === 'getMax') return object.max ?? 100; if (name === 'setProgress') { object.progress = Math.max(0, Math.min(object.max ?? 100, args[1])); return; } if (name === 'getProgress') return object.progress ?? 0; if (name === 'setIndeterminate') { object.indeterminate = !!args[1]; return; } return object.indeterminate ? 1 : 0; }
     if (name === 'setOnCheckedChangeListener') { object.checkedListener = args[1]; return; }
-    if (name === 'setOnCheckedChangeWidgetListener') { object.checkedWidgetListener = args[1]; return; }   // CompoundButton's hidden second listener: the one RadioGroup tracks its children with
-    // CompoundButton.toggle() is setChecked(!mChecked), a virtual call: a subclass's setChecked (ToggleButton syncs its text, an app's own button) runs.
-    if (name === 'toggle') { runtime.dispatch({ owner: 'Landroid/widget/CompoundButton;', name: 'setChecked', signature: '(Z)V', parameters: ['Z'], result: 'V' }, [receiver, object.checked ? 0 : 1], 'virtual'); return; }
-    if (name === 'setChecked') return this.setChecked(runtime, receiver, !!args[1]);
-    if (runtime.isSubtype(object.type, 'Landroid/widget/CompoundButton;')) {
-      // CompoundButton.getButtonStateDescription / setDefaultStateDescription / setStateDescription (android-13.0.0_r1): the state description is the app's own one or, without it,
-      // the framework's "checked" / "not checked" string (a subclass such as ToggleButton answers its own text). The default is the button's current answer: it is read when the
-      // description is asked for, not stored at every setChecked.
-      if (name === 'getButtonStateDescription') {
-        const id = runtime.readStatic({ owner: 'Lcom/android/internal/R$string;', name: object.checked ? 'checked' : 'not_checked', type: 'I' });
-        const resources = runtime.dispatch({ owner: 'Landroid/view/View;', name: 'getResources', signature: '()Landroid/content/res/Resources;', parameters: [], result: 'Landroid/content/res/Resources;' }, [receiver], 'virtual');
-        return runtime.dispatch({ owner: 'Landroid/content/res/Resources;', name: 'getString', signature: '(I)Ljava/lang/String;', parameters: ['I'], result: 'Ljava/lang/String;' }, [resources, id], 'virtual');
-      }
-      if (name === 'setDefaultStateDescription') return;
-      if (name === 'getStateDescription') return nullish(object.customStateDescription) ? runtime.dispatch({ owner: 'Landroid/widget/CompoundButton;', name: 'getButtonStateDescription', signature: '()Ljava/lang/CharSequence;', parameters: [], result: 'Ljava/lang/CharSequence;' }, [receiver], 'virtual') : object.customStateDescription;
-      if (name === 'setStateDescription') { object.customStateDescription = nullish(args[1]) ? null : args[1]; return; }
-    }
+    if (name === 'setChecked' || name === 'toggle') return this.setChecked(runtime, receiver, name === 'toggle' ? !object.checked : !!args[1]);
     if (name === 'isChecked') return object.checked ? 1 : 0;
     if (name === 'addTextChangedListener') { (object.textWatchers ||= []).push(args[1]); return; }
     if (name === 'removeTextChangedListener') { object.textWatchers = (object.textWatchers || []).filter(ref => !sameRef(ref, args[1])); return; }
@@ -1915,14 +1490,7 @@ export class AndroidPlatform {
     if (name === 'getContext') return object.context ?? runtime.activity;
     if (name === 'setEnabled') { if (object.enabled !== !!args[1]) { object.enabled = !!args[1]; this.drawableViewHost.invoke(runtime, { owner: 'Landroid/view/View;', name: 'refreshDrawableState' }, [receiver]); this.requestDraw(runtime, receiver); } return; }
     if (name === 'isEnabled') return object.enabled === false ? 0 : 1;
-    if (name === 'setPadding') {
-      // View.setPadding: the relative padding is undefined again, left / right are the new user padding "initial" values, then the virtual internalSetPadding(): a subclass that
-      // overrides it (CheckedTextView keeps the padding its check mark is added to) is told; View's own adds the scroll bar's size for an inset scroll bar style.
-      object.userPaddingStart = object.userPaddingEnd = -2147483648;
-      if (runtime.objectOverride(object.type, 'internalSetPadding(IIII)V')) { this.syncViewFields(runtime, receiver); object.userPaddingLeftInitial = args[1]; object.userPaddingRightInitial = args[3]; runtime.dispatch({ owner: 'Landroid/view/View;', name: 'internalSetPadding', signature: '(IIII)V', parameters: ['I', 'I', 'I', 'I'], result: 'V' }, [receiver, args[1], args[2], args[3], args[4]], 'virtual'); return; }
-      const inset = this.viewXmlAttributes?.scrollbarInsets(runtime, receiver) ?? { left: 0, right: 0, bottom: 0 };
-      object.padding = { left: args[1] + inset.left, top: args[2], right: args[3] + inset.right, bottom: args[4] + inset.bottom }; object.userPaddingLeftInitial = args[1]; object.userPaddingRightInitial = args[3]; this.syncViewFields(runtime, receiver); return;
-    }
+    if (name === 'setPadding') { object.padding = { left: args[1], top: args[2], right: args[3], bottom: args[4] }; this.syncViewFields(runtime, receiver); return; }
     if (name.startsWith('getPadding')) return object.padding?.[name.slice(10).toLowerCase()] ?? 0;
     if (name === 'getText') { if (runtime.isSubtype(object.type, 'Landroid/widget/EditText;')) { const editable = this.editableTextHost.get(runtime, receiver); if (editable) return editable; } if (method.result === 'Landroid/text/Editable;') { if (!object.editable) { object.editable = runtime.makeObject(EDITABLE); runtime.object(object.editable).sourceView = receiver; } return object.editable; } return object.text; }
     if (name === 'setText') { const text = method.parameters[0] === 'I' ? args[1] === 0 ? '' : this.resource(args[1], ['string']).value : nullish(args[1]) ? '' : typeof args[1] === 'string' ? args[1] : runtime.javaString(args[1], method.parameters[0]); return this.setInput(runtime, object.id, text, { replaceBuffer: true, sourceValue: method.parameters[0] === 'I' ? text : args[1] ?? '' }); }
@@ -2024,31 +1592,25 @@ export class AndroidPlatform {
     view.checked = checked;
     // CompoundButton.setChecked() calls refreshDrawableState(); without it the CHECKED state never reaches stateful drawables.
     this.drawableViewHost.invoke(runtime, { owner: 'Landroid/view/View;', name: 'refreshDrawableState' }, [receiver]); this.drawableViewHost.checkedChanged(runtime, receiver, checked); this.requestDraw(runtime, receiver);
-    // CompoundButton.setChecked: the app's listener, then the widget listener (RadioGroup's), never re-entered from a listener.
-    if (view.broadcasting || nullish(view.checkedListener) && nullish(view.checkedWidgetListener)) return;
+    if (view.broadcasting || nullish(view.checkedListener)) return;
     view.broadcasting = true;
-    try { for (const listener of [view.checkedListener, view.checkedWidgetListener]) if (!nullish(listener)) runtime.dispatch({ owner: runtime.object(listener).type, name: 'onCheckedChanged', signature: '(Landroid/widget/CompoundButton;Z)V', parameters: ['Landroid/widget/CompoundButton;', 'Z'], result: 'V' }, [listener, receiver, checked ? 1 : 0], 'virtual'); }
+    try { runtime.dispatch({ owner: runtime.object(view.checkedListener).type, name: 'onCheckedChanged', signature: '(Landroid/widget/CompoundButton;Z)V', parameters: ['Landroid/widget/CompoundButton;', 'Z'], result: 'V' }, [view.checkedListener, receiver, checked ? 1 : 0], 'virtual'); }
     finally { view.broadcasting = false; }
   }
-  /** CompoundButton.toggle() through the receiver's class: RadioButton.toggle() leaves a checked button checked, ToggleButton.setChecked() swaps its text. */
-  toggleChecked(runtime, receiver) { runtime.dispatch({ owner: 'Landroid/widget/CompoundButton;', name: 'toggle', signature: '()V', parameters: [], result: 'V' }, [receiver], 'virtual'); }
   performClick(runtime, receiver) {
     const view = runtime.object(receiver); if (!runtime.isSubtype(view.type, 'Landroid/widget/CompoundButton;')) return false;
-    this.toggleChecked(runtime, receiver);
+    this.setChecked(runtime, receiver, !view.checked);
     if (!nullish(view.listener)) runtime.dispatch({ owner: runtime.object(view.listener).type, name: 'onClick', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [view.listener, receiver], 'virtual');
     return true;
   }
   checkInput(runtime, id, checked) {
     this.noteInput(); const receiver = { ref: id }, view = runtime.object(receiver);
     if (!runtime.isSubtype(view.type, 'Landroid/widget/CompoundButton;') || view.enabled === false) error('Invalid disabled/non-CompoundButton input');
-    if (!!view.checked !== !!checked) this.toggleChecked(runtime, receiver);   // the page's tap: CompoundButton.performClick() toggles
+    this.setChecked(runtime, receiver, !!checked);
     if (!nullish(view.listener)) runtime.dispatch({ owner: runtime.object(view.listener).type, name: 'onClick', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [view.listener, receiver], 'virtual');
   }
-  attachTree(runtime, ref, attached, seen = new Set(), visibility = null) {
+  attachTree(runtime, ref, attached, seen = new Set()) {
     if (!ref) return; const object = runtime.object(ref);
-    // The visibility View.dispatchAttachedToWindow(info, visibility) receives: 0 for a window's root (ViewRootImpl), the parent's own visibility for a child added to an attached parent
-    // (ViewGroup.addViewInner), and combineVisibility(the parent's value, the child's own) = the larger one for everything ViewGroup.dispatchAttachedToWindow reaches below.
-    if (attached && visibility === null) { const parent = object.parent && runtime.object(object.parent); visibility = parent && runtime.isSubtype(parent.type, 'Landroid/view/View;') ? parent.visibility ?? 0 : 0; }
     if (seen.has(object.id) || seen.size >= 4096) error('Cyclic/excessive attachment hierarchy'); seen.add(object.id);
     // ViewGroup.dispatchAttachedToWindow runs the parent first; dispatchDetachedFromWindow runs the children first (Compose's AndroidViewHolder needs its owner while detaching).
     if (!attached) for (const child of [...object.children]) this.attachTree(runtime, child, false, seen);
@@ -2059,46 +1621,13 @@ export class AndroidPlatform {
       this.insetsHost.afterAttach(runtime, ref, attached);
       this.viewLayoutHost.afterAttach(runtime, ref, attached);
       this.viewInputHost.afterAttach(runtime, ref, attached);
-      // View.dispatchDetachedFromWindow: the window is gone for the view (onWindowVisibilityChanged(GONE), onVisibilityAggregated(false)) before onDetachedFromWindow.
-      if (!attached) { this.visibilityCallback(runtime, ref, 'onWindowVisibilityChanged', '(I)V', ['I'], [8]); if (this.viewShown(runtime, ref)) this.visibilityCallback(runtime, ref, 'onVisibilityAggregated', '(Z)V', ['Z'], [0]); }
       runtime.dispatch({ owner: object.type, name: attached ? 'onAttachedToWindow' : 'onDetachedFromWindow', signature: '()V', parameters: [], result: 'V' }, [ref], 'virtual');
       this.drawableViewHost.afterAttach(runtime, ref, attached);
-      this.progressBarApi.afterAttach(runtime, ref, attached);
-      // View.dispatchAttachedToWindow / dispatchDetachedFromWindow: "if (mOverlay != null) mOverlay.getOverlayView().dispatch..."
-      if (object.overlay) { const group = this.viewApi.overlayView(runtime, ref); if (group) this.attachTree(runtime, group, attached, seen, attached ? object.visibility ?? 0 : null); }
       this.viewTreeHost.afterAttach(runtime, ref, attached);
       for (const listener of [...(object.attachListeners || [])]) runtime.dispatch({ owner: runtime.object(listener).type, name: attached ? 'onViewAttachedToWindow' : 'onViewDetachedFromWindow', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [listener, ref], 'virtual');
-      // View.dispatchAttachedToWindow, after onAttachedToWindow and the attach listeners: the window's visibility, then the aggregated one for a shown view.
-      // Then onVisibilityChanged(this, visibility) directly on the view (not dispatchVisibilityChanged: the subtree is attached view by view and each one gets its own call).
-      if (attached) {
-        this.visibilityCallback(runtime, ref, 'onWindowVisibilityChanged', '(I)V', ['I'], [0]); if (this.viewShown(runtime, ref)) this.visibilityCallback(runtime, ref, 'onVisibilityAggregated', '(Z)V', ['Z'], [1]);
-        this.visibilityCallback(runtime, ref, 'onVisibilityChanged', '(Landroid/view/View;I)V', ['Landroid/view/View;', 'I'], [ref, visibility]);
-      }
       if (!attached) object.attached = false;
     }
-    if (attached) for (const child of [...object.children]) this.attachTree(runtime, child, true, seen, Math.max(visibility ?? 0, runtime.object(child).visibility ?? 0));
-  }
-  // The visibility callbacks of View (onWindowVisibilityChanged, onVisibilityChanged, onVisibilityAggregated) reach the classes that override them: a Chronometer or TextClock starts and
-  // stops its ticking there, an app's own View its animation. View's own bodies are hooks whose effects (drawable visibility, scroll bars) the lab applies where the state changes.
-  visibilityCallback(runtime, ref, name, signature, parameters, values) {
-    const type = runtime.object(ref).type; if (!runtime.objectOverride(type, name + signature)) return;
-    runtime.dispatch({ owner: type, name, signature, parameters, result: 'V' }, [ref, ...values], 'virtual');
-  }
-  /** View.isShown(): this view and every ancestor View is VISIBLE. */
-  viewShown(runtime, ref) {
-    for (let current = ref, depth = 0; current && depth < 4096; depth++) { const view = runtime.object(current); if (!runtime.isSubtype(view.type, 'Landroid/view/View;')) break; if ((view.visibility ?? 0) !== 0) return false; current = view.parent; }
-    return true;
-  }
-  /** View / ViewGroup.dispatchVisibilityChanged(changedView, visibility). */
-  dispatchVisibilityChanged(runtime, ref, changed, visibility, depth = 0) {
-    this.visibilityCallback(runtime, ref, 'onVisibilityChanged', '(Landroid/view/View;I)V', ['Landroid/view/View;', 'I'], [changed, visibility]);
-    if (depth < 4096) for (const child of [...(runtime.object(ref).children ?? [])]) this.dispatchVisibilityChanged(runtime, child, changed, visibility, depth + 1);
-  }
-  /** View / ViewGroup.dispatchVisibilityAggregated(isVisible): a view that is not VISIBLE hears only "false", and so does everything under it. */
-  dispatchVisibilityAggregated(runtime, ref, visible, depth = 0) {
-    const view = runtime.object(ref), own = (view.visibility ?? 0) === 0;
-    if (own || !visible) this.visibilityCallback(runtime, ref, 'onVisibilityAggregated', '(Z)V', ['Z'], [visible ? 1 : 0]);
-    if (depth < 4096) for (const child of [...(view.children ?? [])]) if ((runtime.object(child).visibility ?? 0) === 0) this.dispatchVisibilityAggregated(runtime, child, own && visible, depth + 1);
+    if (attached) for (const child of [...object.children]) this.attachTree(runtime, child, true, seen);
   }
   notifyActivity(runtime, frame, event, bundle) {
     const parameters = [ACTIVITY]; const values = [frame.activity];
@@ -2160,7 +1689,7 @@ export class AndroidPlatform {
   /** The frame is still the live instance of its task: not finishing, finished, destroyed or replaced. */
   launchAlive(frame) { return !frame.finished && !frame.destroyed && !frame.finishing && !frame.finishRequested && !frame.finishQueued && !this.finishedActivities.has(frame.activity.ref) && this.allFrames().includes(frame); }
   afterActivityCreate(runtime, activity = runtime.activity) {
-    if (this.finishedActivities.has(activity?.ref)) return; const frame = this.frame(runtime, activity); if (frame.lifecycleStage >= 2) return; frame.lifecycleStage = 2; this.activityApi.noteDecorActionBar?.(runtime, activity); this.moveFragments(runtime, frame, 2);
+    if (this.finishedActivities.has(activity?.ref)) return; const frame = this.frame(runtime, activity); if (frame.lifecycleStage >= 2) return; frame.lifecycleStage = 2; this.moveFragments(runtime, frame, 2);
     // ActivityThread checks mFinished after every step of the launch (performLaunchActivity, handleStartActivity, performResumeActivity): an Activity that finished (or was replaced) inside onCreate / onStart /
     // onRestoreInstanceState / onPostCreate is already torn down by then and gets none of the following callbacks.
     const alive = () => this.launchAlive(frame);
@@ -2178,19 +1707,10 @@ export class AndroidPlatform {
     if (!view.attached) return;
     if (!runtime.classes.has('Landroid/view/ViewTreeObserver;') && !view.imageDrawable && !view.backgroundDrawable) return;
     const root=this.dialogWindowHost.recordFor(runtime,receiver)?.root||runtime.root;if(!root)return;
-    // View.updateDisplayListIfDirty / View.draw(Canvas, ViewGroup, long) call computeScroll() on a view that is drawn again (android-13.0.0_r1): that is where a Scroller / OverScroller
-    // animation advances (ScrollView, HorizontalScrollView, an app's own scrolling container) and asks for the next frame with postInvalidateOnAnimation(). An invalidated view whose
-    // class overrides computeScroll() gets the call in the frame that draws it. Attached views only, so the window's root keeps them reachable until then.
-    if(view.type&&runtime.objectOverride(view.type,'computeScroll()V'))(this.computeScrollPending??=new Map()).set(receiver.ref,receiver);
     this.drawRootsQueued??=new Set();if(this.drawRootsQueued.has(root.ref))return;this.drawRootsQueued.add(root.ref);
     this.queueTask(() => {
       this.drawRootsQueued.delete(root.ref);
       if(this.taskClosed||!runtime.object(root).attached||!this.viewRoots(runtime).some(value=>sameRef(value.root,root)))return;
-      // A traversal lays the window out before its pre-draw listeners and its draw (ViewRootImpl.performTraversals): with a layout pass of this root queued, the frame is the one
-      // that pass asks for when it is done (view-layout-host.js), so that OnPreDrawListeners and a LayoutTransition see the new layout, as on Android.
-      if(this.viewLayoutHost.layoutQueued(root))return;
-      const scrolling=this.computeScrollPending;
-      if(scrolling?.size){this.computeScrollPending=null;for(const target of scrolling.values())if(runtime.object(target).attached)runtime.dispatch({owner:'Landroid/view/View;',name:'computeScroll',signature:'()V',parameters:[],result:'V'},[target],'virtual');}
       const draw=()=>{this.drawableViewHost.drawTree(runtime,root);this.composeCanvasHost.renderTree(runtime,root);};
       if(runtime.classes.has('Landroid/view/ViewTreeObserver;')){if(!this.viewTreeHost.dispatchFrame(runtime,root,draw)){this.requestDraw(runtime,root,1000/60);return;}}else draw();
       runtime.object(root).invalidated=false;
@@ -2250,9 +1770,7 @@ export class AndroidPlatform {
   }
   locale(runtime, languageTag) {
     this.localeCache ||= new Map();
-    // Locale.forLanguageTag never throws: "if the specified language tag contains any ill-formed subtags, the first such subtag and all following subtags are ignored".
-    let tag = 'und';
-    if (languageTag && languageTag !== 'und') { const parts = String(languageTag).split(/[-_]/); for (let count = parts.length; count > 0; count--) { try { tag = Intl.getCanonicalLocales(parts.slice(0, count).join('-'))[0] ?? 'und'; break; } catch (failure) { if (!(failure instanceof RangeError)) throw failure; } } }
+    const tag = languageTag === 'und' || !languageTag ? 'und' : Intl.getCanonicalLocales(String(languageTag))[0];
     if (!this.localeCache.has(tag)) { const info = new Intl.Locale(tag), value = runtime.makeObject(LOCALE); runtime.object(value).localeData = { language: info.language === 'und' ? '' : info.language, country: info.region || '', script: info.script || '', variant: '', tag }; this.localeCache.set(tag, value); }
     return this.localeCache.get(tag);
   }
@@ -2289,7 +1807,7 @@ export class AndroidPlatform {
     for (const [name, value] of Object.entries({ sourceDir: `${code}/base.apk`, publicSourceDir: `${code}/base.apk`, dataDir: data, deviceProtectedDataDir: `/data/user_de/0/${pkg}`, credentialProtectedDataDir: data, nativeLibraryDir: `${code}/lib/wasm32`, processName: pkg, taskAffinity: pkg })) put(name, 'Ljava/lang/String;', value);
     // FLAG_DEBUGGABLE=2, FLAG_HAS_CODE=4, FLAG_ALLOW_CLEAR_USER_DATA=0x40, FLAG_INSTALLED=1<<23, FLAG_EXTRACT_NATIVE_LIBS=1<<28 (default when extractNativeLibs is not declared false).
     const isFalse = value => value === false || value === 'false' || value === 0, hasCode = !isFalse(app.hasCode);
-    put('flags', 'I', (app.debuggable === true || app.debuggable === 'true' || (Number.isInteger(app.debuggable) && app.debuggable !== 0) ? 2 : 0) | (hasCode ? 4 : 0) | 0x40 | (this.viewXmlAttributes?.hasRtlSupport() ? (1 << 22) : 0) /* FLAG_SUPPORTS_RTL: android:supportsRtl */ | (1 << 23) | (isFalse(app.extractNativeLibs) ? 0 : (1 << 28)));
+    put('flags', 'I', (app.debuggable === true || app.debuggable === 'true' || (Number.isInteger(app.debuggable) && app.debuggable !== 0) ? 2 : 0) | (hasCode ? 4 : 0) | 0x40 | (1 << 23) | (isFalse(app.extractNativeLibs) ? 0 : (1 << 28)));
     put('minSdkVersion', 'I', Number(this.manifest.usesSdk?.minSdkVersion || 1)); put('enabled', 'Z', 1); put('category', 'I', Number.isInteger(app.appCategory) ? app.appCategory : -1);   // android:appCategory, else CATEGORY_UNDEFINED
     return info;
   }
@@ -2310,28 +1828,21 @@ export class AndroidPlatform {
     if (runtime.classes.has('Landroid/graphics/Rect;')) { const key = `${CONFIGURATION}->windowConfiguration:Landroid/app/WindowConfiguration;`, existing = fields.get(key), configured = this.deviceServices.createWindowConfiguration(runtime, existing); if (!existing) runtime.storeField(fields, key, configured); }
     runtime.storeField(fields, `${CONFIGURATION}->fontScale:F`, floatBits(wanted.fontScale)); runtime.storeField(fields, `${CONFIGURATION}->locale:${LOCALE}`, this.locale(runtime, wanted.locale)); runtime.storeField(fields, `${CONFIGURATION}->mLocaleList:${LOCALES}`, this.localeList(runtime, [this.locale(runtime, wanted.locale)]));
   }
-  /** Right-to-left layout is what the original FrameLayout / LinearLayout (and the widgets over them) compute; the host containers used without the layouts profile lay out left-to-right only. */
-  rtlLayoutAvailable(runtime) { return ['FrameLayout', 'LinearLayout'].every(name => runtime.classes.get(`Landroid/widget/${name};`)?.methods.has('onMeasure(II)V')); }
-  /** ApplicationInfo.hasRtlSupport() && targetSdkVersion >= 17 of the Context's application (the loaded app's without a Context): what View.resolveLayoutDirection and MarginLayoutParams require before anything is right-to-left. The negation of View.isRtlCompatibilityMode (view-xml-attributes.js), the one place that decides it. */
-  rtlSupported(runtime, context = null) { return !this.viewXmlAttributes.rtlCompatibility(runtime, context); }
-  /** What is said once when a View resolves to right-to-left in a run without the original containers (see rtlLayoutAvailable). */
-  get rtlNeedsProfile() { return RTL_NEEDS_PROFILE; }
   layoutParamsFromAttributes(runtime, parent, attrs, target = null, context = null, typeOverride = null) {
     const view = parent ? runtime.object(parent) : { context }, linear = !!view.type && runtime.isSubtype(view.type, 'Landroid/widget/LinearLayout;'), frame = !!view.type && runtime.isSubtype(view.type, 'Landroid/widget/FrameLayout;');
     const type = typeOverride || (linear ? 'Landroid/widget/LinearLayout$LayoutParams;' : frame ? 'Landroid/widget/FrameLayout$LayoutParams;' : MARGIN_PARAMS);
+    const names = ['layout_width', 'layout_height', 'layout_margin', 'layout_marginLeft', 'layout_marginTop', 'layout_marginRight', 'layout_marginBottom', 'layout_gravity', 'layout_weight'];
+    const table = this.resources.frameworkTable || this.resources.table, ids = runtime.newArray('[I', names.length); runtime.object(ids).elements = names.map(name => { const id = table.findId('attr/' + name); if (!id) error(`Framework attribute ID ${name} unavailable`); return id; });
+    const array = this.styleBackend.obtain(runtime, this.styleBackend.theme(runtime, view.context), attrs, ids);
+    const get = (name, parameters, result, values) => runtime.dispatch({ owner: 'Landroid/content/res/TypedArray;', name, parameters, result, signature: `(${parameters.join('')})${result}` }, [array, ...values], 'virtual');
     const ref = target || runtime.makeObject(type), fields = runtime.object(ref).fields;
-    if (attrs?.ref && runtime.object(attrs).node) (this.layoutParamsSource ??= new WeakMap()).set(runtime.object(ref), { attrs, parser: runtime.object(attrs), node: runtime.object(attrs).node });   // the tag these LayoutParams are read from (recoverLayoutParams)
-    // ViewGroup.LayoutParams / MarginLayoutParams(Context, AttributeSet): layout_width, layout_height and every layout_margin* in the original's precedence (view-xml-attributes.js)
-    this.viewXmlAttributes.readMarginLayout(runtime, ref, attrs, view.context, (name, value) => runtime.storeField(fields, `${name === 'width' || name === 'height' ? LAYOUT_PARAMS : MARGIN_PARAMS}->${name}:I`, value), type === LAYOUT_PARAMS);
-    if (linear || frame) {   // the host LinearLayout / FrameLayout params: layout_gravity, layout_weight
-      const names = ['layout_gravity', 'layout_weight'], table = this.resources.frameworkTable || this.resources.table, ids = runtime.newArray('[I', names.length); runtime.object(ids).elements = names.map(name => { const id = table.findId('attr/' + name); if (!id) error(`Framework attribute ID ${name} unavailable`); return id; });
-      const array = this.styleBackend.obtain(runtime, this.styleBackend.theme(runtime, view.context), attrs, ids);
-      const get = (name, parameters, result, values) => runtime.dispatch({ owner: 'Landroid/content/res/TypedArray;', name, parameters, result, signature: `(${parameters.join('')})${result}` }, [array, ...values], 'virtual');
-      try {
-        runtime.storeField(fields, `${type}->gravity:I`, get('getInt', ['I', 'I'], 'I', [0, -1]));
-        if (linear) runtime.storeField(fields, `${type}->weight:F`, get('getFloat', ['I', 'F'], 'F', [1, 0]));
-      } finally { get('recycle', [], 'V', []); }
-    }
+    try {
+      for (const [i, name] of ['width', 'height'].entries()) runtime.storeField(fields, `${LAYOUT_PARAMS}->${name}:I`, get('getLayoutDimension', ['I', 'Ljava/lang/String;'], 'I', [i, 'layout_' + name]));
+      const margin = get('getDimensionPixelSize', ['I', 'I'], 'I', [2, 0]);
+      for (const [i, edge] of ['left', 'top', 'right', 'bottom'].entries()) runtime.storeField(fields, `${MARGIN_PARAMS}->${edge}Margin:I`, get('getDimensionPixelSize', ['I', 'I'], 'I', [i + 3, margin]));
+      if (linear || frame) runtime.storeField(fields, `${type}->gravity:I`, get('getInt', ['I', 'I'], 'I', [7, -1]));
+      if (linear) runtime.storeField(fields, `${type}->weight:F`, get('getFloat', ['I', 'F'], 'F', [8, 0]));
+    } finally { get('recycle', [], 'V', []); }
     return ref;
   }
   inflater(runtime, context, visited = new Set()) {
@@ -2529,7 +2040,7 @@ export class AndroidPlatform {
     if (name === 'getChildFragmentManager') error('Fragment.getChildFragmentManager: nested fragment managers are not part of the lab; use getFragmentManager()');
     if (name === 'getUserVisibleHint') return object.userVisibleHint === false ? 0 : 1;
     if (name === 'setUserVisibleHint') { object.userVisibleHint = !!args[1]; return; }
-    if (name === 'setHasOptionsMenu') { object.hasOptionsMenu = !!args[1]; if (object.hasOptionsMenu) this.noteFrameworkGap(runtime, 'fragment-options-menu', 'android.app.Fragment.setHasOptionsMenu(true): the Activity does not dispatch its options menu to platform Fragments (FragmentController.dispatchCreateOptionsMenu / dispatchPrepareOptionsMenu / dispatchOptionsItemSelected), so Fragment.onCreateOptionsMenu and onOptionsItemSelected are not called'); return; }
+    if (name === 'setHasOptionsMenu') { object.hasOptionsMenu = !!args[1]; return; }
     if (name === 'getResources' || name === 'getString') {
       if (nullish(object.host)) runtime.throwJava('Ljava/lang/IllegalStateException;', `Fragment ${runtime.typeOf(value).slice(1, -1).replaceAll('/', '.')} not attached to Activity`);
       const parameters = name === 'getResources' ? [] : method.parameters, result = name === 'getResources' ? 'Landroid/content/res/Resources;' : 'Ljava/lang/String;';

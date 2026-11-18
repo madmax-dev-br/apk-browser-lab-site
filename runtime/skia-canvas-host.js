@@ -1,21 +1,19 @@
-import {APKError} from './apk-runtime.js?v=9b79f2cfbe27';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=9b79f2cfbe27';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=9b79f2cfbe27';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=9b79f2cfbe27';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=9b79f2cfbe27';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=9b79f2cfbe27';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=9b79f2cfbe27';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=9b79f2cfbe27';
-import {createBitmapHost} from './bitmap-host.js?v=9b79f2cfbe27';
-import { gcRoot } from './heap-gc.js?v=9b79f2cfbe27';
-import {sha256Hex} from './sha256-sync.js?v=9b79f2cfbe27';
-import {colorLongToArgb} from './color-long.js?v=9b79f2cfbe27';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=9b79f2cfbe27';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=9b79f2cfbe27';
+import {APKError} from './apk-runtime.js?v=12145e24651e';
+import {getVectorGraphics} from './vector-native.js?v=12145e24651e';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=12145e24651e';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=12145e24651e';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns} from './skia-paragraph.js?v=12145e24651e';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=12145e24651e';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=12145e24651e';
+import {createBitmapHost} from './bitmap-host.js?v=12145e24651e';
+import { gcRoot } from './heap-gc.js?v=12145e24651e';
+import {sha256Hex} from './sha256-sync.js?v=12145e24651e';
+import {sfntMember,sfntAxes,sfntStyle} from './sfnt.js?v=12145e24651e';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=12145e24651e';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
-const matrix=m=>[m[0],m[2],m[4],m[1],m[3],m[5],m[6]??0,m[7]??0,m[8]??1];   // the canvas matrix [a,b,c,d,e,f] with its perspective row as a tail when it has one (vector-native.js preConcatCanvasMatrix)
+const matrix=m=>[m[0],m[2],m[4],m[1],m[3],m[5],0,0,1];
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite Skia geometry');return values;};
 const argb=(CK,color,alpha=1)=>{const c=color>>>0;return CK.Color((c>>>16)&255,(c>>>8)&255,c&255,(c>>>24)/255*alpha);};
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
@@ -29,7 +27,7 @@ function buildBitmapShader(CK,shader){
    const mask=new CK.Paint(),filter=CK.ColorFilter.MakeBlend(CK.Color(0,0,0,1),CK.BlendMode.SrcIn);mask.setColorFilter(filter);
    try{surface.getCanvas().clear(CK.TRANSPARENT);surface.getCanvas().drawImage(image,0,0,mask);surface.flush();coverage=surface.makeImageSnapshot();source=coverage;}finally{mask.delete();filter.delete();surface.dispose();}
   }
-  const modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror,CK.TileMode.Decal];
+  const modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror];
   return source.makeShaderOptions(modes[shader.tileX],modes[shader.tileY],CK.FilterMode.Linear,CK.MipmapMode.None,shader.matrix?shader.matrix.slice():undefined);
  }finally{coverage?.delete();image.delete();}
 }
@@ -57,9 +55,9 @@ function buildShader(CK,shader,overrides){
  if(shader.kind==='linear'||shader.kind==='radial'||shader.kind==='sweep'||shader.kind==='compose')return buildGradientShader(CK,shader,overrides);
  return fail('Unsupported Paint shader description');
 }
-/** Android gradients: sRGB stops, premultiplied interpolation (Gradient.cpp's kInterpolateColorsInPremul_Flag), Android TileMode ordinals CLAMP/REPEAT/MIRROR/DECAL. */
+/** Android gradients: sRGB stops, premultiplied interpolation (Gradient.cpp's kInterpolateColorsInPremul_Flag), Android TileMode ordinals CLAMP/REPEAT/MIRROR. */
 function buildGradientShader(CK,shader,overrides){
- const matrix=shader.matrix?shader.matrix.slice():undefined,modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror,CK.TileMode.Decal];
+ const matrix=shader.matrix?shader.matrix.slice():undefined,modes=[CK.TileMode.Clamp,CK.TileMode.Repeat,CK.TileMode.Mirror];
  if(shader.kind==='compose'){const dst=buildShader(CK,shader.dst,overrides),src=buildShader(CK,shader.src,overrides);try{return CK.Shader.MakeBlend({value:shader.blend},dst,src);}finally{dst.delete();src.delete();}}
  const colors=shader.colors.map(c=>CK.Color4f(((c>>>16)&255)/255,((c>>>8)&255)/255,(c&255)/255,(c>>>24)/255)),pos=shader.positions?Float32Array.from(shader.positions):null,flags=1;
  if(shader.kind==='linear')return CK.Shader.MakeLinearGradient(shader.p0,shader.p1,colors,pos,modes[shader.tile],matrix,flags);
@@ -68,16 +66,7 @@ function buildGradientShader(CK,shader,overrides){
 }
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function attachShader(CK,paint,shader,overrides){const built=buildShader(CK,shader,overrides);paint.setShader(built);built.delete();}
-function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){
-  let effect;
-  if(state.pathEffect.dash)effect=CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase);
-  else if(state.pathEffect.path1d){   // PathDashPathEffect: SkPath1DPathEffect::Make(shape, advance, phase, style); no effect when Skia makes none (an advance that is not positive, an empty shape)
-   const e=state.pathEffect.path1d,shape=CK.Path.MakeFromCmds(e.commands);
-   if(shape){try{shape.setFillType({value:e.fillType});effect=CK.PathEffect.MakePath1D(shape,e.advance,e.phase,[CK.Path1DEffect.Translate,CK.Path1DEffect.Rotate,CK.Path1DEffect.Morph][e.style]);}finally{shape.delete();}}
-  }
-  else effect=CK.PathEffect.MakeCorner(state.pathEffect.corner);
-  if(effect){paint.setPathEffect(effect);effect.delete();}
- }if(state.maskFilter?.blur){const blur=CK.MaskFilter.MakeBlur([CK.BlurStyle.Normal,CK.BlurStyle.Solid,CK.BlurStyle.Outer,CK.BlurStyle.Inner][state.maskFilter.blur.style]??CK.BlurStyle.Normal,state.maskFilter.blur.sigma,true);if(!blur)fail('Skia made no blur mask filter for this Paint');paint.setMaskFilter(blur);blur.delete();}if(state.shadowLayer)setShadowLayer(CK,paint,state);if(state.shader)attachShader(CK,paint,state.shader);return paint;}
+function makePaint(CK,state){const paint=new CK.Paint();paint.setAntiAlias(!!(state.flags&1));paint.setColor(argb(CK,state.argb));paint.setBlendMode({value:state.blendMode??3});paint.setStyle([CK.PaintStyle.Fill,CK.PaintStyle.Stroke,CK.PaintStyle.StrokeAndFill][state.style]);paint.setStrokeWidth(state.strokeWidth);paint.setStrokeMiter(state.strokeMiter);paint.setStrokeCap([CK.StrokeCap.Butt,CK.StrokeCap.Round,CK.StrokeCap.Square][state.strokeCap]);paint.setStrokeJoin([CK.StrokeJoin.Miter,CK.StrokeJoin.Round,CK.StrokeJoin.Bevel][state.strokeJoin]);if(state.colorFilterSnapshot){const filter=makeSkiaColorFilter(CK,state.colorFilterSnapshot);paint.setColorFilter(filter);filter?.delete();}if(state.pathEffect){const effect=state.pathEffect.dash?CK.PathEffect.MakeDash(state.pathEffect.dash.intervals,state.pathEffect.dash.phase):CK.PathEffect.MakeCorner(state.pathEffect.corner);if(effect){paint.setPathEffect(effect);effect.delete();}}if(state.maskFilter?.blur){const blur=CK.MaskFilter.MakeBlur([CK.BlurStyle.Normal,CK.BlurStyle.Solid,CK.BlurStyle.Outer,CK.BlurStyle.Inner][state.maskFilter.blur.style]??CK.BlurStyle.Normal,state.maskFilter.blur.sigma,true);if(!blur)fail('Skia made no blur mask filter for this Paint');paint.setMaskFilter(blur);blur.delete();}if(state.shadowLayer)setShadowLayer(CK,paint,state);if(state.shader)attachShader(CK,paint,state.shader);return paint;}
 /**
  * Paint.setShadowLayer(radius, dx, dy, color): what hwui's BlurDrawLooper does, a copy of the draw in the shadow color, blurred and offset by (dx, dy), below the draw itself, as one
  * drop-shadow image filter. Sigma is SkBlurMask::ConvertRadiusToSigma (0.57735 × radius + 0.5, as BlurMaskFilter). The shadow takes the shape's coverage; its alpha follows
@@ -95,9 +84,9 @@ function makeFont(backend,state,text){
  const size=state.textSize??12,scale=state.textScaleX??1,skew=state.textSkewX??0;if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Skia font extent exceeds VM limits');
  if(state.hyphenEdit)fail('Text drawing with Android hyphen edits requires the Minikin boundary');
  // A simple glyph run is exact for scripts without contextual shaping (Latin, punctuation, symbols) that Roboto covers;
- // complex scripts, combining marks, emoji/joiner sequences, letter/word spacing, font feature settings and code points Roboto lacks are shaped
+ // complex scripts, combining marks, emoji/joiner sequences, letter/word spacing and code points Roboto lacks are shaped
  // run by run through the Android font fallback chain (SkParagraph/HarfBuzz) instead: makeFont then returns {shaped:true}.
- const shaped=state.letterSpacing||state.wordSpacing||state.fontVariations?.length||(state.fontFeatureSettings&&parseFontFeatureSettings(state.fontFeatureSettings).length)||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text);
+ const shaped=state.letterSpacing||state.wordSpacing||state.fontVariations?.length||/[\p{Mark}\u200c\u200d\ufe0e\ufe0f\p{Extended_Pictographic}]|[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=Thaana}\p{Script=Nko}\p{Script=Devanagari}\p{Script=Bengali}\p{Script=Gurmukhi}\p{Script=Gujarati}\p{Script=Oriya}\p{Script=Tamil}\p{Script=Telugu}\p{Script=Kannada}\p{Script=Malayalam}\p{Script=Sinhala}\p{Script=Thai}\p{Script=Lao}\p{Script=Tibetan}\p{Script=Myanmar}\p{Script=Khmer}\p{Script=Mongolian}\p{Script=Hangul}]/u.test(text);
  if(state.flags&0x800)fail('The CanvasKit font API does not expose force-auto-hinting');
  const font=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);font.setScaleX(state.textScaleX??1);font.setSkewX((state.textSkewX??0)+(state.fakeItalic?-0.25:0));font.setEmbolden(!!(state.flags&0x20)||!!state.fakeBold);font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
  // Embind's public enum ABI is {value:number};0.42 omits the Alias symbol (SkFont::Edging::kAlias=0).
@@ -110,20 +99,11 @@ const RTL_SCRIPT=/[\p{Script=Arabic}\p{Script=Hebrew}\p{Script=Syriac}\p{Script=
 /** Paint.BIDI_DEFAULT_LTR: the paragraph direction of Canvas.drawText(String) is that of the first strong character. */
 const firstStrongRtl=text=>{for(const char of text)if(/\p{L}/u.test(char))return RTL_SCRIPT.test(char);return false;};
 const mergeMetrics=(base,extra)=>{const m={...base};for(const e of extra){m.ascent=Math.min(m.ascent,e.ascent);m.descent=Math.max(m.descent,e.descent);m.leading=Math.max(m.leading??0,e.leading??0);if(m.bounds&&e.bounds){m.bounds=[Math.min(m.bounds[0],e.bounds[0]),Math.min(m.bounds[1],e.bounds[1]),Math.max(m.bounds[2],e.bounds[2]),Math.max(m.bounds[3],e.bounds[3])];}}return m;};
-/**
- * SkFontMetrics as Android reads them. For a variable font Skia marks fTop / fBottom / fXMin / fXMax as not exact and CanvasKit then leaves `bounds` out; Paint.getFontMetrics
- * reads the values all the same. They are the font's bounding box (head table) at the font's size, which is what Skia's FreeType scaler puts there.
- */
-function fontMetrics(backend,font,state){
- const metrics=font.getMetrics();if(metrics.bounds)return metrics;
- const box=backend.fontBoxes?.get(state.nativeTypeface??backend.typeface),size=state.textSize??12,scale=box?size/box.unitsPerEm:0;
- return {...metrics,bounds:box?[box.xMin*scale*(state.textScaleX??1),-box.yMax*scale,box.xMax*scale*(state.textScaleX??1),-box.yMin*scale]:[0,metrics.ascent,0,metrics.descent]};
-}
 export function measureSkiaText(backend,text,state={}){const made=makeFont(backend,state,text);
  if(made.shaped){const CK=backend.CanvasKit,face=new CK.Font(state.nativeTypeface??backend.typeface,state.textSize??12);try{face.setScaleX(state.textScaleX??1);face.setSkewX((state.textSkewX??0)+(state.fakeItalic?-0.25:0));face.setEmbolden(!!(state.flags&0x20)||!!state.fakeBold);face.setLinearMetrics(!!(state.flags&0x40));face.setSubpixel(!!(state.flags&0x80));
    const run=measureSkiaShapedText(backend,text,{...state,weight:state.weight??400,italic:!!state.italic});
-   return {width:run.width,metrics:mergeMetrics(fontMetrics(backend,face,state),run.fontMetrics),glyphCount:run.glyphCount,source:'official-Skia-SkParagraph/Roboto+Android-fallback-chain'};}finally{face.delete();}}
- const {font,glyphs}=made;try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:fontMetrics(backend,font,state),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
+   return {width:run.width,metrics:mergeMetrics(face.getMetrics(),run.fontMetrics),glyphCount:run.glyphCount,source:'official-Skia-SkParagraph/Roboto+Android-fallback-chain'};}finally{face.delete();}}
+ const {font,glyphs}=made;try{return {width:font.getGlyphWidths(glyphs).reduce((a,b)=>a+b,0),metrics:font.getMetrics(),glyphCount:glyphs.length,source:'official-Skia-Font/Roboto/simple-glyph-run'};}finally{font.delete();}}
 function applyClips(CK,canvas,clips){if(!clips?.length)return;for(const clip of clips)canvas.clipPath(clipShape(CK,clip),clip.difference?CK.ClipOp.Difference:CK.ClipOp.Intersect,!!clip.antiAlias);}
 /**
  * The device-space path of a recorded clip (its rect or path under the matrix it was recorded with), made once per clip object: a clip object is immutable once recorded
@@ -384,7 +364,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
     const paint=command.paint?(command.paint.isLayerAlpha?(()=>{const p=new CK.Paint();p.setAlphaf(command.paint.alpha);return p;})():makePaint(CK,command.paint)):null;
     // The bounds are in the coordinates of the matrix current at saveLayer; the replay keeps the canvas at the node's base matrix and gives each command its own, so the
     // layer's bounds are mapped here (their bounding box under a rotation: Skia treats saveLayer bounds as a hint to size the layer, the clip is the commands' own).
-    if(command.bounds&&!(command.matrix?.length>6)){const m=command.matrix??[1,0,0,1,0,0],[l,t,r2,b]=command.bounds,xs=[l,r2].flatMap(x=>[t,b].map(y=>m[0]*x+m[2]*y+m[4])),ys=[l,r2].flatMap(x=>[t,b].map(y=>m[1]*x+m[3]*y+m[5]));canvas.saveLayer(paint,CK.LTRBRect(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)));}else canvas.saveLayer(paint);paint?.delete();return;   // under a perspective matrix the layer is not sized by the hint
+    if(command.bounds){const m=command.matrix??[1,0,0,1,0,0],[l,t,r2,b]=command.bounds,xs=[l,r2].flatMap(x=>[t,b].map(y=>m[0]*x+m[2]*y+m[4])),ys=[l,r2].flatMap(x=>[t,b].map(y=>m[1]*x+m[3]*y+m[5]));canvas.saveLayer(paint,CK.LTRBRect(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)));}else canvas.saveLayer(paint);paint?.delete();return;
    }
    if(command.op==='layerEnd'){canvas.restore();return;}
    canvas.save();applyClips(CK,canvas,command.clips);canvas.concat(matrix(command.matrix));
@@ -488,26 +468,17 @@ export function createSkiaCanvasHost(runtime,backend){
  const TYPEFACE='Landroid/graphics/Typeface;',PAINT='Landroid/graphics/Paint;',typefaces=gcRoot(new Map()),faceCache=gcRoot(new Map());
  add(TYPEFACE,[`create(Ljava/lang/String;I)${TYPEFACE}`,`create(${TYPEFACE}I)${TYPEFACE}`,`create(${TYPEFACE}IZ)${TYPEFACE}`,`defaultFromStyle(I)${TYPEFACE}`,'getStyle()I','getWeight()I','isBold()Z','isItalic()Z']);
  add(PAINT,[`setTypeface(${TYPEFACE})${TYPEFACE}`,`getTypeface()${TYPEFACE}`,'getFillPath(Landroid/graphics/Path;Landroid/graphics/Path;)Z']);
- // System faces: the system font map of Android 13's fonts.xml (src/system-fonts.js): sans-serif and its weight aliases, sans-serif-condensed, serif, monospace, serif-monospace,
- // casual, cursive, sans-serif-smallcaps, source-sans-pro and their aliases. A name outside the map answers the default family, as Typeface.create(String, int) does: it is not
- // an error. The Roboto faces of the Skia backend draw sans-serif at the weights and slants it has; every other font is the file fonts.xml names, read when it is first needed.
+ // System faces: the lab ships Roboto only. fonts.xml maps sans-serif and its aliases (arial, helvetica, tahoma, verdana) to it and defines weight aliases (sans-serif-thin 100 ... sans-serif-black 900). Any other
+ // family name is absent from the system font map, and Typeface.create(String, int) answers the default typeface for it (create((Typeface) null, style)), as Android does: it is not an error.
+ // Families fonts.xml defines that need font files the lab does not ship (serif, monospace, cursive, casual, the condensed and small-caps variants) therefore also answer Roboto.
+ const SYSTEM_BASE=new Map([['sans-serif',400],['sans-serif-thin',100],['sans-serif-light',300],['sans-serif-medium',500],['sans-serif-black',900],['arial',400],['helvetica',400],['tahoma',400],['verdana',400]]);
  const apiStyle=(weight,italic)=>(weight>=600?1:0)|(italic?2:0);   // Typeface.cpp computeAPIStyle
- const variationKey=axes=>axes?.length?axes.map(axis=>axis.tag+'='+axis.value).join(','):'';
- /** The Typeface of a system family at an absolute weight and slant (one object per distinct family, weight, slant, base weight, API style and variation). */
- const systemTypeface=(family,weight,italic,base,api,variation=null)=>{
-  const key=family+':'+weight+':'+italic+':'+base+':'+api+':'+variationKey(variation);
-  if(faceCache.has(key))return faceCache.get(key);
-  const picked=backend.systemFonts?backend.systemFonts.select(family,weight,italic,variation):{backend:true},value=runtime.makeObject(TYPEFACE);
-  const info=picked.backend?{face:backend.selectTypeface(weight,italic),...(variation?.length?{fontVariations:variation.map(axis=>({axis:axis.tag,value:axis.value}))}:{})}
-   :{custom:true,system:true,face:picked.file.ck,families:[picked.file.name],fontVariations:picked.fontVariations.length?picked.fontVariations:undefined,fakeBold:weight>=600&&weight-picked.font.weight>=200,fakeItalic:italic&&!picked.font.italic};
-  Object.assign(info,{family,style:api,weight,baseWeight:base,italic,reference:value,variation:variation?.length?variation:null});
-  typefaces.set(value.ref,info);faceCache.set(key,value);return value;
- };
- const makeTypeface=(family='sans-serif',style=0,weight=null,italic=null,baseHint=null,variation=null)=>{
-  const name=typeof family==='string'||family===null||family===undefined?family:runtime.stringCharacters(family),known=systemFamilyOf(name??DEFAULT_SYSTEM_FAMILY)??{family:DEFAULT_SYSTEM_FAMILY,base:400};
-  const relative=weight===null,base=baseHint??known.base;
+ const makeTypeface=(family='sans-serif',style=0,weight=null,italic=null,baseHint=null)=>{
+  const name=typeof family==='string'||family===null||family===undefined?family:runtime.stringCharacters(family);
+  const relative=weight===null,base=baseHint??SYSTEM_BASE.get(name??'sans-serif')??400;
   if((style&~3)!==0)style=0;weight??=Math.min(1000,base+(style&1?300:0));italic??=!!(style&2);   // Typeface::computeRelativeStyle: bold adds 300 to the base weight
-  return systemTypeface(known.family,weight,italic,base,relative?style:apiStyle(weight,italic),variation);
+  const api=relative?style:apiStyle(weight,italic),key=weight+':'+italic+':'+base+':'+api;
+  if(!faceCache.has(key)){const face=backend.selectTypeface(weight,italic),value=runtime.makeObject(TYPEFACE),info={face,family:'Roboto',style:api,weight,baseWeight:base,italic,reference:value};typefaces.set(value.ref,info);faceCache.set(key,value);}return faceCache.get(key);
  };
  // App fonts: one registered face per distinct font file (content hash + collection index), shared by every Typeface built from it, and registered once with the paragraph font provider under a content-derived family
  // name so SkParagraph can shape and fall back through [app family..., Roboto].
@@ -519,7 +490,6 @@ export function createSkiaCanvasHost(runtime,backend){
   const data=sfntMember(bytes,ttc);if(!data||!sfntStyle(data,0))return null;
   const ck=CK.Typeface.MakeFreeTypeFaceFromData(data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength));if(!ck)return null;
   const name='apk-font-'+hash.slice(0,32).replace(':','-');if(!registeredNames.has(name)){if(registeredNames.size>=1024)fail('Registered custom font limit (1024) exceeded');backend.fallback.registerCustom(name,data);registeredNames.add(name);}
-  backend.fontBoxes?.set(ck,sfntBounds(data,0));
   const entry={ck,name,axes:sfntAxes(data,0),size:data.length};fontFiles.set(hash,entry);return entry;
  };
  // Minikin FontFamily::getClosestMatch (score = weight grades apart + 2 for a slant mismatch) and computeFakery (fake bold when the wanted weight is >= 600 and 200+ above the font's; fake italic for an italic request on an upright font)
@@ -559,7 +529,6 @@ export function createSkiaCanvasHost(runtime,backend){
  add(CANVAS,[`drawPath(${PATH}Landroid/graphics/Paint;)V`,'drawCircle(FFFLandroid/graphics/Paint;)V','drawOval(FFFFLandroid/graphics/Paint;)V','drawRoundRect(FFFFFFLandroid/graphics/Paint;)V','drawColor(I)V','drawText(Ljava/lang/String;FFLandroid/graphics/Paint;)V','drawText(Ljava/lang/String;IIFFLandroid/graphics/Paint;)V','drawText(Ljava/lang/CharSequence;IIFFLandroid/graphics/Paint;)V','drawText([CIIFFLandroid/graphics/Paint;)V','clipRect(FFFF)Z','clipRect(Landroid/graphics/Rect;)Z',`clipPath(${PATH})Z`]);
  add(CANVAS,['drawRect(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','drawRoundRect(Landroid/graphics/RectF;FFLandroid/graphics/Paint;)V','drawOval(Landroid/graphics/RectF;Landroid/graphics/Paint;)V','saveLayer(FFFFLandroid/graphics/Paint;)I','save()I','restore()V','restoreToCount(I)V','getSaveCount()I']);
  add(CANVAS,['setCompatibilityVersion(I)V','<init>(J)V','getClipBounds(Landroid/graphics/Rect;)Z','getClipBounds()Landroid/graphics/Rect;']);
- add(CANVAS,['quickReject(FFFF)Z','quickReject(Landroid/graphics/RectF;)Z',`quickReject(${PATH})Z`,'quickReject(FFFFLandroid/graphics/Canvas$EdgeType;)Z','quickReject(Landroid/graphics/RectF;Landroid/graphics/Canvas$EdgeType;)Z',`quickReject(${PATH}Landroid/graphics/Canvas$EdgeType;)Z`,'drawColor(J)V','getDrawFilter()Landroid/graphics/DrawFilter;','setDrawFilter(Landroid/graphics/DrawFilter;)V']);
  add(CANVAS,['drawLine(FFFFLandroid/graphics/Paint;)V','drawPoint(FFLandroid/graphics/Paint;)V','drawArc(FFFFFFZLandroid/graphics/Paint;)V','drawArc(Landroid/graphics/RectF;FFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['drawTextRun(Ljava/lang/CharSequence;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun(Ljava/lang/String;IIIIFFZLandroid/graphics/Paint;)V','drawTextRun([CIIIIFFZLandroid/graphics/Paint;)V']);
  add(CANVAS,['clipRect(FFFFLandroid/graphics/Region$Op;)Z','clipRect(IIIILandroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/Rect;Landroid/graphics/Region$Op;)Z','clipRect(Landroid/graphics/RectF;Landroid/graphics/Region$Op;)Z',`clipPath(${PATH}Landroid/graphics/Region$Op;)Z`,'clipOutRect(FFFF)Z','clipOutRect(IIII)Z','clipOutRect(Landroid/graphics/Rect;)Z','clipOutRect(Landroid/graphics/RectF;)Z',`clipOutPath(${PATH})Z`]);
@@ -600,11 +569,7 @@ export function createSkiaCanvasHost(runtime,backend){
   resolveTypeface,customTypeface,registerFontFile,faceState,
   /** Typeface.createFromTypefaceWithVariation: the same family chain with the supported axes (those the font file declares in fvar) set on every font; null when no axis is supported. */
   variationTypeface(reference,axes){
-   const info=resolveTypeface(reference);
-   if(!info.spec){   // a Typeface of the system font map: Typeface.isSupportedAxes asks the family's fonts and the fallback chain; a font without the axis is left as it is
-    const known=backend.systemFonts?.supportedAxes(info.family),kept=axes.filter(axis=>known?.has(axis.tag));if(!kept.length)return axes.length?null:info.variation?systemTypeface(info.family,info.weight,info.italic,info.baseWeight,info.style,null):null;
-    return systemTypeface(info.family,info.weight,info.italic,info.baseWeight,info.style,[...(info.variation??[]).filter(axis=>!kept.some(k=>k.tag===axis.tag)),...kept.map(axis=>({tag:axis.tag,value:axis.value}))]);
-   }
+   const info=resolveTypeface(reference);if(!info.custom)return null;
    const supported=axes.filter(a=>info.spec.families.some(fonts=>fonts.some(f=>f.file.axes.some(x=>x.tag===a.tag))));if(!supported.length)return null;
    const apply=font=>font.file.axes.length?{...font,axes:[...(font.axes??[]).filter(x=>!supported.some(a=>a.tag===x.tag)),...supported.filter(a=>font.file.axes.some(x=>x.tag===a.tag)).map(a=>({tag:a.tag,value:a.value}))]}:font;
    return makeCustom({id:specSeq++,families:info.spec.families.map(fonts=>fonts.map(apply)),cache:new Map()},info.weight,info.italic,info.baseWeight,info.style);
@@ -631,11 +596,11 @@ export function createSkiaCanvasHost(runtime,backend){
      const source=resolveTypeface(args[0]);
      if(method.parameters.length===3){   // create(Typeface, weight, italic): an absolute style over the same family chain
       if(args[1]<0||args[1]>1000)vm.throwJava('Ljava/lang/IllegalArgumentException;','Typeface weight must be0..1000');
-      return source.spec?makeCustom(source.spec,args[1],!!args[2],source.baseWeight,apiStyle(args[1],!!args[2])):makeTypeface(source.family,0,args[1],!!args[2],source.baseWeight,source.variation);
+      return source.custom?makeCustom(source.spec,args[1],!!args[2],source.baseWeight,apiStyle(args[1],!!args[2])):makeTypeface(source.family,0,args[1],!!args[2],source.baseWeight);
      }
      let style=args[1];if((style&~3)!==0)style=0;
      if(style===source.style)return source.reference;
-     return source.spec?makeCustom(source.spec,Math.min(1000,source.baseWeight+(style&1?300:0)),!!(style&2),source.baseWeight,style):makeTypeface(source.family,style,null,null,source.baseWeight,source.variation);
+     return source.custom?makeCustom(source.spec,Math.min(1000,source.baseWeight+(style&1?300:0)),!!(style&2),source.baseWeight,style):makeTypeface(source.family,style,null,null,source.baseWeight);
     }
     if(name==='defaultFromStyle')return makeTypeface('sans-serif',args[0]);
     const info=resolveTypeface(receiver);return name==='getStyle'?info.style:name==='getWeight'?info.weight:name==='isBold'?(info.style&1?1:0):info.italic?1:0;
@@ -664,11 +629,10 @@ export function createSkiaCanvasHost(runtime,backend){
      if(picture.recording)endRecording(pictureRef);
      const state=canvasState(canvasRef),saved=state.matrix.slice();
      try{
-      if(dst&&state.matrix.length>6){const scaled=picture.width>0&&picture.height>0;preConcatCanvasMatrix(state.matrix,[scaled?(dst.right-dst.left)/picture.width:1,0,0,scaled?(dst.bottom-dst.top)/picture.height:1,dst.left,dst.top]);}
-      else if(dst){const[a,b,c,d]=state.matrix;state.matrix[4]+=a*dst.left+c*dst.top;state.matrix[5]+=b*dst.left+d*dst.top;
+      if(dst){const[a,b,c,d]=state.matrix;state.matrix[4]+=a*dst.left+c*dst.top;state.matrix[5]+=b*dst.left+d*dst.top;
        if(picture.width>0&&picture.height>0){const sx=(dst.right-dst.left)/picture.width,sy=(dst.bottom-dst.top)/picture.height;state.matrix[0]=a*sx;state.matrix[1]=b*sx;state.matrix[2]=c*sy;state.matrix[3]=d*sy;}}
       record(canvasRef,{op:'picture',draws:picture.draws});
-     }finally{state.matrix.length=saved.length;for(let i=0;i<saved.length;i++)state.matrix[i]=saved[i];}
+     }finally{for(let i=0;i<6;i++)state.matrix[i]=saved[i];}
     };
     const endRecording=ref=>{const picture=vm.object(ref).picture;if(!picture.recording)return;picture.draws=graphics.get(vm.object(picture.recording).nativeCanvasHandle,'canvas').draws.slice();picture.recording=null;};
     if(method.owner===CANVAS){
@@ -800,30 +764,13 @@ export function createSkiaCanvasHost(runtime,backend){
     if(state.width>0&&state.height>0){withScratch(state.width,state.height,c=>{applyClips(CK,c,state.clips);c.concat(matrix(state.matrix));const device=c.getDeviceClipBounds(),inverse=CK.Matrix.invert(c.getTotalMatrix());if(device[2]>device[0]&&device[3]>device[1]&&inverse){const points=CK.Matrix.mapPoints(inverse,[device[0],device[1],device[2],device[1],device[2],device[3],device[0],device[3]]);finite(points);bounds=[Math.min(points[0],points[2],points[4],points[6]),Math.min(points[1],points[3],points[5],points[7]),Math.max(points[0],points[2],points[4],points[6]),Math.max(points[1],points[3],points[5],points[7])].map(v=>Math.max(-2147483648,Math.min(2147483647,Math.floor(v+.5)))|0);nonempty=true;}});}
     ['left','top','right','bottom'].forEach((field,i)=>vm.storeField(target.fields,`Landroid/graphics/Rect;->${field}:I`,bounds[i]));return nonempty?1:0;
    }
-   if(name==='quickReject'){   // Canvas.quickReject (SkCanvas::quickReject): true when the rectangle, or the path's bounds, lies outside the current clip under the current matrix. The EdgeType is ignored, as it is on Android
-    let rect;
-    if(method.parameters[0]==='F')rect=finite(values.slice(0,4));
-    else{
-     if(args[1]===null||args[1]===0)vm.throwJava('Ljava/lang/NullPointerException;',null);
-     if(method.parameters[0]===PATH){const p=path(args[1]).builder.snapshot();try{if(p.isEmpty())return 1;if(p.getFillType().value>=2)return 0;rect=finite([...p.getBounds()]);}finally{p.delete();}}   // an empty path is rejected, an inverse fill never is
-     else rect=rectF(args[1]);
-    }
-    const width=state.width??411,height=state.height??840;if(!(width>0&&height>0))return 1;
-    return withScratch(width,height,c=>{applyClips(CK,c,state.clips);c.concat(matrix(state.matrix));return c.quickReject(CK.LTRBRect(rect[0],rect[1],rect[2],rect[3]))?1:0;});
-   }
-   if(name==='getDrawFilter')return state.drawFilter??null;
-   if(name==='setDrawFilter'){   // Canvas.setDrawFilter: null clears it; a filter (PaintFlagsDrawFilter) would change the flags of every paint that draws afterwards, which the recording backend does not do
-    if(args[1]!==null&&args[1]!==0)fail('Canvas.setDrawFilter with a DrawFilter requires a paint-flags filter in the Skia recording backend');
-    state.drawFilter=null;return;
-   }
    if(name==='concat'){
-    const transform=getMatrixValues(vm,args[1]);
-    // Skia composes; a result with a perspective row (a View rotated about its X or Y axis, a Camera matrix) keeps the row as the tail of the canvas matrix
-    withScratch(1,1,canvas=>{canvas.concat(matrix(state.matrix));canvas.concat(transform);const result=canvas.getTotalMatrix(),next=finite([result[0],result[3],result[1],result[4],result[2],result[5]]);if(result[6]!==0||result[7]!==0||result[8]!==1)next.push(...finite([result[6],result[7],result[8]]));state.matrix=next;});return;
+    const transform=getMatrixValues(vm,args[1]);if(transform[6]!==0||transform[7]!==0||transform[8]!==1)fail('Perspective Canvas transforms require a projective canvas-state backend');
+    withScratch(1,1,canvas=>{canvas.concat(matrix(state.matrix));canvas.concat(transform);const result=canvas.getTotalMatrix();state.matrix=finite([result[0],result[3],result[1],result[4],result[2],result[5]]);});return;
    }
    if(name==='getSaveCount')return state.stack.length+1;
    if(name==='getMatrix'){   // Canvas.getMatrix(Matrix): the current transform as a 3x3 (the canvas keeps [a,b,c,d,e,f]); getMatrix() is the deprecated allocating form
-    const m=state.matrix,rows=matrix(m);
+    const m=state.matrix,rows=[m[0],m[2],m[4],m[1],m[3],m[5],0,1*0,1];
     const target=method.parameters.length?args[1]:(()=>{const ref=vm.allocate(MATRIX);vm.dispatch({owner:MATRIX,name:'<init>',parameters:[],result:'V',signature:'()V'},[ref],'direct');return ref;})();
     if(target===null||target===0)vm.throwJava('Ljava/lang/NullPointerException;','ctm is null');
     const array=vm.newArray('[F',9);vm.array(array).elements=rows.map(value=>{bits.setFloat32(0,value,true);return bits.getInt32(0,true);});
@@ -856,11 +803,6 @@ export function createSkiaCanvasHost(runtime,backend){
     const cells=clip.commands?.length??8;clipCells+=cells;if(clipCells>1000000){clipCells=liveClipCells()+cells;if(clipCells>1000000)fail('Aggregate Skia clip storage limit exceeded');}if((state.clips??=[]).length>=128)fail('Skia clip limit exceeded');state.clips.push(clip);
     const width=state.width??411,height=state.height??840;if(!(width>0&&height>0))return 0;   // a canvas with no area (a RenderNode recorded at 0x0): every clip leaves it empty, as Canvas.clipRect answers false; Skia cannot even allocate the scratch surface
     return withScratch(width,height,canvas=>{applyClips(CK,canvas,state.clips);return canvas.quickReject(CK.LTRBRect(0,0,width,height))?0:1;});
-   }
-   if(name==='drawColor'&&method.parameters[0]==='J'){   // Canvas.drawColor(@ColorLong long): BlendMode.SRC_OVER with the color's sRGB 8-bit value (Color.toArgb(long)), as Paint.setColor(long) draws it
-    const packed=BigInt.asIntN(64,BigInt(args[1])),argb=colorLongToArgb(packed);
-    if(argb===null)fail(`Canvas.drawColor(long) with ColorSpace id ${Number(BigInt.asUintN(64,packed)&63n)} is not implemented (sRGB, linear sRGB and their extended variants are)`);
-    record(receiver,{op:'color',color:argb});return;
    }
    if(name==='drawColor'){
     if(method.parameters.length===2){const mode=vm.object(args[2]).fields.get('Landroid/graphics/PorterDuff$Mode;->nativeInt:I');if(!Number.isInteger(mode)||mode<0||mode>28)fail('drawColor needs an original PorterDuff.Mode');record(receiver,{op:'color',color:args[1],blendMode:mode});return;}

@@ -75,23 +75,7 @@ function stringAt(strings, index, optional = false) {
   if (!strings || index >= strings.length) fail(`Invalid resource string index ${index}`);
   return strings[index];
 }
-/**
- * DynamicRefTable::lookupResourceValue / lookupResourceId (androidfw/ResourceTypes.cpp, android-13.0.0_r1) for a TYPE_DYNAMIC_REFERENCE / TYPE_DYNAMIC_ATTRIBUTE value: a build-time id of
- * the system package (0x01) or of the app package (0x7f) is already final, package 0x00 is "this package" and takes the id it was assigned, and any other build-time package id belongs to a
- * shared library and is translated through the table's library map. The lab loads no shared-library resource packages, so that last case has no mapping and stays unresolved, named.
- */
-function dynamic(type, data, dynamicRefs) {
-  const packageId = data >>> 24, resolvedType = type === 7 ? 1 : 2;
-  if (data === 0 || packageId === 1 || packageId === 0x7f) return { type: resolvedType, data };
-  if (packageId === 0) return { type: resolvedType, data: (((dynamicRefs?.assigned ?? 0x7f) << 24) | (data & 0xffffff)) >>> 0 };
-  return { type, data, library: dynamicRefs?.libraries?.get(packageId) ?? null };
-}
-function scalar(type, data, strings, dynamicRefs = null) {
-  if (type === 7 || type === 8) {
-    const translated = dynamic(type, data, dynamicRefs);
-    if (translated.type === type) return { dataType: type, rawData: data, kind: 'unresolved', value: null, reference: data, reason: `${type === 7 ? 'Dynamic reference' : 'Dynamic attribute reference'} 0x${data.toString(16)} names shared-library package 0x${(data >>> 24).toString(16).padStart(2, '0')}${translated.library ? ` (${translated.library})` : ''}: shared-library resource packages are not loaded, so the id has no run-time mapping (DynamicRefTable)` };
-    type = translated.type; data = translated.data;
-  }
+function scalar(type, data, strings) {
   const base = { dataType: type, rawData: data };
   if (type === 0) return { ...base, kind: 'null', value: null, empty: data === 1 };
   if (type === 1 || type === 2) return { ...base, kind: type === 1 ? 'reference' : 'attribute', value: data, reference: data };
@@ -101,22 +85,22 @@ function scalar(type, data, strings, dynamicRefs = null) {
     const radix = [1 / 256, 1 / 32768, 1 / 8388608, 1 / 2147483648][(data >> 4) & 3];
     return { ...base, kind: type === 5 ? 'dimension' : 'fraction', value: (data & 0xffffff00) * radix, unit: (type === 5 ? ['px', 'dp', 'sp', 'pt', 'in', 'mm'] : ['%', '%p'])[data & 15] ?? `unknown-${data & 15}` };
   }
+  if (type === 7 || type === 8) return { ...base, kind: 'unresolved', value: null, reference: data, reason: 'Dynamic package reference/attribute requires library ID remapping' };
   if (type === 0x12) return { ...base, kind: 'boolean', value: data !== 0 };
   if (type >= 0x1c && type <= 0x1f) return { ...base, kind: 'color', value: `#${data.toString(16).padStart(8, '0')}` };
   if (type === 0x10 || type === 0x11) return { ...base, kind: 'integer', value: type === 0x10 ? data | 0 : data };
-  return { ...base, kind: 'unresolved', value: null, reason: `Res_value data type 0x${type.toString(16)} is not a type of android-13.0.0_r1 ResourceTypes.h` };
+  return { ...base, kind: 'unresolved', value: null, reason: `Unsupported typed resource value 0x${type.toString(16)}` };
 }
-const bagReason = resourceType => `a ${resourceType} resource is a bag (a map of entries, as a style, an array, plurals and an attr are), not a single value`;
-function readValue(reader, at, end, strings, dynamicRefs = null) {
+function readValue(reader, at, end, strings) {
   reader.check(at, 8, end); const size = reader.u16(at);
   if (size < 8) fail('Invalid typed resource value size'); reader.check(at, size, end);
-  return scalar(reader.u8(at + 3), reader.u32(at + 4), strings, dynamicRefs);
+  return scalar(reader.u8(at + 3), reader.u32(at + 4), strings);
 }
 
 /** Scalars/strings/references and real binary XML; no theme, drawable, or AndroidX execution. */
 export class AndroidResources {
   constructor(arscBytes = null, callbacks = {}) {
-    this.options = callbacks; this.sourceCookie = callbacks.sourceCookie ?? 1; this.entries = new Map(); this.names = new Map(); this.packages = []; this.warnings = []; this.strings = []; this.libraries = new Map();
+    this.options = callbacks; this.sourceCookie = callbacks.sourceCookie ?? 1; this.entries = new Map(); this.names = new Map(); this.packages = []; this.warnings = []; this.strings = [];
     if (arscBytes != null) this.parseTable(arscBytes);
   }
   static fromJSON(data, callbacks = {}) {
@@ -129,7 +113,6 @@ export class AndroidResources {
         if (++count > 300000 || !value || value.id !== pair[0] || typeof value.kind !== 'string' || !value.config) fail('Invalid/excessive resource JSON variant');
         if (value.items && (!Array.isArray(value.items) || value.items.length > 65536)) fail('Invalid resource JSON bag');
         const entry = { ...value, sourceCookie: table.sourceCookie };
-        if (entry.kind === 'bag') entry.reason = bagReason(entry.resourceType);
         if (entry.items) entry.items = entry.items.map(item => ({ ...item, sourceCookie: table.sourceCookie }));
         return entry;
       });
@@ -144,7 +127,7 @@ export class AndroidResources {
     if (visited.has(id) || visited.size >= 64) fail(`Cyclic/excessive resource bag inheritance at 0x${id.toString(16)}`);
     const next = new Set(visited); next.add(id);
     let entry = this.resolve(id); while (entry.resolved) entry = entry.resolved;
-    if (entry.kind !== 'bag' || !entry.items) fail(`Resource 0x${id.toString(16)} is not a style / array / plurals bag (${entry.kind === 'unresolved' ? entry.reason : `it is a ${entry.resourceType ?? entry.kind} ${entry.kind} value`})${visited.size ? `; it is in the parent chain of 0x${[...visited][0].toString(16)}` : ''}`);
+    if (entry.kind !== 'bag' || !entry.items) fail(`Resource 0x${id.toString(16)} is not a resolved bag: ${entry.reason || entry.kind}`);
     const values = entry.parent ? this.resolveBag(entry.parent, next) : new Map();
     for (const item of entry.items) values.set(item.name >>> 0, { ...item, sourceResourceId: entry.id, sourceCookie: item.sourceCookie ?? entry.sourceCookie ?? this.sourceCookie });
     return values;
@@ -185,54 +168,17 @@ export class AndroidResources {
     }
     if (value.kind === 'null' && !(value.rawData & 1) && !(value.dataType)) return null;   // @null (TYPE_NULL with DATA_NULL_EMPTY unset) is not a value; @empty is
     let ref = 0;
-    if (resolveRefs) { const followed = this.followReferences(value); if (followed.missing) return null; value = followed.value; ref = followed.ref; }
-    return { value, ref };
-  }
-  /** Why an id has no entry here, named by the package it belongs to (0x01 the framework, this table's own packages, anything else a package that is not loaded). */
-  absentReason(id) {
-    id = Number(id) >>> 0; const hex = `0x${id.toString(16)}`, packageId = id >>> 24;
-    if (packageId === 1) return `android framework resource ${hex} is not in the lab's framework resource data (assets/framework-resources)`;
-    if (this.packages.some(pkg => pkg.id === packageId)) return `resource ${hex} has no entry in this package's resources.arsc (a configuration split that is not installed may define it)`;
-    return `resource ${hex} belongs to package 0x${packageId.toString(16).padStart(2, '0')}, which is not loaded (only the app package and the android framework package are; shared-library and feature-split resource packages are not)`;
-  }
-  /**
-   * AssetManager2::ResolveReference (android-13.0.0_r1): while the value is a TYPE_REFERENCE to a resource, take that resource's value, one resource per iteration and at most
-   * kMaxIterations (20) of them. A style / array / plurals / attr resource (a bag) is represented as a reference to itself. Returns the final value and `ref`, the id of the last
-   * resource that was read (TypedValue.resourceId; 0 when the value was not a reference). A reference to a resource that cannot be read ends the walk: the value stays the last
-   * reference that could be read, `ref` is the id that could not, and `missing` says why.
-   */
-  followReferences(value) {
-    let ref = 0;
-    for (let iteration = 0; value.kind === 'reference' && (value.reference >>> 0) !== 0; iteration++) {
-      const id = value.reference >>> 0, raw = this.entries.has(id) ? this.selectVariant(id) : this.options.resolveExternal?.(id);
-      if (!raw || raw.kind === 'unresolved') return { value, ref: id, missing: raw?.reason ?? (this.entries.has(id) ? `resource 0x${id.toString(16)} has no variant for the device configuration` : this.absentReason(id)) };
-      ref = id;
-      if (raw.kind === 'bag') return { value: { kind: 'reference', dataType: 1, rawData: id, reference: id, sourceCookie: raw.sourceCookie, sourceResourceId: raw.id }, ref };
-      if (raw.reference !== undefined && raw.resolved !== undefined) value = { kind: 'reference', dataType: 1, rawData: raw.reference >>> 0, reference: raw.reference >>> 0, sourceCookie: raw.sourceCookie };   // an alias that came back already resolved: one more hop
-      else value = { ...raw };
-      if (iteration === 20 || (value.kind === 'reference' && (value.reference >>> 0) === id)) break;
+    if (resolveRefs) {
+      for (let iteration = 0; value.kind === 'reference' && (value.reference >>> 0) !== 0 && iteration < 20; iteration++) {
+        ref = value.reference >>> 0;
+        const raw = this.entries.has(ref) ? this.selectVariant(ref) : this.options.resolveExternal?.(ref);
+        if (!raw || raw.kind === 'unresolved') return null;
+        if (raw.kind === 'bag') { value = { kind: 'reference', dataType: 1, rawData: ref, reference: ref, sourceResourceId: raw.id }; break; }   // a style/array resource: the value stays a reference to it
+        if (raw.reference !== undefined && raw.resolved !== undefined) value = { kind: 'reference', dataType: 1, rawData: raw.reference >>> 0, reference: raw.reference >>> 0, sourceCookie: raw.sourceCookie };   // an alias: one more hop
+        else value = { ...raw };
+      }
     }
     return { value, ref };
-  }
-  /**
-   * Theme::ResolveAttributeReference as ApplyStyle / ResolveAttrs / RetrieveAttributes fill a TypedArray (AttributeResolution.cpp, android-13.0.0_r1): a ?attr value is looked up in
-   * `theme` (null: no theme, the attribute stays as it is) and resolved; a @reference is followed. What cannot be resolved is not an error there: the value stays the TYPE_ATTRIBUTE
-   * or the last readable TYPE_REFERENCE, and the TypedArray getter that needs it is what fails. `missing` carries the reason for the diagnostics.
-   */
-  resolveAttributeReference(original, theme) {
-    const NULL = { kind: 'null', value: null, dataType: 0, rawData: 0, resourceId: 0 };   // "Deal with the special @null value -- it turns back to TYPE_NULL" (a TYPE_REFERENCE whose data is 0, wherever the resolution ended on it)
-    if (original.kind === 'attribute') {
-      const id = original.reference >>> 0, found = theme ? this.getThemeAttribute(theme, id, true) : null;
-      if (found) return found.value.kind === 'reference' && !(found.value.reference >>> 0) ? { value: { ...NULL } } : { value: { ...found.value, resourceId: found.ref } };
-      return { value: { kind: 'attribute', dataType: 2, rawData: id, reference: id, sourceCookie: original.sourceCookie, resourceId: 0 }, missing: theme ? `theme attribute 0x${id.toString(16)} has no value that resolves in the current theme` : null };
-    }
-    if (original.kind === 'reference') {
-      if (!(original.reference >>> 0)) return { value: { ...NULL } };
-      const followed = this.followReferences({ kind: 'reference', dataType: 1, rawData: original.reference >>> 0, reference: original.reference >>> 0, sourceCookie: original.sourceCookie });
-      if (!followed.missing && followed.value.kind === 'reference' && !(followed.value.reference >>> 0)) return { value: { ...NULL } };
-      return { value: { ...followed.value, resourceId: followed.ref }, missing: followed.missing };
-    }
-    return { value: { ...original } };
   }
   warn(message) { if (!this.warnings.includes(message)) { this.warnings.push(message); this.options.onWarning?.(message); } }
   parseTable(bytes) {
@@ -259,17 +205,11 @@ export class AndroidResources {
     const typeAt = r.u32(c.at + 268), keyAt = r.u32(c.at + 276);
     if (!typeAt || !keyAt || typeAt < c.header || keyAt < c.header) fail('Inherited package string pools are not supported');
     const types = pool(r, r.chunk(c.at + typeAt, c.end)), keys = pool(r, r.chunk(c.at + keyAt, c.end));
-    const pkg = { id, name, typeOffset, types, keys, dynamicRefs: { assigned: id, libraries: this.libraries } }; this.packages.push({ id, name });
-    // ResTable_lib_header (RES_TABLE_LIBRARY_TYPE): build-time package id -> shared library package name. Read before the entries so a dynamic reference can name the library it needs.
-    for (let at = c.at + c.header; at < c.end;) {
-      const child = r.chunk(at, c.end);
-      if (child.type === 0x203) { const count = r.u32(child.at + 8); if (count > 255 || child.header + count * 260 > child.size) fail('Malformed resource library table'); for (let i = 0; i < count; i++) { const entry = child.at + child.header + i * 260; let length = 0; while (length < 128 && r.u16(entry + 4 + length * 2)) length++; this.libraries.set(r.u32(entry) & 0xff, utf16.decode(r.slice(entry + 4, length * 2))); } }
-      at = child.end;
-    }
+    const pkg = { id, name, typeOffset, types, keys }; this.packages.push({ id, name });
     for (let at = c.at + c.header; at < c.end;) {
       const child = r.chunk(at, c.end);
       if (child.type === 0x201) this.parseType(r, child, pkg);
-      else if (![1, 0x202, 0x203].includes(child.type)) this.warn(`Package ${name} has unsupported chunk 0x${child.type.toString(16)}`);
+      else if (![1, 0x202].includes(child.type)) this.warn(`Package ${name} has unsupported chunk 0x${child.type.toString(16)}`);
       at = child.end;
     }
   }
@@ -301,9 +241,9 @@ export class AndroidResources {
         const parent = r.u32(at + 8), mapCount = r.u32(at + 12);
         if (mapCount > 65536) fail('Complex resource map exceeds limit'); r.check(at + entrySize, mapCount * 12, c.end);
         const items = [];
-        for (let j = 0; j < mapCount; j++) { const mapAt = at + entrySize + j * 12; items.push({ sourceCookie: this.sourceCookie, name: r.u32(mapAt), ...readValue(r, mapAt + 4, c.end, this.strings, pkg.dynamicRefs) }); }
-        value = { kind: 'bag', value: null, parent, items, reason: bagReason(resourceType) };
-      } else value = compact ? scalar(entryFlags >> 8, r.u32(at + 4), this.strings, pkg.dynamicRefs) : readValue(r, at + entrySize, c.end, this.strings, pkg.dynamicRefs);
+        for (let j = 0; j < mapCount; j++) { const mapAt = at + entrySize + j * 12; items.push({ sourceCookie: this.sourceCookie, name: r.u32(mapAt), ...readValue(r, mapAt + 4, c.end, this.strings) }); }
+        value = { kind: 'bag', value: null, parent, items, reason: 'Bag retained; theme/style inheritance is not executed' };
+      } else value = compact ? scalar(entryFlags >> 8, r.u32(at + 4), this.strings) : readValue(r, at + entrySize, c.end, this.strings);
       const entry = { sourceCookie: this.sourceCookie, id: resourceId, packageName: pkg.name, resourceType, name: resourceName, fullName: `${pkg.name}:${resourceType}/${resourceName}`, config, ...value };
       if (!this.entries.has(resourceId)) { if (this.entries.size >= 250000) fail('Resource entry count exceeds limit'); this.entries.set(resourceId, []); }
       this.entries.get(resourceId).push(entry);
@@ -322,7 +262,7 @@ export class AndroidResources {
     if (!id) return { id, kind: 'null', value: null };
     if (visited.has(id) || visited.size >= 64) return { id, kind: 'unresolved', value: null, reason: 'Cyclic/excessive resource reference chain' };
     const variants = this.entries.get(id);
-    if (!variants) return this.options.resolveExternal?.(id) ?? { id, kind: 'unresolved', value: null, reason: this.absentReason(id) };
+    if (!variants) return this.options.resolveExternal?.(id) ?? { id, kind: 'unresolved', value: null, reason: `Resource 0x${id.toString(16)} is absent (framework/split resources may be required)` };
     const selected = this.selectVariant(id);
     if (!selected || !variants.includes(selected)) return { id, kind: 'unresolved', value: null, reason: typeof this.options.chooseConfiguration === 'function' ? 'No compatible resource variant for the explicit device configuration' : 'No unqualified resource variant; explicit configuration selection required', variants: variants.map((entry) => entry.config) };
     if (selected.kind !== 'reference') return { ...selected };
@@ -334,7 +274,6 @@ export class AndroidResources {
     const r = new Reader(bytes), root = r.chunk(0);
     if (root.type !== 3 || root.end !== r.length) fail('Expected complete binary Android XML layout');
     let strings = null, resourceMap = [], tree = null, nodes = 0;
-    const dynamicRefs = { assigned: this.packages.find(pkg => pkg.id !== 1)?.id ?? 0x7f, libraries: this.libraries };   // a compiled XML file belongs to its package: package 0x00 in it is that package
     const stack = [], namespaces = [];
     for (let at = root.header; at < root.end;) {
       const c = r.chunk(at, root.end);
@@ -356,7 +295,7 @@ export class AndroidResources {
         const node = { name, namespace, lineNumber: r.u32(at + 8), namespaces: namespaces.map((ns) => ({ ...ns })), attributes: [], children: [], text: '' };
         for (let i = 0; i < count; i++) {
           const pos = attrStart + i * width, nameIndex = r.u32(pos + 4), rawIndex = r.u32(pos + 8);
-          const typedValue = readValue(r, pos + 12, pos + width, strings, dynamicRefs);
+          const typedValue = readValue(r, pos + 12, pos + width, strings);
           const attribute = { name: stringAt(strings, nameIndex), namespace: stringAt(strings, r.u32(pos), true), resourceId: resourceMap[nameIndex] || null, rawValue: stringAt(strings, rawIndex, true), ...typedValue };
           if (typedValue.kind === 'reference') attribute.resolved = this.resolve(typedValue.reference);
           node.attributes.push(attribute);

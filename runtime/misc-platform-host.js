@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=9b79f2cfbe27';
-import { APKError } from './apk-error.js?v=9b79f2cfbe27';
-import { cleartextPermitted } from './network-native.js?v=9b79f2cfbe27';
-import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=9b79f2cfbe27';
-import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=9b79f2cfbe27';
-import { rotateRGBA } from './camera-frames.js?v=9b79f2cfbe27';
-import { Blocked } from './scheduler.js?v=9b79f2cfbe27';
-import { IntCells } from './java-arrays.js?v=9b79f2cfbe27';
-import { state as ioState } from './libcore-io-native.js?v=9b79f2cfbe27';
+import { createHostRegistry } from './host-contract.js?v=12145e24651e';
+import { APKError } from './apk-error.js?v=12145e24651e';
+import { cleartextPermitted } from './network-native.js?v=12145e24651e';
+import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=12145e24651e';
+import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=12145e24651e';
+import { rotateRGBA } from './camera-frames.js?v=12145e24651e';
+import { Blocked } from './scheduler.js?v=12145e24651e';
+import { IntCells } from './java-arrays.js?v=12145e24651e';
+import { state as ioState } from './libcore-io-native.js?v=12145e24651e';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
@@ -209,14 +209,6 @@ export function createMiscPlatformHost(platform) {
   def(UL, 'getDefault', `()${UL}`, r => wrap(r, callS(r, LOCALE, 'getDefault', [], LOCALE)), { static: true });
   def(UL, 'getDefault', `(Landroid/icu/util/ULocale$Category;)${UL}`, r => wrap(r, callS(r, LOCALE, 'getDefault', [], LOCALE)), { static: true });
   def(UL, 'getAvailableLocales', `()[${UL}`, r => { const tags = ['en-US', 'pt-BR', 'es-ES', 'fr-FR', 'de-DE'], array = r.newArray(`[${UL}`, tags.length); r.array(array).elements = tags.map(tag => wrap(r, callS(r, LOCALE, 'forLanguageTag', [STRING], LOCALE, [tag]))); return array; }, { static: true });
-  // ULocale.addLikelySubtags / minimizeSubtags (UTS #35 likely subtags): the platform's CLDR data through Intl.Locale.maximize() / minimize(). ICU returns its argument only for a
-  // locale it has no likely subtags for (the data adds neither a script nor a region), otherwise a new ULocale, also when the tags come out the same. Keywords are kept.
-  for (const [name, method] of [['addLikelySubtags', 'maximize'], ['minimizeSubtags', 'minimize']]) def(UL, name, `(${UL})${UL}`, (r, _m, [given]) => {
-    if (nullish(given)) npe(r);
-    const base = text(r, callV(r, locale(r, given), LOCALE, 'toLanguageTag', [], STRING)).replace(/-u(?:-[a-z0-9]{2,8})+/i, '');
-    let result = base, known = false; try { const maximal = new Intl.Locale(base).maximize(); known = !!(maximal.script && maximal.region); result = method === 'maximize' ? maximal.toString() : new Intl.Locale(base).minimize().toString(); } catch { return given; }   // a tag Intl refuses has no likely subtags
-    return known ? wrap(r, callS(r, LOCALE, 'forLanguageTag', [STRING], LOCALE, [result]), { ...(r.object(given).keywords ?? {}) }) : given;
-  }, { static: true });
   def(UL, 'toLanguageTag', `()${STRING}`, (r, _m, [self]) => tagWithKeywords(r, locale(r, self), r.object(self).keywords ?? {}));
   def(UL, 'toLocale', `()${LOCALE}`, (r, _m, [self]) => locale(r, self));
   for (const name of ['getLanguage', 'getCountry', 'getVariant']) def(UL, name, `()${STRING}`, (r, _m, [self]) => callV(r, locale(r, self), LOCALE, name, [], STRING));
@@ -269,7 +261,7 @@ export function createMiscPlatformHost(platform) {
 
   // ---- AnimationUtils XML loading: the lab's AnimationUtils class carries the animation clock only; the load* / make* calls go to the original code copied into dev.apkweb.view.XmlAnimations (layouts profile)
   const UTILS = 'Landroid/view/animation/AnimationUtils;', XA = 'Ldev/apkweb/view/XmlAnimations;', ANIM = 'Landroid/view/animation/Animation;', INTERP = 'Landroid/view/animation/Interpolator;', LAC = 'Landroid/view/animation/LayoutAnimationController;';
-  const xa = (r, name, parameters, result, args) => { if (!r.classes.has(XA)) unsupported(`AnimationUtils.${name}: XML animations are loaded by original code of the layouts profile, which is not loaded for this APK (the loader brings the profile for an APK whose layouts or styles give android:layoutAnimation or a ProgressBar android:interpolator)`, 'xml-animations-profile'); return callS(r, XA, name, parameters, result, args); };
+  const xa = (r, name, parameters, result, args) => { if (!r.classes.has(XA)) unsupported(`AnimationUtils.${name}: XML animation loading needs the layouts framework profile (enableLayoutProfile)`, 'xml-animations-profile'); return callS(r, XA, name, parameters, result, args); };
   for (const [name, parameters, result] of [['loadAnimation', [CONTEXT, 'I'], ANIM], ['loadLayoutAnimation', [CONTEXT, 'I'], LAC], ['loadInterpolator', [CONTEXT, 'I'], INTERP], ['loadInterpolator', ['Landroid/content/res/Resources;', 'Landroid/content/res/Resources$Theme;', 'I'], INTERP], ]) {
     def(UTILS, name, `(${parameters.join('')})${result}`, (r, _m, args) => xa(r, name, parameters, result, args), { static: true });
   }
