@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=5273acf85d70';
-import { CHARSET_DATA } from './charset-data.js?v=5273acf85d70';
-import { closeConverterHandle } from './icu-converter-native.js?v=5273acf85d70';
+import { APKError } from './apk-error.js?v=0eed5c4e54ff';
+import { CHARSET_DATA } from './charset-data.js?v=0eed5c4e54ff';
+import { closeConverterHandle } from './icu-converter-native.js?v=0eed5c4e54ff';
 
 const CONVERTER = 'Lcom/android/icu/charset/NativeConverter;';
 const CHARSET = 'Ljava/nio/charset/Charset;';

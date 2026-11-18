@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=5273acf85d70';
-import { createHostRegistry } from './host-contract.js?v=5273acf85d70';
-import { Blocked, VMThread } from './scheduler.js?v=5273acf85d70';
-import { Invoke } from './interpreter.js?v=5273acf85d70';
-import { GC_ROOTS } from './heap-gc.js?v=5273acf85d70';
+import { APKError } from './apk-error.js?v=0eed5c4e54ff';
+import { createHostRegistry } from './host-contract.js?v=0eed5c4e54ff';
+import { Blocked, VMThread } from './scheduler.js?v=0eed5c4e54ff';
+import { Invoke } from './interpreter.js?v=0eed5c4e54ff';
+import { GC_ROOTS } from './heap-gc.js?v=0eed5c4e54ff';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -528,7 +528,7 @@ export function createConcurrencyHost(platform) {
     const runnable = r.allocate(WORKER); r.object(runnable).worker = { pool: self, worker }; worker.runnable = runnable;
     const thread = vcall(r, p.factory, FACTORY, 'newThread', [RUNNABLE], THREAD, [runnable]);
     if (thread === null) return false; // factory refused: execute() then falls through to the queue / rejection like the JDK
-    worker.thread = thread; p.workers.push(worker); startWorker(r, self, worker); return true;
+    worker.thread = thread; p.workers.push(worker); if (p.workers.length > (p.largest ?? 0)) p.largest = p.workers.length; startWorker(r, self, worker); return true;
   }
   // A pool worker is a green thread whose driver runs one step at a time: take a task, run it as Java frames (an Invoke), and come back for the next. An idle worker blocks
   // until work arrives, the pool shuts down, or a non-core worker's keep-alive time passes.
@@ -544,10 +544,13 @@ export function createConcurrencyHost(platform) {
         if (p.shutdown) { retire(r, self, worker); return undefined; }
         worker.idle = true;
         const nonCore = live(p) > p.core || p.allowCoreTimeout, keep = nonCore && p.keepAliveMs > 0 ? p.keepAliveMs : Infinity;
-        return block(r, { reason: 'ThreadPoolExecutor idle worker', ready: () => p.queue.length > 0 || p.shutdown, timeoutMs: keep, interruptible: false,
-          finish: () => { if (!p.queue.length && !p.shutdown && keep !== Infinity) worker.expired = true; } });   // keep-alive elapsed: a surplus worker retires
+        return block(r, { reason: 'ThreadPoolExecutor idle worker', ready: () => p.queue.length > 0 || p.shutdown || worker.first !== null, timeoutMs: keep, interruptible: false,
+          finish: () => { if (worker.first === null && !p.queue.length && !p.shutdown && keep !== Infinity) worker.expired = true; } });   // keep-alive elapsed: a surplus worker retires; a hand-off (execute) wakes it with its task
       }
       worker.idle = false;
+      // ThreadPoolExecutor.runWorker: unless the pool is stopping (shutdownNow), the worker's interrupt status is cleared before each task, so an interrupt aimed at an earlier task
+      // (FutureTask.cancel(true) of the task this thread ran) never reaches the next one.
+      if (!p.stopped) { const st = state(r, worker.thread); if (st.interrupted) st.interrupted = false; }
       vcall(r, self, TPE, 'beforeExecute', [THREAD, RUNNABLE], 'V', [worker.thread, task]);
       return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [task], 'virtual',
         () => { vcall(r, self, TPE, 'afterExecute', [RUNNABLE, THROWABLE], 'V', [task, null]); p.completed++; return undefined; },
@@ -571,6 +574,14 @@ export function createConcurrencyHost(platform) {
         const p = pool(r, self);
     if (p.shutdown) return reject(r, self, task);
     if (live(p) < p.core && addWorker(r, self, task)) return;
+    // SynchronousQueue (capacity 0: Executors.newCachedThreadPool, and every pool built as ThreadPoolExecutor(0, MAX, keepAlive, new SynchronousQueue())): workQueue.offer succeeds
+    // when a worker waits in poll(keepAlive) for its next task, and that worker takes it. Only when no worker is idle does execute start a new one (ThreadPoolExecutor.execute, step 3).
+    if (p.capacity === 0) { const idle = p.workers.find(w => w.idle && !w.expired && w.first === null); if (idle) {
+      idle.first = task; idle.idle = false;
+      // The woken worker takes the processor where a newly started one would (Scheduler.start appends): the end of the round robin, so a hand-off is served no later than a new thread.
+      const st = state(r, idle.thread), list = r.scheduler.threads, at = list.indexOf(st); if (at >= 0 && at !== list.length - 1) { list.splice(at, 1); list.push(st); if (r.scheduler.cursor > at) r.scheduler.cursor--; }
+      return;
+    } }
     if (p.queue.length < p.capacity) {
       p.queue.push(task);
       if (live(p) === 0) addWorker(r, self, null);   // idle workers see the new task through their wait condition
@@ -608,7 +619,7 @@ export function createConcurrencyHost(platform) {
     if (!live(p)) vcall(r, self, TPE, 'terminated', [], 'V');
   });
   def(TPE, 'shutdownNow', `()${LIST}`, (r, _m, [self]) => {
-    const p = pool(r, self); p.shutdown = true; const pending = p.queue.splice(0);
+    const p = pool(r, self); p.shutdown = true; p.stopped = true; const pending = p.queue.splice(0);
     for (const w of [...p.workers]) { state(r, w.thread).interrupted = true; if (w.idle) retire(r, self, w); }
     return listOf(r, pending);
   });
@@ -617,7 +628,7 @@ export function createConcurrencyHost(platform) {
   def(TPE, 'isTerminated', '()Z', (r, _m, [self]) => terminated(pool(r, self)) ? 1 : 0);
   def(TPE, 'isTerminating', '()Z', (r, _m, [self]) => { const p = pool(r, self); return p.shutdown && !terminated(p) ? 1 : 0; });
   def(TPE, 'awaitTermination', `(J${UNIT})Z`, (r, _m, [self, t, unit]) => { const p = pool(r, self); checkInterrupt(r); return helpUntil(r, () => terminated(p), Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]))) ? 1 : 0; });
-  def(TPE, 'getPoolSize', '()I', (r, _m, [self]) => live(pool(r, self))); def(TPE, 'getActiveCount', '()I', (r, _m, [self]) => pool(r, self).workers.filter(w => !w.idle).length);
+  def(TPE, 'getPoolSize', '()I', (r, _m, [self]) => live(pool(r, self))); def(TPE, 'getLargestPoolSize', '()I', (r, _m, [self]) => pool(r, self).largest ?? 0); def(TPE, 'getActiveCount', '()I', (r, _m, [self]) => pool(r, self).workers.filter(w => !w.idle).length);
   def(TPE, 'getCorePoolSize', '()I', (r, _m, [self]) => pool(r, self).core); def(TPE, 'getMaximumPoolSize', '()I', (r, _m, [self]) => pool(r, self).max);
   def(TPE, 'setCorePoolSize', '(I)V', (r, _m, [self, n]) => { if (n < 0) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); pool(r, self).core = n; });
   def(TPE, 'setMaximumPoolSize', '(I)V', (r, _m, [self, n]) => { if (n <= 0 || n < pool(r, self).core) throwNew(r, 'Ljava/lang/IllegalArgumentException;'); pool(r, self).max = n; });
