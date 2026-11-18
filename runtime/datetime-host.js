@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=f44ff036c903';
-import { gcRoot } from './heap-gc.js?v=f44ff036c903';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=f44ff036c903';
-import { JavaException } from './apk-runtime.js?v=f44ff036c903';
-import { bestDateTimePattern } from './date-skeleton.js?v=f44ff036c903';
+import { APKError } from './apk-error.js?v=15e12aa41512';
+import { gcRoot } from './heap-gc.js?v=15e12aa41512';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=15e12aa41512';
+import { JavaException } from './apk-runtime.js?v=15e12aa41512';
+import { bestDateTimePattern } from './date-skeleton.js?v=15e12aa41512';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -19,15 +19,17 @@ export function createDateTimeHost(platform) {
   type(PARSE, 'Ljava/lang/Exception;'); type('Ljava/text/ParseException;', 'Ljava/lang/Exception;');
 
   // ---- Date ----------------------------------------------------------------------------------------------------------------------------------------
-  const time = (r, ref) => { const t = r.object(ref).dateMillis; if (t === undefined) r.throwJava('Ljava/lang/IllegalStateException;', 'java.util.Date used before construction'); return t; };
+  // libcore Date keeps the time in `transient long fastTime`: an instance no constructor ran for (Unsafe.allocateInstance, as object factories of JSON and serialization libraries
+  // use) has fastTime 0, the epoch -- getTime() answers 0, setTime works -- never an error.
+  const time = (r, ref) => r.object(ref).dateMillis ?? 0n;
   def(DATE, '<init>', '()V', (r, _m, [self]) => { r.object(self).dateMillis = BigInt(Math.floor(r.clock.wall())); });
   def(DATE, '<init>', '(J)V', (r, _m, [self, t]) => { r.object(self).dateMillis = BigInt(t); });
   def(DATE, 'getTime', '()J', (r, _m, [self]) => time(r, self));
-  def(DATE, 'setTime', '(J)V', (r, _m, [self, t]) => { time(r, self); r.object(self).dateMillis = BigInt(t); });
+  def(DATE, 'setTime', '(J)V', (r, _m, [self, t]) => { r.object(self).dateMillis = BigInt(t); });
   def(DATE, 'before', `(${DATE})Z`, (r, _m, [self, o]) => time(r, self) < time(r, o) ? 1 : 0); def(DATE, 'after', `(${DATE})Z`, (r, _m, [self, o]) => time(r, self) > time(r, o) ? 1 : 0);
   const compare = (r, a, b) => { const x = time(r, a), y = time(r, b); return x < y ? -1 : x > y ? 1 : 0; };
   def(DATE, 'compareTo', `(${DATE})I`, (r, _m, [self, o]) => compare(r, self, o)); def(DATE, 'compareTo', `(${OBJECT})I`, (r, _m, [self, o]) => compare(r, self, o));
-  def(DATE, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => o !== null && typeof o === 'object' && r.object(o).dateMillis !== undefined && r.object(o).dateMillis === time(r, self) ? 1 : 0);
+  def(DATE, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => o !== null && o !== 0 && typeof o === 'object' && r.isSubtype(r.typeOf(o), DATE) && time(r, o) === time(r, self) ? 1 : 0);   // obj instanceof Date && getTime() == ((Date) obj).getTime()
   def(DATE, 'hashCode', '()I', (r, _m, [self]) => { const t = BigInt.asUintN(64, time(r, self)); return Number(BigInt.asIntN(32, t ^ (t >> 32n))); });
   def(DATE, 'clone', `()${OBJECT}`, (r, _m, [self]) => { const c = r.allocate(DATE); r.object(c).dateMillis = time(r, self); return c; });
   def(DATE, 'toString', `()${STRING}`, (r, _m, [self]) => { const t = Number(time(r, self)), tz = defaultZone(); const p = parts(t, tz.id); return `${p.weekday.slice(0, 3)} ${p.monthName.slice(0, 3)} ${String(p.day).padStart(2, '0')} ${two(p.hour)}:${two(p.minute)}:${two(p.second)} ${zoneName({ zone: tz.id }, t, false)} ${p.year}`; });

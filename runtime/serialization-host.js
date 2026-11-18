@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=f44ff036c903';
-import { APKError } from './apk-error.js?v=f44ff036c903';
-import { createHostRegistry, floatBits } from './host-contract.js?v=f44ff036c903';
-import { DIGESTS } from './crypto-host.js?v=f44ff036c903';
+import { gcRoot } from './heap-gc.js?v=15e12aa41512';
+import { APKError } from './apk-error.js?v=15e12aa41512';
+import { createHostRegistry, floatBits } from './host-contract.js?v=15e12aa41512';
+import { DIGESTS } from './crypto-host.js?v=15e12aa41512';
 
 // java.io.ObjectOutputStream / ObjectInputStream: the Java Object Serialization Stream Protocol (JDK 8 ObjectStreamConstants, protocol version 5) for the types a VM app
 // serializes through Parcel.writeSerializable, Bundle/Intent extras, WorkManager's Data, caches and Externalizable models: String, boxed primitives, primitive and reference
@@ -21,6 +21,7 @@ const BOX = {   // java.lang boxes: [serialVersionUID, primitive field type]
 // Collections: serialVersionUID, non-transient fields, whether the class has its own writeObject, and the parent class whose writeObject writes the content.
 const COLLECTIONS = {
   'Ljava/util/ArrayList;': { suid: 8683452581122892189n, fields: [['size', 'I']], kind: 'list', own: true },
+  'Ljava/util/Date;': { suid: 7523967970034938905n, fields: [], kind: 'date', own: true },   // libcore Date.writeObject: s.writeLong(getTimeImpl()); no serial fields (fastTime is transient)
   'Ljava/util/LinkedList;': { suid: 876323262645176354n, fields: [], kind: 'linked', own: true },
   'Ljava/util/HashMap;': { suid: 362498820763181265n, fields: [['loadFactor', 'F'], ['threshold', 'I']], kind: 'map', own: true },
   'Ljava/util/LinkedHashMap;': { suid: 3801124242820219131n, fields: [['accessOrder', 'Z']], kind: 'map', own: false, parent: 'Ljava/util/HashMap;' },
@@ -216,7 +217,8 @@ export function createSerializationHost(platform) {
     const c = level.collection;
     if (!c || !c.own) return;
     setBlockMode(s, true);
-    if (c.kind === 'list' || c.kind === 'linked') { emit(s, int4(collectionSize(r, ref))); iterate(r, ref, e => writeBlockObject(r, s, e)); }
+    if (c.kind === 'date') emit(s, primitiveBytes('J', vcall(r, ref, 'Ljava/util/Date;', 'getTime', [], 'J')));
+    else if (c.kind === 'list' || c.kind === 'linked') { emit(s, int4(collectionSize(r, ref))); iterate(r, ref, e => writeBlockObject(r, s, e)); }
     else if (c.kind === 'map') {
       const size = mapSize(r, ref); emit(s, int4(capacityFor(size))); emit(s, int4(size));
       iterate(r, vcall(r, ref, 'Ljava/util/Map;', 'entrySet', [], 'Ljava/util/Set;'), entry => { writeBlockObject(r, s, vcall(r, entry, 'Ljava/util/Map$Entry;', 'getKey', [], OBJECT)); writeBlockObject(r, s, vcall(r, entry, 'Ljava/util/Map$Entry;', 'getValue', [], OBJECT)); });
@@ -507,7 +509,8 @@ export function createSerializationHost(platform) {
     setReadBlockMode(r, s, true);
     const readInt = () => primitiveValue('I', dataBytes(r, s, 4)), element = () => { setReadBlockMode(r, s, false); try { return readObject0(r, s, false); } finally { setReadBlockMode(r, s, true); } };
     const add = value => vcall(r, ref, 'Ljava/util/Collection;', 'add', [OBJECT], 'Z', [value]);
-    if (c.kind === 'list') { readInt(); for (let i = 0, n = slot.values.size; i < n; i++) add(element()); }
+    if (c.kind === 'date') r.dispatch({ owner: 'Ljava/util/Date;', name: 'setTime', parameters: ['J'], result: 'V', signature: '(J)V' }, r.argumentWords(['J'], [primitiveValue('J', dataBytes(r, s, 8))], { receiver: ref }), 'virtual');   // Date.readObject: fastTime = s.readLong()
+    else if (c.kind === 'list') { readInt(); for (let i = 0, n = slot.values.size; i < n; i++) add(element()); }
     else if (c.kind === 'linked') { for (let i = 0, n = readInt(); i < n; i++) add(element()); }
     else if (c.kind === 'map') { readInt(); for (let i = 0, n = readInt(); i < n; i++) { const key = element(), value = element(); vcall(r, ref, 'Ljava/util/Map;', 'put', [OBJECT, OBJECT], OBJECT, [key, value]); } }
     else { readInt(); readInt(); for (let i = 0, n = readInt(); i < n; i++) add(element()); }

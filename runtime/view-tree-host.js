@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=f44ff036c903';
-import { gcRoot } from './heap-gc.js?v=f44ff036c903';
+import { APKError } from './apk-runtime.js?v=15e12aa41512';
+import { gcRoot } from './heap-gc.js?v=15e12aa41512';
 
 const OBSERVER = 'Landroid/view/ViewTreeObserver;';
 const GET_OBSERVER = 'Landroid/view/View;->getViewTreeObserver()Landroid/view/ViewTreeObserver;';
