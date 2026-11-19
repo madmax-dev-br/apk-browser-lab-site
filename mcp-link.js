@@ -65,7 +65,7 @@ export function mcpAgentSetup(agent, options = {}) {
 }
 
 /**
- * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (install_apk, adb install / push) and context.sendFile(slot, blob) hands it one to write (adb pull). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
+ * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (adb install / push) and context.sendFile(slot, blob) hands it one to write (adb pull). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
  * Returns { connect({ url, token }), disconnect(), get connected(), state }.
  */
 export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = globalThis.EventSource, fetchImpl = (...args) => globalThis.fetch(...args) }) {
@@ -78,7 +78,7 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
     try { await fetchImpl(`${base}/result`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: call.id, ...result }) }); }
     catch (error) { emit('erro', `the response did not reach the bridge: ${error?.message ?? error}`); }
   }
-  /** A file the bridge offers for the call in flight (install_apk: { id, name, size }), read from the bridge on this machine into a File. */
+  /** A file the bridge offers for the call in flight (adb install / push: { id, name, size }), read from the bridge on this machine into a File. */
   async function fetchFile(base, { id, name, size } = {}) {
     if (!/^[0-9a-f]{16,64}$/.test(String(id ?? ''))) throw new Error('The bridge did not deliver the file for this call.');
     const res = await fetchImpl(`${base}/file/${id}`, { cache: 'no-store' });

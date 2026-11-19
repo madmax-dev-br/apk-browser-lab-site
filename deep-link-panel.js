@@ -1,4 +1,4 @@
-// An Intent request from a link, an action and a component (the MCP tool open_link), and the wording of the result. DOM-free; src/deep-link-host.js (Worker) does the
+// An Intent request from a link, an action and a component (adb am start -a VIEW -d, through the MCP tool adb), and the wording of the result. DOM-free; src/deep-link-host.js (Worker) does the
 // resolution and the start. (The Controles panel had an "Abrir" form built on this; links are now opened from the adb terminal: adb shell am start -a VIEW -d <link>.)
 export const DEFAULT_ACTION = 'android.intent.action.VIEW';
 

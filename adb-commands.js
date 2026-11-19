@@ -7,9 +7,9 @@
 // createAdb(device).run({ command | args }, io) -> { stdout, stderr, code, images: [{ blob, type }], notes: [] }
 //   io.localFile(path) -> File of the machine that runs the bridge (adb install / push); io.writeLocal(path, blob, { append }) writes one there (adb pull, `> file`).
 // The command-line syntax (quotes, | grep, &&, >) is src/adb-shell.js. No process.*.
-import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=2c8f02932a2c';
-import { formatThreadtime } from './logcat.js?v=2c8f02932a2c';
-import { kindOf, directoryOf } from './shared-storage.js?v=2c8f02932a2c';
+import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=537a5b96b853';
+import { formatThreadtime } from './logcat.js?v=537a5b96b853';
+import { kindOf, directoryOf } from './shared-storage.js?v=537a5b96b853';
 
 export const SERIAL = 'apkweb-lab';
 const SHARED_ROOT = '/storage/emulated/0', SHARED_ALIASES = ['/sdcard', '/mnt/sdcard', '/storage/self/primary'];
@@ -377,7 +377,7 @@ export function createAdb(device, { sleep = ms => new Promise(resolve => setTime
       if (service === 'package') {
         if (rest.length !== 1) throw unsupported('dumpsys package without a package', 'dumpsys package <package>');
         const known = await device.packages(); if (!known.some(item => item.packageName === rest[0])) return ok(`Unable to find package: ${rest[0]}\n`);
-        const inventory = info.inventory; if (!inventory || inventory.packageName !== rest[0]) throw new AdbError(`dumpsys package ${rest[0]}: the page only knows the manifest of the loaded app (${info.packageName ?? 'none'}). Open ${rest[0]} first (am start, monkey -p or open_app).`);
+        const inventory = info.inventory; if (!inventory || inventory.packageName !== rest[0]) throw new AdbError(`dumpsys package ${rest[0]}: the page only knows the manifest of the loaded app (${info.packageName ?? 'none'}). Open ${rest[0]} first (am start or monkey -p).`);
         env.notes.push('Summary with what the manifest and the permissions panel say; the other dumpsys package sections do not exist here.');
         const permissions = await device.permissions(), runtime = new Map(permissions.map(item => [item.name, item.granted]));
         let text = `Packages:\n  Package [${rest[0]}] (${token(rest[0])}):\n    pkg=Package{${token(rest[0])} ${rest[0]}}\n`;

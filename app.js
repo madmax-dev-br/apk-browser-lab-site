@@ -1,53 +1,53 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=2c8f02932a2c';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=2c8f02932a2c';
-import { clientIdentityStatus } from './client-identity.js?v=2c8f02932a2c';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=2c8f02932a2c';
-import { initCollapsibleSections } from './panel-sections.js?v=2c8f02932a2c';
-import { warmupLabel } from './warmup.js?v=2c8f02932a2c';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=2c8f02932a2c';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=2c8f02932a2c';
-import { initHelpTips } from './help-tips.js?v=2c8f02932a2c';
-import { createToolDock } from './tool-dock.js?v=2c8f02932a2c';
-import { createPermissionsPanel } from './permissions-panel.js?v=2c8f02932a2c';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=2c8f02932a2c';
-import { createAppDataPanel } from './app-data-panel.js?v=2c8f02932a2c';
-import { createCameraLab } from './camera-lab.js?v=2c8f02932a2c';
-import { createOverridesPanel } from './overrides-panel.js?v=2c8f02932a2c';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=2c8f02932a2c';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=2c8f02932a2c';
-import { createHostMapPanel } from './host-map-panel.js?v=2c8f02932a2c';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=2c8f02932a2c';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=2c8f02932a2c';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=2c8f02932a2c';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=2c8f02932a2c';
-import { createDeviceView, createViewState } from './device-view.js?v=2c8f02932a2c';
-import { createTaskSwitcher } from './task-switcher.js?v=2c8f02932a2c';
-import { createDeviceZoom } from './device-zoom.js?v=2c8f02932a2c';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2c8f02932a2c';
-import { formatApiGapReport } from './api-gap-scan.js?v=2c8f02932a2c';
-import { createLogcatPanel } from './logcat-panel.js?v=2c8f02932a2c';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=2c8f02932a2c';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=2c8f02932a2c';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=2c8f02932a2c';
-import { captureImage, paintScreen } from './screen-capture.js?v=2c8f02932a2c';
-import { createScreenRecorder } from './screen-recorder.js?v=2c8f02932a2c';
-import { createPluginsPanel } from './plugins-panel.js?v=2c8f02932a2c';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=2c8f02932a2c';
-import { createAdb } from './adb-commands.js?v=2c8f02932a2c';
-import { createAdbTerminal } from './adb-terminal.js?v=2c8f02932a2c';
-import { memorySummary } from './worker-memory.js?v=2c8f02932a2c';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=2c8f02932a2c';
-import { createModalHost } from './lab-modal.js?v=2c8f02932a2c';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=2c8f02932a2c';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=2c8f02932a2c';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=2c8f02932a2c';
-import { createDragLayer } from './lab-drag.js?v=2c8f02932a2c';
-import { createLabScroll } from './lab-scroll.js?v=2c8f02932a2c';
-import { createGlSurfaces } from './gl-surfaces.js?v=2c8f02932a2c';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=2c8f02932a2c';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=2c8f02932a2c';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=2c8f02932a2c';
-import { resolveIntentFields } from './intent-resolver.js?v=2c8f02932a2c';
+import { APKWorkerClient } from './apk-worker-client.js?v=537a5b96b853';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=537a5b96b853';
+import { clientIdentityStatus } from './client-identity.js?v=537a5b96b853';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=537a5b96b853';
+import { initCollapsibleSections } from './panel-sections.js?v=537a5b96b853';
+import { warmupLabel } from './warmup.js?v=537a5b96b853';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=537a5b96b853';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=537a5b96b853';
+import { initHelpTips } from './help-tips.js?v=537a5b96b853';
+import { createToolDock } from './tool-dock.js?v=537a5b96b853';
+import { createPermissionsPanel } from './permissions-panel.js?v=537a5b96b853';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=537a5b96b853';
+import { createAppDataPanel } from './app-data-panel.js?v=537a5b96b853';
+import { createCameraLab } from './camera-lab.js?v=537a5b96b853';
+import { createOverridesPanel } from './overrides-panel.js?v=537a5b96b853';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=537a5b96b853';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=537a5b96b853';
+import { createHostMapPanel } from './host-map-panel.js?v=537a5b96b853';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=537a5b96b853';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=537a5b96b853';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=537a5b96b853';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=537a5b96b853';
+import { createDeviceView, createViewState } from './device-view.js?v=537a5b96b853';
+import { createTaskSwitcher } from './task-switcher.js?v=537a5b96b853';
+import { createDeviceZoom } from './device-zoom.js?v=537a5b96b853';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=537a5b96b853';
+import { formatApiGapReport } from './api-gap-scan.js?v=537a5b96b853';
+import { createLogcatPanel } from './logcat-panel.js?v=537a5b96b853';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=537a5b96b853';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=537a5b96b853';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=537a5b96b853';
+import { captureImage, paintScreen } from './screen-capture.js?v=537a5b96b853';
+import { createScreenRecorder } from './screen-recorder.js?v=537a5b96b853';
+import { createPluginsPanel } from './plugins-panel.js?v=537a5b96b853';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=537a5b96b853';
+import { createAdb } from './adb-commands.js?v=537a5b96b853';
+import { createAdbTerminal } from './adb-terminal.js?v=537a5b96b853';
+import { memorySummary } from './worker-memory.js?v=537a5b96b853';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=537a5b96b853';
+import { createModalHost } from './lab-modal.js?v=537a5b96b853';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=537a5b96b853';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=537a5b96b853';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=537a5b96b853';
+import { createDragLayer } from './lab-drag.js?v=537a5b96b853';
+import { createLabScroll } from './lab-scroll.js?v=537a5b96b853';
+import { createGlSurfaces } from './gl-surfaces.js?v=537a5b96b853';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=537a5b96b853';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=537a5b96b853';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=537a5b96b853';
+import { resolveIntentFields } from './intent-resolver.js?v=537a5b96b853';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -223,7 +223,7 @@ function closeCrashedApp(note = 'The app was ended by the error; tap its icon on
   taskSwitcher?.closed(); $('preview-name').textContent = state.inventory?.packageName || state.currentSource?.name || 'App preview';
   appendTrace(note);
 }
-/** The user threw the app away (its recents card dragged off, or the window flung up: src/task-switcher.js), or an MCP client closed it (close_app): as when Android removes a
+/** The user threw the app away (its recents card dragged off, or the window flung up: src/task-switcher.js), or adb closed it (am force-stop): as when Android removes a
  *  task from the recents, the app's process is killed with no further callback. Here the process is the Worker; the launcher icon opens the APK again in a new one. */
 function dismissApp(by = 'by the user (swiped out of the recents)') {
   if (state.mode !== 'apk' || !state.currentSource || !state.runtime) return;
@@ -808,7 +808,7 @@ const mcpInput = {
   async back() { if (!state.canGoBack) throw Object.assign(new Error('There is no previous screen to go back to.'), { code: 'bad-args' }); await backAPK(); return { back: true }; },
   scrollTo: args => labScrollCall('scrollTo', args), scrollInfo: args => labScrollCall('info', args),   // to a position / percentage (src/lab-scroll.js), as lab.scrollTo of the plugins
 };
-// The Controls panel and the device's apps for MCP (src/mcp-tools.js: app_data, device, apps, install_apk, open_app, close_app, open_link, host_redirects, permissions): each does
+// The Controls panel and the device's apps for MCP (src/mcp-tools.js: app_data, device, host_redirects; and the adb device facade below: install, open, close): each does
 // what the page's own control does.
 const DEVICE_KEYS_MCP = ['screen', 'orientation', 'locale', 'darkTheme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'connectivity', 'navigation', 'renderer', 'engine', 'eventSeconds', 'memoryMiB', 'raster'];
 /** The apps of the device's home screen as the MCP tools name them (ids an agent can carry: printableShelfId), and the app of this VM. */
@@ -837,7 +837,7 @@ const mcpControls = {
     else throw new Error('action is list, open, restart or stop');
     await waitIdle(); return mcpAppState();
   },
-  /** install_apk: the file the bridge handed over is installed as a file dropped on the page is (read in the Worker, kept on the home screen); `open` also starts it. */
+  /** adb install: the file the bridge handed over is installed as a file dropped on the page is (read in the Worker, kept on the home screen); `open` also starts it. */
   async installApk(file, { open = false } = {}) {
     if (!file || !/\.apk$/i.test(file.name)) throw new Error('The file must be an .apk.');
     if (file.size > 1024 * 1024 * 1024) throw new Error('This lab limits APKs to 1 GiB.');
@@ -845,13 +845,13 @@ const mcpControls = {
     await importSource(source, open); await waitIdle();
     if (state.currentSource !== source) throw new Error(`The installation of ${file.name} was interrupted: another APK was opened in the page.`);
     if (!state.inventory) throw new Error(`Could not install ${file.name}: ${state.lastAPKError ? String(state.lastAPKError.error?.message ?? state.lastAPKError.error) : 'reading the APK was canceled'}`);
-    appendTrace(`MCP (install_apk): ${file.name} installed${open ? ' and opened' : ''}`);
-    return { installed: true, ...mcpAppState(), launcherActivity: state.inventory.launcherActivity ?? null, sizeBytes: file.size, ...(open ? { opened: state.apkRunning } : { note: 'Installed on the home screen; open_app opens it.' }) };
+    appendTrace(`adb install: ${file.name} installed${open ? ' and opened' : ''}`);
+    return { installed: true, ...mcpAppState(), launcherActivity: state.inventory.launcherActivity ?? null, sizeBytes: file.size, ...(open ? { opened: state.apkRunning } : { note: 'Installed on the home screen; adb shell monkey -p <package> 1 opens it.' }) };
   },
-  /** open_app: what a tap on the app's launcher icon does. The app of this VM is started (or brought back from the background); another installed one is loaded and started. */
+  /** adb's open (am start, monkey): what a tap on the app's launcher icon does. The app of this VM is started (or brought back from the background); another installed one is loaded and started. */
   async openApp(selector = {}) {
     const entry = await mcpNamedApp(selector);
-    if (!entry && !state.currentSource) throw new Error('No current app: say which one to open (id, package or name; apps lists the installed ones) or install one with install_apk.');
+    if (!entry && !state.currentSource) throw new Error('No current app: say which one to open (id, package or name; apps lists the installed ones) or install one with adb install.');
     await waitIdle();
     const current = entry ? entry.id === state.shelfId && !!state.currentSource : true;
     if (current && state.runtime && state.apkRunning) {
@@ -861,17 +861,17 @@ const mcpControls = {
     if (current && (state.runtime || state.needsRestart)) await runAPK();
     else if (entry) await openSavedApp(entry.id);
     else { state.needsRestart = true; await runAPK(); }   // the VM of the current APK was ended (apps stop): reopened in a fresh Worker
-    await waitIdle(); if (state.apkRunning) appendTrace('MCP (open_app): app opened');
+    await waitIdle(); if (state.apkRunning) appendTrace('adb (open): app opened');
     return { opened: state.apkRunning, ...mcpAppState() };
   },
-  /** close_app: the app is thrown away as from the recents (dismissApp). One app runs at a time: a named app that is not the open one is reported, not closed. */
+  /** adb's close (am force-stop): the app is thrown away as from the recents (dismissApp). One app runs at a time: a named app that is not the open one is reported, not closed. */
   async closeApp(selector = {}) {
     const entry = await mcpNamedApp(selector);
     if (entry && entry.id !== state.shelfId) return { closed: false, ...mcpAppState(), note: `${printableShelfId(entry.id)} is not the open app.` };
     if (state.busy || state.runStarting) await waitIdle(5000);
-    if (state.busy || state.runStarting) { cancelOperation(); appendTrace('MCP (close_app): the app was still opening; the VM was ended'); return { closed: true, ...mcpAppState(), note: 'The app was still opening: the VM was ended.' }; }
+    if (state.busy || state.runStarting) { cancelOperation(); appendTrace('adb (close): the app was still opening; the VM was ended'); return { closed: true, ...mcpAppState(), note: 'The app was still opening: the VM was ended.' }; }
     if (!state.runtime || !state.apkRunning) return { closed: false, ...mcpAppState(), note: state.currentSource ? 'The current app is not open.' : 'No app is open.' };
-    dismissApp('by MCP (close_app)');
+    dismissApp('by adb (close)');
     return { closed: !state.apkRunning, ...mcpAppState() };
   },
   async openLink({ link = '', action = '', component = '' } = {}) {

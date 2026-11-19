@@ -5,7 +5,7 @@
 // Cost: nothing without overlays, tracks or frame listeners (no animation-frame loop, no listener). With them, one animation-frame loop reads the screen's rectangle (one
 // getBoundingClientRect) and does the rest only when the rectangle changed or a new frame was drawn; tracks and 'frame' reach the plugin only when their value changed.
 // No process.*.
-import { matchTargets } from './lab-target.js?v=2c8f02932a2c';
+import { matchTargets } from './lab-target.js?v=537a5b96b853';
 
 export const OVERLAY_PLACEMENTS = ['over', 'top', 'bottom', 'left', 'right', 'center'];
 export const OVERLAY_ALIGNS = ['start', 'center', 'end'];

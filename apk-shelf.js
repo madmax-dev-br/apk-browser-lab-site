@@ -21,7 +21,7 @@ export function printableShelfId(id) { return String(id ?? '').replace('\u0000',
  */
 export function resolveShelfApp(items, { id = null, packageName = null, name = null } = {}) {
   const list = Array.isArray(items) ? items : [], lower = value => String(value ?? '').trim().toLowerCase(), error = (code, message) => Object.assign(new Error(message), { code });
-  const show = item => `${printableShelfId(item.id)}${item.label ? ` (${item.label})` : ''}`, installed = list.length ? `Installed: ${list.map(show).join(', ')}.` : 'No app is installed: use install_apk.';
+  const show = item => `${printableShelfId(item.id)}${item.label ? ` (${item.label})` : ''}`, installed = list.length ? `Installed: ${list.map(show).join(', ')}.` : 'No app is installed: use adb install.';
   let found, what;
   if (id) { found = list.filter(item => item.id === id || printableShelfId(item.id) === id); what = `id "${printableShelfId(id)}"`; }
   else if (packageName) { found = list.filter(item => item.packageName === packageName); what = `package "${packageName}"`; }

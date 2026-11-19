@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=2c8f02932a2c';
+import { blockValue, outputsOf } from './plugin-host.js?v=537a5b96b853';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -93,10 +93,6 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
     if (args.screenshot) { const shot = await query('screenshot', { maxWidth: args.max_width }); content.unshift(await image(shot)); }
     return content;
   }
-  /** Which installed app a call names: its id (apps, install_apk), its package, or its label / file name. */
-  const appSelector = args => ({ id: args.id === undefined ? null : String(args.id), packageName: args.package === undefined ? null : String(args.package), name: args.name === undefined ? null : String(args.name) });
-  /** After an app was opened: "Screen ready" (up to wait_ms) and the Activity on screen. */
-  async function settled(waitMs, networkMs) { return readyReport(await waitReady(waitMs ?? 15000, networkMs)); }
   const tools = {
     async lab_status() {
       const screen = await query('screen', {});
@@ -244,7 +240,6 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
       return afterInput(await input.scrollTo({ target: scrollTargetOf(args), x: args.to_x, y: args.to_y, percentX: args.percent_x, percentY: args.percent_y }), args);
     },
     async scroll_info(args) { if (!input?.scrollInfo) throw fail('Input is not available on this page.'); return [text(await input.scrollInfo({ target: scrollTargetOf(args) }))]; },
-    async back(args) { if (!input?.back) throw fail('Input is not available on this page.'); return afterInput(await input.back(args), args); },
     async reload(args) { if (!actions?.reload) throw fail('Reload is not available on this page.'); return [text(await actions.reload(args.mode === 'reopen' ? 'reopen' : 'recreate'))]; },
     // ---- the Controls panel (controls: src/app.js mcpControls) ----
     async app_data(args) {
@@ -270,20 +265,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
       return [text(await controls.appData({ op: 'sql', db: String(args.db), sql: String(args.sql), params: Array.isArray(args.params) ? args.params : [], limit: bounded(args.limit, 200, 1, 500) }))];
     },
     async device(args) { if (!controls?.device) throw fail('Device settings are not available on this page.'); return [text(controls.device(args.set ?? null))]; },
-    async apps(args) { if (!controls?.apps) throw fail('Saved apps are not available on this page.'); const result = await controls.apps(args.action ?? 'list', args.id ?? null); if ((args.action ?? 'list') === 'list' || !result.running) return [text(result)]; return [text({ ...result, ...(await settled(args.wait_ms)) })]; },
-    // ---- the device's apps (src/app.js mcpControls: the same paths as dropping a file on the page, the launcher icon and throwing the app off the recents) ----
-    async install_apk(args, context) {
-      if (!controls?.installApk) throw fail('Installing an APK is not available on this page.');
-      if (!args.file?.id || typeof context?.fetchFile !== 'function') throw fail('install_apk needs the file delivered by the bridge: pass path (an .apk on the machine where the bridge runs) and use the current lab-mcp.mjs bridge.');
-      const result = await controls.installApk(await context.fetchFile(args.file), { open: args.open === true });
-      return [text(args.open === true && result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
-    },
-    async open_app(args) {
-      if (!controls?.openApp) throw fail('Opening an installed app is not available on this page.');
-      const result = await controls.openApp(appSelector(args));
-      return [text(result.running ? { ...result, ...(await settled(args.wait_ms, args.network_ms)) } : result)];
-    },
-    async close_app(args) { if (!controls?.closeApp) throw fail('Closing an app is not available on this page.'); return [text(await controls.closeApp(appSelector(args)))]; },
+    // ---- installing, opening and closing apps, deep links, Back and permissions are adb commands (adb install, am start, am force-stop, input keyevent 4, pm grant) ----
     /** A video of the screen (src/screen-recorder.js): start, then the other tools act on the app, then stop writes the file on the bridge's machine (`args.local.outputs.recording`). */
     async record_screen(args, context) {
       const recorder = controls?.recordScreen; if (!recorder) throw fail('Screen recording is not available on this page.');
@@ -315,9 +297,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
       if (result.code !== 0 || result.notes?.length) content.push(text({ exit: result.code, ...(result.notes?.length ? { lab: result.notes } : {}) }));
       return Object.assign(content, { isError: result.code !== 0 });
     },
-    async open_link(args) { if (!controls?.openLink) throw fail('Deep links are not available on this page.'); if (!args.link && !args.component) throw fail('link (or component) is required.'); return [text(await controls.openLink({ link: String(args.link ?? ''), action: String(args.action ?? ''), component: String(args.component ?? '') }))]; },
     async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirect hosts is not available on this page.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
-    async permissions(args) { if (!controls?.permissions) throw fail('Permissions are not available on this page.'); return [text(controls.permissions(args.name ?? null, args.state ?? null))]; },
     async wait_ready(args) { const report = readyReport(await waitReady(args.timeout_ms, args.network_ms)); return [text({ ...report, waitingFor: report.waitingFor ?? [] })]; },
   };
   return {

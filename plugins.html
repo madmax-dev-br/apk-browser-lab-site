@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=2c8f02932a2c">
-  <link rel="stylesheet" href="./lab-tokens.css?v=2c8f02932a2c">
+  <link rel="stylesheet" href="./site-pages.css?v=537a5b96b853">
+  <link rel="stylesheet" href="./lab-tokens.css?v=537a5b96b853">
 </head>
 <body>
   <header class="topbar">
@@ -1007,7 +1007,7 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
           <h4 class="api-sig names"><code>lab_status</code><code>wait_ready</code></h4>
           <p>The current screen and “Screen ready”; waits for the screen to settle.</p>
           <dl class="facts">
-            <div><dt>Slow network</dt><dd>The screen only becomes ready with no network request in flight, but a slow or hanging endpoint (a long poll, a server that does not respond) does not hold the wait to the end: with the screen already drawn and still and only the network pending, <code>wait_ready</code> waits <code>network_ms</code> more (default 5000) and returns <code>ready: false</code> with <code>networkPending</code>, the list of open requests (method, URL and for how many seconds). The same applies to the wait in <code>open_app</code>, <code>install_apk</code> with <code>open</code>, <code>tap</code>, <code>type</code>, <code>scroll</code> and <code>back</code>. If the content depends on the response, call <code>wait_ready</code> again with a larger <code>network_ms</code>.</dd></div>
+            <div><dt>Slow network</dt><dd>The screen only becomes ready with no network request in flight, but a slow or hanging endpoint (a long poll, a server that does not respond) does not hold the wait to the end: with the screen already drawn and still and only the network pending, <code>wait_ready</code> waits <code>network_ms</code> more (default 5000) and returns <code>ready: false</code> with <code>networkPending</code>, the list of open requests (method, URL and for how many seconds). The same applies to the wait in <code>tap</code>, <code>type</code> and <code>scroll</code>. If the content depends on the response, call <code>wait_ready</code> again with a larger <code>network_ms</code>.</dd></div>
           </dl>
         </div>
 
@@ -1081,13 +1081,12 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
         </div>
 
         <div class="api" id="mcp-tap">
-          <h4 class="api-sig names"><code>tap</code><code>type</code><code>scroll</code><code>back</code></h4>
+          <h4 class="api-sig names"><code>tap</code><code>type</code><code>scroll</code></h4>
           <p>Operate the app like you do. Each one waits for the screen to settle and returns the screen; with <code>screenshot: true</code>, the screenshot too.</p>
           <ul class="params">
             <li><code>tap</code> touches a component (by <code>test_tag</code>, <code>text</code> or <code>element_key</code>) or a point (<code>x</code>, <code>y</code>), with a real touch in Compose and a click on a View.</li>
             <li><code>type</code> types into a field (<code>value</code>).</li>
             <li><code>scroll</code> scrolls the component's list (<code>dy</code>, <code>dx</code>).</li>
-            <li><code>back</code> is the Back button.</li>
           </ul>
         </div>
 
@@ -1102,13 +1101,14 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
         </div>
 
         <div class="api" id="mcp-apps">
-          <h4 class="api-sig names"><code>install_apk</code><code>open_app</code><code>close_app</code><code>apps</code></h4>
-          <p>The apps on the emulator's home screen: install an APK, open an already installed app and close the open app. The device runs one app at a time, like the page: installing or opening another one ends the one that is open.</p>
+          <h4 class="api-sig names"><code>adb</code>: apps, deep links, Back and permissions</h4>
+          <p>Installing, listing, opening and closing apps, deep links, the Back button and runtime permissions are <code>adb</code> commands; there is no separate tool for them. The device runs one app at a time, like the page: installing or opening another one ends the one that is open. After a command that opens a screen, call <code>wait_ready</code>.</p>
           <ul class="params">
-            <li><code>install_apk</code> installs the <code>.apk</code> file at <code>path</code>, a path on the machine where the bridge runs (absolute, relative to the bridge's folder, or <code>~/…</code>). It is the same as dropping the file on the page: the bridge hands the bytes to this page through <code>127.0.0.1</code>, the APK is read in the browser and the icon appears on the home screen. With <code>open: true</code> the app opens next and the response waits for the screen to be ready. It returns <code>id</code>, <code>packageName</code> and <code>launcherActivity</code>; an APK that the lab cannot read comes back as an error with the reason, and one that it reads but cannot run carries <code>cannotRun</code>.</li>
-            <li><code>open_app</code> opens an installed app, like tapping its icon: by <code>id</code> (from <code>apps</code> or <code>install_apk</code>), by <code>package</code> or by <code>name</code> (the label or the file name). With none, the current app. An app that is in the background comes back to the front (<code>alreadyOpen</code>). It waits for the screen to be ready (<code>wait_ms</code>); if the app stopped on opening, the response carries <code>opened: false</code> and the error.</li>
-            <li><code>close_app</code> closes the open app, like swiping it out of recents: the process ends and the icon stays on the home screen. With <code>id</code>, <code>package</code> or <code>name</code>, it only closes if that is the open app; with no open app, it answers <code>closed: false</code>.</li>
-            <li><code>apps</code> lists the installed ones (<code>id</code>, package, label, file, <code>current</code> and <code>open</code>); also <code>restart</code> (reopens the current APK) and <code>stop</code> (ends the VM).</li>
+            <li><code>adb install app.apk</code> installs an <code>.apk</code> of the machine where the bridge runs (absolute, relative to the bridge's folder, or <code>~/…</code>), as a file dropped on the page: the bridge hands the bytes to this page through <code>127.0.0.1</code> and the icon appears on the home screen. <code>adb shell pm list packages</code> lists the installed ones and <code>adb shell pm uninstall</code> removes one.</li>
+            <li><code>adb shell monkey -p package 1</code> or <code>adb shell am start -n package/.Activity</code> opens an app, like its icon; <code>adb shell am force-stop package</code> closes it, like swiping it out of recents.</li>
+            <li><code>adb shell am start -a android.intent.action.VIEW -d &lt;link&gt;</code> opens a deep link in the installed app whose filters answer it.</li>
+            <li><code>adb shell input keyevent 4</code> is the Back button.</li>
+            <li><code>adb shell pm grant</code> / <code>revoke package android.permission.X</code> changes a runtime permission; <code>adb shell dumpsys package package</code> shows them.</li>
           </ul>
         </div>
 
@@ -1157,7 +1157,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
         <h3 id="mcp-seguranca">Bridge security</h3>
         <ul>
           <li><b>Who can reach it:</b> the bridge listens only on 127.0.0.1, accepts only the lab's origins (this page and a local copy; others with <code>--origin</code>) and requires the token, compared in constant time and never written to the logs; it stores nothing.</li>
-          <li><b>Files:</b> the bridge only reads a file when the agent calls <code>install_apk</code>: the <code>.apk</code> at the requested path (up to 1 GiB), handed to this page while the call lasts, with the same origin and token check. The page receives the file's name and size, not the path. <code>record_screen</code> writes the video at the path requested on <code>stop</code>. The <code>adb</code> tool does the same with the files the command line mentions: it reads the one in <code>adb install</code> and the one in <code>adb push</code>, and writes the destination of <code>adb pull</code> and of <code>&gt; file</code> (it overwrites, like a shell). No other path is read or written. With <code>--host 0.0.0.0</code>, an agent on another machine that has the token can ask for these reads and writes at any path you can reach on this machine.</li>
+          <li><b>Files:</b> the bridge only reads a file that an <code>adb</code> command line names (<code>adb install</code>, <code>adb push</code>): the file at the requested path (an <code>.apk</code> up to 1 GiB), handed to this page while the call lasts, with the same origin and token check. The page receives the file's name and size, not the path. <code>record_screen</code> writes the video at the path requested on <code>stop</code>. The <code>adb</code> tool does the same with the files the command line mentions: it reads the one in <code>adb install</code> and the one in <code>adb push</code>, and writes the destination of <code>adb pull</code> and of <code>&gt; file</code> (it overwrites, like a shell). No other path is read or written. With <code>--host 0.0.0.0</code>, an agent on another machine that has the token can ask for these reads and writes at any path you can reach on this machine.</li>
           <li><b>Token:</b> without <code>APK_WEB_LAB_MCP_TOKEN</code> or <code>--token</code>, the bridge uses the token in <code>~/.apk-web-lab-mcp-token</code> (<code>node lab-mcp.mjs token</code> shows it), which can be pasted into the page's Token field, as before.</li>
           <li><b>What changes in the app:</b> the MCP does not change the app from the inside: besides the reads, it taps and types like you and uses the lab's controls (mocks, reloading the screen, installing, opening and closing apps), which appear in Controls, on the home screen and in the execution log.</li>
           <li><b>Visible tab:</b> keep the lab's tab visible while you use it (background tabs get slow).</li>
@@ -1568,6 +1568,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=2c8f02932a2c"></script>
+  <script type="module" src="./site-pages.js?v=537a5b96b853"></script>
 </body>
 </html>
