@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=3f6a8d956a3c';
-import { throwNew } from './java-throw.js?v=3f6a8d956a3c';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=3f6a8d956a3c';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=3f6a8d956a3c';
-import { Blocked } from './scheduler.js?v=3f6a8d956a3c';
-import { captureBody } from './network-capture.js?v=3f6a8d956a3c';
-import { OS_CONSTANTS } from './os-constants-data.js?v=3f6a8d956a3c';
-import { openExchange, describeFailure } from './network-transport.js?v=3f6a8d956a3c';
-import { WorkerExecutor } from './network-worker-executor.js?v=3f6a8d956a3c';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=3f6a8d956a3c';
-import { TransportAuthority } from './transport-ca.js?v=3f6a8d956a3c';
-import { openWebSocketSession } from './websocket-bridge.js?v=3f6a8d956a3c';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=3f6a8d956a3c';
-import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=3f6a8d956a3c';
+import { APKError } from './apk-error.js?v=c5fc9f680879';
+import { throwNew } from './java-throw.js?v=c5fc9f680879';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=c5fc9f680879';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=c5fc9f680879';
+import { Blocked } from './scheduler.js?v=c5fc9f680879';
+import { captureBody } from './network-capture.js?v=c5fc9f680879';
+import { OS_CONSTANTS } from './os-constants-data.js?v=c5fc9f680879';
+import { openExchange, describeFailure } from './network-transport.js?v=c5fc9f680879';
+import { WorkerExecutor } from './network-worker-executor.js?v=c5fc9f680879';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=c5fc9f680879';
+import { TransportAuthority } from './transport-ca.js?v=c5fc9f680879';
+import { openWebSocketSession } from './websocket-bridge.js?v=c5fc9f680879';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=c5fc9f680879';
+import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=c5fc9f680879';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -253,7 +253,7 @@ export class NetworkBridge {
   useClientIdentity(dest, identity, alias) {
     const mapped = this.redirectFor(`https://${dest}/`), target = mapped ? destinationOfUrl(mapped.url) ?? dest : dest, proxyUrl = this.policy.proxyUrl ?? '', key = identityKey(identity);
     this.clientIdentities ??= new Map(); const current = this.clientIdentities.get(target);
-    if (current && current.key === key && current.proxyUrl === proxyUrl) return;
+    if (current && current.key === key && current.proxyUrl === proxyUrl) return;   // handed over already (its outcome is in clientIdentityStatus)
     const record = text => this.runtime?.record?.(`NET tls client certificate for ${target}: ${text}`);
     if (!proxyUrl) { this.clientIdentities.set(target, { key, proxyUrl, job: null }); this.noteClientIdentity(target, { state: 'no-relay', alias, detail: 'the browser cannot present a client certificate: set the relay as the Proxy' }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) NOT presented: a browser cannot present a client certificate; set the relay as the Proxy (Controls > Device)`); return; }
     if (this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }).catch(() => {}) };
@@ -266,7 +266,9 @@ export class NetworkBridge {
   /** What the page shows under the mTLS field: per destination, the last outcome (presented, failed, no relay, none offered by the app) and how many requests to it went out after the relay had it. */
   noteClientIdentity(dest, { state, alias = null, detail = '' }) {
     this.clientIdentityStatus ??= new Map(); const previous = this.clientIdentityStatus.get(dest);
-    this.clientIdentityStatus.set(dest, { dest, state, alias, detail, uses: state === 'presented' && previous?.state === 'presented' ? previous.uses : 0 });
+    // a connection that offers no certificate (another SSLContext of the app, the default one) does not hide that another connection to the same host presented one
+    if (state === 'none' && (previous?.state === 'presented' || previous?.state === 'pending' || previous?.state === 'no-relay')) { previous.without = detail; return; }
+    this.clientIdentityStatus.set(dest, { dest, state, alias, detail, uses: state === 'presented' && previous?.state === 'presented' ? previous.uses : 0, without: state === 'none' ? null : previous?.without ?? (previous?.state === 'none' ? previous.detail : null) });
   }
   noteClientIdentityUse(dest) { const entry = this.clientIdentityStatus?.get(dest); if (entry?.state === 'presented') entry.uses++; }
   /** -> [{ dest, state, alias, detail, uses }] for vmHealth. */

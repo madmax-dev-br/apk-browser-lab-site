@@ -59,7 +59,7 @@ export function clientIdentityStatus({ hosts = [], proxyUrl = '', entries = null
   if (!seen.length) return { state: 'on', label: 'On, waiting', text: `mTLS on for ${list}. Nothing used it yet: it works once the app opens a TLS connection to one of these hosts.` };
   const describe = entry => {
     const who = entry.alias ? `alias "${entry.alias}"` : 'the app';
-    if (entry.state === 'presented') return `${entry.dest}: ${who} presented (${entry.uses} request${entry.uses === 1 ? '' : 's'})`;
+    if (entry.state === 'presented') return `${entry.dest}: ${who} presented (${entry.uses} request${entry.uses === 1 ? '' : 's'})${entry.without ? `; other connections to it offered none (${entry.without})` : ''}`;
     if (entry.state === 'pending') return `${entry.dest}: ${who}, handing to the relay`;
     if (entry.state === 'none') return `${entry.dest}: the app offered no certificate (${entry.detail})`;
     return `${entry.dest}: ${who} NOT presented (${entry.detail})`;
