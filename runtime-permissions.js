@@ -12,8 +12,8 @@
 //   - ACCESS_BACKGROUND_LOCATION is only grantable while a foreground location permission is held, and (targetSdk >= 30) cannot be requested in the same call as the foreground ones;
 //   - READ_EXTERNAL_STORAGE has no effect for targetSdk >= 33 (use READ_MEDIA_*): never granted;
 //   - requests that need a dialog are asked per permission group; the dialog's answer ("Permitir", "Só desta vez", "Não permitir") updates the config.
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=bc2f15a379b6';
-import { PERMISSION_GROUPS } from './permission-groups-data.js?v=bc2f15a379b6';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=41a7ba3ac140';
+import { PERMISSION_GROUPS } from './permission-groups-data.js?v=41a7ba3ac140';
 
 export const DEVICE_SDK = 33;
 const P = 'android.permission.';

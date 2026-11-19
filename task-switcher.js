@@ -4,8 +4,9 @@
 // the launcher icon. Before any app runs the device shows that launcher too: empty, then with the app being installed (a spinner over its icon while the
 // package is read) and installed (tap to start). While the finger only drags, the app stays resumed and the window just follows it; nothing is sent to the VM until the gesture commits.
 // The app is thrown away (its process is killed, as when Android removes a task from the recents) by dragging its recents card up and off, with the gesture or the three
-// buttons, or by holding the window with the swipe-up gesture and flinging it up.
+// buttons, or with the swipe-up gesture: dragging the window past the middle of the screen (it fades as it goes) or holding it and flinging it up.
 const COMMIT_FRACTION = 0.22;      // of the screen height: a shorter drag springs back, a longer one opens the recents
+const CLOSE_FRACTION = 0.5;        // of the screen height: the window dragged this far up and released is thrown away (the app is closed)
 const CARD_SCALE = 0.62, CARD_LIFT = 0.03;   // the recents card: scale of the app window and how far (of the screen height) its centre sits above the screen's (nearly centred)
 const BACK_EDGE = 14, BACK_COMMIT = 46, BACK_MAX = 72;   // the back gesture, in device px: width of the edge strips (styles.css), the pull that arms it, how far the bubble follows
 const ANDROID_HEAD = 'M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.463 11.463 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 001 18h22a10.78 10.78 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z';
@@ -14,12 +15,12 @@ const ANDROID_HEAD = 'M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.0
 export function dragTransform(dy, height) {
   const travel = Math.max(0, Math.min(dy, height)), progress = height > 0 ? travel / height : 0;
   // the window shrinks about its centre faster than it rises, so its top edge comes down from the top of the screen as soon as the drag starts (it never sticks to it)
-  return { scale: Math.max(CARD_SCALE - 0.12, 1 - progress * 0.9), lift: travel * 0.25, commits: progress >= COMMIT_FRACTION, progress };
+  return { scale: Math.max(CARD_SCALE - 0.12, 1 - progress * 0.9), lift: travel * 0.25, commits: progress >= COMMIT_FRACTION, progress, closes: progress >= CLOSE_FRACTION };
 }
 const FLING_SPEED = 1, FLING_HOLD_MS = 400;                // the swipe-up gesture: a release at least this fast (device px per ms, upwards) after holding the window this long throws the app away
 const CARD_DISMISS_FRACTION = 0.22, CARD_FLING_SPEED = 0.5, CARD_FLING_MIN = 24;   // the recents card: dragged this far up (of the screen height), or released this fast after at least this many px, it is thrown away
 /** Pure: whether releasing the swipe-up gesture throws the app away: the window was held (not a quick swipe, which opens the recents), is past the commit point, and is flung upwards. */
-export function flingDismisses({ velocity, heldMs, progress }) { return velocity >= FLING_SPEED && heldMs >= FLING_HOLD_MS && progress >= COMMIT_FRACTION; }
+export function flingDismisses({ velocity, heldMs, progress }) { return progress >= CLOSE_FRACTION || (velocity >= FLING_SPEED && heldMs >= FLING_HOLD_MS && progress >= COMMIT_FRACTION); }
 /** Pure: whether releasing the recents card `dy` px above where it rests (upwards positive), moving at `velocity` px/ms upwards, throws the app away. */
 export function cardDismisses({ dy, velocity, height }) { return dy >= height * CARD_DISMISS_FRACTION || (velocity >= CARD_FLING_SPEED && dy >= CARD_FLING_MIN); }
 /** Pure: the upward speed (px per ms) at the end of `samples` ([{ t, y }], page px, oldest first), over about the last 100 ms, for a page scale of `scale`. */
@@ -34,7 +35,7 @@ export function backPull(dx) {
   return { offset: pull * 0.75, grow: Math.min(1, 0.55 + progress * 0.45), armed: dx >= BACK_COMMIT, edge: BACK_EDGE };
 }
 
-export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {} }) {
+export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {}, onIcon = () => {} }) {
   const screen = $('android-screen');
   if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground', resume: async () => {}, navigate: async () => null };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
@@ -51,6 +52,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   // the saved apps (src/apk-shelf.js), one beside the other in the order they were added; the app of this run keeps its own icon (`app`) at its place among them
   let shelfItems = [], shelfCurrent = null, shelfButtons = [], shelfURLs = [], savedIconURL = null, savedLabel = '';   // savedIconURL, savedLabel: the icon and label stored with the app of this run, shown until its PackageManager answers (opening a saved app does not lose its icon meanwhile)
   const renderShelf = () => {
+    closeMenu();
     for (const node of shelfButtons) node.remove(); shelfButtons = []; for (const url of shelfURLs.splice(0)) URL.revokeObjectURL(url);
     let placed = false;
     // two saved APKs of the same app (the same label) also show their file names, so they can be told apart
@@ -65,14 +67,39 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       if (item.icon?.bytes) { const url = URL.createObjectURL(new Blob([item.icon.bytes], { type: item.icon.mime || 'image/png' })), img = doc.createElement('img'); shelfURLs.push(url); img.alt = ''; img.src = url; img.draggable = false; box.append(img); }
       else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
       fileLine(button, item); button.setAttribute('aria-label', `Open ${name}`);
-      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nRight-click: remove from the home screen`;
+      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nHold or right-click: uninstall`;
       button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
       button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });
+      longPress(button, () => item);
       shelfButtons.push(button);
     }
     if (!placed) wall.after(app);   // an app that is not saved (a demo, a hosted example) leads the row
     wall.hidden = !(mode === 'idle' && shelfButtons.length === 0);
   };
+  // Long press on an icon of the home screen (as on a launcher): a small menu over it with Uninstall (the copy kept in this browser is deleted; shelfActions.remove confirms).
+  // The press that opened the menu is not a click: it does not open the app.
+  let menu = null, pressTimer = 0, pressed = null;
+  const closeMenu = () => { menu?.remove(); menu = null; };
+  const openMenu = (button, item) => {
+    closeMenu(); menu = el('div', 'launcher-menu', launcher); menu.setAttribute('role', 'menu');
+    const name = el('div', 'launcher-menu-title', menu); name.textContent = item.label || String(item.name).replace(/\.apk$/i, '');
+    const remove = el('button', 'launcher-menu-item', menu); remove.type = 'button'; remove.setAttribute('role', 'menuitem'); remove.textContent = 'Uninstall';
+    remove.addEventListener('click', event => { event.stopPropagation(); closeMenu(); shelfActions.remove?.(item); });
+    const box = button.getBoundingClientRect(), base = launcher.getBoundingClientRect(), scale = pageScale();
+    menu.style.left = `${Math.max(4, (box.left - base.left) / scale)}px`; menu.style.top = `${(box.bottom - base.top) / scale + 4}px`; remove.focus?.();
+  };
+  const longPress = (button, itemOf) => {
+    button.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return; const item = itemOf(); if (!item) return; clearTimeout(pressTimer);
+      pressed = { button, x: event.clientX, y: event.clientY, fired: false };
+      pressTimer = setTimeout(() => { if (pressed?.button !== button) return; pressed.fired = true; navigator.vibrate?.(10); openMenu(button, item); }, 550);
+    });
+    button.addEventListener('pointermove', event => { if (pressed?.button === button && Math.hypot(event.clientX - pressed.x, event.clientY - pressed.y) > 10) { clearTimeout(pressTimer); pressed = null; } });
+    for (const type of ['pointerup', 'pointercancel', 'pointerleave']) button.addEventListener(type, () => { clearTimeout(pressTimer); if (pressed?.button === button && !pressed.fired) pressed = null; });
+    button.addEventListener('click', event => { if (pressed?.button === button && pressed.fired) { pressed = null; event.stopImmediatePropagation(); event.preventDefault(); } }, true);
+  };
+  doc.addEventListener?.('pointerdown', event => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
+  doc.addEventListener?.('keydown', event => { if (event.key === 'Escape') closeMenu(); });
   const away = () => mode === 'home' || mode === 'closed' || mode === 'idle' || mode === 'installing' || mode === 'installed';   // the launcher is on screen, no app window
 
   const setTransform = (scale, lift, animate) => { for (const node of targets()) { node.style.transition = animate ? 'transform .26s cubic-bezier(.2,.8,.2,1), border-radius .26s, opacity .2s' : 'none'; node.style.transformOrigin = '50% 50%'; node.style.transform = scale === 1 && lift === 0 ? '' : `translateY(${-lift}px) scale(${scale})`; node.style.borderRadius = scale === 1 ? '' : '28px'; node.style.opacity = ''; } };
@@ -86,7 +113,10 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     app.dataset.state = next === 'closed' || next === 'installed' ? 'closed' : next === 'installing' ? 'installing' : 'background';
     announce(next);
   };
+  let iconSent;   // the icon last given to onIcon: the saved app's stored icon at once, then the one its PackageManager answers
+  const iconChanged = () => { const url = iconURL ?? savedIconURL ?? null; if (url !== iconSent) { iconSent = url; onIcon(url); } };
   const paintIcon = () => {
+    iconChanged();
     label.textContent = info?.label || info?.packageName || savedLabel || pendingLabel || 'App'; iconBox.replaceChildren(); iconBox.classList.remove('generic');
     const url = iconURL ?? savedIconURL; if (url) { const img = doc.createElement('img'); img.alt = ''; img.src = url; img.draggable = false; iconBox.append(img); }
     else { iconBox.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; iconBox.classList.add('generic'); }
@@ -130,11 +160,11 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     if (!drag || event.pointerId !== drag.id) return; const dy = (drag.y - event.clientY) / drag.scale, height = screen.offsetHeight;
     drag.samples.push({ t: now(), y: event.clientY }); if (drag.samples.length > 24) drag.samples.shift();
     if (drag.from === 'overview') { drag.last = { commits: dy > height * 0.05, progress: 1 }; return; }
-    const t = dragTransform(dy, height); drag.last = t; if (dy > 2) { if (mode !== 'dragging') { mode = 'dragging'; screen.dataset.task = 'dragging'; launcher.hidden = false; } setTransform(t.scale, t.lift, false); }
+    const t = dragTransform(dy, height); drag.last = t; if (dy > 2) { if (mode !== 'dragging') { mode = 'dragging'; screen.dataset.task = 'dragging'; launcher.hidden = false; } setTransform(t.scale, t.lift, false); for (const node of targets()) node.style.opacity = t.closes ? String(Math.max(0.3, 1 - (t.progress - CLOSE_FRACTION) * 2.5)) : ''; screen.dataset.closing = String(t.closes); }   // past the middle the window fades: released there, the app closes
     event.preventDefault();
   });
   const end = event => {
-    if (!drag || event.pointerId !== drag.id) return; const { last, from, at, samples, scale } = drag; drag = null; try { zone.releasePointerCapture(event.pointerId); } catch { /* gone */ }
+    if (!drag || event.pointerId !== drag.id) return; const { last, from, at, samples, scale } = drag; drag = null; try { zone.releasePointerCapture(event.pointerId); } catch { /* gone */ } delete screen.dataset.closing;
     samples.push({ t: now(), y: event.clientY });
     if (from === 'overview') { if (last?.commits) show('home'); return; }          // a second swipe up from the recents goes home
     if (mode !== 'dragging') return;
@@ -198,6 +228,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     const rect = screen.getBoundingClientRect(), x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height, half = CARD_SCALE / 2, centre = 0.5 - CARD_LIFT;
     if (event.detail === 0 || (Math.abs(x - 0.5) <= half && Math.abs(y - centre) <= half)) resume(); else show('home');   // keyboard activation or a tap on the card resumes; a tap beside it goes home
   });
+  longPress(app, () => (mode === 'closed' || mode === 'installed') ? shelfItems.find(item => item.id === shelfCurrent) ?? null : null);   // the app of this run, when it is not running (closed, or installed and not started) and is saved
   app.addEventListener('click', () => resume());
   const button = (selector, action) => screen.querySelector(selector)?.addEventListener('click', event => { event.stopPropagation(); if (!working && !busy()) action(); });
   button('.sysbar-back', () => { if (mode === 'overview') { resume(); return; } if (away()) return; if (canGoBack()) back(); else leave('home'); });   // Back on the root Activity of the launcher task leaves it in the background (Android 12+)
@@ -242,7 +273,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       shelfItems = Array.isArray(items) ? items : []; shelfCurrent = currentId; renderShelf();
       const current = shelfItems.find(item => item.id === currentId), saved = current?.icon, hadSaved = !!savedIconURL, name = current?.label ?? ''; const relabel = name !== savedLabel; savedLabel = name; if (savedIconURL) { URL.revokeObjectURL(savedIconURL); savedIconURL = null; }
       if (saved?.bytes) savedIconURL = URL.createObjectURL(new Blob([saved.bytes], { type: saved.mime || 'image/png' }));
-      if ((!iconURL && (hadSaved || savedIconURL)) || (relabel && !info?.label)) paintIcon();
+      if ((!iconURL && (hadSaved || savedIconURL)) || (relabel && !info?.label)) paintIcon(); else iconChanged();
     },
     /** After a render repainted the page's status: say again that the app is in the background. */
     restate() { if (mode === 'overview' || mode === 'home') announce(mode); },

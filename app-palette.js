@@ -103,7 +103,7 @@ export function createAppPalette({ doc = globalThis.document, toggle = null, ori
       if (!url) return this.clear();
       const token = ++S.pending; let blob = null; try { blob = await (await fetch(url)).blob(); } catch { blob = null; }
       if (token !== S.pending) return;
-      return blob ? this.fromIcon({ bytes: new Uint8Array(await blob.arrayBuffer()), mime: blob.type }) : this.clear();
+      return blob ? this.fromIcon({ bytes: new Uint8Array(await blob.arrayBuffer()), mime: blob.type }) : undefined;   // an icon URL revoked meanwhile (a newer icon replaced it): the newer one decides
     },
     /** No app: the page's own palette. */
     clear() { S.pending++; S.color = null; S.palette = null; apply(); },
