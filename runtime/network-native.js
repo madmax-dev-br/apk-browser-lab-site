@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=41a7ba3ac140';
-import { throwNew } from './java-throw.js?v=41a7ba3ac140';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=41a7ba3ac140';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=41a7ba3ac140';
-import { Blocked } from './scheduler.js?v=41a7ba3ac140';
-import { captureBody } from './network-capture.js?v=41a7ba3ac140';
-import { OS_CONSTANTS } from './os-constants-data.js?v=41a7ba3ac140';
-import { openExchange, describeFailure } from './network-transport.js?v=41a7ba3ac140';
-import { WorkerExecutor } from './network-worker-executor.js?v=41a7ba3ac140';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=41a7ba3ac140';
-import { TransportAuthority } from './transport-ca.js?v=41a7ba3ac140';
-import { openWebSocketSession } from './websocket-bridge.js?v=41a7ba3ac140';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=41a7ba3ac140';
-import { destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=41a7ba3ac140';
+import { APKError } from './apk-error.js?v=c30a36398847';
+import { throwNew } from './java-throw.js?v=c30a36398847';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=c30a36398847';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=c30a36398847';
+import { Blocked } from './scheduler.js?v=c30a36398847';
+import { captureBody } from './network-capture.js?v=c30a36398847';
+import { OS_CONSTANTS } from './os-constants-data.js?v=c30a36398847';
+import { openExchange, describeFailure } from './network-transport.js?v=c30a36398847';
+import { WorkerExecutor } from './network-worker-executor.js?v=c30a36398847';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=c30a36398847';
+import { TransportAuthority } from './transport-ca.js?v=c30a36398847';
+import { openWebSocketSession } from './websocket-bridge.js?v=c30a36398847';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=c30a36398847';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=c30a36398847';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -156,7 +156,7 @@ export class NetworkBridge {
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl) }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
-    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [] }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url) }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
@@ -191,7 +191,10 @@ export class NetworkBridge {
     const entry = this.log?.begin({ method: 'CONNECT', url: `tcp://${host}:${port}`, headers: [], body: null }, { api: 'Tunnel', mapped }) ?? null, record = { head: null, error: null, ended: false, closed: false, received: 0 };
     this.stats.requests++; this.noteHost(host);
     if (mapped) { const counted = noteRedirect(this.runtime, this.redirects, mapped, { method: 'CONNECT', url: original }); counted.responses++; }
+    const dest = tls ? destination(target.hostname, targetPort) : null, held = dest ? this.clientIdentities?.get(dest) : null, identity = held?.identity && held.proxyUrl === (this.policy.proxyUrl ?? '') ? held : null;
     const session = openTunnelSession({ endpoint, host: target.hostname, port: targetPort, tls, alpn, create: Socket ? url => new Socket(url) : () => { throw new Error('this realm has no WebSocket'); },
+      ready: identity?.job ?? null, clientIdentityKey: identity?.key ?? null,   // the client certificate this TLS tunnel needs: at the relay first, and handed again if the relay restarted
+      reregister: identity ? () => registerClientIdentity({ proxyUrl: identity.proxyUrl, fetch: this.fetchFunction(), dest, identity: identity.identity }).then(() => this.noteClientIdentityRenewed(dest)) : null,
       signal: () => {
         if (session?.connected && !record.head) { record.head = { status: 200, reason: 'Connected (relay tunnel)', headers: session.alpn ? [['alpn', session.alpn]] : [] }; this.log?.observe(entry, record); }
         if (session?.error && !record.error) { record.error = session.error; this.log?.observe(entry, record); }
@@ -256,12 +259,27 @@ export class NetworkBridge {
     if (current && current.key === key && current.proxyUrl === proxyUrl) return;   // handed over already (its outcome is in clientIdentityStatus)
     const record = text => this.runtime?.record?.(`NET tls client certificate for ${target}: ${text}`);
     if (!proxyUrl) { this.clientIdentities.set(target, { key, proxyUrl, job: null }); this.noteClientIdentity(target, { state: 'no-relay', alias, detail: 'the browser cannot present a client certificate: set the relay as the Proxy' }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) NOT presented: a browser cannot present a client certificate; set the relay as the Proxy (Controls > Device)`); return; }
-    if (this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }).catch(() => {}) };
+    const reset = this.relayReset(proxyUrl);
     this.noteClientIdentity(target, { state: 'pending', alias, detail: 'handing the certificate to the relay' });
-    const job = this.identityReset.job.then(() => registerClientIdentity({ proxyUrl, fetch: this.fetchFunction(), dest: target, identity }))
+    // the key goes only to a relay that said it keeps identities (another proxy would forward the POST to the destination); a relay that did not answer is asked again next time
+    const job = reset.job.then(answer => { if (!answer?.supported) { if (this.identityReset === reset) this.identityReset = null; throw new Error(answer?.reason ?? 'the relay did not answer'); } return registerClientIdentity({ proxyUrl, fetch: this.fetchFunction(), dest: target, identity }); })
       .then(() => { this.noteClientIdentity(target, { state: 'presented', alias, detail: `${identity.chain.length} certificate(s) at the relay` }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) handed to the relay, presented in the TLS handshakes to this destination only`); },
         error => { const detail = String(error?.message ?? error).slice(0, 200); this.noteClientIdentity(target, { state: 'failed', alias, detail }); record(`alias "${alias}" NOT presented: ${detail}`); this.clientIdentities.delete(target); });
-    this.clientIdentities.set(target, { key, proxyUrl, job });
+    this.clientIdentities.set(target, { key, proxyUrl, job, identity });
+  }
+  /** The session's "forget every identity" request to this relay (once per relay address; again after a relay that did not answer). Its job resolves { supported, reason }. */
+  relayReset(proxyUrl) {
+    if (this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }) };
+    return this.identityReset;
+  }
+  /** The client identity the relay holds for a request's destination, for openExchange to name (client-identity-key) and hand again if the relay restarted; null when none. */
+  clientIdentityFor(url) {
+    const mapped = this.redirectFor(url), dest = destinationOfUrl(mapped?.url ?? url), entry = dest ? this.clientIdentities?.get(dest) : null;
+    return entry?.identity && entry.proxyUrl && entry.proxyUrl === (this.policy.proxyUrl ?? '') ? { dest, key: entry.key, identity: entry.identity } : null;
+  }
+  /** The relay had lost the identity (it was restarted) and was handed it again: said in the trace; the page's line stays "presented". */
+  noteClientIdentityRenewed(dest) {
+    this.runtime?.record?.(`NET tls client certificate for ${dest}: the relay no longer held it (restarted); handed to it again and the request repeated`);
   }
   /** What the page shows under the mTLS field: per destination, the last outcome (presented, failed, no relay, none offered by the app) and how many requests to it went out after the relay had it. */
   noteClientIdentity(dest, { state, alias = null, detail = '' }) {
@@ -278,7 +296,7 @@ export class NetworkBridge {
   /** The registration of the client identity a request's destination waits for, or null. */
   clientIdentityReady(url) {
     // the first request of a session through a relay first clears the identities a previous session handed over (a relay that is not the lab's ignores the request: errors are dropped)
-    const proxyUrl = this.policy.proxyUrl ?? ''; if (proxyUrl && this.identityReset?.proxyUrl !== proxyUrl) this.identityReset = { proxyUrl, job: forgetClientIdentities({ proxyUrl, fetch: this.fetchFunction() }).catch(() => {}) };
+    const proxyUrl = this.policy.proxyUrl ?? ''; if (proxyUrl) this.relayReset(proxyUrl);
     const mapped = this.redirectFor(url), dest = destinationOfUrl(mapped?.url ?? url), own = dest ? this.clientIdentities?.get(dest)?.job ?? null : null, reset = proxyUrl ? this.identityReset.job : null;
     return own && reset ? Promise.all([reset, own]) : own ?? reset;
   }
@@ -287,7 +305,8 @@ export class NetworkBridge {
     const { request } = op, policy = this.policy;
     const identity = this.clientIdentityReady(request.url); if (identity) await identity;   // the relay has the client identity before the request that needs it
     { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); if (dest && this.clientIdentities?.get(dest)?.job) this.noteClientIdentityUse(dest); }
-    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders });
+    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders, clientIdentity: this.clientIdentityFor(request.url) });
+    if (head.clientIdentityRenewed) { delete head.clientIdentityRenewed; this.noteClientIdentityRenewed(destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url)); }
     if (op.closed || op.error !== null) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     if (head.status >= 300 && head.status < 400) this.stats.redirectsObserved++;
     op.head = head; this.observe(op); this.signal();

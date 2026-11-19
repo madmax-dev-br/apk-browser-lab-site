@@ -20,26 +20,41 @@ export function tunnelEndpoint(policy) {
  * Opens a tunnel: { connected, alpn, error, closed, queue (bytes for the app), send(bytes), close(), dispose() }. `create(url)` makes the realm's WebSocket; `signal()` wakes the VM
  * when bytes, the connection or the end arrived.
  */
-export function openTunnelSession({ endpoint, host, port, tls = false, alpn = [], create = url => new globalThis.WebSocket(url), signal = () => {} }) {
-  const session = { connected: false, alpn: null, error: null, closed: false, queue: [], queued: 0, pending: [], bytesIn: 0, bytesOut: 0 };
-  const query = new URLSearchParams({ host, port: String(port), tls: tls ? '1' : '0', ...(alpn.length ? { alpn: alpn.join(',') } : {}) });
-  let socket;
-  try { socket = create(`${endpoint}?${query}`); }
-  catch (error) { session.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port} through the relay: ${error?.message ?? error}` }; return session; }
-  socket.binaryType = 'arraybuffer';
-  socket.onmessage = event => {
-    if (typeof event.data === 'string') {
-      let message = null; try { message = JSON.parse(event.data); } catch { /* not ours */ }
-      if (message?.connected) { session.connected = true; session.alpn = message.alpn ?? null; for (const bytes of session.pending.splice(0)) socket.send(bytes); }
-      else if (message?.error) session.error = { type: message.error.code === 'ETIMEDOUT' ? 'Ljava/net/SocketTimeoutException;' : 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}: ${message.error.code ?? ''} ${message.error.message ?? ''}`.trim(), code: message.error.code ?? null };
-      signal(); return;
-    }
-    const bytes = new Uint8Array(event.data); session.queue.push(bytes); session.queued += bytes.length; session.bytesIn += bytes.length; signal();
+export function openTunnelSession({ endpoint, host, port, tls = false, alpn = [], create = url => new globalThis.WebSocket(url), signal = () => {}, ready = null, clientIdentityKey = null, reregister = null }) {
+  const session = { connected: false, alpn: null, error: null, closed: false, queue: [], queued: 0, pending: [], bytesIn: 0, bytesOut: 0, identityRenewed: false };
+  // clientIdentityKey: the client certificate (mTLS) this TLS tunnel needs; `ready` resolves once the relay has it. A relay that no longer holds it (restarted) answers
+  // APKWEB_RELAY_NO_CLIENT_IDENTITY before connecting anywhere; then `reregister()` hands it again and the tunnel is opened once more.
+  const query = new URLSearchParams({ host, port: String(port), tls: tls ? '1' : '0', ...(alpn.length ? { alpn: alpn.join(',') } : {}), ...(tls && clientIdentityKey ? { 'client-identity-key': clientIdentityKey } : {}) });
+  let socket = null, wanted = true;
+  const failed = text => { if (!session.error) { session.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}${text}` }; signal(); } };
+  const connect = () => {
+    if (!wanted) { session.closed = true; signal(); return; }
+    let current;
+    try { current = socket = create(`${endpoint}?${query}`); }
+    catch (error) { failed(` through the relay: ${error?.message ?? error}`); return; }
+    current.binaryType = 'arraybuffer';
+    current.onmessage = event => {
+      if (current !== socket) return;
+      if (typeof event.data === 'string') {
+        let message = null; try { message = JSON.parse(event.data); } catch { /* not ours */ }
+        if (message?.connected) { session.connected = true; session.alpn = message.alpn ?? null; for (const bytes of session.pending.splice(0)) current.send(bytes); }
+        else if (message?.error?.code === 'APKWEB_RELAY_NO_CLIENT_IDENTITY' && reregister && !session.identityRenewed) {
+          session.identityRenewed = true; socket = null; try { current.close(1000); } catch { /* closed */ }
+          Promise.resolve().then(reregister).then(connect, error => failed(`: the client certificate could not be handed to the relay again (${error?.message ?? error})`));
+          return;
+        }
+        else if (message?.error) session.error = { type: message.error.code === 'ETIMEDOUT' ? 'Ljava/net/SocketTimeoutException;' : 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}: ${message.error.code ?? ''} ${message.error.message ?? ''}`.trim(), code: message.error.code ?? null };
+        signal(); return;
+      }
+      const bytes = new Uint8Array(event.data); session.queue.push(bytes); session.queued += bytes.length; session.bytesIn += bytes.length; signal();
+    };
+    current.onerror = () => { if (current === socket && !session.connected) failed(': the relay\'s tunnel did not answer (is APK Lab Relay running?)'); };
+    current.onclose = () => { if (current !== socket) return; if (!session.connected && !session.error) session.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}: the relay closed the tunnel` }; session.closed = true; signal(); };
   };
-  socket.onerror = () => { if (!session.connected && !session.error) { session.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}: the relay's tunnel did not answer (is APK Lab Relay running?)` }; signal(); } };
-  socket.onclose = () => { if (!session.connected && !session.error) session.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${port}: the relay closed the tunnel` }; session.closed = true; signal(); };
   session.send = bytes => { session.bytesOut += bytes.length; if (session.connected) socket.send(bytes); else session.pending.push(bytes.slice()); };
-  session.close = () => { try { socket.close(1000); } catch { /* closed */ } };
-  session.dispose = () => { session.closed = true; try { if (socket.readyState < 2) socket.close(1000); } catch { /* gone */ } };
+  session.close = () => { wanted = false; try { socket?.close(1000); } catch { /* closed */ } };
+  session.dispose = () => { wanted = false; session.closed = true; try { if (socket && socket.readyState < 2) socket.close(1000); } catch { /* gone */ } };
+  if (ready) Promise.resolve(ready).then(connect, connect);   // a failed registration still opens the tunnel: the relay then refuses it by name, or the server does
+  else connect();
   return session;
 }

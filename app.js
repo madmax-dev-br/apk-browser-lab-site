@@ -1,54 +1,54 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=41a7ba3ac140';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=41a7ba3ac140';
-import { clientIdentityStatus } from './client-identity.js?v=41a7ba3ac140';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=41a7ba3ac140';
-import { initCollapsibleSections } from './panel-sections.js?v=41a7ba3ac140';
-import { warmupLabel } from './warmup.js?v=41a7ba3ac140';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=41a7ba3ac140';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=41a7ba3ac140';
-import { initHelpTips } from './help-tips.js?v=41a7ba3ac140';
-import { createToolDock } from './tool-dock.js?v=41a7ba3ac140';
-import { createPermissionsPanel } from './permissions-panel.js?v=41a7ba3ac140';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=41a7ba3ac140';
-import { createAppDataPanel } from './app-data-panel.js?v=41a7ba3ac140';
-import { createCameraLab } from './camera-lab.js?v=41a7ba3ac140';
-import { createOverridesPanel } from './overrides-panel.js?v=41a7ba3ac140';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=41a7ba3ac140';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=41a7ba3ac140';
-import { createHostMapPanel } from './host-map-panel.js?v=41a7ba3ac140';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=41a7ba3ac140';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=41a7ba3ac140';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=41a7ba3ac140';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=41a7ba3ac140';
-import { createDeviceView, createViewState } from './device-view.js?v=41a7ba3ac140';
-import { createTaskSwitcher } from './task-switcher.js?v=41a7ba3ac140';
-import { createDeviceZoom } from './device-zoom.js?v=41a7ba3ac140';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=41a7ba3ac140';
-import { formatApiGapReport } from './api-gap-scan.js?v=41a7ba3ac140';
-import { createLogcatPanel } from './logcat-panel.js?v=41a7ba3ac140';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=41a7ba3ac140';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=41a7ba3ac140';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=41a7ba3ac140';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=41a7ba3ac140';
-import { createAppPalette } from './app-palette.js?v=41a7ba3ac140';
-import { createScreenRecorder } from './screen-recorder.js?v=41a7ba3ac140';
-import { createPluginsPanel } from './plugins-panel.js?v=41a7ba3ac140';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=41a7ba3ac140';
-import { createAdb } from './adb-commands.js?v=41a7ba3ac140';
-import { createAdbTerminal } from './adb-terminal.js?v=41a7ba3ac140';
-import { memorySummary } from './worker-memory.js?v=41a7ba3ac140';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=41a7ba3ac140';
-import { createModalHost } from './lab-modal.js?v=41a7ba3ac140';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=41a7ba3ac140';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=41a7ba3ac140';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=41a7ba3ac140';
-import { createDragLayer } from './lab-drag.js?v=41a7ba3ac140';
-import { createLabScroll } from './lab-scroll.js?v=41a7ba3ac140';
-import { createGlSurfaces } from './gl-surfaces.js?v=41a7ba3ac140';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=41a7ba3ac140';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=41a7ba3ac140';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=41a7ba3ac140';
-import { resolveIntentFields } from './intent-resolver.js?v=41a7ba3ac140';
+import { APKWorkerClient } from './apk-worker-client.js?v=c30a36398847';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=c30a36398847';
+import { clientIdentityStatus } from './client-identity.js?v=c30a36398847';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=c30a36398847';
+import { initCollapsibleSections } from './panel-sections.js?v=c30a36398847';
+import { warmupLabel } from './warmup.js?v=c30a36398847';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=c30a36398847';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=c30a36398847';
+import { initHelpTips } from './help-tips.js?v=c30a36398847';
+import { createToolDock } from './tool-dock.js?v=c30a36398847';
+import { createPermissionsPanel } from './permissions-panel.js?v=c30a36398847';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=c30a36398847';
+import { createAppDataPanel } from './app-data-panel.js?v=c30a36398847';
+import { createCameraLab } from './camera-lab.js?v=c30a36398847';
+import { createOverridesPanel } from './overrides-panel.js?v=c30a36398847';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=c30a36398847';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=c30a36398847';
+import { createHostMapPanel } from './host-map-panel.js?v=c30a36398847';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=c30a36398847';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=c30a36398847';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=c30a36398847';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=c30a36398847';
+import { createDeviceView, createViewState } from './device-view.js?v=c30a36398847';
+import { createTaskSwitcher } from './task-switcher.js?v=c30a36398847';
+import { createDeviceZoom } from './device-zoom.js?v=c30a36398847';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=c30a36398847';
+import { formatApiGapReport } from './api-gap-scan.js?v=c30a36398847';
+import { createLogcatPanel } from './logcat-panel.js?v=c30a36398847';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=c30a36398847';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=c30a36398847';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=c30a36398847';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=c30a36398847';
+import { createAppPalette } from './app-palette.js?v=c30a36398847';
+import { createScreenRecorder } from './screen-recorder.js?v=c30a36398847';
+import { createPluginsPanel } from './plugins-panel.js?v=c30a36398847';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=c30a36398847';
+import { createAdb } from './adb-commands.js?v=c30a36398847';
+import { createAdbTerminal } from './adb-terminal.js?v=c30a36398847';
+import { memorySummary } from './worker-memory.js?v=c30a36398847';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=c30a36398847';
+import { createModalHost } from './lab-modal.js?v=c30a36398847';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=c30a36398847';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=c30a36398847';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=c30a36398847';
+import { createDragLayer } from './lab-drag.js?v=c30a36398847';
+import { createLabScroll } from './lab-scroll.js?v=c30a36398847';
+import { createGlSurfaces } from './gl-surfaces.js?v=c30a36398847';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=c30a36398847';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=c30a36398847';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=c30a36398847';
+import { resolveIntentFields } from './intent-resolver.js?v=c30a36398847';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -64,11 +64,26 @@ const intentActivities = inventory => (inventory?.activities ?? []).filter(activ
 async function refreshShelf() { if (!apkShelf) return; try { taskSwitcher?.setShelf(await apkShelf.list(), state.shelfId ?? null); } catch (error) { appendTrace(`Home screen: ${error?.message ?? error}`); } }
 async function openSavedApp(id) {
   if (!apkShelf) return;   // another app while one loads or runs: importSource ends the current VM first
+  state.reimportShelfId = null;
   try {
     const got = await apkShelf.file(id); if (!got) { await refreshShelf(); return; }
-    appendTrace(got.fromDisk ? `Opening ${got.file.name} from disk (file saved on the home screen)` : `Opening the saved copy of ${got.file.name}`);
+    appendTrace(got.fromDisk ? `Opening ${got.file.name} from disk (file saved on the home screen)` : `Opening the saved copy of ${got.file.name}${got.note ? ` (${got.note})` : ''}`);
     await importSource({ file: got.file, name: got.file.name, shelfId: id }, true);   // a tap on a launcher icon starts the app
-  } catch (error) { reportAPKError(error, 'Could not open the saved app', { crash: false }); }
+  } catch (error) {
+    // The stored APK cannot be used (src/apk-shelf.js ShelfFileError): the icon stays, marked, and the error offers to choose the file again, which replaces that copy.
+    if (error?.reimport && error.shelfId) { state.reimportShelfId = error.shelfId; await refreshShelf(); }
+    reportAPKError(error, 'Could not open the saved app', { crash: false });
+  }
+}
+/** "Choose the APK again": the file picker, for an installed app whose stored copy could not be opened. The file chosen takes that entry's place (its icon and label stay). */
+async function reimportSavedApp() {
+  const id = state.reimportShelfId; if (!id) return;
+  dismissError(); state.pendingReplaceShelfId = id;
+  if (typeof window.showOpenFilePicker === 'function') {
+    try { const [handle] = await window.showOpenFilePicker({ types: [{ description: 'APK', accept: { 'application/vnd.android.package-archive': ['.apk'], 'application/octet-stream': ['.aab'] } }], excludeAcceptAllOption: false }); if (handle) await chooseFile(await handle.getFile(), handle); return; }
+    catch (error) { if (error?.name === 'AbortError') { state.pendingReplaceShelfId = null; return; } }
+  }
+  $('apk-file').click();   // the plain input; its change event takes pendingReplaceShelfId
 }
 async function removeSavedApp(item) {
   if (!apkShelf || state.busy) return;
@@ -184,6 +199,7 @@ function showError(error, title = 'Run attempt interrupted') {
   const inventory = state.mode === 'apk' ? state.inventory : null;
   const raw = error?.message || String(error);
   $('error-title').textContent = /JNI|native method|native library/i.test(raw) ? 'Native execution limit' : title;
+  if ($('error-reimport')) $('error-reimport').hidden = !state.reimportShelfId;   // an installed app that could not be opened: choose its APK again
   const cause = causeOf(raw);
   $('error-message').textContent = cause.length > 800 ? '…' + cause.slice(-800) : cause;
   const details = [...(inventory?.unsupportedFeatures || [])];
@@ -333,7 +349,7 @@ function showAppData(info) {
   const element = $('app-data-usage'); if (!element) return;
   if (!info) { element.textContent = 'App data: open an APK to see usage.'; return; }
   const cap = formatSize(info.limitBytes ?? 0), used = `${formatSize(info.bytes ?? 0)} of ${cap} · ${info.files ?? 0} file(s)`;
-  element.textContent = info.enabled === false ? (info.reason === 'disabled' ? `Persistence is off for this run · stored: ${used}` : 'Persistence is unavailable in this browser (no IndexedDB).')
+  element.textContent = info.enabled === false ? (info.reason === 'disabled' ? `Persistence is off for this run · stored: ${used}` : info.reason === 'storage-error' ? `The stored app data could not be read (${info.error}): this run started without it and stores nothing` : 'Persistence is unavailable in this browser (no IndexedDB).')
     : info.error ? `App data: error while saving (${info.error}) · ${used}` : info.overLimit ? `App data over the limit: the write was refused and the last saved state was kept · ${used}` : `App data stored: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restored` : ''}`;
 }
 apkVM.onAppData = showAppData;
@@ -611,6 +627,7 @@ async function inspectSelectedNative() {
 async function importSource(source, autoRun = false) {
   // Another APK (a file, a launcher icon, an example) while one loads or runs: the current VM is ended first, with no button for it (the new load would end it too; this also drops the operation in flight).
   if (state.busy || state.runStarting) { cancelOperation(); state.runStarting = false; }
+  state.reimportShelfId = null;   // set again if this load fails for an installed app
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or the app opened again from its launcher icon) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
@@ -660,7 +677,11 @@ async function importSource(source, autoRun = false) {
     }
   } catch (error) {
     if (token !== state.operation) return;
-    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle'; showDeviceHome('idle'); reportAPKError(error, 'Could not inspect the APK', { crash: false });
+    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle';
+    // An installed app that failed to open keeps its icon on the launcher (it is not the app of a run any more: drawn as a saved app, to tap again), and the error offers to
+    // choose its APK again, which replaces the stored copy. Before, the entry stayed "the app of this run", whose icon the idle launcher hides: the app vanished from the home screen.
+    if (source.shelfId) { state.reimportShelfId = source.shelfId; state.shelfId = null; await refreshShelf(); }
+    showDeviceHome('idle'); reportAPKError(error, source.shelfId ? 'Could not open the installed app' : 'Could not inspect the APK', { crash: false });
   } finally { finishOperation(token); }
   if (token === state.operation && autoRun && state.runtime && !state.inventory?.unsupportedFeatures?.length) await runAPK();
 }
@@ -676,6 +697,7 @@ async function bundleAsApk(file) {
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
 }
 async function chooseFile(file, handle = null) {   // handle: a FileSystemFileHandle (or a promise of one) where the browser gives it, kept with the saved app
+  const replaces = state.pendingReplaceShelfId ?? null; state.pendingReplaceShelfId = null;   // "Choose the APK again" for an installed app: this file takes that entry's place
   if (!file) return;
   if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('This lab limits APKs to 1 GiB. Choose a smaller file to continue.'), 'APK above the size limit'); return; }
   if (!/\.(apk|aab)$/i.test(file.name)) { switchMode('apk'); showError(new Error('Choose an .apk or .aab file.'), 'Invalid file format'); return; }
@@ -684,7 +706,7 @@ async function chooseFile(file, handle = null) {   // handle: a FileSystemFileHa
     try { file = await bundleAsApk(file); } catch (error) { switchMode('apk'); showError(error, 'This App Bundle could not be converted'); return; }
     fileHandle = null;
   }
-  await importSource({ file, name: file.name, handle: fileHandle }, true);   // installed and opened at once; the launcher keeps its icon to open it again
+  await importSource({ file, name: file.name, handle: fileHandle, ...(replaces ? { shelfId: replaces } : {}) }, true);   // installed and opened at once; the launcher keeps its icon to open it again
 }
 // Memory readout in the status bar: the memory in use (the Worker's measured memory plus, where the browser exposes it, the page's JS heap) and a bar of live VM objects against the
 // object budget (the OutOfMemoryError threshold); the parts are in the hover panel (src/worker-memory.js memorySummary).
@@ -1434,13 +1456,16 @@ function switchMode() {
   setStatus(running ? 'Activity running · interact with the UI' : state.inventory?.unsupportedFeatures?.length ? 'APK identified · run blocked by unsupported features' : state.runtime ? 'Inspected · run attempt available' : 'Waiting for an app', running ? 'ok' : state.inventory?.unsupportedFeatures?.length ? 'error' : '');
 }
 $('apk-file').addEventListener('change', (event) => { chooseFile(event.target.files?.[0]); event.target.value = ''; });
+$('apk-file').addEventListener('cancel', () => { state.pendingReplaceShelfId = null; });   // the picker of "Choose the APK again" closed without a file
+$('error-reimport')?.addEventListener('click', () => reimportSavedApp());
 $('drop-zone').addEventListener('dragover', (event) => { event.preventDefault(); $('drop-zone').classList.add('dragging'); });
 $('drop-zone').addEventListener('dragleave', () => $('drop-zone').classList.remove('dragging'));
 // The file handle of a dropped file (Chrome: DataTransferItem.getAsFileSystemHandle) must be asked for during the drop event itself; the saved app keeps it (src/apk-shelf.js).
 const droppedHandle = event => { try { return [...(event.dataTransfer?.items ?? [])].find(item => item.kind === 'file')?.getAsFileSystemHandle?.() ?? null; } catch { return null; } };
-$('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('drop-zone').classList.remove('dragging'); chooseFile(event.dataTransfer.files?.[0], droppedHandle(event)); });
+$('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('drop-zone').classList.remove('dragging'); state.pendingReplaceShelfId = null; chooseFile(event.dataTransfer.files?.[0], droppedHandle(event)); });
 // Choosing the file: the browser's file picker with a handle where there is one (showOpenFilePicker), the plain file input otherwise.
 $('drop-zone').addEventListener('click', async event => {
+  state.pendingReplaceShelfId = null;   // a new APK, not "Choose the APK again"
   if (typeof window.showOpenFilePicker !== 'function') return;
   event.preventDefault();
   try { const [handle] = await window.showOpenFilePicker({ types: [{ description: 'APK', accept: { 'application/vnd.android.package-archive': ['.apk'], 'application/octet-stream': ['.aab'] } }], excludeAcceptAllOption: false }); if (handle) chooseFile(await handle.getFile(), handle); }
@@ -1450,7 +1475,7 @@ $('drop-zone').addEventListener('click', async event => {
 { const stage = $('preview-stage'), hasFiles = event => [...(event.dataTransfer?.types ?? [])].includes('Files');
   stage.addEventListener('dragover', event => { if (!hasFiles(event)) return; event.preventDefault(); stage.classList.add('apk-dragging'); });
   stage.addEventListener('dragleave', event => { if (!stage.contains(event.relatedTarget)) stage.classList.remove('apk-dragging'); });
-  stage.addEventListener('drop', event => { if (!hasFiles(event)) return; event.preventDefault(); stage.classList.remove('apk-dragging'); chooseFile(event.dataTransfer.files?.[0], droppedHandle(event)); }); }
+  stage.addEventListener('drop', event => { if (!hasFiles(event)) return; event.preventDefault(); stage.classList.remove('apk-dragging'); state.pendingReplaceShelfId = null; chooseFile(event.dataTransfer.files?.[0], droppedHandle(event)); }); }
 showDeviceHome(state.homeMode ?? 'idle');   // by default the stage shows the Android device on its launcher
 refreshShelf();   // the apps saved by earlier visits, on that launcher
 $('error-close').addEventListener('click', dismissError);

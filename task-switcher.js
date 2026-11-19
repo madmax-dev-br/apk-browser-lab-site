@@ -68,6 +68,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
       fileLine(button, item); button.setAttribute('aria-label', `Open ${name}`);
       button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nHold or right-click: uninstall`;
+      if (item.problem) { button.dataset.problem = item.problem.code ?? 'problem'; button.title = `${name}\n${item.problem.message ?? 'The stored APK cannot be opened.'}\nTap to see why and choose the APK again.\nHold or right-click: uninstall`; const mark = el('span', 'launcher-problem', button); mark.textContent = '!'; mark.setAttribute('aria-hidden', 'true'); button.setAttribute('aria-label', `${name}: the stored APK cannot be opened, choose it again`); }   // the stored copy could not be used (src/apk-shelf.js file()): still on the launcher, marked
       button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
       button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });
       longPress(button, () => item);

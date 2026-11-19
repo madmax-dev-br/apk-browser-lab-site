@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=41a7ba3ac140';
-import { Blocked } from './scheduler.js?v=41a7ba3ac140';
-import { JavaException } from './apk-runtime.js?v=41a7ba3ac140';
-import { networkOf } from './network-native.js?v=41a7ba3ac140';
-import { httpSocketOf } from './libcore-io-native.js?v=41a7ba3ac140';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=41a7ba3ac140';
+import { APKError } from './apk-error.js?v=c30a36398847';
+import { Blocked } from './scheduler.js?v=c30a36398847';
+import { JavaException } from './apk-runtime.js?v=c30a36398847';
+import { networkOf } from './network-native.js?v=c30a36398847';
+import { httpSocketOf } from './libcore-io-native.js?v=c30a36398847';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=c30a36398847';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -58,7 +58,8 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     const authority = authorityOf(r), entry = authority.entry(host); if (entry) return entry;
     const failure = authority.failure(host); if (failure) javaThrow(r, 'Ljavax/net/ssl/SSLException;', `The lab transport certificate for ${host} cannot be generated (${message(failure)}); ${what}`);
     authority.prepare(host).catch(() => {});
-    return new Blocked({ ready: () => authority.entry(host) !== null || authority.failure(host) !== null, retry: true, interruptible: false, reason: `lab transport certificate for ${host}` });
+    // ready also when the job ended with a leaf that is already due (the CA was renewed meanwhile): the retry prepares a new one
+    return new Blocked({ ready: () => authority.entry(host) !== null || authority.failure(host) !== null || !authority.jobs.has(String(host).toLowerCase()), retry: true, interruptible: false, reason: `lab transport certificate for ${host}` });
   };
   /** X509Certificate objects (the platform's CertificateFactory parses the DER) for a chain entry, created once per host and kept alive as host roots. */
   const certificatesOf = (r, entry) => {
@@ -327,10 +328,14 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     /** The CA certificate object (Blocked until the authority started; null when WebCrypto is missing). */
     authorityCertificate(r) {
       const authority = authorityOf(r); if (!authority.available) return null;
-      if (!authority.ca) { authority.start().catch(() => {}); if (authority.starting && !authority.startFailed) return new Blocked({ ready: () => !!authority.ca || authority.startFailed, retry: true, interruptible: false, reason: 'lab transport CA' }); return null; }
-      if (authority.caJava) return authority.caJava;
+      if (!authority.ca || !authority.caCurrent()) {   // not started yet, or due for renewal (the device clock passed its renewal point): wait for the (new) CA
+        authority.start().catch(() => {});
+        if (authority.starting && !authority.startFailed) return new Blocked({ ready: () => authority.caCurrent() || authority.startFailed || !authority.renewing && !!authority.ca, retry: true, interruptible: false, reason: 'lab transport CA' });
+        if (!authority.ca) return null;
+      }
+      if (authority.caJava && authority.caJavaDer === authority.ca.der) return authority.caJava;   // the object of the current CA only: a renewed CA gets a new one
       const factory = call(r, CERT_FACTORY, 'getInstance', [STRING], CERT_FACTORY, ['X.509'], 'static'), stream = construct(r, 'Ljava/io/ByteArrayInputStream;', ['[B'], [byteArray(r, authority.ca.der)]);
-      authority.caJava = call(r, CERT_FACTORY, 'generateCertificate', ['Ljava/io/InputStream;'], CERT, [factory, stream]); (r.hostStaticValues ??= []).push(authority.caJava); return authority.caJava;
+      authority.caJava = call(r, CERT_FACTORY, 'generateCertificate', ['Ljava/io/InputStream;'], CERT, [factory, stream]); authority.caJavaDer = authority.ca.der; (r.hostStaticValues ??= []).push(authority.caJava); return authority.caJava;
     },
     /** True when the chain (X509Certificate[]) is made of certificates the lab authority issued. */
     isLabChain: (r, chain) => authorityOf(r).isLabChain(r.object(chain).elements.map(cert => bytesOf(r, call(r, CERT, 'getEncoded', [], '[B', [cert])))),

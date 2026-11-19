@@ -1,6 +1,7 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=41a7ba3ac140';
+import { mapUrl } from './host-map.js?v=c30a36398847';
+import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=c30a36398847';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -12,8 +13,12 @@ export const inBrowser = () => typeof window !== 'undefined' || (typeof WorkerGl
  * request: { method, url, headers: [[name, value]], body: Uint8Array|null, redirect: 0|1 }; options: { fetch, proxyUrl, redirect: 'auto'|'manual'|'follow', browser, signal }.
  * Resolves { head: { version, status, reason, url, headers: [[name, value]] }, reader } once the response head is available; rejects with the raw fetch error.
  * Redirects outside a browser are returned hop by hop (the Java side applies Android's rules); a browser hides redirect responses, so it follows them.
+ * `clientIdentity` { dest, key, identity }: the client certificate (mTLS) the relay already holds for the request's destination (network-native.js useClientIdentity). The request names
+ * it (client-identity-key); a relay that no longer holds it (restarted: it keeps identities in memory only) refuses before reaching the server, and the identity is handed to it
+ * again and the request repeated once (head.clientIdentityRenewed). Only for that destination, through a relay.
  */
-export async function openExchange(request, { fetch: fetchFunction = globalThis.fetch, proxyUrl = '', redirect = 'auto', browser = inBrowser(), signal, dropped = null, hostMap = null } = {}) {
+export async function openExchange(request, options = {}) {
+  const { fetch: fetchFunction = globalThis.fetch, proxyUrl = '', redirect = 'auto', browser = inBrowser(), signal, dropped = null, hostMap = null, clientIdentity = null, identityRenewed = false } = options;
   const headers = [];
   for (const [name, value] of request.headers) {
     const lower = name.toLowerCase();
@@ -23,7 +28,8 @@ export async function openExchange(request, { fetch: fetchFunction = globalThis.
   }
   const mapped = mapUrl(request.url, hostMap);
   let target = mapped?.url ?? request.url;   // "Redirecionar hosts" (src/host-map.js): the exchange goes to the mapped host, the app keeps its URL
-  if (proxyUrl) target = proxyUrl.includes('{url}') ? proxyUrl.replace('{url}', encodeURIComponent(target)) : proxyUrl + encodeURIComponent(target);   // the relay repeats the (mapped) target
+  const identity = proxyUrl && clientIdentity?.identity && destinationOfUrl(target) === clientIdentity.dest ? clientIdentity : null;   // never named for another destination
+  if (proxyUrl) target = relayUrl(proxyUrl, target, identity ? { 'client-identity-key': identity.key } : {});   // the relay repeats the (mapped) target
   const manual = redirect === 'manual' || (redirect !== 'follow' && !browser) || request.redirect === 0;
   const init = { method: request.method, headers, redirect: manual ? 'manual' : 'follow', signal, credentials: 'omit', cache: 'no-store' };
   if (request.body && request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
@@ -38,7 +44,14 @@ export async function openExchange(request, { fetch: fetchFunction = globalThis.
   if (response.type === 'opaqueredirect') { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error('The browser does not expose redirect responses; enable redirect following for this connection'), { code: 'APKWEB_OPAQUE_REDIRECT' }); }
   // A relay that could not reach the target answers 502 with the Node error code (scripts/cors-relay.mjs): it is the same failure as a direct connect, so it becomes the same exception.
   const relayCode = proxyUrl ? response.headers.get('x-apkweb-relay-error-code') : null;
-  if (relayCode) { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true }); }
+  if (relayCode) {
+    try { await response.body?.cancel(); } catch { /* ignored */ }
+    if (relayCode === NO_IDENTITY_CODE && identity && !identityRenewed) {   // the relay restarted since the identity was handed over: hand it again, then the same request once more
+      await registerClientIdentity({ proxyUrl, fetch: fetchFunction, dest: identity.dest, identity: identity.identity });
+      const again = await openExchange(request, { ...options, identityRenewed: true }); again.head.clientIdentityRenewed = true; return again;
+    }
+    throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true });
+  }
   const out = []; let encoded = false;
   response.headers.forEach((value, name) => {
     const lower = name.toLowerCase();
@@ -95,6 +108,8 @@ export function describeFailure(error, request, timedOut = false) {
   if (/^(CERT_|DEPTH_ZERO|SELF_SIGNED|UNABLE_TO_|ERR_TLS|ERR_SSL|ERR_CERT|HANDSHAKE)/.test(code) || /certificate|tls|ssl/i.test(message)) return { type: 'Ljavax/net/ssl/SSLHandshakeException;', message: `Chain validation failed: ${message}` };
   if (code === 'UND_ERR_ABORTED' || code === 'ERR_STREAM_PREMATURE_CLOSE') return { type: 'Ljava/io/IOException;', message: 'unexpected end of stream' };
   if (code === 'APKWEB_OPAQUE_REDIRECT') return { type: 'Ljava/io/IOException;', message };
+  if (code === NO_IDENTITY_CODE) return { type: 'Ljava/io/IOException;', message: `the client certificate for ${host}:${port} is not at the relay: ${message}` };
+  if (code === 'APKWEB_RELAY_TOKEN') return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}): the CORS relay refused the Proxy address (${message})` };
   if (code === 'APKWEB_RELAY_PRIVATE') return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}) from /:: (port 0): the CORS relay refused the target (${message})` };   // only relays from before 2026-11-16 refuse private destinations; the code stays mapped for them
   if (name === 'TypeError' && /fetch/i.test(message)) return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host}/${host} (port ${port}): the browser reports unreachable hosts, CORS rejections and blocked requests identically ("${message}")` };
   return { type: 'Ljava/io/IOException;', message: `${name || 'Error'}: ${message}` };

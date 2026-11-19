@@ -1,5 +1,5 @@
-import { captureBody } from './network-capture.js?v=41a7ba3ac140';
-import { describeFailure } from './network-transport.js?v=41a7ba3ac140';
+import { captureBody } from './network-capture.js?v=c30a36398847';
+import { describeFailure } from './network-transport.js?v=c30a36398847';
 
 // Main-side half of the synchronous network bridge. The exchange runs in a dedicated worker (network-worker.js): it fetches, then hands the response to this side through
 // SharedArrayBuffers (head as JSON, body through a ring buffer, state words) and wakes it with Atomics.notify, so a VM frame that cannot yield to the event loop can wait for
@@ -43,6 +43,7 @@ export class WorkerExecutor {
     const state = Atomics.load(control, STATE);
     if (state === STATE_HEAD && !shared.headParsed) {
       const head = JSON.parse(new TextDecoder().decode(data.slice(0, Atomics.load(control, HEAD_LENGTH)))); shared.headParsed = true;
+      if (head.clientIdentityRenewed) { delete head.clientIdentityRenewed; this.bridge.noteClientIdentityRenewed?.(this.bridge.clientIdentityFor?.(op.request.url)?.dest ?? new URL(op.request.url).host); }   // the relay restarted and was given the identity again (openExchange)
       op.head = head; this.bridge.stats.redirectsObserved += head.status >= 300 && head.status < 400 ? 1 : 0; changed = true;
     } else if (state === STATE_ERROR && op.error === null) {
       const failure = JSON.parse(new TextDecoder().decode(data.slice(0, Atomics.load(control, ERROR_LENGTH))));

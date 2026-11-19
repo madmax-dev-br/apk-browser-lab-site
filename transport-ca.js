@@ -60,11 +60,16 @@ const ipBytes = host => {
 export const CA_COMMON_NAME = 'APK Web Lab transport CA';
 export const DAY = 24 * 60 * 60 * 1000;
 export const LEAF_VALIDITY_MS = 90 * DAY, CA_VALIDITY_MS = 365 * DAY;
+// Renewal, judged at use time on the device clock (which the device settings can move): a leaf is replaced a day before it expires, and the CA when less than one leaf validity is
+// left (so a new leaf always gets its full 90 days); a certificate whose notBefore is after the clock (the clock was moved back) is replaced too. A renewed CA drops every leaf and
+// what the old one issued from the default trust decision.
+export const LEAF_RENEW_MS = DAY, CA_RENEW_MS = LEAF_VALIDITY_MS;
 const hexOf = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 
 /**
- * One authority per session. `prepare(host)` resolves the host's chain once (cached); `entry(host)` is the synchronous answer once it did. `isLabChain(ders)` is the default trust
- * decision: every certificate in the chain was issued by this authority (the leaf byte for byte, the issuer byte for byte the CA).
+ * One authority per session. `prepare(host)` resolves the host's chain (cached while valid); `entry(host)` is the synchronous answer once it did, null when there is none or it is
+ * due for renewal. `isLabChain(ders)` is the default trust decision: every certificate in the chain was issued by the current CA of this authority (the leaf byte for byte, the
+ * issuer byte for byte the CA).
  */
 export class TransportAuthority {
   constructor({ subtle = globalThis.crypto?.subtle, random = bytes => globalThis.crypto.getRandomValues(bytes), now = () => Date.now(), track = promise => promise } = {}) {
@@ -74,11 +79,26 @@ export class TransportAuthority {
   get available() { return !!this.subtle; }
   /** The CA certificate (DER) once started. */
   get caDer() { return this.ca?.der ?? null; }
-  entry(host) { return this.leaves.get(String(host).toLowerCase()) ?? null; }
-  /** Starts (once) the CA and leaf key generation; resolves when the authority can sign. */
+  entry(host) { const entry = this.leaves.get(String(host).toLowerCase()) ?? null; return entry && this.current(entry) ? entry : null; }
+  /** True while the CA can keep signing (not within CA_RENEW_MS of its end, not after the clock). */
+  caCurrent() { const now = this.now(); return !!this.ca && now >= this.ca.notBefore && now < this.ca.notAfter - CA_RENEW_MS; }
+  /** True while a leaf can be presented: issued by the current CA, valid now and not within LEAF_RENEW_MS of its end. */
+  current(entry) { const now = this.now(); return this.caCurrent() && entry.caDer === this.ca.der && now >= entry.notBefore && now < entry.notAfter - LEAF_RENEW_MS; }
+  /** Starts the CA and leaf key generation (again when the CA is due for renewal); resolves when the authority can sign. */
   start() {
     if (!this.subtle) return Promise.reject(Object.assign(new Error('WebCrypto SubtleCrypto is not available: the lab transport CA cannot be generated'), { kind: 'webcrypto-unavailable' }));
-    this.starting ??= this.track((async () => {
+    if (this.ca && !this.caCurrent() && !this.renewing) {   // renewal: a new CA (and leaf key); the leaves and the trust of the old one go with it once the new one exists
+      this.renewing = true; this.starting = null;
+      this.starting = this.generate().finally(() => { this.renewing = false; });
+      this.starting.catch(error => { this.startFailed = true; this.startError = error; });
+      return this.starting;
+    }
+    this.starting ??= this.generate();
+    this.starting.catch(error => { this.startFailed = true; this.startError = error; });
+    return this.starting;
+  }
+  generate() {
+    return this.track((async () => {
       const algorithm = { name: 'ECDSA', namedCurve: 'P-256' }, sign = { name: 'ECDSA', hash: 'SHA-256' };
       const caKeys = await this.subtle.generateKey(algorithm, true, ['sign', 'verify']), leafKeys = await this.subtle.generateKey(algorithm, true, ['sign', 'verify']);
       const caSpki = new Uint8Array(await this.subtle.exportKey('spki', caKeys.publicKey)), caKeyId = new Uint8Array(await this.subtle.digest('SHA-1', caSpki));
@@ -88,26 +108,25 @@ export class TransportAuthority {
           extension(OID.basicConstraints, true, der.seq(der.bool(true))), extension(OID.keyUsage, true, der.bits(Uint8Array.of(0x06), 1)), extension(OID.ski, false, der.octets(caKeyId)))));
       const signature = derSignature(new Uint8Array(await this.subtle.sign(sign, caKeys.privateKey, tbs)));
       const caDer = der.seq(tbs, der.seq(der.oid(OID.ecdsaSha256)), der.bits(signature));
-      this.ca = { der: caDer, subject, keyId: caKeyId, privateKey: caKeys.privateKey, notBefore, notAfter };
       const leafSpki = new Uint8Array(await this.subtle.exportKey('spki', leafKeys.publicKey));
-      this.leafKey = { spki: leafSpki, keyId: new Uint8Array(await this.subtle.digest('SHA-1', leafSpki)) };
-      this.issued.add(hexOf(caDer));
+      const leafKey = { spki: leafSpki, keyId: new Uint8Array(await this.subtle.digest('SHA-1', leafSpki)) };
+      this.ca = { der: caDer, subject, keyId: caKeyId, privateKey: caKeys.privateKey, notBefore, notAfter }; this.leafKey = leafKey;
+      this.leaves.clear(); this.issued = new Set([hexOf(caDer)]); this.generation = (this.generation ?? 0) + 1;
       return this.ca;
     })());
-    this.starting.catch(error => { this.startFailed = true; this.startError = error; });
-    return this.starting;
   }
   /** The error that stopped the chain of `host` (or the authority's start), or null. */
   failure(host) { return this.failures.get(String(host).toLowerCase()) ?? (this.startFailed ? this.startError ?? new Error('the authority could not start') : null); }
   serial() { const bytes = new Uint8Array(16); this.random(bytes); bytes[0] &= 0x7f; if (bytes[0] === 0) bytes[0] = 1; return bytes; }
   /** The chain presented for `host`: { host, leafDer, caDer, notBefore, notAfter }. */
   prepare(hostName) {
-    const host = String(hostName).toLowerCase(), have = this.leaves.get(host); if (have) return Promise.resolve(have);
+    const host = String(hostName).toLowerCase(), have = this.entry(host); if (have) return Promise.resolve(have);
     this.failures.delete(host);
     let job = this.jobs.get(host);
     if (!job) {
       job = this.track((async () => {
         await this.start();
+        if (!this.caCurrent()) await this.start();   // the CA came due while this waited: renew it first
         const ip = ipBytes(host), generalName = ip ? der.implicit(7, ip) : der.implicit(2, encoder.encode(host));
         const notBefore = Math.floor(this.now() / 1000) * 1000, notAfter = Math.min(notBefore + LEAF_VALIDITY_MS, this.ca.notAfter);
         const tbs = der.seq(der.explicit(0, der.int(2)), der.int(this.serial()), der.seq(der.oid(OID.ecdsaSha256)), this.ca.subject, der.seq(der.time(notBefore), der.time(notAfter)), name(host.length > 64 ? host.slice(0, 64) : host), this.leafKey.spki,

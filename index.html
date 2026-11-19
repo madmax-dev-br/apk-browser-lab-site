@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=41a7ba3ac140") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=41a7ba3ac140">
-  <link rel="stylesheet" href="./lab-theme.css?v=41a7ba3ac140">
-  <meta name="apk-browser-build" content="41a7ba3ac140">
+  <style>@import url("./styles.css?v=c30a36398847") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=c30a36398847">
+  <link rel="stylesheet" href="./lab-theme.css?v=c30a36398847">
+  <meta name="apk-browser-build" content="c30a36398847">
 </head>
 <body>
   <header class="topbar">
@@ -234,7 +234,7 @@
               </div>
             </div>
           </div>
-          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Could not run</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Technical details of the run</summary><pre id="error-detail" hidden></pre></details><button id="error-close" type="button" title="Closes this window; the app stays on the device home screen to open again (Esc)">Close</button> <button id="error-copy" type="button">Copy diagnostics</button> <button id="error-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Show summary</button></div>
+          <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Could not run</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Technical details of the run</summary><pre id="error-detail" hidden></pre></details><button id="error-reimport" type="button" title="Opens the file picker: the APK chosen replaces the copy stored for this app (its icon and app data stay)" hidden>Choose the APK again…</button> <button id="error-close" type="button" title="Closes this window; the app stays on the device home screen to open again (Esc)">Close</button> <button id="error-copy" type="button">Copy diagnostics</button> <button id="error-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Show summary</button></div>
         </div>
         <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" tabindex="0" aria-describedby="memory-detail" hidden><i></i><span class="memory-text" role="status"></span></span><div id="memory-detail" class="memory-detail" role="tooltip" hidden></div><span id="execution-engine">411 × 914 dp · density 1</span></div>
         <details id="trace" class="trace"><summary><span>Execution log</span><span id="trace-count">0 events</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Summary</button><button id="screen-state-copy" type="button" title="Copies a summary of what the VM shows (Activities, view tree, Compose, frames, queue, threads, memory) even without an error">State</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">The log will appear after the run.</pre></details>
@@ -274,7 +274,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=41a7ba3ac140"></script>
+  <script type="module" src="./app.js?v=c30a36398847"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

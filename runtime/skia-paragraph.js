@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=41a7ba3ac140';
+import { APKError } from './apk-runtime.js?v=c30a36398847';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -52,6 +52,8 @@ const registeredFace = (backend, state) => !!shapingFace(backend, state).familie
 /** Code points a shaper reports as unresolved although no glyph is drawn for them (default ignorables, layout controls). */
 const drawable = codepoint => !(codepoint === 0xad || codepoint === 0x34f || codepoint === 0x61c || (codepoint >= 0x200b && codepoint <= 0x200f) || (codepoint >= 0x202a && codepoint <= 0x202e) || (codepoint >= 0x2060 && codepoint <= 0x206f) || codepoint === 0xfeff || (codepoint >= 0xfe00 && codepoint <= 0xfe0f) || (codepoint >= 0xe0100 && codepoint <= 0xe01ef) || codepoint === 10 || codepoint === 13 || codepoint === 9);
 const unresolved = paragraph => paragraph.unresolvedCodepoints().filter(drawable);
+/** The widest paragraph layout: 2^24 px, where float32 positions still step by whole pixels (Android's own TextView.VERY_WIDE is 2^20). */
+const MAX_PARAGRAPH_WIDTH = 16777216;
 const base64 = bytes => { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384)); return btoa(binary); };
 
 /** Original SkParagraph CPU implementation from the verified CanvasKit bundle.
@@ -63,7 +65,12 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
   // Paint.setShadowLayer { radius, dx, dy, color }, lineSpacing { add, mult, firstTop } as StaticLayout applies android:lineSpacingExtra / lineSpacingMultiplier (below).
   if (!Number.isFinite(letterSpacing) || Math.abs(letterSpacing) > 512) fail('Paragraph letter spacing exceeds the web text backend limits');
   if (typeof text !== 'string' || text.length > 65536) fail('Paragraph text exceeds 65536 characters');
-  if (!Number.isFinite(width) || width <= 0 || width > 4096 || !Number.isFinite(textSize) || textSize <= 0 || textSize > 512) fail('Paragraph extent exceeds the web text backend limits');
+  // The layout width is the one StaticLayout gets: TextView.makeNewLayout lays out at max(0, want), so a view measured 0 wide (or narrower than its padding) breaks its text
+  // grapheme by grapheme, and a view measured UNSPECIFIED (a horizontally scrolling parent, Compose's Constraints.Infinity) lays out at its text's own width, however long the
+  // line. SkParagraph lays out both (width 0: one grapheme per line; a wide line: one line). The only bound is the float range SkParagraph measures in.
+  if (!Number.isFinite(width) || width > MAX_PARAGRAPH_WIDTH) fail(`Paragraph layout width ${width} is outside the web text backend range (finite, at most ${MAX_PARAGRAPH_WIDTH}px)`);
+  width = Math.max(0, width);
+  if (!Number.isFinite(textSize) || textSize <= 0 || textSize > 512) fail(`Paragraph text size ${textSize} is outside the web text backend range (0, 512]px`);
   if (maxLines !== null && (!Number.isInteger(maxLines) || maxLines < 1)) fail('Paragraph maxLines must be a positive integer');
   if (!['start','left','right','center'].includes(alignment)) fail('Unsupported paragraph alignment');
   if (![0, 1].includes(direction)) fail('Invalid paragraph direction');
@@ -92,18 +99,18 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
     const missing = unresolved(paragraph);
     if (missing.length) fail('The supplied Roboto fonts lack paragraph glyphs: ' + missing.slice(0, 8).map(codepoint => 'U+' + codepoint.toString(16)).join(', '));
     const lines = paragraph.getLineMetrics().map(line => ({ ...line }));
-    if (lines.length > 1024) fail('Paragraph exceeds 1024 lines');
     // StaticLayout.out: every line but the last is followed by extra = round((descent - ascent) * (spacingmult - 1) + spacingadd) pixels, where the first line's height includes
     // the font padding above its ascent when the layout includes it (firstTop). SkParagraph has no such spacing: the lines are drawn one by one, each moved down by the extras before it.
     const extras = lineSpacing && lines.length > 1 && (lineSpacing.add !== 0 || lineSpacing.mult !== 1) ? lines.slice(0, -1).map((line, index) => { const extra = (Math.round(line.ascent + line.descent) + (index === 0 ? lineSpacing.firstTop ?? 0 : 0)) * (lineSpacing.mult - 1) + lineSpacing.add; return extra >= 0 ? Math.trunc(extra + 0.5) : -Math.trunc(-extra + 0.5); }) : null;
     const height = paragraph.getHeight() + (extras ? extras.reduce((sum, extra) => sum + extra, 0) : 0);
-    if (!Number.isFinite(height) || height < 0 || height > 65536) fail('Invalid or excessive paragraph height');
+    if (!Number.isFinite(height) || height < 0 || height > MAX_PARAGRAPH_WIDTH) fail(`Paragraph height ${height} is outside the web text backend range (finite, at most ${MAX_PARAGRAPH_WIDTH}px)`);
     const result = { width: Math.min(width, Math.max(0, paragraph.getLongestLine())), layoutWidth: width, height,
       baseline: lines[0]?.baseline ?? paragraph.getAlphabeticBaseline(), lineCount: paragraph.getNumberOfLines(), lines,
       intrinsicWidth: paragraph.getMaxIntrinsicWidth(), maxLines, exceededMaxLines: paragraph.didExceedMaxLines(), source: 'official-Skia-SkParagraph/Roboto', scope: 'SkParagraph web backend; not Android StaticLayout/Minikin' };
     if (raster && height > 0) {
       const rasterWidth = Math.max(1, Math.ceil(width)), rasterHeight = Math.max(1, Math.ceil(height));
-      if (rasterHeight > 4096 || rasterWidth * rasterHeight > 4 * 1024 * 1024) fail('Paragraph raster exceeds4096px/4Mpixel VM limit');
+      // a genuine resource bound: the paragraph is drawn into one CPU surface and one PNG
+      if (rasterHeight > 4096 || rasterWidth * rasterHeight > 4 * 1024 * 1024) fail(`Paragraph raster ${rasterWidth}x${rasterHeight}px exceeds the 4096px-high / 4-Mpixel web text raster limit`);
       const surface = CK.MakeSurface(rasterWidth, rasterHeight);
       if (!surface) fail('Skia paragraph raster allocation failed');
       let image;

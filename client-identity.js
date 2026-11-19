@@ -75,17 +75,32 @@ const base64 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 
 /** A short fingerprint of an identity (the leaf certificate's bytes), to register each identity once. */
 export const identityKey = identity => { const leaf = identity.chain[0]; let h = 0x811c9dc5; for (const b of leaf) h = Math.imul(h ^ b, 0x01000193) >>> 0; return `${leaf.length}:${h.toString(16)}`; };
 
-/** Tells the relay to forget every client identity (a new session: what a previous one handed over must not reach a host this session does not list). Errors are the caller's to ignore. */
+/** The relay's answer when a request names an identity (client-identity-key) the relay does not hold for its destination: it was restarted (identities live in its memory only). */
+export const NO_IDENTITY_CODE = 'APKWEB_RELAY_NO_CLIENT_IDENTITY';
+/** The relay URL for `target` (the proxy's {url} placeholder, or appended), plus `extra` query parameters for the relay itself. */
+export function relayUrl(proxyUrl, target, extra = {}) {
+  let url = proxyUrl.includes('{url}') ? proxyUrl.replace('{url}', encodeURIComponent(target)) : proxyUrl + encodeURIComponent(target);
+  for (const [name, value] of Object.entries(extra)) url += `${url.includes('?') ? '&' : '?'}${name}=${encodeURIComponent(value)}`;
+  return url;
+}
+/** True when a relay's answer says it keeps client identities (scripts/cors-relay.mjs `x-apkweb-relay-features`); any other server would forward the POST to the destination. */
+const keepsIdentities = response => response.status === 204 && /(^|[\s,])client-identity([\s,]|$)/.test(response.headers?.get?.('x-apkweb-relay-features') ?? '');
+
+/**
+ * Tells the relay to forget every client identity (a new session: what a previous one handed over must not reach a host this session does not list). Resolves { supported, reason }:
+ * supported when the relay answered as one that keeps identities; otherwise no identity may be sent to it (reason says why). Never rejects.
+ */
 export async function forgetClientIdentities({ proxyUrl, fetch: fetchFunction = globalThis.fetch }) {
-  const probe = 'https://client-identity.invalid/', url = (proxyUrl.includes('{url}') ? proxyUrl.replace('{url}', encodeURIComponent(probe)) : proxyUrl + encodeURIComponent(probe)) + '&client-identity=forget-all';
-  const response = await fetchFunction(url, { method: 'POST', body: '', headers: [['content-type', 'text/plain']], credentials: 'omit', cache: 'no-store' });
-  await response.body?.cancel?.();
+  let response;
+  try { response = await fetchFunction(relayUrl(proxyUrl, 'https://client-identity.invalid/', { 'client-identity': 'forget-all' }), { method: 'POST', body: '', headers: [['content-type', 'text/plain']], credentials: 'omit', cache: 'no-store' }); }
+  catch (error) { return { supported: false, reason: `the relay did not answer (${String(error?.message ?? error).slice(0, 120)}): is it running?` }; }
+  try { await response.body?.cancel?.(); } catch { /* ignored */ }
+  return keepsIdentities(response) ? { supported: true, reason: null } : { supported: false, reason: `the Proxy is not a relay that keeps client certificates (answer ${response.status}): use scripts/cors-relay.mjs; the key was not sent` };
 }
 /** POSTs the identity for `dest` to the relay (its token-protected channel). Resolves when the relay stored it; rejects with the relay's answer otherwise. */
 export async function registerClientIdentity({ proxyUrl, fetch: fetchFunction = globalThis.fetch, dest, identity }) {
   const target = `https://${dest.replace(/:443$/, '')}/`;
-  const url = (proxyUrl.includes('{url}') ? proxyUrl.replace('{url}', encodeURIComponent(target)) : proxyUrl + encodeURIComponent(target)) + '&client-identity=1';
   const body = JSON.stringify(identity ? { key: base64(identity.key), chain: identity.chain.map(base64) } : { chain: [] });
-  const response = await fetchFunction(url, { method: 'POST', body, headers: [['content-type', 'text/plain']], credentials: 'omit', cache: 'no-store' });
+  const response = await fetchFunction(relayUrl(proxyUrl, target, { 'client-identity': '1' }), { method: 'POST', body, headers: [['content-type', 'text/plain']], credentials: 'omit', cache: 'no-store' });
   if (response.status !== 204) { const text = await response.text().catch(() => ''); throw new Error(`the relay did not accept the client identity for ${dest}: ${response.status} ${text.slice(0, 200)}`); }
 }
