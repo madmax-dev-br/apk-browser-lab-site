@@ -1,7 +1,7 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=a0c4fb9d6a79';
-import { createRasterReceiver } from './raster-cache.js?v=a0c4fb9d6a79';
+import { createWebAudioPlayer } from './web-audio-player.js?v=645464e2adea';
+import { createRasterReceiver } from './raster-cache.js?v=645464e2adea';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=a0c4fb9d6a79', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=645464e2adea', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');

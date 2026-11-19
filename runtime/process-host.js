@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=a0c4fb9d6a79';
-import { createHostRegistry } from './host-contract.js?v=a0c4fb9d6a79';
-import { ANDROID_IDS } from './android-ids-data.js?v=a0c4fb9d6a79';
+import { APKError } from './apk-error.js?v=645464e2adea';
+import { createHostRegistry } from './host-contract.js?v=645464e2adea';
+import { ANDROID_IDS } from './android-ids-data.js?v=645464e2adea';
 
 // The rest of android.os.Process over the browser VM's single virtual process (frameworks/base/core/java/android/os/Process.java and its JNI half
 // core/jni/android_util_Process.cpp, android-13.0.0_r1). The uid arithmetic is the Java code verbatim; the natives follow the C++ control flow against the VM's

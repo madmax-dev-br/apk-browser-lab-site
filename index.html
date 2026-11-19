@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=a0c4fb9d6a79") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=a0c4fb9d6a79">
-  <link rel="stylesheet" href="./lab-theme.css?v=a0c4fb9d6a79">
-  <meta name="apk-browser-build" content="a0c4fb9d6a79">
+  <style>@import url("./styles.css?v=645464e2adea") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=645464e2adea">
+  <link rel="stylesheet" href="./lab-theme.css?v=645464e2adea">
+  <meta name="apk-browser-build" content="645464e2adea">
 </head>
 <body>
   <header class="topbar">
@@ -249,8 +249,8 @@
             <form class="adb-form" autocomplete="off"><label class="adb-prompt" for="adb-input" aria-hidden="true">$</label><input id="adb-input" class="adb-input" type="text" spellcheck="false" autocapitalize="off" autocorrect="off" autocomplete="off" enterkeyhint="go" aria-label="adb command (Enter runs it)"></form>
           </div>
           <input class="adb-file" type="file" hidden></details>
-        <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Compose</span><span class="ci-count">closed</span><span class="trace-chevron">⌄</span></summary>
-          <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspects the screen now: Compose layout tree, Views and a crop of each element">Capture</button><label class="logcat-auto" title="Captures again when the screen navigates (another Activity or destination)"><input class="ci-follow" type="checkbox"> Update on navigation</label><label class="logcat-auto" title="Shows every LayoutNode of the Compose tree; off, shows the boxes of &quot;Show layout bounds&quot;"><input class="ci-tree" type="checkbox"> Full tree</label><input class="ci-filter" type="search" placeholder="Filter by name, text, tag or modifier" aria-label="Filter elements by name, text, testTag or modifier"><button class="ci-copy" type="button" title="Copies the inspection data (without images) as JSON">Copy JSON</button></div>
+        <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Layout</span><span class="ci-count">closed</span><span class="trace-chevron">⌄</span></summary>
+          <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspects the screen now: its layout tree (XML Views and Compose, detected), and an image of the element you choose">Capture</button><label class="logcat-auto" title="Captures again when the screen navigates (another Activity or destination)"><input class="ci-follow" type="checkbox" checked> Update on navigation</label><label class="logcat-auto" title="Shows every LayoutNode of the Compose tree; off, shows the boxes of &quot;Show layout bounds&quot;"><input class="ci-tree" type="checkbox"> Full tree</label><input class="ci-filter" type="search" placeholder="Filter by name, id, text, tag or modifier" aria-label="Filter elements by name, text, testTag or modifier"><button class="ci-copy" type="button" title="Copies the inspection data (without images) as JSON">Copy JSON</button></div>
           <div class="ci-body" aria-live="polite"></div></details>
         <details id="plugins-output" class="trace logcat plugins-output" hidden><summary><span>Plugins</span><span class="po-count">0 running</span><span class="trace-chevron">⌄</span></summary>
           <div class="po-cards" aria-live="off"></div></details>
@@ -273,7 +273,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=a0c4fb9d6a79"></script>
+  <script type="module" src="./app.js?v=645464e2adea"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

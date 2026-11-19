@@ -524,8 +524,8 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8819340,
-  "sha256": "b3e1f23a6f203dc79a9f42d1a44b9ed278d5a5e5a4d0cbff2555371ad40d44e6",
+  "bytes": 8819536,
+  "sha256": "730bd9490c3ac5506afa53a97c22eaffb10036a57550321b2099ea0a4bd65218",
   "classCount": 6783,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
@@ -41895,7 +41895,7 @@
       },
       {
         "path": "framework-aosp/lab-java-jca/dev/apkweb/keystore/LabKeystore.java",
-        "sha256": "d667cddfb830eb472596c496bbf293a4f7b562c35385e3f0143f64e66a8981ae"
+        "sha256": "d62bfd29e0f3c8d0e97d577cc6b4c466e77114ab8b4b40fb74e2caf3c89cf5f6"
       },
       {
         "path": "framework-aosp/lab-java-jca/dev/apkweb/keystore/Params.java",

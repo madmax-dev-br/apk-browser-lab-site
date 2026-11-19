@@ -1,4 +1,5 @@
-// The "Compose" panel of the lab page: a one-shot inspection of the screen's Compose layout tree (src/compose-inspector.js, run in the Worker) and of its Views.
+// The "Layout" panel of the lab page: a one-shot inspection of the screen's layout, XML Views and Compose alike (src/compose-inspector.js, run in the Worker, and the snapshot's
+// Views). The kind of screen is detected (screenKind: XML Views, Compose, or both) and shown in one tree: the View hierarchy, each AndroidComposeView with its LayoutNodes under it.
 // After a capture the panel shows the status line and a two-column split: on the left the elements as a tree (one row per element, indented by depth, with its name, kind and
 // size; a filterable list that scrolls inside its column), on the right the details of the clicked element (its crop cut from the frame the page shows, name, properties). Until an
 // element is clicked the right column is an empty state and no crop is cut; selecting an element cuts exactly one crop and highlights the element on the device screen.
@@ -9,7 +10,7 @@
 // The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=a0c4fb9d6a79';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=645464e2adea';
 
 const NO_RASTER = 'the displayed frame has no content raster for this element';
 const DETAIL_W = 360, DETAIL_H = 260;
@@ -29,7 +30,7 @@ export function flattenViews(snapshot) {
     const base = hasRaster ? { hostId: view.id, x: own.x, y: own.y } : raster;
     const local = b && base ? { left: round(own.x - base.x), top: round(own.y - base.y), right: round(own.x - base.x + b.right - b.left), bottom: round(own.y - base.y + b.bottom - b.top) } : null;
     out.push({ id: view.id, parentId: parent?.id ?? null, depth, type: view.type ?? null, kind: view.kind ?? null, text: typeof view.text === 'string' ? view.text : null, contentDescription: view.contentDescription ?? null,
-      androidId: view.androidId ?? null, visibility: view.visibility ?? 0, visible, clickable: !!(view.hasClickListener ?? view.clickable), compose: /AndroidComposeView;$/.test(String(view.type ?? '')),
+      androidId: view.androidId ?? null, resourceName: typeof view.resourceName === 'string' ? view.resourceName : null, visibility: view.visibility ?? 0, visible, clickable: !!(view.hasClickListener ?? view.clickable), compose: /AndroidComposeView;$/.test(String(view.type ?? '')),
       window: view.windowSurface ? { id: view.windowSurface.id, kind: view.windowSurface.kind ?? null, modal: !!view.windowSurface.modal } : null,
       bounds: b ? { left: round(own.x), top: round(own.y), right: round(own.x + b.right - b.left), bottom: round(own.y + b.bottom - b.top) } : null,
       rasterHostId: base?.hostId ?? null, rasterBounds: local });
@@ -78,27 +79,46 @@ export function buildLayoutBoundsElements(inspection, snapshot) {
 
 const viewElements = (views, viewById, density) => views.map(view => {
   const label = view.text || view.contentDescription;
-  return { key: `v:${view.id}`, kind: 'view', name: `${simple(view.type)}${label ? ` "${label.length > 40 ? label.slice(0, 39) + '…' : label}"` : ''}`, nameSource: 'view', id: view.id, parentName: view.parentId !== null ? simple(viewById.get(String(view.parentId))?.type) : null,
+  return { key: `v:${view.id}`, kind: 'view', name: `${simple(view.type)}${view.resourceName ? ` #${view.resourceName}` : ''}${label ? ` "${label.length > 40 ? label.slice(0, 39) + '…' : label}"` : ''}`, nameSource: 'view', id: view.id, parentName: view.parentId !== null ? simple(viewById.get(String(view.parentId))?.type) : null,
     depth: view.depth, hostId: view.rasterHostId, hostSize: view.rasterHostId === null ? null : sizeOf(viewById.get(String(view.rasterHostId))?.bounds), cropBounds: view.rasterBounds, bounds: view.bounds, visibleBounds: view.bounds, windowBounds: view.bounds, placed: view.visible,
-    zIndex: null, type: view.type, viewKind: view.kind, text: view.text, contentDescription: view.contentDescription, androidId: view.androidId, visibility: view.visibility, clickable: view.clickable, compose: view.compose, window: view.window, density };
+    zIndex: null, type: view.type, viewKind: view.kind, text: view.text, contentDescription: view.contentDescription, androidId: view.androidId, resourceName: view.resourceName ?? null, visibility: view.visibility, clickable: view.clickable, compose: view.compose, window: view.window, density };
 });
 
 /** One list for the carousel and the table: the Compose elements of the inspection (by owner), then the Views of the snapshot. */
 export function buildElements(inspection, snapshot, { mode = 'tree' } = {}) {
   if (mode === 'layout') return buildLayoutBoundsElements(inspection, snapshot);
   const density = inspection?.density ?? snapshot?.density ?? null, list = [], views = flattenViews(snapshot), viewById = new Map(views.map(view => [String(view.id), view]));
-  for (const owner of inspection?.owners ?? []) {
+  // one tree: the Views in drawing order, and under each AndroidComposeView the LayoutNodes of its composition (an owner whose View is not in the snapshot comes last)
+  const owners = new Map((inspection?.owners ?? []).map(owner => [String(owner.ownerViewId), owner]));
+  const nodesOf = (owner, base) => {
     const ownerView = viewById.get(String(owner.ownerViewId)), names = new Map(owner.nodes.map(node => [node.id, node.name]));
     for (const node of owner.nodes) {
       list.push({ key: `c:${node.id}`, kind: 'compose', name: node.name, nameSource: node.nameSource, id: node.semanticsId, ownerViewId: owner.ownerViewId, parentName: node.parentId ? names.get(node.parentId) ?? null : null,
-        depth: node.depth, childCount: node.childCount, hostId: owner.ownerViewId, hostSize: { width: owner.width, height: owner.height }, cropBounds: node.visibleBounds, bounds: node.bounds, visibleBounds: node.visibleBounds,
+        depth: base + node.depth, childCount: node.childCount, hostId: owner.ownerViewId, hostSize: { width: owner.width, height: owner.height }, cropBounds: node.visibleBounds, bounds: node.bounds, visibleBounds: node.visibleBounds,
         windowBounds: node.boundsInWindow ?? (ownerView?.bounds && node.visibleBounds ? shift(node.visibleBounds, ownerView.bounds) : null), placed: node.placed, attached: node.attached, zIndex: node.zIndex,
         measurePolicy: node.measurePolicy, modifiers: node.modifiers ?? [], semantics: node.semantics, calls: node.calls ?? [], window: owner.window, density });
     }
+  };
+  for (const element of viewElements(views, viewById, density)) {
+    list.push(element);
+    const owner = owners.get(String(element.id)); if (owner) { owners.delete(String(element.id)); nodesOf(owner, element.depth + 1); }
   }
-  list.push(...viewElements(views, viewById, density));
+  for (const owner of owners.values()) nodesOf(owner, 0);
   return list;
 }
+/**
+ * What the screen is made of: 'compose' when every content View is part of a composition (the Views around an AndroidComposeView are only its containers), 'xml' without any
+ * AndroidComposeView, 'mixed' with both, 'empty' with no View. Views inside an AndroidComposeView (its ViewLayers, ripples, interop hosts' layers) belong to the composition.
+ */
+export function screenKind(snapshot) {
+  const views = flattenViews(snapshot); if (!views.length) return 'empty';
+  const byId = new Map(views.map(view => [String(view.id), view])), hosts = views.filter(view => view.compose); if (!hosts.length) return 'xml';
+  const containers = new Set(), inside = new Set();
+  for (const host of hosts) for (let at = byId.get(String(host.parentId)); at; at = byId.get(String(at.parentId))) containers.add(String(at.id));
+  for (const view of views) for (let at = view; at; at = byId.get(String(at.parentId))) if (at.compose) { inside.add(String(view.id)); break; }
+  return views.some(view => !containers.has(String(view.id)) && !inside.has(String(view.id)) && view.visible && view.bounds) ? 'mixed' : 'compose';
+}
+export const SCREEN_KINDS = { xml: 'XML Views', compose: 'Compose', mixed: 'XML Views + Compose', empty: 'no View' };
 const shift = (b, origin) => ({ left: round(b.left + origin.left), top: round(b.top + origin.top), right: round(b.right + origin.left), bottom: round(b.bottom + origin.top) });
 
 /** "16, 42 · 219 × 28 px · 219 × 28 dp" (dp only when the density is known). */
@@ -169,14 +189,16 @@ export function detailRows(element) {
       if (Array.isArray(s.textSelection)) rows.push(['Selection', s.textSelection.join('–')]);
     } else rows.push(['Semantics', 'none on this node']);
   } else {
-    rows.push(['Class', String(element.type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.')], ['Renderer type', element.viewKind ?? '—'], ['In the window', formatBounds(element.windowBounds, element.density)]);
+    rows.push(['Class', String(element.type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.')]);
+    if (element.androidId > 0) rows.push(['Resource id', element.resourceName ? `@id/${element.resourceName} (0x${(element.androidId >>> 0).toString(16)})` : `0x${(element.androidId >>> 0).toString(16)}`]);
+    rows.push(['Renderer type', element.viewKind ?? '—'], ['In the window', formatBounds(element.windowBounds, element.density)]);
     if (element.text) rows.push(['Text', element.text]);
     if (element.contentDescription) rows.push(['contentDescription', element.contentDescription]);
     rows.push(['Visible', element.placed ? 'yes' : `no (visibility ${element.visibility})`], ['Clickable', element.clickable ? 'yes' : 'no']);
-    if (element.compose) rows.push(['Compose', 'hosts a composition: see the Compose elements']);
+    if (element.compose) rows.push(['Compose', 'hosts a composition: its LayoutNodes are listed under it']);
   }
   if (element.window && element.window.id !== null) rows.push(['Window', `${element.window.kind ?? 'window'} ${element.window.id}${element.window.modal ? ' · modal' : ''}`]);
-  const problem = cropProblem(element); rows.push(['Crop', problem ? `no crop: ${problem}` : 'cut from the frame shown by the page']);
+  const problem = cropProblem(element); rows.push(['Crop', element.kind === 'view' && element.placed && (element.hostId === null || element.hostId === undefined) ? 'built from the page\'s element of this View (drawn by the page DOM)' : problem ? `no crop: ${problem}` : 'cut from the frame shown by the page']);
   return rows;
 }
 
@@ -186,13 +208,14 @@ export function detailRows(element) {
  * device (its _contentLayer is the raster to cut). getScreen(): the #android-screen element (the highlight's parent). copyText(text): Promise (clipboard).
  * Returns { rendered(snapshot), reset(), capture(), state }.
  */
-export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000 } = {}) {
+export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000, domImage = null, resourceNames = null } = {}) {
   const q = selector => root.querySelector(selector), body = q('.ci-body'), count = q('.ci-count'), captureButton = q('.ci-capture'), follow = q('.ci-follow'), filterInput = q('.ci-filter'), copyButton = q('.ci-copy');
   const el = (tag, className = '', text = null) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== null) node.textContent = text; return node; };
   // "Full tree" (on by default): every LayoutNode of the inspection instead of the boxes "Show layout bounds" draws
   let treeToggle = q('.ci-tree');
   if (!treeToggle && follow?.parentElement?.parentElement) { const label = document.createElement('label'); label.className = 'logcat-auto'; label.title = 'Shows every LayoutNode of the Compose tree, not only the boxes of \'Show layout bounds\''; treeToggle = document.createElement('input'); treeToggle.type = 'checkbox'; treeToggle.className = 'ci-tree'; label.append(treeToggle, ' Full tree'); follow.parentElement.after(label); }
   if (treeToggle) treeToggle.checked = true;
+  if (follow) follow.checked = true;   // automatic: a new screen is captured again (only while the panel is open)
   const mode = () => treeToggle && !treeToggle.checked ? 'layout' : 'tree';
   const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
   const setCount = text => { count.textContent = text; };
@@ -261,6 +284,13 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     for (const old of pane.querySelectorAll('canvas')) { old.width = 0; old.height = 0; } S.thumbs = S.thumbs.filter(canvas => canvas.width > 0);
     const canvas = el('canvas', 'ci-detail-image'), note = el('p', 'ci-noimage'), problem = paint(element, canvas, DETAIL_W, DETAIL_H);
     if (problem) { canvas.hidden = true; note.textContent = `no crop: ${problem}`; } else { note.hidden = true; S.thumbs.push(canvas); }
+    if (element.kind === 'view' && element.placed && domImage) {   // a View the page draws with its DOM (an XML widget, or a raster with DOM children over it): the image of its element
+      const token = S.token; if (problem) note.textContent = 'building the image of this View from the page…';
+      Promise.resolve().then(() => domImage(element, canvas)).then(done => {
+        if (token !== S.token || !canvas.isConnected) return; if (!done) { if (problem) note.textContent = `no crop: ${problem}`; return; }
+        const css = fit(canvas.width, canvas.height, DETAIL_W, DETAIL_H); canvas.style.width = `${css.width}px`; canvas.style.height = 'auto'; canvas.hidden = false; note.hidden = true; if (!S.thumbs.includes(canvas)) S.thumbs.push(canvas);
+      }, error => { if (token === S.token && canvas.isConnected && problem) note.textContent = `no crop: ${String(error?.message ?? error).slice(0, 200)}`; });
+    }
     const list = el('dl', 'ci-props'); for (const [label, value] of detailRows(element)) list.append(el('dt', '', label), el('dd', '', String(value ?? '—')));
     pane.replaceChildren(el('h4', '', element.name), canvas, note, list);
   };
@@ -287,13 +317,14 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     const status = el('p', 'ci-status'), notes = [...(capture.inspection?.notes ?? [])];
     for (const owner of capture.inspection?.owners ?? []) if (owner.names?.note) notes.push(owner.names.note);
     if (!capture.fullDensity) notes.push('the frame was still at reduced density (screen moving): crops are less sharp');
-    status.textContent = `${mode() === 'layout' ? 'Layout bounds: ' : 'Full tree: '}${compose} Compose elements · ${views} Views${capture.inspection?.ms !== undefined ? ` · inspected in ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} match the filter` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
+    const kind = screenKind(capture.snapshot);
+    status.textContent = `Screen: ${SCREEN_KINDS[kind]} · ${mode() === 'layout' ? 'layout bounds: ' : 'full tree: '}${views} Views${compose || kind !== 'xml' ? ` · ${compose} Compose elements` : ''}${capture.inspection?.ms !== undefined ? ` · inspected in ${capture.inspection.ms} ms` : ''}${S.visible.length !== S.elements.length ? ` · ${S.visible.length} match the filter` : ''}${notes.length ? ' · ' + [...new Set(notes)].join(' · ') : ''}`;
     const split = el('div', 'ci-split'), tree = el('div', 'ci-tree'), details = el('div', 'ci-details');
     tree.setAttribute('role', 'tree'); tree.setAttribute('aria-label', 'Screen elements');
     if (S.visible.length) tree.append(...S.visible.map(treeRow)); else tree.append(el('p', 'logcat-empty', S.elements.length ? 'No element matches the filter.' : 'No element on the screen.'));
     details.append(emptyDetails()); split.append(tree, details);
     body.replaceChildren(status, split);
-    setCount(`${compose} Compose · ${views} Views`);
+    setCount(kind === 'xml' ? `XML · ${views} Views` : kind === 'compose' ? `Compose · ${compose} nodes` : `XML + Compose · ${views} Views · ${compose} nodes`);
     if (S.selected && !S.visible.some(element => element.key === S.selected)) S.selected = null;
     const rows = treeRows(); if (rows[0]) rows[0].tabIndex = 0;
     if (S.selected) select(S.selected); else highlight(null);
@@ -307,6 +338,11 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       if (!snapshot) { body.replaceChildren(el('p', 'logcat-empty', 'No app is running. Run an APK and capture again.')); setCount('no screen'); return; }
       const inspection = await inspect(); if (token !== S.token || !root.open) return;
       const shownNow = getSnapshot() ?? snapshot;
+      if (resourceNames) {   // "@id/name" of the Views that have an id (the app's resources), as uiautomator shows resource-id
+        const ids = []; (function walk(view) { if (!view) return; if (Number.isInteger(view.androidId) && view.androidId > 0) ids.push(view.androidId); for (const child of view.children ?? []) walk(child); })({ children: shownNow.views ?? [] });
+        const names = ids.length ? await resourceNames([...new Set(ids)]).catch(() => null) : null; if (token !== S.token || !root.open) return;
+        if (names?.size) (function name(view) { if (!view) return; const found = names.get(view.androidId); if (found) view.resourceName = String(found).replace(/^.*:id\//, '').replace(/^id\//, ''); for (const child of view.children ?? []) name(child); })({ children: shownNow.views ?? [] });
+      }
       for (const frame of S.frames.values()) if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } S.frames.clear();
       S.capture = { inspection, snapshot: shownNow, fullDensity: !shownNow.rasterReduced, capturedAt: new Date().toISOString() }; S.followKey = navigationKey(shownNow);
       S.elements = buildElements(inspection, shownNow, { mode: mode() });
