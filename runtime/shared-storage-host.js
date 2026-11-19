@@ -1,9 +1,9 @@
-import { createHostRegistry } from './host-contract.js?v=ad30c2f37025';
-import { APKError } from './apk-error.js?v=ad30c2f37025';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ad30c2f37025';
-import { allocateFd } from './libcore-io-native.js?v=ad30c2f37025';
+import { createHostRegistry } from './host-contract.js?v=92485a604379';
+import { APKError } from './apk-error.js?v=92485a604379';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=92485a604379';
+import { allocateFd } from './libcore-io-native.js?v=92485a604379';
 import { ACTION, EXTRA, AUTHORITY, SYSTEM_PICKERS, PICK_IMAGES_MAX_LIMIT, MAX_FILES, MAX_TOTAL_BYTES, QuerySyntaxError, compileSelection, directoryOf, extensionOf, fileRecord, kindOf, parseSortOrder, parseStorageUri,
-  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=ad30c2f37025';
+  pickerCandidates, pickerSpec, readPermissionFor, settleSelection, sortRows, titleOf, uniqueName, uriFor } from './shared-storage.js?v=92485a604379';
 
 // The VM side of the virtual device's shared storage (src/shared-storage.js): the files the page attached, the system providers an app reads them through and the system pickers.
 //
