@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=b5a3187a4c91';
-import { GC_ROOTS } from './heap-gc.js?v=b5a3187a4c91';
-import { LooperYield } from './message-queue-native.js?v=b5a3187a4c91';
-import { APKError } from './apk-error.js?v=b5a3187a4c91';
+import { createHostRegistry } from './host-contract.js?v=bc2f15a379b6';
+import { GC_ROOTS } from './heap-gc.js?v=bc2f15a379b6';
+import { LooperYield } from './message-queue-native.js?v=bc2f15a379b6';
+import { APKError } from './apk-error.js?v=bc2f15a379b6';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -29,6 +29,13 @@ const K = {
   when: key(MESSAGE, 'when', 'J'), flags: key(MESSAGE, 'flags', 'I'), queue: key(LOOPER, 'mQueue', QUEUE),
 };
 const isNull = value => value === null || value === undefined || value === 0;
+/**
+ * A host task that may run while main is parked (see nextDueWhileParked): the lab's own work (a network result, a service answer, a timer). App work for the main thread that the
+ * lab also queues as host tasks is not: a layout pass (ui), a Choreographer frame (windowFrameTime) and a View.post Runnable (windowCallback) run only once main is back in its Looper.
+ */
+export const hostOnly = event => !!event.platformTask && !event.ui && event.windowFrameTime === undefined && event.windowCallback === undefined;
+/** Main-thread work of the view tree: a layout pass or a Choreographer frame (measure, layout, draw, animation and input callbacks). */
+export const uiWork = event => !!event.ui || event.windowFrameTime !== undefined;
 
 export function createLooperHost(platform) {
   const registry = createHostRegistry(), { type, def } = registry;
@@ -163,13 +170,13 @@ export function createLooperHost(platform) {
      */
     nextDueWhileParked(runtime, now) {
       const limit = uptime(now);
-      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (candidate.platformTask && !candidate.ui) return { event: candidate, direct: true }; }
+      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (hostOnly(candidate)) return { event: candidate, direct: true }; }
       return null;
     },
     /** Milliseconds until the first host task that may run while main is parked (see nextDueWhileParked): 0 when one is due, null when none is queued. */
     nextDelayWhileParked(runtime, now) {
       const limit = uptime(now);
-      for (const candidate of host.snapshot(runtime)) { if (!candidate.platformTask || candidate.ui) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
+      for (const candidate of host.snapshot(runtime)) { if (!hostOnly(candidate)) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
       return null;
     },
     // ---- running ----

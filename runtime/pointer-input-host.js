@@ -68,13 +68,13 @@ export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx 
   const root = rootOf(runtime, ownerViewId), activity = root ? activityOf(runtime, root) : null;
   const [ox, oy] = root ? windowOffset(runtime, ownerViewId) : [0, 0];
   const event = call(MOTION, 'obtain', '(JJIFFI)Landroid/view/MotionEvent;', P, MOTION, runtime.argumentWords(P, [gesture.downTime, eventTime, action, bits(x + ox), bits(y + oy), 0]), 'static');
-  let handled;
+  let handled; const platform = runtime.platform; if (platform) platform.uiWorkDepth = (platform.uiWorkDepth ?? 0) + 1;   // a wait inside the touch serves host tasks only (Scheduler.mainImplicitWait)
   try {
     handled = activity ? call(ACTIVITY, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [activity, event])   // the Activity window's callback: onUserInteraction, the app's overrides, then the window's views
       : root ? call(VIEW, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [root, event])                          // another window (Dialog, popup): its root View
       : call(VIEW, 'dispatchTouchEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]);
   }
-  finally { try { call(MOTION, 'recycle', '()V', [], 'V', [event]); } catch { /* the app may have recycled it */ } if (action === ACTION_UP || action === ACTION_CANCEL) runtime.pointerGesture = null; }
+  finally { if (platform) platform.uiWorkDepth--; try { call(MOTION, 'recycle', '()V', [], 'V', [event]); } catch { /* the app may have recycled it */ } if (action === ACTION_UP || action === ACTION_CANCEL) runtime.pointerGesture = null; }
   return { handled: !!handled };
 }
 

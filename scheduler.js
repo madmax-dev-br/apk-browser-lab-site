@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=b5a3187a4c91';
+import { APKError } from './apk-error.js?v=bc2f15a379b6';
 
 // Green-thread scheduler for the VM.
 //
@@ -177,7 +177,14 @@ export class Scheduler {
    * such a wait re-entered a Compose composition in progress: ComposeRuntimeError "pending composition has not been applied"). Explicit waits (Object.wait, park, sleep, join,
    * Future.get) keep the allowance described at mainParked.
    */
-  mainImplicitWait() { const main = this.main, reason = main !== null && (main.state === 'blocked' || this.waitingNested.has(main)) ? main.blocked?.reason : null; return typeof reason === 'string' && IMPLICIT_WAIT.test(reason); }
+  // Any wait, explicit or not, that main entered inside view-tree work (a layout pass, a Choreographer frame, a touch: platform.uiWorkDepth) is treated the same way: Android
+  // never runs a frame, an input event or a posted message inside a measure, a layout or a draw. Served there, a frame drew during a measure (Compose:
+  // IllegalArgumentException "performMeasureAndLayout called during measure layout"), a scroll remeasured inside one, and a View's draw re-entered its own (RenderNode
+  // IllegalStateException "Recording currently in progress").
+  mainImplicitWait() {
+    const main = this.main, parked = main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); if (!parked) return false;
+    const reason = main.blocked?.reason; return (typeof reason === 'string' && IMPLICIT_WAIT.test(reason)) || (this.rt.platform?.uiWorkDepth ?? 0) > 0;
+  }
   /** The delay until an event that may be served now: during an implicit wait of main only the lab's host tasks count. */
   servableEventDelay() { const platform = this.rt.platform; return this.mainImplicitWait() && platform.nextParkedEventDelay ? platform.nextParkedEventDelay() : platform.nextEventDelay?.(); }
   mayServeEvents() { return !(this.parkedServing > 0 && this.mainParked()); }
