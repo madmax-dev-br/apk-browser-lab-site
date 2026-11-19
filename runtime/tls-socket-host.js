@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=537a5b96b853';
-import { Blocked } from './scheduler.js?v=537a5b96b853';
-import { JavaException } from './apk-runtime.js?v=537a5b96b853';
-import { networkOf } from './network-native.js?v=537a5b96b853';
-import { httpSocketOf } from './libcore-io-native.js?v=537a5b96b853';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=537a5b96b853';
+import { APKError } from './apk-error.js?v=2c7efb6e89da';
+import { Blocked } from './scheduler.js?v=2c7efb6e89da';
+import { JavaException } from './apk-runtime.js?v=2c7efb6e89da';
+import { networkOf } from './network-native.js?v=2c7efb6e89da';
+import { httpSocketOf } from './libcore-io-native.js?v=2c7efb6e89da';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=2c7efb6e89da';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -159,6 +159,26 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
    * so the identity goes to the relay for this destination only (network-native.js useClientIdentity). Hosts that are not listed never consult the KeyManager here.
    */
   const X509KM = 'Ljavax/net/ssl/X509KeyManager;', PRINCIPAL = 'Ljava/security/Principal;', PRIVATE_KEY = 'Ljava/security/PrivateKey;';
+  /**
+   * Why a KeyManager chose nothing, when it is the platform's (KeyManagerFactory over a KeyStore: Conscrypt's KeyManagerImpl, which copies the KeyStore's private-key entries at
+   * KeyManagerFactory.init): how many it holds and their key algorithms. An app's own X509KeyManager is named by its class. '' when nothing can be said.
+   */
+  const KMI = 'Lcom/android/org/conscrypt/KeyManagerImpl;';
+  const keyManagerContents = (r, manager) => {
+    try {
+      const type = r.object(manager).type;
+      if (type !== KMI) return `; the KeyManager is the app's own ${type.slice(1, -1).replace(/\//g, '.')}`;
+      const hash = r.object(manager).fields.get(`${KMI}->hash:Ljava/util/HashMap;`);
+      if (hash === null || hash === undefined || hash === 0) return '';
+      const entries = call(r, 'Ljava/util/Map;', 'values', [], 'Ljava/util/Collection;', [hash]), list = call(r, 'Ljava/util/Collection;', 'toArray', [], '[Ljava/lang/Object;', [entries]);
+      const algorithms = r.object(list).elements.map(entry => {
+        const chain = call(r, 'Ljava/security/KeyStore$PrivateKeyEntry;', 'getCertificateChain', [], `[${CERT}`, [entry]), leaf = r.object(chain).elements[0];
+        return text(r, call(r, 'Ljava/security/Key;', 'getAlgorithm', [], STRING, [call(r, CERT, 'getPublicKey', [], 'Ljava/security/PublicKey;', [leaf])]));
+      });
+      if (!algorithms.length) return '; it holds no private-key entry: the KeyStore given to KeyManagerFactory.init had none at that moment (a failed KeyStore.load, or a key added after init, leaves it empty, as on a device)';
+      return `; it holds ${algorithms.length} private-key entr${algorithms.length === 1 ? 'y' : 'ies'} (${algorithms.join(', ')}), none matching the key types EC, RSA`;
+    } catch (error) { if (error instanceof JavaException) return ''; throw error; }
+  };
   const clientIdentity = (r, self, host, port) => {
     const network = networkOf(r); if (!clientCertHostMatches(network.policy?.clientCertHosts, host, port)) return;
     const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
@@ -169,7 +189,7 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
       return note(`none offered: ${state(r, self).defaultFactory ? 'this socket comes from the default SSLContext (SSLContext.getDefault, SSLSocketFactory.getDefault or HttpsURLConnection\'s default factory), which has no KeyManager unless the app made its own context the default with SSLContext.setDefault' : none ? 'the SSLContext of this socket was initialized with null KeyManagers (SSLContext.init(null, ...))' : 'none of the KeyManagers of this socket\'s SSLContext is an X509KeyManager'}; a device offers no certificate either`);
     }
     const alias = call(r, X509KM, 'chooseClientAlias', [`[${STRING}`, `[${PRINCIPAL}`, SOCKET], STRING, [manager, array(r, STRING, ['EC', 'RSA']), null, self]);
-    if (alias === null || alias === 0) return note('none offered: the app\'s KeyManager chose no alias (chooseClientAlias returned null)');
+    if (alias === null || alias === 0) return note(`none offered: the app's KeyManager chose no alias (chooseClientAlias returned null)${keyManagerContents(r, manager)}`);
     const name = text(r, alias), key = call(r, X509KM, 'getPrivateKey', [STRING], PRIVATE_KEY, [manager, alias]), certs = call(r, X509KM, 'getCertificateChain', [STRING], `[${X509}`, [manager, alias]);
     const chain = certs === null || certs === 0 ? [] : r.object(certs).elements.filter(item => item !== null && item !== 0).map(cert => r.bytesOf(call(r, CERT, 'getEncoded', [], '[B', [cert])));
     if (key === null || key === 0 || !chain.length) return note(`none offered: alias "${name}" has ${key === null || key === 0 ? 'no private key' : 'no certificate chain'} (the app must have registered its certificate first)`);
