@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=2c7efb6e89da';
-import {DIGESTS} from './crypto-host.js?v=2c7efb6e89da';
+import {APKError} from './apk-runtime.js?v=a0c4fb9d6a79';
+import {DIGESTS} from './crypto-host.js?v=a0c4fb9d6a79';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -24,6 +24,11 @@ const inRanges = (ranges, cp) => { let lo = 0, hi = ranges.length - 1; while (lo
 /** Code points that no glyph can be missing for: layout controls handled by the line breaker/shaper, never drawn. */
 const LAYOUT_CONTROL = c => c === 0x0a || c === 0x0d || c === 0x09 || c === 0x85 || c === 0x2028 || c === 0x2029;
 const u = cp => 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
+/**
+ * Default ignorable code points (U+2060 WORD JOINER, U+2061..2064 invisible operators, U+180E, U+E0000 tags...): when no font of the chain has one, Minikin keeps it in the
+ * family of the run (getFamilyForChar falls back to the first family) and HarfBuzz hides it (a zero-advance, invisible glyph), so it never needs a glyph.
+ */
+const IGNORABLE = /^\p{Default_Ignorable_Code_Point}$/u, ignorable = cp => IGNORABLE.test(String.fromCodePoint(cp));
 
 export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTypeface}) {
   let manifest = null, provider = null, lookup = null, generation = 0;
@@ -121,7 +126,7 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
         else if (LAYOUT_CONTROL(cp)) family = last === undefined ? PRIMARY : last;
         else if (NO_SUPPORT_NEEDED(cp)) family = PRIMARY;
         else family = pick(cp, vs, face);
-        if (family === undefined) { missing.push(u(cp)); family = last === undefined ? PRIMARY : last; }
+        if (family === undefined) { if (!ignorable(cp)) missing.push(u(cp)); family = last === undefined ? PRIMARY : last; }
         open(i, family);
         if (family !== PRIMARY && !NO_SUPPORT_NEEDED(cp) && !LAYOUT_CONTROL(cp)) { const file = familyFile(family, cp); if (file) runFiles.add(file.stem); }
         i += width;
@@ -150,7 +155,7 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
           }
         }
         const next = text.codePointAt(i + width), vs = next === VS16 || next === VS15 ? next : null;
-        if (!LAYOUT_CONTROL(cp) && !NO_SUPPORT_NEEDED(cp) && pick(cp, vs, face) === undefined) return false;
+        if (!LAYOUT_CONTROL(cp) && !NO_SUPPORT_NEEDED(cp) && pick(cp, vs, face) === undefined && !ignorable(cp)) return false;
         i += width;
       }
       return true;
