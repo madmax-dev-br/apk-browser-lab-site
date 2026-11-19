@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=f6a6624dec7c") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=f6a6624dec7c">
-  <link rel="stylesheet" href="./lab-theme.css?v=f6a6624dec7c">
-  <meta name="apk-browser-build" content="f6a6624dec7c">
+  <style>@import url("./styles.css?v=b5a3187a4c91") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=b5a3187a4c91">
+  <link rel="stylesheet" href="./lab-theme.css?v=b5a3187a4c91">
+  <meta name="apk-browser-build" content="b5a3187a4c91">
 </head>
 <body>
   <header class="topbar">
@@ -50,6 +50,7 @@
               <summary><h3 id="cp-look-title">Appearance</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <div class="cp-grid">
                 <label for="dev-dark">Dark theme</label><input id="dev-dark" type="checkbox">
+                <label for="look-app-colors" title="The page around the device takes the colours of the open app (read from its launcher icon), with a reveal from the device. The app itself is not changed">Page in the app's colors</label><input id="look-app-colors" type="checkbox" checked>
                 <label for="dev-layout-bounds" title="Android developer option (debug.layout), drawn as Android draws it: each View's bounds in red with blue corner marks and its margins in magenta; each Compose LayoutNode in red and each layout modifier in blue">Show layout bounds</label><input id="dev-layout-bounds" type="checkbox">
                 <label for="dev-font">Font scale <output id="dev-font-out">1.00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
                 <label for="dev-locale">Language</label><select id="dev-locale"></select>
@@ -273,7 +274,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=f6a6624dec7c"></script>
+  <script type="module" src="./app.js?v=b5a3187a4c91"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

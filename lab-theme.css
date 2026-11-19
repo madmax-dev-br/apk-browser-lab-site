@@ -742,3 +742,7 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .cp-grid .mtls-pill[data-state=ok]{color:var(--ok)}
 .cp-grid .mtls-pill[data-state=warn]{color:var(--amber-ink)}
 .cp-grid .mtls-pill[data-state=error]{color:var(--warn)}
+
+/* ---- The page in the open app's colours (src/app-palette.js): a circular reveal from the device; the old page stays still underneath -------------------------------- */
+::view-transition-old(root),::view-transition-new(root){animation:none;mix-blend-mode:normal}
+::view-transition-new(root){z-index:2}
