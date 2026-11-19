@@ -1,4 +1,4 @@
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=92485a604379';
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=f6a6624dec7c';
 
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
 // MAX_REGEX_INPUT: the text a Matcher runs over (an app may match a whole JSON or HTML response, which Android does not bound): copied as UTF-16 into the module's 64 MiB, so at

@@ -34,8 +34,8 @@
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES } from './natives.js?v=92485a604379';
-import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=92485a604379';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES } from './natives.js?v=f6a6624dec7c';
+import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=f6a6624dec7c';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
@@ -154,6 +154,19 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       if (mi.owner.isInterface && !mi.def?.code && !mi.hostDispatch) info.vtable[slot] = dispatchRecord(host, mi.name, mi.nameSig.slice(mi.name.length));
     });
   };
+
+  // (10) an instance method of a class with DEX code that a lab helper replaces (APKRuntime LAB_HELPERS: ConcurrentHashMap's parallel bulk operations, whose original builds
+  // ForkJoin tasks the VM has no pool for): its vtable slot is a host-dispatch record, so the call reaches APKRuntime.dispatch, which selects the helper as the JavaScript VM does.
+  {
+    const vtableOf = linker.buildVtable;
+    linker.buildVtable = function (info) {
+      vtableOf.call(this, info);
+      if (!info.cls || info.isInterface || typeof runtime.helpedDexMethod !== 'function') return;
+      info.vtable.forEach((mi, slot) => {
+        if (mi.owner === info && !mi.hostDispatch && runtime.helpedDexMethod(info.type, mi.name, mi.nameSig.slice(mi.name.length))) info.vtable[slot] = dispatchRecord(info, mi.name, mi.nameSig.slice(mi.name.length), { slot });
+      });
+    };
+  }
 
   // (6) a static, direct or super call the class chain does not answer: a host-call record of the referenced class (no slot), served by APKRuntime.dispatch with the site's reference
   const callRecord = (info, reference, isStatic) => {
