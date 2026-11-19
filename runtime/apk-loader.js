@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=c5fc9f680879';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=c5fc9f680879';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=c5fc9f680879';
-import { inspectELF } from './native-inspector.js?v=c5fc9f680879';
-import { elfBuildId } from './elf-build-id.js?v=c5fc9f680879';
-import { inflateRaw } from './inflate.js?v=c5fc9f680879';
-import { crc32, inflateEntry } from './zip-entry.js?v=c5fc9f680879';
-import { resolveDevice } from './device-profile.js?v=c5fc9f680879';
-import { resourceProfileFor } from './device-configuration.js?v=c5fc9f680879';
-import { JniBridge } from './jni-host.js?v=c5fc9f680879';
-import { providerForApk } from './native-provider-variants.js?v=c5fc9f680879';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=c5fc9f680879';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=c5fc9f680879';
-import { AndroidResources } from './android-resources.js?v=c5fc9f680879';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=c5fc9f680879';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=c5fc9f680879';
-import { FrameworkProvider } from './framework-provider.js?v=c5fc9f680879';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=2c8f02932a2c';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=2c8f02932a2c';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=2c8f02932a2c';
+import { inspectELF } from './native-inspector.js?v=2c8f02932a2c';
+import { elfBuildId } from './elf-build-id.js?v=2c8f02932a2c';
+import { inflateRaw } from './inflate.js?v=2c8f02932a2c';
+import { crc32, inflateEntry } from './zip-entry.js?v=2c8f02932a2c';
+import { resolveDevice } from './device-profile.js?v=2c8f02932a2c';
+import { resourceProfileFor } from './device-configuration.js?v=2c8f02932a2c';
+import { JniBridge } from './jni-host.js?v=2c8f02932a2c';
+import { providerForApk } from './native-provider-variants.js?v=2c8f02932a2c';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=2c8f02932a2c';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=2c8f02932a2c';
+import { AndroidResources } from './android-resources.js?v=2c8f02932a2c';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=2c8f02932a2c';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=2c8f02932a2c';
+import { FrameworkProvider } from './framework-provider.js?v=2c8f02932a2c';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -706,10 +706,12 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesLineBreakAttributes=lineBreakScan.found;
   const usesTextClock=clockScan.found,usesMenuWidgets=menuScan.found,usesProfileWidgets=profileScan.found,usesProgressBars=barScan.found,usesProfileAttributes=attributeScan.found;
   const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
+  const usesSpeech=files.some(file=>file.dex.types.some(type=>type.startsWith('Landroid/speech/tts/')));   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
+    {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
   ];
   for(const selection of profiles){
     const requested=selection.explicit===true||(selection.explicit!==false&&selection.automatic);if(!requested)continue;

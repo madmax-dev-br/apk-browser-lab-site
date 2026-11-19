@@ -1,8 +1,8 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=c5fc9f680879';
-import { APKError } from './apk-error.js?v=c5fc9f680879';
-import { Blocked } from './scheduler.js?v=c5fc9f680879';
-import { networkOf } from './network-native.js?v=c5fc9f680879';
-import { installTlsSockets, TRUST_KEY, KEYS_KEY } from './tls-socket-host.js?v=c5fc9f680879';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=2c8f02932a2c';
+import { APKError } from './apk-error.js?v=2c8f02932a2c';
+import { Blocked } from './scheduler.js?v=2c8f02932a2c';
+import { networkOf } from './network-native.js?v=2c8f02932a2c';
+import { installTlsSockets, TRUST_KEY, KEYS_KEY } from './tls-socket-host.js?v=2c8f02932a2c';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -203,7 +203,11 @@ export function createSecurityHost(platform) {
     if (provider === null) r.throwJava('Ljava/security/NoSuchProviderException;', `no such provider: ${r.stringCharacters(pname)}`);
     return contextFromProvider(r, name, provider);
   }, { static: true });
-  def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => { const ref = r.allocate(SSL_CONTEXT); Object.assign(r.object(ref), { protocol: 'Default', factory: r.allocate(OSFI) }); return ref; }, { static: true });
+  // SSLContext.getDefault: one default context per process (libcore keeps it in a static), the one SSLSocketFactory.getDefault and HttpsURLConnection use; SSLContext.setDefault replaces it
+  // (an app that initialized a context with its KeyManagers makes it the default, and default sockets then offer its client certificate).
+  const keepDefault = (r, ref) => { r.labDefaultSslContext = ref; (r.hostStaticValues ??= []).push(ref); return ref; };
+  def(SSL_CONTEXT, 'getDefault', `()${SSL_CONTEXT}`, r => r.labDefaultSslContext ?? (() => { const ref = r.allocate(SSL_CONTEXT), factory = r.allocate(OSFI); r.object(factory).labDefault = true; Object.assign(r.object(ref), { protocol: 'Default', factory }); return keepDefault(r, ref); })(), { static: true });
+  def(SSL_CONTEXT, 'setDefault', `(${SSL_CONTEXT})V`, (r, _m, [context]) => { if (context === null || context === 0 || context === undefined) r.throwJava('Ljava/lang/NullPointerException;', 'sslContext == null'); keepDefault(r, context); }, { static: true });
   def(SSL_CONTEXT, 'getProtocol', `()${STRING}`, (r, _m, [self]) => r.object(self).protocol);
   def(SSL_CONTEXT, 'init', `([${KM}[${TM}${SECURE_RANDOM})V`, (r, _m, [self, keys, trust]) => { const o = r.object(self); o.trustManagers = (trust === null || trust === 0 || trust === undefined) ? null : [...r.array(trust).elements]; o.factory = r.allocate(OSFI); r.storeField(r.object(o.factory).fields, TRUST_KEY, o.trustManagers ? trust : null); r.storeField(r.object(o.factory).fields, KEYS_KEY, keys === null || keys === 0 || keys === undefined ? null : keys); });   // the KeyManagers: the client identity the handshake offers (tls-socket-host.js clientIdentity)
   def(SSL_CONTEXT, 'getSocketFactory', `()${SSL_SOCKET_FACTORY}`, (r, _m, [self]) => r.object(self).factory ?? r.throwJava('Ljava/lang/IllegalStateException;', 'SSLContext is not initialized'));

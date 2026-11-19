@@ -524,8 +524,8 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8819240,
-  "sha256": "bb87ee17a3cb9f55f791bbe2c7de9104fe4f0f6532c8c6f4be48abaae640666b",
+  "bytes": 8819340,
+  "sha256": "b3e1f23a6f203dc79a9f42d1a44b9ed278d5a5e5a4d0cbff2555371ad40d44e6",
   "classCount": 6783,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
@@ -8181,6 +8181,9 @@
         "suggestActionMsg",
         "suggestActionMsgColumn"
       ],
+      "TextToSpeechEngine": [
+        "settingsActivity"
+      ],
       "Menu": [],
       "MenuGroup": [
         "id",
@@ -8765,6 +8768,7 @@
       "AccessibilityService": {},
       "Searchable": {},
       "SearchableActionKey": {},
+      "TextToSpeechEngine": {},
       "Menu": {},
       "MenuGroup": {},
       "MenuItem": {},
@@ -8887,8 +8891,8 @@
     "resourceProfilePath": "assets/framework-resources/framework-resources.json",
     "resourceProfileSha256": "ede88f5ead33e891eef7dc603f1ca24497f1e06b18da59a144969f5bc3ab18ca",
     "aapt2": "$ANDROID_SDK/build-tools/36.1.0/aapt2",
-    "inputXmlSha256": "94ccd0b87486dd6d09e9f772a178cd6db15a82fcabdcc2052a3ba4001fadfc79",
-    "generatedRJavaSha256": "baa19515032944c046e3c626e18827c6c8ef65759e8775423316047c02233034",
+    "inputXmlSha256": "9ddffec4bbc9ac4b76e49354f6d1d4327654a69a642b1256569e3aedfc966efd",
+    "generatedRJavaSha256": "c601474c0705e175ae39506bc4897aafa7b3aa517147676b64545487ea144784",
     "adaptations": [
       "All styleable memberships are copied from complete selected original AOSP13 declare-styleable elements.",
       "AAPT2 independently verifies every public ID and numeric array/index ordering against the actual runtime ARSC profile.",
@@ -43797,8 +43801,8 @@
   "generatedSources": [
     {
       "localPath": "framework-aosp/generated/com/android/internal/R.java",
-      "sha256": "baa19515032944c046e3c626e18827c6c8ef65759e8775423316047c02233034",
-      "bytes": 888528,
+      "sha256": "c601474c0705e175ae39506bc4897aafa7b3aa517147676b64545487ea144784",
+      "bytes": 888654,
       "role": "AAPT2 generated framework resource attribute data"
     }
   ],

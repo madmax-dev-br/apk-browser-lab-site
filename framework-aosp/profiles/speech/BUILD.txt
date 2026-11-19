@@ -1,0 +1,29 @@
+Original Android 13 speech profile (android.speech.tts)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-speech-profile.sh
+    node --test --import ./tests/setup-javacrypto.mjs tests/tts.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/speech-sources.txt (TextToSpeech
+with its nested Engine, EngineInfo, OnInitListener, OnUtteranceCompletedListener and connection classes,
+TtsEngines, Voice, UtteranceProgressListener), compiled unchanged (no source transform), and the Java the
+Android SDK aidl compiler writes for the AIDL originals listed in framework-aosp/speech-aidl-sources.txt
+(ITextToSpeechService, ITextToSpeechCallback, ITextToSpeechManager, ITextToSpeechSession,
+ITextToSpeechSessionCallback), generated into generated/ by scripts/generate-service-aidl.py
+--sources speech-aidl-sources.txt --out profiles/speech/generated --no-refusals.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file
+(framework-aosp/BUILD.txt); these classes do not fit in it. The loader (src/apk-loader.js) adds this DEX when the
+APK's DEX references any android.speech.tts type, or when the loader option enableSpeechProfile is true.
+
+Behaviour: the virtual device has no text-to-speech engine installed. The original TtsEngines asks
+PackageManager.queryIntentServices for android.intent.action.TTS_SERVICE and Settings.Secure for
+tts_default_synth; neither names an engine, so the original TextToSpeech constructor finds none and calls
+OnInitListener.onInit(TextToSpeech.ERROR) synchronously inside the constructor, as Android 13 does on a device
+without an engine. Calls that need an engine (speak, synthesizeToFile, getVoices, isLanguageAvailable, ...) take
+the original "not bound to TTS engine" path and return its error result. No engine, binder or system service
+is faked: there are no Refusing bases here because no lab service implements these interfaces, and the
+original code never reaches a binder on this device.
+
+The com.android.internal.R.styleable.TextToSpeechEngine group TtsEngines reads an engine's meta-data with is
+in the default DEX's internal R (scripts/build-framework-styleables.py).

@@ -1,0 +1,237 @@
+{
+  "schemaVersion": 1,
+  "profile": "speech",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "3718c93f83213a027162da49dd222c9181e147d1e5fb0ec43f7596e6b6be2c5f",
+  "bytes": 64224,
+  "methods": 570,
+  "classes": [
+    "Landroid/speech/tts/ITextToSpeechCallback;",
+    "Landroid/speech/tts/ITextToSpeechCallback$Default;",
+    "Landroid/speech/tts/ITextToSpeechCallback$Stub$Proxy;",
+    "Landroid/speech/tts/ITextToSpeechCallback$Stub;",
+    "Landroid/speech/tts/ITextToSpeechManager;",
+    "Landroid/speech/tts/ITextToSpeechManager$Default;",
+    "Landroid/speech/tts/ITextToSpeechManager$Stub$Proxy;",
+    "Landroid/speech/tts/ITextToSpeechManager$Stub;",
+    "Landroid/speech/tts/ITextToSpeechService;",
+    "Landroid/speech/tts/ITextToSpeechService$Default;",
+    "Landroid/speech/tts/ITextToSpeechService$Stub$Proxy;",
+    "Landroid/speech/tts/ITextToSpeechService$Stub;",
+    "Landroid/speech/tts/ITextToSpeechService$_Parcel;",
+    "Landroid/speech/tts/ITextToSpeechSession;",
+    "Landroid/speech/tts/ITextToSpeechSession$Default;",
+    "Landroid/speech/tts/ITextToSpeechSession$Stub$Proxy;",
+    "Landroid/speech/tts/ITextToSpeechSession$Stub;",
+    "Landroid/speech/tts/ITextToSpeechSessionCallback;",
+    "Landroid/speech/tts/ITextToSpeechSessionCallback$Default;",
+    "Landroid/speech/tts/ITextToSpeechSessionCallback$Stub$Proxy;",
+    "Landroid/speech/tts/ITextToSpeechSessionCallback$Stub;",
+    "Landroid/speech/tts/TextToSpeech$Action;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda0;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda10;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda11;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda12;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda13;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda14;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda15;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda16;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda17;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda1;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda2;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda3;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda4;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda5;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda6;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda7;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda8;",
+    "Landroid/speech/tts/TextToSpeech$$ExternalSyntheticLambda9;",
+    "Landroid/speech/tts/TextToSpeech$1;",
+    "Landroid/speech/tts/TextToSpeech$Connection$1;",
+    "Landroid/speech/tts/TextToSpeech$Connection$SetupConnectionAsyncTask;",
+    "Landroid/speech/tts/TextToSpeech$Connection;",
+    "Landroid/speech/tts/TextToSpeech$DirectConnection;",
+    "Landroid/speech/tts/TextToSpeech$Engine;",
+    "Landroid/speech/tts/TextToSpeech$EngineInfo;",
+    "Landroid/speech/tts/TextToSpeech$Error;",
+    "Landroid/speech/tts/TextToSpeech$OnInitListener;",
+    "Landroid/speech/tts/TextToSpeech$OnUtteranceCompletedListener;",
+    "Landroid/speech/tts/TextToSpeech$SystemConnection$1;",
+    "Landroid/speech/tts/TextToSpeech$SystemConnection;",
+    "Landroid/speech/tts/TextToSpeech;",
+    "Landroid/speech/tts/TtsEngines$EngineInfoComparator;",
+    "Landroid/speech/tts/TtsEngines;",
+    "Landroid/speech/tts/UtteranceProgressListener;",
+    "Landroid/speech/tts/UtteranceProgressListener$1;",
+    "Landroid/speech/tts/Voice$1;",
+    "Landroid/speech/tts/Voice;"
+  ],
+  "classCount": 59,
+  "algorithmPatches": [],
+  "sourceTransforms": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Bundle.aidl",
+      "localPath": "framework-aosp/upstream/android/os/Bundle.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
+      "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
+      "bytes": 712,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/TextToSpeech.java",
+      "localPath": "framework-aosp/upstream/android/speech/tts/TextToSpeech.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/TextToSpeech.java?format=TEXT",
+      "sha256": "472ecf1d001406da1f5ae9b26a4ad231aa14797f53f7c9fb6e17dd75217b5d8c",
+      "bytes": 104863,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/TtsEngines.java",
+      "localPath": "framework-aosp/upstream/android/speech/tts/TtsEngines.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/TtsEngines.java?format=TEXT",
+      "sha256": "370002551a5ce02a1ac78c616d3c9227e74f817bbef855880f991194d6ce3699",
+      "bytes": 23243,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/Voice.java",
+      "localPath": "framework-aosp/upstream/android/speech/tts/Voice.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/Voice.java?format=TEXT",
+      "sha256": "b0f072cf8b07367999d77e744e96e3921cc909473f636ef03ac581b948f5214b",
+      "bytes": 8080,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/UtteranceProgressListener.java",
+      "localPath": "framework-aosp/upstream/android/speech/tts/UtteranceProgressListener.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/UtteranceProgressListener.java?format=TEXT",
+      "sha256": "a70c04aa6860936a75183057bc4c0a6ee1dbb3fbb5983f13c23aadafc54b4f23",
+      "bytes": 7598,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/ITextToSpeechService.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/ITextToSpeechService.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/ITextToSpeechService.aidl?format=TEXT",
+      "sha256": "caabdcce7eac59a6826f830ccb18f09c29a7803744ad9846634e82c199655338",
+      "bytes": 8583,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/ITextToSpeechCallback.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/ITextToSpeechCallback.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/ITextToSpeechCallback.aidl?format=TEXT",
+      "sha256": "d586f83ffc20abb0bb71ee76b2bb3db8fe5ab2e978d6c13004c6c0408620e516",
+      "bytes": 4083,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/ITextToSpeechManager.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/ITextToSpeechManager.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/ITextToSpeechManager.aidl?format=TEXT",
+      "sha256": "26865a6f6e8288c42a3c4ab30d97d7c9a66b43a79cab5f35cc9b47e0720227fc",
+      "bytes": 1007,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/ITextToSpeechSession.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/ITextToSpeechSession.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/ITextToSpeechSession.aidl?format=TEXT",
+      "sha256": "ef5ceea29d53f946543eca9380f22b562f7c91db1de177bb4c2a3f7c263f5562",
+      "bytes": 971,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/ITextToSpeechSessionCallback.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/ITextToSpeechSessionCallback.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/ITextToSpeechSessionCallback.aidl?format=TEXT",
+      "sha256": "101ba07010758d83dd45273c87f307548b9a1f2d1b9127ea11ea89dddc6dbeb3",
+      "bytes": 998,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/speech/tts/Voice.aidl",
+      "localPath": "framework-aosp/upstream/android/speech/tts/Voice.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/speech/tts/Voice.aidl?format=TEXT",
+      "sha256": "a48ee8a88a2b686087910910ae33f93d307ebfb26ac014d6cb69bd321b4c6a64",
+      "bytes": 665,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/net/Uri.aidl",
+      "localPath": "framework-aosp/upstream/android/net/Uri.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/Uri.aidl?format=TEXT",
+      "sha256": "d78bb922870ccb04e7800478d06e41e4bb472ef21f179e7f54b753163810a522",
+      "bytes": 694,
+      "license": "Apache-2.0"
+    }
+  ],
+  "generatedSources": {
+    "tool": "Android SDK build-tools 36.1.0 aidl --lang=java",
+    "interfaces": [
+      "android/speech/tts/ITextToSpeechService.aidl",
+      "android/speech/tts/ITextToSpeechCallback.aidl",
+      "android/speech/tts/ITextToSpeechManager.aidl",
+      "android/speech/tts/ITextToSpeechSession.aidl",
+      "android/speech/tts/ITextToSpeechSessionCallback.aidl"
+    ],
+    "files": [
+      {
+        "localPath": "framework-aosp/profiles/speech/generated/android/speech/tts/ITextToSpeechCallback.java",
+        "sha256": "461952db89c679ba5ca55bbf9c5129dfd5450a204628246584293324b7aef18e"
+      },
+      {
+        "localPath": "framework-aosp/profiles/speech/generated/android/speech/tts/ITextToSpeechManager.java",
+        "sha256": "8b6405efeadab50be985aaea5d40c8e1b43becda8db93cc7a885e7594d45a966"
+      },
+      {
+        "localPath": "framework-aosp/profiles/speech/generated/android/speech/tts/ITextToSpeechService.java",
+        "sha256": "87da6156599dd10efccecf7ba671f6e08ee27f7d98d7554a95a28ecf59ea40b7"
+      },
+      {
+        "localPath": "framework-aosp/profiles/speech/generated/android/speech/tts/ITextToSpeechSession.java",
+        "sha256": "d2448409f9dc793939172fe91a26b923e52b0962e05c2e988a10bb0a3ddde84a"
+      },
+      {
+        "localPath": "framework-aosp/profiles/speech/generated/android/speech/tts/ITextToSpeechSessionCallback.java",
+        "sha256": "a99bb197abd6807d04344f8ebc512f5235029043f850e0f0546fa60a786228d4"
+      }
+    ]
+  },
+  "requiresDefaultFrameworkSha256": "b3e1f23a6f203dc79a9f42d1a44b9ed278d5a5e5a4d0cbff2555371ad40d44e6",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original android.speech.tts client classes; the virtual device has no text-to-speech engine, so the original code finds none and reports ERROR as on such a device",
+  "activationPolicy": "APK DEX references a type of android.speech.tts (or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

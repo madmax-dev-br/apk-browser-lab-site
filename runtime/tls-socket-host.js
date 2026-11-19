@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=c5fc9f680879';
-import { Blocked } from './scheduler.js?v=c5fc9f680879';
-import { JavaException } from './apk-runtime.js?v=c5fc9f680879';
-import { networkOf } from './network-native.js?v=c5fc9f680879';
-import { httpSocketOf } from './libcore-io-native.js?v=c5fc9f680879';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=c5fc9f680879';
+import { APKError } from './apk-error.js?v=2c8f02932a2c';
+import { Blocked } from './scheduler.js?v=2c8f02932a2c';
+import { JavaException } from './apk-runtime.js?v=2c8f02932a2c';
+import { networkOf } from './network-native.js?v=2c8f02932a2c';
+import { httpSocketOf } from './libcore-io-native.js?v=2c8f02932a2c';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=2c8f02932a2c';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -164,7 +164,10 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
     const managers = r.object(self).fields.get(KEYS_KEY);
     const manager = managers === null || managers === undefined || managers === 0 ? null : r.object(managers).elements.find(item => item !== null && item !== 0 && r.isSubtype(r.object(item).type, X509KM));
-    if (!manager) return note('none offered: the SSLContext of this socket has no X509KeyManager (SSLContext.init with null KeyManagers), as on the device');
+    if (!manager) {
+      const none = managers === null || managers === 0 || managers === undefined;
+      return note(`none offered: ${state(r, self).defaultFactory ? 'this socket comes from the default SSLContext (SSLContext.getDefault, SSLSocketFactory.getDefault or HttpsURLConnection\'s default factory), which has no KeyManager unless the app made its own context the default with SSLContext.setDefault' : none ? 'the SSLContext of this socket was initialized with null KeyManagers (SSLContext.init(null, ...))' : 'none of the KeyManagers of this socket\'s SSLContext is an X509KeyManager'}; a device offers no certificate either`);
+    }
     const alias = call(r, X509KM, 'chooseClientAlias', [`[${STRING}`, `[${PRINCIPAL}`, SOCKET], STRING, [manager, array(r, STRING, ['EC', 'RSA']), null, self]);
     if (alias === null || alias === 0) return note('none offered: the app\'s KeyManager chose no alias (chooseClientAlias returned null)');
     const name = text(r, alias), key = call(r, X509KM, 'getPrivateKey', [STRING], PRIVATE_KEY, [manager, alias]), certs = call(r, X509KM, 'getCertificateChain', [STRING], `[${X509}`, [manager, alias]);
@@ -280,7 +283,7 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     r.dispatch({ owner: OSI, name: '<init>', parameters, result: 'V', signature: `(${parameters.join('')})V` }, r.argumentWords(parameters, args, { receiver: self }), 'direct');
     const tls = state(r, self); tls.certHost = host ? host.toLowerCase() : null;
     r.storeField(r.object(self).fields, TRUST_KEY, r.object(factory).fields.get(TRUST_KEY) ?? null);
-    r.storeField(r.object(self).fields, KEYS_KEY, r.object(factory).fields.get(KEYS_KEY) ?? null);
+    r.storeField(r.object(self).fields, KEYS_KEY, r.object(factory).fields.get(KEYS_KEY) ?? null); tls.defaultFactory = r.object(factory).labDefault === true;
     const raw = rawSocketOf(r, self); httpSocketOf(r, !raw || raw === self ? self : raw)?.markTls(host);   // a TLS socket's requests are https from the start; startHandshake() confirms it
     return self;
   };

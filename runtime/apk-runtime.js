@@ -1,33 +1,33 @@
-import { VMClock } from './vm-clock.js?v=c5fc9f680879';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=c5fc9f680879';
-import { OperationMonitor } from './operation-monitor.js?v=c5fc9f680879';
-import { ExecutionProfile } from './execution-profile.js?v=c5fc9f680879';
-import { SamplingProfiler } from './sampling-profiler.js?v=c5fc9f680879';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c5fc9f680879';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c5fc9f680879';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c5fc9f680879';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c5fc9f680879';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c5fc9f680879';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=c5fc9f680879';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c5fc9f680879';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c5fc9f680879';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c5fc9f680879';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c5fc9f680879';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=c5fc9f680879';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c5fc9f680879';
-import { APKError } from './apk-error.js?v=c5fc9f680879';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c5fc9f680879';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=c5fc9f680879';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=c5fc9f680879';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c5fc9f680879';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c5fc9f680879';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c5fc9f680879';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c5fc9f680879';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=c5fc9f680879';
+import { VMClock } from './vm-clock.js?v=2c8f02932a2c';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=2c8f02932a2c';
+import { OperationMonitor } from './operation-monitor.js?v=2c8f02932a2c';
+import { ExecutionProfile } from './execution-profile.js?v=2c8f02932a2c';
+import { SamplingProfiler } from './sampling-profiler.js?v=2c8f02932a2c';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=2c8f02932a2c';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=2c8f02932a2c';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=2c8f02932a2c';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=2c8f02932a2c';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=2c8f02932a2c';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=2c8f02932a2c';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=2c8f02932a2c';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=2c8f02932a2c';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=2c8f02932a2c';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=2c8f02932a2c';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=2c8f02932a2c';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=2c8f02932a2c';
+import { APKError } from './apk-error.js?v=2c8f02932a2c';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=2c8f02932a2c';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=2c8f02932a2c';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=2c8f02932a2c';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=2c8f02932a2c';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=2c8f02932a2c';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=2c8f02932a2c';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=2c8f02932a2c';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=2c8f02932a2c';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=c5fc9f680879';
-import { bootClassLacksMember } from './boot-class-members.js?v=c5fc9f680879';
-export { APKError } from './apk-error.js?v=c5fc9f680879';
+import { Scheduler, Blocked } from './scheduler.js?v=2c8f02932a2c';
+import { bootClassLacksMember } from './boot-class-members.js?v=2c8f02932a2c';
+export { APKError } from './apk-error.js?v=2c8f02932a2c';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1153,7 +1153,7 @@ export const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Me
 // monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
 // interpreter's time on a Compose flow). tests/interpreter-fast-paths.test.mjs fails when a launch adds a property that is not listed. `key in runtime` is not used for any of them.
 export const LATE_RUNTIME_PROPERTIES = Object.freeze([
-  'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
+  'hostTaskTrace', 'labDefaultSslContext', 'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
   'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
   'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
   'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
@@ -1306,7 +1306,7 @@ export class APKRuntime {
     if (this.traceMuted) return; // host plumbing
     if (this.logSink !== undefined && quiet !== true && typeof line === 'string' && line.charCodeAt(0) === 76 && line.startsWith('LOG ')) this.logSink(line);   // src/logcat.js: every log line is also a logcat entry
     if (typeof line === 'object') { if (line.exempt === true) return; }
-    else { const frames = this.thread?.frames, method = frames?.length ? frames[frames.length - 1].method : null; if (method && (method.plumbing ??= LOOPER_PLUMBING.test(method.owner))) return; }   // a host call made by the pump's own Looper/MessageQueue/Handler code that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
+    else { const frames = this.thread?.frames, method = frames?.length ? frames[frames.length - 1].method : null; if (method && this.hostTaskTrace !== true && (method.plumbing ??= LOOPER_PLUMBING.test(method.owner))) return; }   // a host call made by the pump's own Looper/MessageQueue/Handler code that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
     const ring = this.traceRing ??= { head: [], tail: new Array(384), start: 0, length: 0 };
     if (ring.head.length < 128) { ring.head.push(line); return; }
     if (ring.length === 384) { ring.tail[ring.start] = line; ring.start = (ring.start + 1) % 384; this.traceDropped = (this.traceDropped ?? 0) + 1; return; }

@@ -1,7 +1,7 @@
-import { APKError } from './apk-runtime.js?v=c5fc9f680879';
-import { getMatrixValues } from './matrix-native.js?v=c5fc9f680879';
-import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=c5fc9f680879';
-import { cameraTransform, hasCameraRotation } from './camera-transform.js?v=c5fc9f680879';
+import { APKError } from './apk-runtime.js?v=2c8f02932a2c';
+import { getMatrixValues } from './matrix-native.js?v=2c8f02932a2c';
+import { renderLightInfo, renderNodeProperties } from './rendernode-native.js?v=2c8f02932a2c';
+import { cameraTransform, hasCameraRotation } from './camera-transform.js?v=2c8f02932a2c';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const IDENTITY = [1, 0, 0, 0, 1, 0, 0, 0, 1];
