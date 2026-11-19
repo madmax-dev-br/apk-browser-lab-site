@@ -20,7 +20,9 @@ export class VMClock {
   freeze() { if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
   thaw() { this.frozenAt = null; this.reads = 0; }
   /** Wall-clock milliseconds since the epoch. */
-  wall() { return this.base !== undefined ? Math.floor(performance.timeOrigin + this.base) + this.skew + this.nanoReads * 0.001 : Date.now() + this.skew; }
+  wall() { return Math.floor(performance.timeOrigin + this.now()); }   // the same timeline as now(): wall = origin + monotonic, so a frozen frame or a skip moves both together (Date.now() could drift from performance.now())
+  /** The clocks side by side, for the report: all derived from one timeline. */
+  readings() { const now = this.now(), wall = this.wall(), nano = Number(this.nanos()) / 1e6; return { uptime: now, elapsedRealtime: now, nanoMinusUptimeUs: Math.round((nano - this.now()) * 1000), wallMinusTimelineMs: Math.round(wall - (performance.timeOrigin + this.now())), skippedMs: Math.round(this.skew), realMs: Math.round(performance.now()) }; }
   /** Monotonic nanoseconds as a BigInt. */
   nanos() { if (this.base !== undefined) this.nanoReads++; return BigInt(Math.floor(this.now() * 1000)) * 1000n; }
   /** Wall-clock nanoseconds since the epoch as a BigInt. */

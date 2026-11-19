@@ -1,53 +1,53 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=aaeb4f39d05f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=aaeb4f39d05f';
-import { clientIdentityStatus } from './client-identity.js?v=aaeb4f39d05f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=aaeb4f39d05f';
-import { initCollapsibleSections } from './panel-sections.js?v=aaeb4f39d05f';
-import { warmupLabel } from './warmup.js?v=aaeb4f39d05f';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=aaeb4f39d05f';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=aaeb4f39d05f';
-import { initHelpTips } from './help-tips.js?v=aaeb4f39d05f';
-import { createToolDock } from './tool-dock.js?v=aaeb4f39d05f';
-import { createPermissionsPanel } from './permissions-panel.js?v=aaeb4f39d05f';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=aaeb4f39d05f';
-import { createAppDataPanel } from './app-data-panel.js?v=aaeb4f39d05f';
-import { createCameraLab } from './camera-lab.js?v=aaeb4f39d05f';
-import { createOverridesPanel } from './overrides-panel.js?v=aaeb4f39d05f';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=aaeb4f39d05f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=aaeb4f39d05f';
-import { createHostMapPanel } from './host-map-panel.js?v=aaeb4f39d05f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=aaeb4f39d05f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=aaeb4f39d05f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=aaeb4f39d05f';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=aaeb4f39d05f';
-import { createDeviceView, createViewState } from './device-view.js?v=aaeb4f39d05f';
-import { createTaskSwitcher } from './task-switcher.js?v=aaeb4f39d05f';
-import { createDeviceZoom } from './device-zoom.js?v=aaeb4f39d05f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=aaeb4f39d05f';
-import { formatApiGapReport } from './api-gap-scan.js?v=aaeb4f39d05f';
-import { createLogcatPanel } from './logcat-panel.js?v=aaeb4f39d05f';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=aaeb4f39d05f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=aaeb4f39d05f';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=aaeb4f39d05f';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=aaeb4f39d05f';
-import { createScreenRecorder } from './screen-recorder.js?v=aaeb4f39d05f';
-import { createPluginsPanel } from './plugins-panel.js?v=aaeb4f39d05f';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=aaeb4f39d05f';
-import { createAdb } from './adb-commands.js?v=aaeb4f39d05f';
-import { createAdbTerminal } from './adb-terminal.js?v=aaeb4f39d05f';
-import { memorySummary } from './worker-memory.js?v=aaeb4f39d05f';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=aaeb4f39d05f';
-import { createModalHost } from './lab-modal.js?v=aaeb4f39d05f';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=aaeb4f39d05f';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=aaeb4f39d05f';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=aaeb4f39d05f';
-import { createDragLayer } from './lab-drag.js?v=aaeb4f39d05f';
-import { createLabScroll } from './lab-scroll.js?v=aaeb4f39d05f';
-import { createGlSurfaces } from './gl-surfaces.js?v=aaeb4f39d05f';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=aaeb4f39d05f';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=aaeb4f39d05f';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=aaeb4f39d05f';
-import { resolveIntentFields } from './intent-resolver.js?v=aaeb4f39d05f';
+import { APKWorkerClient } from './apk-worker-client.js?v=d03508f39110';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d03508f39110';
+import { clientIdentityStatus } from './client-identity.js?v=d03508f39110';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState } from './device-settings.js?v=d03508f39110';
+import { initCollapsibleSections } from './panel-sections.js?v=d03508f39110';
+import { warmupLabel } from './warmup.js?v=d03508f39110';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d03508f39110';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d03508f39110';
+import { initHelpTips } from './help-tips.js?v=d03508f39110';
+import { createToolDock } from './tool-dock.js?v=d03508f39110';
+import { createPermissionsPanel } from './permissions-panel.js?v=d03508f39110';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d03508f39110';
+import { createAppDataPanel } from './app-data-panel.js?v=d03508f39110';
+import { createCameraLab } from './camera-lab.js?v=d03508f39110';
+import { createOverridesPanel } from './overrides-panel.js?v=d03508f39110';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d03508f39110';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d03508f39110';
+import { createHostMapPanel } from './host-map-panel.js?v=d03508f39110';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d03508f39110';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d03508f39110';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d03508f39110';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d03508f39110';
+import { createDeviceView, createViewState } from './device-view.js?v=d03508f39110';
+import { createTaskSwitcher } from './task-switcher.js?v=d03508f39110';
+import { createDeviceZoom } from './device-zoom.js?v=d03508f39110';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d03508f39110';
+import { formatApiGapReport } from './api-gap-scan.js?v=d03508f39110';
+import { createLogcatPanel } from './logcat-panel.js?v=d03508f39110';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d03508f39110';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d03508f39110';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d03508f39110';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=d03508f39110';
+import { createScreenRecorder } from './screen-recorder.js?v=d03508f39110';
+import { createPluginsPanel } from './plugins-panel.js?v=d03508f39110';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d03508f39110';
+import { createAdb } from './adb-commands.js?v=d03508f39110';
+import { createAdbTerminal } from './adb-terminal.js?v=d03508f39110';
+import { memorySummary } from './worker-memory.js?v=d03508f39110';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d03508f39110';
+import { createModalHost } from './lab-modal.js?v=d03508f39110';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d03508f39110';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d03508f39110';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d03508f39110';
+import { createDragLayer } from './lab-drag.js?v=d03508f39110';
+import { createLabScroll } from './lab-scroll.js?v=d03508f39110';
+import { createGlSurfaces } from './gl-surfaces.js?v=d03508f39110';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d03508f39110';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d03508f39110';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d03508f39110';
+import { resolveIntentFields } from './intent-resolver.js?v=d03508f39110';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -663,11 +663,26 @@ async function importSource(source, autoRun = false) {
   } finally { finishOperation(token); }
   if (token === state.operation && autoRun && state.runtime && !state.inventory?.unsupportedFeatures?.length) await runAPK();
 }
+/**
+ * An Android App Bundle (.aab) chosen or dropped: the APK of its base module (src/aab-bundle.js, what bundletool's universal APK holds), as a File named .apk; an .apk is returned
+ * as it is. What the conversion left out (other modules) is reported in the status line.
+ */
+async function bundleAsApk(file) {
+  if (!/\.aab$/i.test(file.name)) return file;
+  const { appBundleToApk } = await import('./aab-bundle.js');
+  const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
+  if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
+  return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
+}
 async function chooseFile(file, handle = null) {   // handle: a FileSystemFileHandle (or a promise of one) where the browser gives it, kept with the saved app
   if (!file) return;
   if (file.size > 1024 * 1024 * 1024) { switchMode('apk'); showError(new Error('This lab limits APKs to 1 GiB. Choose a smaller file to continue.'), 'APK above the size limit'); return; }
-  if (!/\.apk$/i.test(file.name)) { switchMode('apk'); showError(new Error('Choose an .apk file.'), 'Invalid file format'); return; }
+  if (!/\.(apk|aab)$/i.test(file.name)) { switchMode('apk'); showError(new Error('Choose an .apk or .aab file.'), 'Invalid file format'); return; }
   let fileHandle = null; try { fileHandle = await handle; if (fileHandle?.kind !== 'file') fileHandle = null; } catch { fileHandle = null; }
+  if (/\.aab$/i.test(file.name)) {   // the saved app keeps the converted APK, not a handle to the bundle
+    try { file = await bundleAsApk(file); } catch (error) { switchMode('apk'); showError(error, 'This App Bundle could not be converted'); return; }
+    fileHandle = null;
+  }
   await importSource({ file, name: file.name, handle: fileHandle }, true);   // installed and opened at once; the launcher keeps its icon to open it again
 }
 // Memory readout in the status bar: the memory in use (the Worker's measured memory plus, where the browser exposes it, the page's JS heap) and a bar of live VM objects against the
@@ -841,7 +856,8 @@ const mcpControls = {
   },
   /** adb install: the file the bridge handed over is installed as a file dropped on the page is (read in the Worker, kept on the home screen); `open` also starts it. */
   async installApk(file, { open = false } = {}) {
-    if (!file || !/\.apk$/i.test(file.name)) throw new Error('The file must be an .apk.');
+    if (!file || !/\.(apk|aab)$/i.test(file.name)) throw new Error('The file must be an .apk or .aab.');
+    file = await bundleAsApk(file);
     if (file.size > 1024 * 1024 * 1024) throw new Error('This lab limits APKs to 1 GiB.');
     const source = { file, name: file.name };
     await importSource(source, open); await waitIdle();
@@ -1424,7 +1440,7 @@ $('drop-zone').addEventListener('drop', (event) => { event.preventDefault(); $('
 $('drop-zone').addEventListener('click', async event => {
   if (typeof window.showOpenFilePicker !== 'function') return;
   event.preventDefault();
-  try { const [handle] = await window.showOpenFilePicker({ types: [{ description: 'APK', accept: { 'application/vnd.android.package-archive': ['.apk'] } }], excludeAcceptAllOption: false }); if (handle) chooseFile(await handle.getFile(), handle); }
+  try { const [handle] = await window.showOpenFilePicker({ types: [{ description: 'APK', accept: { 'application/vnd.android.package-archive': ['.apk'], 'application/octet-stream': ['.aab'] } }], excludeAcceptAllOption: false }); if (handle) chooseFile(await handle.getFile(), handle); }
   catch (error) { if (error?.name !== 'AbortError') $('apk-file').click(); }
 });
 // The device takes an APK too: dropped on the stage it is installed like one dropped on the panel.

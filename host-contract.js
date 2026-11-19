@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=bd06e10bf2b9';
+import { APKError } from './apk-error.js?v=d03508f39110';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -14,8 +14,18 @@ export const bitsDouble = n => { bits.setBigInt64(0, BigInt(n), true); return bi
 export const floatBits = n => { bits.setFloat32(0, n, true); return bits.getInt32(0, true); };
 export const bitsFloat = n => { bits.setInt32(0, n, true); return bits.getFloat32(0, true); };
 
+/** Number of methods any host registry has defined so far: a memo of "no host serves this key" stays valid while it is unchanged (hosts define methods later, e.g. on first use). */
+let definedMethods = 0;
+export const hostDefinitions = () => definedMethods;
 export function createHostRegistry() {
   const defaultedParents = new Set(), reflectedFields = new Map(), instanceFields = new Map(), methods = new Map(), parents = new Map(), interfaces = new Map(), members = new Map(), fields = new Map(), allocatable = new Set();
+  const callWith = (runtime, method, args, fn) => {
+    if (!fn) throw new APKError(`Unsupported contract-host method ${method.owner}->${method.name}${method.signature}`);
+    // Bytecode passes a null reference as the register value 0; a host body tests references with `=== null`. Reference parameters are normalised here, once for every contract host.
+    const offset = args.length - method.parameters.length;
+    for (let i = 0; i < method.parameters.length; i++) { const kind = method.parameters[i][0]; if (args[offset + i] === 0 && (kind === 'L' || kind === '[')) { if (args === undefined) break; args = Array.isArray(args) && Object.isFrozen(args) ? [...args] : args; args[offset + i] = null; } }
+    return fn(runtime, method, args);
+  };
   return {
     parents, interfaces,
     /** type(owner, parent, interfaces?, {allocatable}) declares a host class. */
@@ -24,15 +34,15 @@ export function createHostRegistry() {
     },
     /** def(owner, name, signature, fn, {static}) fn(runtime, method, args) -- args[0] is the receiver unless static. */
     def(owner, name, signature, fn, { static: isStatic = false } = {}) {
-      methods.set(`${owner}->${name}${signature}`, fn);
+      methods.set(`${owner}->${name}${signature}`, fn); definedMethods++;
       if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } // implicit: yields to the VM's own hierarchy tables
       const byName = members.get(owner) ?? members.set(owner, new Map()).get(owner);
       (byName.get(name) ?? byName.set(name, []).get(name)).push({ ...parseSignature(signature), signature, static: isStatic });
     },
     /** staticField(owner, name, type, (runtime) => value) -- lazily computed, cached per runtime. */
-    staticField(owner, name, type, compute) { fields.set(`${owner}->${name}:${type}`, { compute, cache: new WeakMap() }); if (!parents.has(owner)) parents.set(owner, 'Ljava/lang/Object;'); },
+    staticField(owner, name, type, compute) { fields.set(`${owner}->${name}:${type}`, { compute, cache: new WeakMap() }); if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } },
     /** instanceField(owner, name, type): a protected/public instance field of a host class (subclasses in APK code access it through their own class reference). */
-    instanceField(owner, name, type, { reflect = false } = {}) { if (reflect) { const byName = reflectedFields.get(owner) ?? reflectedFields.set(owner, new Map()).get(owner); byName.set(name, type); } instanceFields.set(`${name}:${type}`, [...(instanceFields.get(`${name}:${type}`) ?? []), owner]); if (!parents.has(owner)) parents.set(owner, 'Ljava/lang/Object;'); },
+    instanceField(owner, name, type, { reflect = false } = {}) { if (reflect) { const byName = reflectedFields.get(owner) ?? reflectedFields.set(owner, new Map()).get(owner); byName.set(name, type); } instanceFields.set(`${name}:${type}`, [...(instanceFields.get(`${name}:${type}`) ?? []), owner]); if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } },
     resolveExternalField(runtime, field) {
       const owners = instanceFields.get(`${field.name}:${field.type}`); if (!owners) return null;
       for (let type = field.owner, depth = 0; type && depth < 64; type = runtime.parent(type), depth++) if (owners.includes(type)) return { owner: type, name: field.name, type: field.type };
@@ -57,13 +67,9 @@ export function createHostRegistry() {
       const wanted = (parameters ?? []).join(''), found = candidates.find(c => c.parameters.join('') === wanted); if (!found) return null;
       return { method: { owner, name: memberName, parameters: found.parameters, result: found.result, signature: found.signature, key: `${owner}->${memberName}${found.signature}` }, flags: 1 | (found.static ? 8 : 0) };
     },
-    invoke(runtime, method, args) {
-      const fn = methods.get(`${method.owner}->${method.name}${method.signature}`);
-      if (!fn) throw new APKError(`Unsupported contract-host method ${method.owner}->${method.name}${method.signature}`);
-      // Bytecode passes a null reference as the register value 0; a host body tests references with `=== null`. Reference parameters are normalised here, once for every contract host.
-      const offset = args.length - method.parameters.length;
-      for (let i = 0; i < method.parameters.length; i++) { const kind = method.parameters[i][0]; if (args[offset + i] === 0 && (kind === 'L' || kind === '[')) { if (args === undefined) break; args = Array.isArray(args) && Object.isFrozen(args) ? [...args] : args; args[offset + i] = null; } }
-      return fn(runtime, method, args);
-    },
+    invoke(runtime, method, args) { return callWith(runtime, method, args, methods.get(`${method.owner}->${method.name}${method.signature}`)); },
+    /** The body registered for a key, or undefined; a caller that invokes the same key repeatedly keeps it and calls callWith (the runtime does, per bridge resolution). */
+    fnFor: key => methods.get(key),
+    callWith,
   };
 }

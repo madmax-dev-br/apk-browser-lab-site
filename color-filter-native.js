@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=bd06e10bf2b9';
-import { bitsFloat } from './host-contract.js?v=bd06e10bf2b9';
+import { APKError } from './apk-error.js?v=d03508f39110';
+import { bitsFloat } from './host-contract.js?v=d03508f39110';
 
 const FILTER='Landroid/graphics/ColorFilter;',REGISTRY='Llibcore/util/NativeAllocationRegistry;',FINALIZER=0x43464c5401n;
 export const COLOR_FILTER_CLEANER='Lapkweb/bridge/ColorFilterCleaner;';
@@ -32,6 +32,17 @@ export function createColorFilterNativeBindings(){
   const descriptor={kind:'blend',argb:argb>>>0,mode},native=makeSkiaColorFilter(CK,descriptor);
   // Skia legitimately returns null for an identity filter (e.g. DST).
   if(!native)return 0n;
+  const state=stateFor(runtime);if(state.handles.size>=4096){native.delete();fail('Color-filter allocation limit exceeded');}
+  const handle=state.next++;state.handles.set(handle,{descriptor,native});return handle;
+ });
+ // LightingColorFilter (android-13.0.0_r1 ColorFilter.cpp -> SkColorFilters::Lighting): with no RGB to add the filter is a MODULATE blend with the opaque multiplier,
+ // otherwise the colour matrix that scales R, G and B by the multiplier's channels and then adds the add colour's channels; alpha is untouched either way.
+ bindings.set('Landroid/graphics/LightingColorFilter;->native_CreateLightingFilter(II)J',(runtime,[mul,add])=>{
+  const CK=runtime.skia?.CanvasKit;if(!CK?.ColorFilter?.MakeMatrix||!CK.ColorFilter.MakeBlend)fail('Color filters require the verified Skia Wasm backend');
+  const channel=(color,shift)=>(color>>>shift)&255,unit=byte=>byte===255?1:byte/255;
+  const descriptor=(add&0xffffff)===0?{kind:'blend',argb:(mul|0xff000000)>>>0,mode:13}
+   :{kind:'matrix',values:[unit(channel(mul,16)),0,0,0,channel(add,16),0,unit(channel(mul,8)),0,0,channel(add,8),0,0,unit(channel(mul,0)),0,channel(add,0),0,0,0,1,0]};
+  const native=makeSkiaColorFilter(CK,descriptor);if(!native)return 0n;
   const state=stateFor(runtime);if(state.handles.size>=4096){native.delete();fail('Color-filter allocation limit exceeded');}
   const handle=state.next++;state.handles.set(handle,{descriptor,native});return handle;
  });

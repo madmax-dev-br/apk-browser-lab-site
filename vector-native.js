@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=bd06e10bf2b9';
-import { getSolidPaint } from './paint-host.js?v=bd06e10bf2b9';
-import { getMatrixValues } from './matrix-native.js?v=bd06e10bf2b9';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=bd06e10bf2b9';
+import { APKError } from './apk-error.js?v=d03508f39110';
+import { getSolidPaint } from './paint-host.js?v=d03508f39110';
+import { getMatrixValues } from './matrix-native.js?v=d03508f39110';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=d03508f39110';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -30,13 +30,29 @@ const pathString=commands=>commands.map(c=>c.verb+c.values.join(' ')).join(' ');
 const sameShape=(a,b)=>a.length===b.length&&a.every((c,i)=>c.verb===b[i].verb&&c.values.length===b[i].values.length);
 const clone=value=>structuredClone(value);
 const FULL_DEFAULTS={strokeWidth:0,strokeColor:0,strokeAlpha:1,fillColor:0,fillAlpha:1,trimPathStart:0,trimPathEnd:1,trimPathOffset:0,strokeLineCap:0,strokeLineJoin:0,strokeMiterLimit:4,fillType:0};
+/**
+ * The matrix of a software Canvas is [a, b, c, d, e, f] (x' = a x + c y + e, y' = b x + d y + f). Under a perspective transform (Canvas.concat / setMatrix with a matrix whose
+ * third row is not 0 0 1: a View rotated about its X or Y axis drawn by its parent) it carries that row as a tail, [.., p0, p1, p2]; every consumer that hands the matrix to
+ * Skia reads the tail when it is there. M := M * N for an affine N in the same layout, in place.
+ */
+export function preConcatCanvasMatrix(m,n){
+ const [a0,b0,c0,d0,e0,f0]=m;m[0]=a0*n[0]+c0*n[1];m[1]=b0*n[0]+d0*n[1];m[2]=a0*n[2]+c0*n[3];m[3]=b0*n[2]+d0*n[3];m[4]=a0*n[4]+c0*n[5]+e0;m[5]=b0*n[4]+d0*n[5]+f0;
+ if(m.length>6){const p0=m[6],p1=m[7],p2=m[8];m[6]=p0*n[0]+p1*n[1];m[7]=p0*n[2]+p1*n[3];m[8]=p0*n[4]+p1*n[5]+p2;}
+}
 const GROUP_DEFAULTS={rotation:0,pivotX:0,pivotY:0,scaleX:1,scaleY:1,translateX:0,translateY:0};
 const groupKeys=Object.keys(GROUP_DEFAULTS), propertyKeys=Object.keys(FULL_DEFAULTS);
 const states=new WeakMap();
+/** Graphics handles (Canvas, vector trees and nodes, path data) created since the last collection before they ask for one (VectorGraphics.create). */
+export const VECTOR_PACE_MIN=4096;
 
 export class VectorGraphics {
- constructor(runtime){this.runtime=runtime;this.handles=new Map();this.next=0x200000000n;this.commandCount=0;this.pathChars=0;this.accountedBytes=0n;}
- create(kind,props={}){if(this.handles.size>=20000)problem('Vector handle limit exceeded');const handle=this.next++;this.handles.set(handle,{kind,refs:0,...props});return handle;}
+ // No ceiling on the handles (Android has none on Canvas, VectorDrawable trees and path data): they are freed by their owners' finalizers, i.e. by collections. So, as ART paces
+ // collections by native growth (NativeAllocationRegistry), handles that doubled since the last collection (at least VECTOR_PACE_MIN more) ask for one, once per collection.
+ constructor(runtime){this.runtime=runtime;this.handles=new Map();this.next=0x200000000n;this.commandCount=0;this.pathChars=0;this.accountedBytes=0n;this.atCollection=0;this.collectionAsked=false;
+  (runtime.nativeCollectionHooks??=new Set()).add(()=>{this.atCollection=this.handles.size;this.collectionAsked=false;});}
+ create(kind,props={}){const handle=this.next++;this.handles.set(handle,{kind,refs:0,...props});
+  if(!this.collectionAsked&&this.handles.size-this.atCollection>Math.max(VECTOR_PACE_MIN,this.atCollection)){this.collectionAsked=true;this.runtime.requestNativeCollection?.('vector');}
+  return handle;}
  release(handle){this.get(handle);const pending=[handle],seen=new Set();while(pending.length){const h=pending.pop();if(seen.has(h)||!this.handles.has(h))continue;seen.add(h);const object=this.get(h);if(object.kind==='tree')pending.push(object.root);else if(object.kind==='group')pending.push(...object.children);this.pathChars-=(object.path||'').length;this.handles.delete(h);}}
  get(handle,kind=null){const value=this.handles.get(handle);if(!value||kind&&value.kind!==kind)problem(`Invalid ${kind||'graphics'} VM handle ${handle}`,'invalid-vector-handle');return value;}
  copy(handle,kind){const value=clone(this.get(handle,kind));value.refs=0;return this.create(kind,value);}
@@ -55,7 +71,8 @@ export class VectorGraphics {
     }else body+=render(child,depth+1);}
     body+='</g>'.repeat(clips);result=`<g transform="translate(${p.translateX+p.pivotX} ${p.translateY+p.pivotY}) rotate(${p.rotation}) scale(${p.scaleX} ${p.scaleY}) translate(${-p.pivotX} ${-p.pivotY})">${body}</g>`;
    }else if(node.kind==='full'){
-    const p=node.props;if(p.trimPathStart!==0||p.trimPathEnd!==1||p.trimPathOffset!==0)problem('Vector trimPath requires a measured-path backend');
+    const p=node.props;if((p.trimPathStart!==0||p.trimPathEnd!==1)&&!this.runtime.skia?.rasterizeCanvas)problem('Vector trimPath requires a measured-path backend (the Skia raster backend); the SVG fallback cannot trim');   // with Skia the recorded vector state is rasterized by sourceVector, which trims the path (SkPathMeasure)
+    
     if(![0,1].includes(p.fillType))problem('Unsupported vector fill rule');
     const fill=color(p.fillColor,p.fillAlpha),stroke=color(p.strokeColor,p.strokeAlpha);pathCount++;
     result=`<path d="${xml(node.path||'')}" fill="${fill.color}" fill-opacity="${fill.alpha}" fill-rule="${p.fillType?'evenodd':'nonzero'}" stroke="${stroke.color}" stroke-opacity="${stroke.alpha}" stroke-width="${p.strokeWidth}" stroke-linecap="${['butt','round','square'][p.strokeLineCap]||problem('Invalid stroke cap')}" stroke-linejoin="${['miter','round','bevel'][p.strokeLineJoin]||problem('Invalid stroke join')}" stroke-miterlimit="${p.strokeMiterLimit}"/>`;
@@ -73,14 +90,29 @@ export class VectorGraphics {
   return this.snapshot(handle,{width:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseWidth:I'),height:fields.get('Landroid/graphics/drawable/VectorDrawable$VectorDrawableState;->mBaseHeight:I')});
  }
  createCanvas(){return this.create('canvas',{draws:[],matrix:[1,0,0,1,0,0],stack:[]});}
+ /** The native canvas of a Java object (a Canvas, a Bitmap, a Picture's recording) goes with it: a cleaner on the owner's record releases the handle when the collector frees the owner,
+  *  as Android's NativeAllocationRegistry frees an SkCanvas / SkBitmap. Without it every Canvas ever created kept its recorded draws (and their rasters) for the life of the VM. */
+ releaseWithOwner(owner,handle){const record=this.runtime.object(owner),previous=record.onFree;record.onFree=()=>{if(typeof previous==='function')previous();const object=this.handles.get(handle);if(object?.kind==='canvas')this.handles.delete(handle);};}
  canvasDraws(handle){return this.get(handle,'canvas').draws.slice();}
  captureVector(handle){const tree=this.get(handle,'tree'),active=new Set();let count=0;const capture=(pointer,depth=0)=>{if(depth>128||active.has(pointer)||++count>20000)problem('Cyclic/excessive vector draw snapshot');active.add(pointer);const node=this.get(pointer),copy={kind:node.kind,props:{...node.props},path:node.path??''};if(node.kind==='group')copy.children=node.children.map(child=>capture(child,depth+1));active.delete(pointer);return copy;};return {...tree,root:capture(tree.root)};}
- reserveDrawStorage(extra){let used=extra;for(const object of this.handles.values())if(object.kind==='canvas')for(const draw of object.draws){used+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');}}
+ /** Every recorded command checks the storage of all live canvases' draws plus `extra` against the limit. Each canvas's sum is kept and extended by the draws appended since
+  *  (a draw is not changed once recorded); a canvas whose list was cleared, shortened or replaced is summed again. It was a walk of every draw of every canvas per command. */
+ reserveDrawStorage(extra){
+  let used=extra;
+  for(const object of this.handles.values())if(object.kind==='canvas'){
+   const draws=object.draws,n=draws.length;let memo=object.drawBytes;
+   if(memo===undefined||memo.draws!==draws||memo.count>n||(memo.count>0&&draws[memo.count-1]!==memo.last))memo=object.drawBytes={draws,count:0,bytes:0,last:undefined};
+   for(let i=memo.count;i<n;i++){const draw=draws[i];memo.bytes+=(draw.svg?.length??0)+(draw.commands?.length??0)*4+(draw.text?.length??0);}
+   memo.count=n;memo.last=n?draws[n-1]:undefined;used+=memo.bytes;
+   if(used>32*1024*1024)problem('Aggregate recorded graphics storage limit exceeded');
+  }
+ }
  resetCanvas(receiver,width=null,height=null){const canvas=this.get(this.runtime.object(receiver).nativeCanvasHandle,'canvas');canvas.draws.length=0;canvas.matrix=[1,0,0,1,0,0];canvas.stack.length=0;canvas.clips=[];if(width!==null)canvas.width=width;if(height!==null)canvas.height=height;}
  snapshotCanvas(receiver,width,height,options){
   if(!(width>0&&height>0&&width*height<=16*1024*1024))problem('Invalid canvas snapshot extent');
   if(this.runtime.skia?.rasterizeCanvas)return this.runtime.skia.rasterizeCanvas(this.runtime,this,receiver,width,height,options);
   const handle=this.runtime.object(receiver).nativeCanvasHandle,draws=this.get(handle,'canvas').draws;
+  if(draws.some(draw=>draw.matrix.length>6))problem('A perspective Canvas transform needs the Skia raster backend (the SVG canvas snapshot is affine)');
   const body=draws.map(draw=>`<g transform="matrix(${draw.matrix.join(' ')})"><g transform="translate(${draw.x} ${draw.y})">${draw.svg}</g></g>`).join('');
   return {kind:'svg',svg:`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">${body}</svg>`,width,height,drawCalls:draws.length,source:'original-Drawable.draw/web-software-canvas'};
  }
@@ -111,10 +143,10 @@ export function createVectorNativeBindings(){
  vector('nGetRootAlpha',['J'],'F',(g,[h])=>g.get(h,'tree').alpha);
  for(const [name,field]of [['nSetAntiAlias','antiAlias'],['nSetAllowCaching','allowCaching']])vector(name,['J','Z'],'V',(g,[h,v])=>{g.get(h,'tree')[field]=!!v;});
  vector('nUpdateGroupProperties',['J',...Array(7).fill('F')],'V',(g,[h,...values])=>{const p=g.get(h,'group').props;groupKeys.forEach((key,i)=>p[key]=finite(values[i]));});
- vector('nGetGroupProperties',['J','[F','I'],'Z',(g,[h,array,length],vm)=>{if(length!==7||vm.array(array).elements.length<length)return 0;vm.array(array).elements.splice(0,7,...groupKeys.map(k=>rawFloat(g.get(h,'group').props[k])));return 1;});
+ vector('nGetGroupProperties',['J','[F','I'],'Z',(g,[h,array,length],vm)=>{if(length!==7||vm.array(array).elements.length<length)return 0;vm.array(array).cells.set(groupKeys.map(k=>rawFloat(g.get(h,'group').props[k])));return 1;});
  vector('nUpdateFullPathProperties',['J','F','I','F','I','F','F','F','F','F','I','I','I'],'V',(g,[h,...values])=>{
   const order=['strokeWidth','strokeColor','strokeAlpha','fillColor','fillAlpha','trimPathStart','trimPathEnd','trimPathOffset','strokeMiterLimit','strokeLineCap','strokeLineJoin','fillType'];const p=g.get(h,'full').props;order.forEach((key,i)=>p[key]=finite(values[i]));});
- vector('nGetFullPathProperties',['J','[B','I'],'Z',(g,[h,array,length],vm)=>{if(length!==48||vm.array(array).elements.length<length)return 0;const buf=new DataView(new ArrayBuffer(48)),p=g.get(h,'full').props;propertyKeys.forEach((key,i)=>{if(['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(key))buf.setInt32(i*4,p[key],true);else buf.setFloat32(i*4,p[key],true);});vm.array(array).elements.splice(0,48,...new Int8Array(buf.buffer));return 1;});
+ vector('nGetFullPathProperties',['J','[B','I'],'Z',(g,[h,array,length],vm)=>{if(length!==48||vm.array(array).elements.length<length)return 0;const buf=new DataView(new ArrayBuffer(48)),p=g.get(h,'full').props;propertyKeys.forEach((key,i)=>{if(['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(key))buf.setInt32(i*4,p[key],true);else buf.setFloat32(i*4,p[key],true);});vm.array(array).cells.set(new Int8Array(buf.buffer));return 1;});
  for(const [kind,keys]of [['group',groupKeys],['full',propertyKeys]])for(const property of keys){const suffix=property[0].toUpperCase()+property.slice(1),integer=['strokeColor','fillColor','strokeLineCap','strokeLineJoin','fillType'].includes(property),type=integer?'I':'F';
   if(kind==='full'&&!['strokeWidth','strokeColor','strokeAlpha','fillColor','fillAlpha','trimPathStart','trimPathEnd','trimPathOffset'].includes(property))continue;
   vector('nGet'+suffix,['J'],type,(g,[h])=>g.get(h,kind).props[property]);vector('nSet'+suffix,['J',type],'V',(g,[h,v])=>{g.get(h,kind).props[property]=finite(v);});}
@@ -133,9 +165,16 @@ export function createVectorNativeBindings(){
   if(w*h>16*1024*1024)problem('Vector raster extent exceeds VM pixel limit');const draw=g.snapshot(tree,{width:w,height:h,mirrored:!!mirror});draw.colorFilter=colorFilter;draw.x=get('left');draw.y=get('top');const output=g.get(canvas,'canvas');draw.matrix=output.matrix.slice();draw.clips=(output.clips??[]).slice();draw.vectorTree=tree;draw.vectorState=g.captureVector(tree);draw.mirrored=!!mirror;if(output.draws.length>=1024)problem('Vector canvas command limit exceeded');g.reserveDrawStorage(draw.svg.length);output.draws.push(draw);return Math.ceil(w*h);
  });
  for(const [name,delta]of [['nIncStrong',1],['nDecStrong',-1]])add('Lcom/android/internal/util/VirtualRefBasePtr;',name,['J'],'V',(g,[h])=>{const object=g.get(h);if(object.refs+delta<0)problem('Unbalanced vector handle release');object.refs+=delta;if(!object.refs&&delta<0)g.release(h);});
- for(const [name,delta]of [['registerNativeAllocation',1n],['registerNativeFree',-1n]])add('Ldalvik/system/VMRuntime;',name,['J'],'V',(g,args)=>{
-  // Instance native receives receiver before the declared long parameter.
-  const bytes=args[1];if(typeof bytes!=='bigint'||bytes<0n)problem('Invalid VM native allocation accounting');g.accountedBytes+=delta*bytes;if(g.accountedBytes<0n||g.accountedBytes>64n*1024n*1024n)problem('Vector native allocation accounting limit exceeded');});
+ for(const [name,delta]of [['registerNativeAllocation',1n],['registerNativeFree',-1n]])add('Ldalvik/system/VMRuntime;',name,['J'],'V',(g,args,vm)=>{
+  // dalvik.system.VMRuntime.registerNativeAllocation(long) / registerNativeFree(long) (art runtime/native/dalvik_system_VMRuntime.cc): a negative size is a RuntimeException
+  // ("allocation size negative N"); otherwise the bytes are added to, or taken from, what the heap has registered (Heap::RegisterNativeAllocation / RegisterNativeFree: a free of
+  // more than is registered leaves zero), and growth paces the collector. There is no ceiling: an app and the framework's own classes (VectorDrawable, Bitmap owners, Compose
+  // layers) register whatever native memory they hold, and a fixed 64 MiB cap here ended the run of an app that registered more. The instance native gets its receiver first.
+  const bytes=args[1];if(typeof bytes!=='bigint')problem('Invalid VM native allocation accounting');
+  if(bytes<0n)vm.throwJava('Ljava/lang/RuntimeException;',`allocation size negative ${bytes}`);
+  const amount=bytes>BigInt(Number.MAX_SAFE_INTEGER)?Number.MAX_SAFE_INTEGER:Number(bytes);
+  if(delta>0n)g.accountedBytes+=bytes;else g.accountedBytes-=bytes<g.accountedBytes?bytes:g.accountedBytes;
+  vm.nativeBytesRegistered?.(delta>0n?amount:-amount);});
  return bindings;
 }
 
@@ -146,7 +185,8 @@ export function createVectorCanvasHost(){
   supports:key=>keys.has(key),canAllocate:type=>type===owner,parent:type=>type===owner?'Ljava/lang/Object;':null,
   invoke(runtime,method,args){
    const object=runtime.object(args[0]),graphics=getVectorGraphics(runtime),name=method.name;
-   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();object.canvasDensity=160;return;}
+   if(name==='<init>'){if(object.nativeCanvasHandle)problem('Canvas is already initialized');object.nativeCanvasHandle=graphics.createCanvas();graphics.releaseWithOwner(args[0],object.nativeCanvasHandle);object.canvasDensity=160;return;}
+   runtime.skiaHost?.bitmaps?.flattenFullCanvas(object.nativeCanvasHandle);   // a Bitmap's command list is folded into one pixel command before it reaches the command limit
    const canvas=graphics.get(object.nativeCanvasHandle,'canvas');
    if(name==='getNativeCanvasWrapper')return object.nativeCanvasHandle;
    if(name==='isHardwareAccelerated')return 0;
@@ -158,10 +198,12 @@ export function createVectorCanvasHost(){
     else{[left,top,right,bottom]=args.slice(1,5).map(f32);paint=args[5];}
     for(const n of [left,top,right,bottom])finite(n);
     const width=right-left,height=bottom-top;if(width<=0||height<=0)return;if(width*height>16*1024*1024)problem('Canvas rectangle exceeds VM extent limit');
-    const solid=getSolidPaint(runtime,paint);if(canvas.draws.length>=1024)problem('Canvas command limit exceeded');
+    const solid=getSolidPaint(runtime,paint);if(solid.maskFilter&&solid.maskFilter.blur?.style!==0)problem('BlurMaskFilter styles other than Blur.NORMAL are not implemented for Canvas.drawRect');if(canvas.draws.length>=1024)problem('Canvas command limit exceeded');
     if(![0,1,2].includes(solid.style))problem('Unsupported Paint style');
+    // BlurMaskFilter(radius, Blur.NORMAL): a Gaussian blur of the shape with Skia's sigma (the Skia replay applies it from the paint; the SVG carries the same blur)
+    const blur=solid.maskFilter?.blur??null,spread=blur?Math.ceil(blur.sigma*3):0,blurFilter=blur?`<filter id="blur" filterUnits="userSpaceOnUse" x="${-spread}" y="${-spread}" width="${width+2*spread}" height="${height+2*spread}"><feGaussianBlur stdDeviation="${blur.sigma}"/></filter>`:'';
     const fill=solid.style===1?'none':solid.color,stroke=solid.style===0?'':` stroke="${solid.color}" stroke-opacity="${solid.alpha}" stroke-width="${solid.strokeWidth||1}" stroke-miterlimit="${solid.strokeMiter}" stroke-linecap="${['butt','round','square'][solid.strokeCap]}" stroke-linejoin="${['miter','round','bevel'][solid.strokeJoin]}"${solid.strokeWidth===0?' vector-effect="non-scaling-stroke"':''}`;
-    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible"><rect width="${width}" height="${height}" fill="${fill}" fill-opacity="${solid.alpha}"${stroke}${solid.flags&1?'':' shape-rendering="crispEdges"'}/></svg>`;graphics.reserveDrawStorage(svg.length);canvas.draws.push({kind:'svg',svg,x:left,y:top,width,height,matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice(),argb:solid.argb,paint:solid,source:'original-Drawable.draw/web-Paint/Canvas'});return;
+    const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" overflow="visible">${blurFilter}<rect width="${width}" height="${height}" fill="${fill}" fill-opacity="${solid.alpha}"${stroke}${solid.flags&1?'':' shape-rendering="crispEdges"'}${blur?' filter="url(#blur)"':''}/></svg>`;graphics.reserveDrawStorage(svg.length);canvas.draws.push({kind:'svg',svg,x:left,y:top,width,height,matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice(),argb:solid.argb,paint:solid,source:'original-Drawable.draw/web-Paint/Canvas'});return;
    }
    if(name==='getSaveCount')return canvas.stack.length+1;
    if(name==='save'){if(canvas.stack.length>=256)problem('Canvas save stack limit exceeded');const count=canvas.stack.length+1;canvas.stack.push({matrix:canvas.matrix.slice(),clips:(canvas.clips??[]).slice()});return count;}
@@ -169,18 +211,23 @@ export function createVectorCanvasHost(){
     const count=name==='restore'?canvas.stack.length:args[1];if(count<1||count>canvas.stack.length+1)runtime.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
     while(canvas.stack.length+1>count){const state=canvas.stack.pop();canvas.matrix=state.matrix??state;canvas.clips=state.clips??[];}return;
    }
-   if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix needs a projective canvas-state backend
+   if(name==='setMatrix'){   // Canvas.setMatrix(Matrix): replaces the current transform (null = identity); a perspective matrix keeps its third row (see preConcatCanvasMatrix)
+    canvas.matrix.length=6;
     if(args[1]===null||args[1]===0){canvas.matrix[0]=1;canvas.matrix[1]=0;canvas.matrix[2]=0;canvas.matrix[3]=1;canvas.matrix[4]=0;canvas.matrix[5]=0;return;}
-    const v=getMatrixValues(runtime,args[1]);if(v[6]!==0||v[7]!==0||v[8]!==1)problem('Perspective Canvas transforms require a projective canvas-state backend');
-    canvas.matrix[0]=finite(v[0]);canvas.matrix[1]=finite(v[3]);canvas.matrix[2]=finite(v[1]);canvas.matrix[3]=finite(v[4]);canvas.matrix[4]=finite(v[2]);canvas.matrix[5]=finite(v[5]);return;
+    const v=getMatrixValues(runtime,args[1]);
+    canvas.matrix[0]=finite(v[0]);canvas.matrix[1]=finite(v[3]);canvas.matrix[2]=finite(v[1]);canvas.matrix[3]=finite(v[4]);canvas.matrix[4]=finite(v[2]);canvas.matrix[5]=finite(v[5]);
+    if(v[6]!==0||v[7]!==0||v[8]!==1)canvas.matrix.push(finite(v[6]),finite(v[7]),finite(v[8]));return;
    }
    if((name==='rotate'&&method.parameters.length===3)||(name==='scale'&&method.parameters.length===4)){   // about a pivot: M * T(px,py) * op * T(-px,-py)
     const v=args.slice(1).map(w=>finite(f32(w))),m=canvas.matrix;let n;
     if(name==='rotate'){const radians=v[0]*Math.PI/180,s=Math.sin(radians),k=Math.cos(radians);n=[k,s,-s,k,v[1]-k*v[1]+s*v[2],v[2]-s*v[1]-k*v[2]];}
     else n=[v[0],0,0,v[1],v[2]-v[0]*v[2],v[3]-v[1]*v[3]];
-    const [a0,b0,c0,d0,e0,f0]=m;m[0]=a0*n[0]+c0*n[1];m[1]=b0*n[0]+d0*n[1];m[2]=a0*n[2]+c0*n[3];m[3]=b0*n[2]+d0*n[3];m[4]=a0*n[4]+c0*n[5]+e0;m[5]=b0*n[4]+d0*n[5]+f0;return;
+    preConcatCanvasMatrix(m,n);return;
    }
    const matrix=canvas.matrix,[a,b,c,d,e,f]=matrix,x=finite(f32(args[1])),y=method.parameters.length>1?finite(f32(args[2])):0;
+   if(matrix.length>6&&['translate','scale','skew','rotate'].includes(name)){   // a canvas under a perspective transform: the same operation with the third row carried along
+    const radians=x*Math.PI/180;preConcatCanvasMatrix(matrix,name==='translate'?[1,0,0,1,x,y]:name==='scale'?[x,0,0,y,0,0]:name==='skew'?[1,y,x,1,0,0]:[Math.cos(radians),Math.sin(radians),-Math.sin(radians),Math.cos(radians),0,0]);return;
+   }
    if(name==='translate'){matrix[4]=a*x+c*y+e;matrix[5]=b*x+d*y+f;return;}
    if(name==='scale'){matrix[0]=a*x;matrix[1]=b*x;matrix[2]=c*y;matrix[3]=d*y;return;}
    if(name==='skew'){matrix[0]=a+c*y;matrix[1]=b+d*y;matrix[2]=a*x+c;matrix[3]=b*x+d;return;}   // M x [1 sx 0; sy 1 0]: Canvas.skew(sx, sy)

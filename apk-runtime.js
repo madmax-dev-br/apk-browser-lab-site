@@ -1,27 +1,39 @@
-import { VMClock } from './vm-clock.js?v=bd06e10bf2b9';
-import { ExecutionProfile } from './execution-profile.js?v=bd06e10bf2b9';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=bd06e10bf2b9';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=bd06e10bf2b9';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=bd06e10bf2b9';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=bd06e10bf2b9';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=bd06e10bf2b9';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=bd06e10bf2b9';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=bd06e10bf2b9';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=bd06e10bf2b9';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=bd06e10bf2b9';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=bd06e10bf2b9';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=bd06e10bf2b9';
-import { APKError } from './apk-error.js?v=bd06e10bf2b9';
-import { collectGarbage, collectionDue } from './heap-gc.js?v=bd06e10bf2b9';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=bd06e10bf2b9';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS } from './interpreter.js?v=bd06e10bf2b9';
-import { Scheduler, Blocked } from './scheduler.js?v=bd06e10bf2b9';
-import { bootClassLacksMember } from './boot-class-members.js?v=bd06e10bf2b9';
-export { APKError } from './apk-error.js?v=bd06e10bf2b9';
+import { VMClock } from './vm-clock.js?v=d03508f39110';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=d03508f39110';
+import { OperationMonitor } from './operation-monitor.js?v=d03508f39110';
+import { ExecutionProfile } from './execution-profile.js?v=d03508f39110';
+import { SamplingProfiler } from './sampling-profiler.js?v=d03508f39110';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d03508f39110';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d03508f39110';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d03508f39110';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d03508f39110';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d03508f39110';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=d03508f39110';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d03508f39110';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d03508f39110';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d03508f39110';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d03508f39110';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=d03508f39110';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d03508f39110';
+import { APKError } from './apk-error.js?v=d03508f39110';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=d03508f39110';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=d03508f39110';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=d03508f39110';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=d03508f39110';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=d03508f39110';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=d03508f39110';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=d03508f39110';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=d03508f39110';
+const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
+import { Scheduler, Blocked } from './scheduler.js?v=d03508f39110';
+import { bootClassLacksMember } from './boot-class-members.js?v=d03508f39110';
+export { APKError } from './apk-error.js?v=d03508f39110';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
 const NO_INDEX = 0xffffffff;
+/** Native bytes registered between two collections, at least (APKRuntime.registerNativeAllocation). */
+export const NATIVE_PACE_MIN = 64 * 1024 * 1024;
 export class JavaException extends APKError {
   constructor(value, message, details = null) { super(message, details); this.name = 'JavaException'; this.value = value; }
 }
@@ -63,16 +75,104 @@ export class BinaryReader {
   }
 }
 
+// Java chars to a JavaScript string. A typed run of 64 or more units goes through a UTF-16LE TextDecoder (about 17 times faster than String.fromCharCode over 8 KiB spreads: a
+// 1.6 MB asset read through a Reader appends ~200 such chunks to a StringBuilder): `fatal`, so a lone surrogate (which Java strings may hold and the decoder would replace with
+// U+FFFD) throws and takes the exact path below, and `ignoreBOM`, so a leading U+FEFF stays a char. The view is copied first (the core's memory is shared, which decode() refuses).
+const UTF16_DECODER = typeof TextDecoder === 'function' && new Uint8Array(new Uint16Array([1]).buffer)[0] === 1 ? new TextDecoder('utf-16le', { fatal: true, ignoreBOM: true }) : null;
 function utf16String(units) {
-  let result = '';
-  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode(...units.slice(i, i + 8192));
+  if (UTF16_DECODER !== null && units.length >= 64 && (units instanceof Uint16Array)) { try { return UTF16_DECODER.decode(units.slice()); } catch { /* a lone surrogate: unit by unit below */ } }
+  // fromCharCode.apply takes the units as an array-like: a spread walks a typed array through its iterator, about five times slower (StringBuilder.append(char[]) of a reader's buffers)
+  let result = ''; const typed = ArrayBuffer.isView(units);
+  for (let i = 0; i < units.length; i += 8192) result += String.fromCharCode.apply(null, typed ? units.subarray(i, i + 8192) : units.slice(i, i + 8192));
   return result;
 }
+/** A range of an array's storage: a view when the storage is typed (no copy), a copy otherwise (a reference array or a Proxy-backed view). */
+const cellRange = (cells, from, to) => ArrayBuffer.isView(cells) ? cells.subarray(from, to) : cells.slice(from, to);
 const methodKey = m => `${m.owner}->${m.name}${m.signature}`;
-const fieldKey = f => `${f.owner}->${f.name}:${f.type}`;
+/** A dense array of `n` nulls: the "not decoded yet" cache of a lazy table. Built by pushing so it is a packed array; `new Array(n)` above a few
+ *  thousand elements is dictionary-mode in V8 and every index read on the interpreter's path would pay for it. */
+const nulls = n => { const a = []; for (let i = 0; i < n; i++) a.push(null); return a; };
+const dataProperty = (o, k, v) => { Object.defineProperty(o, k, { value: v, writable: true, enumerable: true, configurable: true }); return v; };
+// A method id's `owner->name(sig)` key is an own accessor that replaces itself with a data property on first read (docs/MEMORY-ON-DEMAND.md, A.4): a method id
+// that is only ever compared by owner/name/signature never pays for it (on a large app's launch 2 % of the decoded method ids had their key read). It stays enumerable so
+// a spread ({ ...method }) or a deep comparison sees the computed value, as with the former data property. The signature of a method or proto and the key of a field
+// are data properties from the start: nearly every decoded one is read (99 % of method signatures, 97 % of field keys), and replacing an accessor with a data property
+// leaves V8 with a slow (dictionary) object, which was ~3 % of a large app's launch.
+const LAZY_METHOD_KEY = { enumerable: true, configurable: true, get() { return dataProperty(this, 'key', this.dex.intern(methodKey(this))); }, set(v) { dataProperty(this, 'key', v); } };
 
+/**
+ * Class table of one DEX file: the class_def index by descriptor, with the class record (fields, methods Map, offsets) built on the first lookup of
+ * that class and cached (docs/MEMORY-ON-DEMAND.md, A.1). Map-like: get/has/set/delete/keys/values/entries/forEach/size/iteration; values() and
+ * iteration materialize every class, which only the diagnostics that scan the whole table do.
+ */
+export class DexClassTable {
+  constructor(dex, names) { this.dex = dex; this.names = names; this.records = nulls(names.size); this.extra = null; }
+  get size() { return this.names.size + (this.extra ? this.extra.size : 0); }
+  get(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra ? this.extra.get(name) : undefined;
+    const cls = this.records[i]; return cls !== null ? cls : this.dex.materializeClass(i);
+  }
+  has(name) { return this.names.has(name) || (this.extra !== null && this.extra.has(name)); }
+  set(name, cls) { const i = this.names.get(name); if (i !== undefined) this.records[i] = cls; else (this.extra ??= new Map()).set(name, cls); return this; }
+  delete(name) { const i = this.names.get(name); if (i === undefined) return this.extra ? this.extra.delete(name) : false; this.names.delete(name); this.records[i] = null; return true; }
+  /** The superclass descriptor of a class (null for java.lang.Object, undefined when the table lacks the class) without building its record. */
+  superclassOf(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra?.get(name)?.superclass;
+    const cls = this.records[i]; if (cls !== null) return cls.superclass;
+    const parent = this.dex.reader.u32(this.dex.classDefsOffset + i * 32 + 8); return parent === NO_INDEX ? null : this.dex.type(parent);
+  }
+  /** The interfaces a class declares (the shared type_list; callers copy if they keep it), undefined when the table lacks the class; no record is built. */
+  interfacesOf(name) {
+    const i = this.names.get(name);
+    if (i === undefined) return this.extra?.get(name)?.interfaces;
+    const cls = this.records[i]; return cls !== null ? cls.interfaces : this.dex.typeList(this.dex.reader.u32(this.dex.classDefsOffset + i * 32 + 12));
+  }
+  /** The DEX that defines `name`, without building the record. */
+  dexOf(name) { return this.names.has(name) ? this.dex : this.extra?.get(name)?.dex; }
+  *keys() { yield* this.names.keys(); if (this.extra) yield* this.extra.keys(); }
+  *values() { for (const name of this.keys()) yield this.get(name); }
+  *entries() { for (const name of this.keys()) yield [name, this.get(name)]; }
+  [Symbol.iterator]() { return this.entries(); }
+  forEach(callback, thisArg) { for (const [name, cls] of this.entries()) callback.call(thisArg, cls, name, this); }
+  /** The records built so far (diagnostics; never materializes). */
+  materialized() { const out = []; for (const cls of this.records) if (cls !== null) out.push(cls); if (this.extra) out.push(...this.extra.values()); return out; }
+}
+
+/**
+ * Class table of a program (APK layer, framework layer, both): descriptor -> class record, or the DexFile that defines it until the record is first
+ * looked up. Same Map-like surface as DexClassTable; the record identity is the DEX table's, so every table hands out the same object for a class.
+ */
+export class ClassTable {
+  constructor(source = null) { this.map = new Map(); if (source) for (const [name, value] of (source instanceof ClassTable ? source.map : source)) this.map.set(name, value); }
+  get size() { return this.map.size; }
+  get(name) {
+    const value = this.map.get(name);
+    if (value === undefined || !(value instanceof DexFile)) return value;
+    const cls = value.classes.get(name); this.map.set(name, cls); return cls;
+  }
+  has(name) { return this.map.has(name); }
+  set(name, value) { this.map.set(name, value); return this; }
+  delete(name) { return this.map.delete(name); }
+  superclassOf(name) { const value = this.map.get(name); return value === undefined ? undefined : value instanceof DexFile ? value.classes.superclassOf(name) : value.superclass; }
+  interfacesOf(name) { const value = this.map.get(name); return value === undefined ? undefined : value instanceof DexFile ? value.classes.interfacesOf(name) : value.interfaces; }
+  dexOf(name) { const value = this.map.get(name); return value instanceof DexFile ? value : value?.dex; }
+  keys() { return this.map.keys(); }
+  *values() { for (const name of this.map.keys()) yield this.get(name); }
+  *entries() { for (const name of this.map.keys()) yield [name, this.get(name)]; }
+  [Symbol.iterator]() { return this.entries(); }
+  forEach(callback, thisArg) { for (const [name, cls] of this.entries()) callback.call(thisArg, cls, name, this); }
+}
+
+/**
+ * One DEX file. The header and the type descriptors are read at construction; everything else is decoded on demand and cached by index
+ * (docs/MEMORY-ON-DEMAND.md, A): `string(i)`, `proto(i)`, `method(i)`, `field(i)` and the class records of `classes`. The arrays `strings`,
+ * `protos`, `methods` and `fields` are the caches (null until decoded; their `length` is the table size), so callers use the accessors; a method or
+ * field id keeps one identity for the life of the DEX (dispatch caches key on it) and carries non-enumerable `dex` and `index`.
+ */
 export class DexFile {
-  constructor(input, { filename = 'classes.dex', maxBytes = 64 * 1024 * 1024, typeRename = null } = {}) {
+  constructor(input, { filename = 'classes.dex', maxBytes = 64 * 1024 * 1024, typeRename = null, internTable = null } = {}) {
     this.filename = filename;
     const b = this.reader = new BinaryReader(input);
     if (b.length < 112 || b.length > maxBytes) fail(`Invalid DEX size (maximum ${maxBytes / 1024 / 1024} MiB): ${filename}`);
@@ -80,113 +180,157 @@ export class DexFile {
     if (!/^dex\n0(35|36|37|38|39|40)\0$/.test(magic)) fail('Unsupported DEX magic/version; expected dex 035–040');
     if (b.u32(32) !== b.length || b.u32(36) !== 112 || b.u32(40) !== 0x12345678) fail('Malformed DEX header or byte order');
     const table = (p, width) => { const n = b.u32(p), offset = b.u32(p + 4); b.table(n, offset, width); return [n, offset]; };
-    const indexed = (list, i, name) => { if (i >= list.length) fail(`Invalid DEX ${name} index ${i}`); return list[i]; };
-    const [sn, so] = table(56, 4);
-    this.strings = [];
-    for (let i = 0; i < sn; i++) {
-      const c = { p: b.u32(so + i * 4) }, size = b.uleb(c);
-      // Each UTF-16 unit takes at least one MUTF-8 byte, so the file itself bounds every string.
-      if (size > b.length - c.p) fail('DEX string is longer than its file');
-      const units = [];
-      while (true) {
-        const a = b.u8(c.p++);
-        if (!a) break;
-        let unit;
-        if (a < 128) unit = a;
-        else if ((a & 0xe0) === 0xc0) {
-          const z = b.u8(c.p++);
-          if ((z & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
-          unit = ((a & 31) << 6) | (z & 63);
-          if (unit < 128 && !(a === 0xc0 && z === 0x80)) fail('Overlong DEX MUTF-8');
-        } else if ((a & 0xf0) === 0xe0) {
-          const z = b.u8(c.p++), q = b.u8(c.p++);
-          if ((z & 0xc0) !== 0x80 || (q & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
-          unit = ((a & 15) << 12) | ((z & 63) << 6) | (q & 63);
-          if (unit < 0x800) fail('Overlong DEX MUTF-8');
-        } else fail('Malformed DEX MUTF-8');
-        units.push(unit);
-        if (units.length > size) fail('DEX string length mismatch');
-      }
-      if (units.length !== size) fail('DEX string length mismatch');
-      this.strings.push(utf16String(units));
-    }
-    const string = i => indexed(this.strings, i, 'string');
+    this.internTable = internTable ?? new Map();
+    const [sn, so] = table(56, 4); this.stringIdsOffset = so; this.strings = nulls(sn);
     const [tn, to] = table(64, 4);
     // typeRename lets a ClassLoader define a second copy of a class under an alias descriptor: every type reference of this DEX (instructions,
     // method/field refs, supertypes, annotations) is read from this table, so renaming here re-binds the whole DEX to its own copies.
-    this.types = Array.from({ length: tn }, (_, i) => { const t = string(b.u32(to + i * 4)); return typeRename ? typeRename(t) : t; });
-    const type = i => indexed(this.types, i, 'type');
-    // Protos and classes may share one type_list; parse each offset once so shared lists cost nothing extra.
-    const typeLists = new Map();
-    const typeList = offset => {
-      if (!offset) return [];
-      let list = typeLists.get(offset);
-      if (!list) {
-        const n = b.u32(offset); b.table(n, offset + 4, 2);
-        list = Array.from({ length: n }, (_, i) => type(b.u16(offset + 4 + i * 2)));
-        typeLists.set(offset, list);
-      }
-      return list.slice();
-    };
-    const [pn, po] = table(72, 12), protos = [];
-    for (let i = 0; i < pn; i++) {
-      const p = po + i * 12, parameters = typeList(b.u32(p + 8)), result = type(b.u32(p + 4));
-      protos.push({ parameters, result, signature: `(${parameters.join('')})${result}` });
+    this.types = [];
+    for (let i = 0; i < tn; i++) { const t = this.string(b.u32(to + i * 4)); this.types.push(typeRename ? typeRename(t) : t); }
+    this.typeLists = new Map();
+    const [pn, po] = table(72, 12); this.protoIdsOffset = po; this.protos = nulls(pn);
+    const [fn, fo] = table(80, 8); this.fieldIdsOffset = fo; this.fields = nulls(fn);
+    const [mn, mo] = table(88, 8); this.methodIdsOffset = mo; this.methods = nulls(mn);
+    const [cn, co] = table(96, 32); this.classDefsOffset = co;
+    const names = new Map();
+    for (let i = 0; i < cn; i++) { const name = this.type(b.u32(co + i * 32)); if (names.has(name)) fail(`Duplicate DEX class ${name}`); names.set(name, i); }
+    this.classes = new DexClassTable(this, names);
+    this.definitions = 0; this.materializedClasses = 0;
+  }
+  /** One copy of each derived string per program: the same descriptors, signatures and keys repeat in every DEX of an APK. */
+  intern(text) { const known = this.internTable.get(text); if (known !== undefined) return known; this.internTable.set(text, text); return text; }
+  string(i) { const s = this.strings[i]; return s != null ? s : this.decodeString(i); }
+  decodeString(i) {
+    const b = this.reader;
+    if (!(i < this.strings.length)) fail(`Invalid DEX string index ${i}`);
+    const c = { p: b.u32(this.stringIdsOffset + i * 4) }, size = b.uleb(c);
+    // Each UTF-16 unit takes at least one MUTF-8 byte, so the file itself bounds every string.
+    if (size > b.length - c.p) fail('DEX string is longer than its file');
+    const units = [];
+    while (true) {
+      const a = b.u8(c.p++);
+      if (!a) break;
+      let unit;
+      if (a < 128) unit = a;
+      else if ((a & 0xe0) === 0xc0) {
+        const z = b.u8(c.p++);
+        if ((z & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
+        unit = ((a & 31) << 6) | (z & 63);
+        if (unit < 128 && !(a === 0xc0 && z === 0x80)) fail('Overlong DEX MUTF-8');
+      } else if ((a & 0xf0) === 0xe0) {
+        const z = b.u8(c.p++), q = b.u8(c.p++);
+        if ((z & 0xc0) !== 0x80 || (q & 0xc0) !== 0x80) fail('Malformed DEX MUTF-8');
+        unit = ((a & 15) << 12) | ((z & 63) << 6) | (q & 63);
+        if (unit < 0x800) fail('Overlong DEX MUTF-8');
+      } else fail('Malformed DEX MUTF-8');
+      units.push(unit);
+      if (units.length > size) fail('DEX string length mismatch');
     }
-    const [fn, fo] = table(80, 8);
-    this.fields = Array.from({ length: fn }, (_, i) => {
-      const p = fo + i * 8, f = { owner: type(b.u16(p)), type: type(b.u16(p + 2)), name: string(b.u32(p + 4)) };
-      f.key = fieldKey(f); Object.defineProperty(f, 'dex', { value: this });Object.defineProperty(f,'index',{value:i});return f;
-    });
-    const [mn, mo] = table(88, 8);
-    this.methods = Array.from({ length: mn }, (_, i) => {
-      const p = mo + i * 8, proto = indexed(protos, b.u16(p + 2), 'proto');
-      const m = { owner: type(b.u16(p)), name: string(b.u32(p + 4)), ...proto };
-      m.key = methodKey(m); Object.defineProperty(m, 'dex', { value: this });Object.defineProperty(m,'index',{value:i});return m;
-    });
-    const [cn, co] = table(96, 32);
-    this.classes = new Map();
-    let definitions = 0;
-    for (let i = 0; i < cn; i++) {
-      const p = co + i * 32, name = type(b.u32(p)), parent = b.u32(p + 8);
-      const cls = { name, superclass: parent === NO_INDEX ? null : type(parent), interfaces: typeList(b.u32(p + 12)),
-        staticValuesOffset: b.u32(p + 28), annotationsOffset: b.u32(p + 20), staticFields: [], fields: [], methods: new Map(), flags: b.u32(p + 4) };
-      Object.defineProperty(cls, 'dex', { value: this });
-      const c = { p: b.u32(p + 24) };
-      if (c.p) {
-        const ns = b.uleb(c), ni = b.uleb(c), nd = b.uleb(c), nv = b.uleb(c);
-        definitions += ns + ni + nd + nv;
-        // Each field_id and method_id is defined by at most one class, so the id tables bound the total.
-        if (ns > fn || ni > fn || nd > mn || nv > mn || definitions > fn + mn) fail('Invalid/excessive DEX class data');
-        for (const [count, target] of [[ns, cls.staticFields], [ni, cls.fields]]) {
-          let index = 0;
-          for (let j = 0; j < count; j++) {
-            index += b.uleb(c); const flags = b.uleb(c);
-            indexed(this.fields, index, 'encoded field'); target.push({ index, flags });
-          }
-        }
-        for (const count of [nd, nv]) {
-          let index = 0;
-          for (let j = 0; j < count; j++) {
-            index += b.uleb(c);
-            const m = indexed(this.methods, index, 'encoded method'), flags = b.uleb(c), offset = b.uleb(c);
-            let code = null;
-            if (offset) {
-              const registers = b.u16(offset), incoming = b.u16(offset + 2), tries = b.u16(offset + 6), units = b.u32(offset + 12);
-              // registers and ins are u16 in the format; b.check below bounds the code by the file.
-              if (incoming > registers) fail('DEX code has more incoming than total registers');
-              b.check(offset + 16, units * 2);
-              code = { registers, incoming, tries, units, offset: offset + 16 };
-            }
-            const key = m.name + m.signature;
-            if (cls.methods.has(key)) fail(`Duplicate DEX method ${m.key}`);
-            cls.methods.set(key, { method: m, flags, code });
-          }
+    if (units.length !== size) fail('DEX string length mismatch');
+    return this.strings[i] = utf16String(units);
+  }
+  /** Index of `text` in the string table, or -1. string_ids are sorted by UTF-16 code unit value (the format requires it; ART rejects out-of-order ids), so this is a binary search. */
+  stringIndex(text) {
+    let low = 0, high = this.strings.length - 1;
+    while (low <= high) { const mid = (low + high) >> 1, s = this.string(mid); if (s === text) return mid; if (s < text) low = mid + 1; else high = mid - 1; }
+    return -1;
+  }
+  type(i) { if (!(i < this.types.length)) fail(`Invalid DEX type index ${i}`); return this.types[i]; }
+  /** Protos and classes may share one type_list; each offset is parsed once and callers copy if they keep it. */
+  typeList(offset) {
+    if (!offset) return [];
+    let list = this.typeLists.get(offset);
+    if (!list) {
+      const b = this.reader, n = b.u32(offset); b.table(n, offset + 4, 2);
+      list = []; for (let i = 0; i < n; i++) list.push(this.type(b.u16(offset + 4 + i * 2)));
+      this.typeLists.set(offset, list);
+    }
+    return list;
+  }
+  proto(i) { const p = this.protos[i]; return p != null ? p : this.decodeProto(i); }
+  decodeProto(i) {
+    if (!(i < this.protos.length)) fail(`Invalid DEX proto index ${i}`);
+    const b = this.reader, p = this.protoIdsOffset + i * 12, parameters = this.typeList(b.u32(p + 8)).slice(), result = this.type(b.u32(p + 4));
+    const proto = { parameters, result, signature: this.intern(`(${parameters.join('')})${result}`) };
+    Object.defineProperty(proto, 'dex', { value: this });
+    return this.protos[i] = proto;
+  }
+  field(i) { const f = this.fields[i]; return f != null ? f : this.decodeField(i); }
+  decodeField(i) {
+    if (!(i < this.fields.length)) fail(`Invalid DEX field index ${i}`);
+    const b = this.reader, p = this.fieldIdsOffset + i * 8, owner = this.type(b.u16(p)), type = this.type(b.u16(p + 2)), name = this.string(b.u32(p + 4));
+    const f = { owner, type, name, key: this.intern(`${owner}->${name}:${type}`) };
+    Object.defineProperty(f, 'dex', { value: this }); Object.defineProperty(f, 'index', { value: i });
+    return this.fields[i] = f;
+  }
+  method(i) { const m = this.methods[i]; return m != null ? m : this.decodeMethod(i); }
+  decodeMethod(i) {
+    if (!(i < this.methods.length)) fail(`Invalid DEX method index ${i}`);
+    const b = this.reader, p = this.methodIdsOffset + i * 8, proto = this.proto(b.u16(p + 2));
+    const m = { owner: this.type(b.u16(p)), name: this.string(b.u32(p + 4)), parameters: proto.parameters, result: proto.result, signature: proto.signature };
+    Object.defineProperty(m, 'key', LAZY_METHOD_KEY); Object.defineProperty(m, 'dex', { value: this }); Object.defineProperty(m, 'index', { value: i });
+    return this.methods[i] = m;
+  }
+  /** Owner descriptor of a method / field id without decoding the id (inventory scans). */
+  methodOwner(i) { if (!(i < this.methods.length)) fail(`Invalid DEX method index ${i}`); return this.type(this.reader.u16(this.methodIdsOffset + i * 8)); }
+  fieldOwner(i) { if (!(i < this.fields.length)) fail(`Invalid DEX field index ${i}`); return this.type(this.reader.u16(this.fieldIdsOffset + i * 8)); }
+  /** The method ids whose name is one of `names` (a string or an iterable of strings), decoding only those. */
+  methodsNamed(names) { return this.idsNamed(names, this.methodIdsOffset, this.methods.length, i => this.method(i)); }
+  fieldsNamed(names) { return this.idsNamed(names, this.fieldIdsOffset, this.fields.length, i => this.field(i)); }
+  idsNamed(names, offset, count, decode) {
+    const wanted = new Set(); for (const name of typeof names === 'string' ? [names] : names) { const index = this.stringIndex(name); if (index >= 0) wanted.add(index); }
+    const out = []; if (!wanted.size) return out;
+    const b = this.reader;
+    for (let i = 0, p = offset + 4; i < count; i++, p += 8) if (wanted.has(b.u32(p))) out.push(decode(i));
+    return out;
+  }
+  /** Every method / field id / string decoded (dense arrays; inventory and tests). */
+  allMethods() { for (let i = 0; i < this.methods.length; i++) if (this.methods[i] === null) this.decodeMethod(i); return this.methods; }
+  allFields() { for (let i = 0; i < this.fields.length; i++) if (this.fields[i] === null) this.decodeField(i); return this.fields; }
+  allStrings() { for (let i = 0; i < this.strings.length; i++) if (this.strings[i] === null) this.decodeString(i); return this.strings; }
+  /** The class records built so far (diagnostics). */
+  materializedClassRecords() { return this.classes.materialized(); }
+  /** Builds the record of class_def `i`: header, class_data (fields, methods with their code headers) and the offsets of static values and annotations. */
+  materializeClass(i) {
+    const b = this.reader, fn = this.fields.length, mn = this.methods.length, p = this.classDefsOffset + i * 32, name = this.type(b.u32(p)), parent = b.u32(p + 8);
+    const cls = { name, superclass: parent === NO_INDEX ? null : this.type(parent), interfaces: this.typeList(b.u32(p + 12)).slice(),
+      staticValuesOffset: b.u32(p + 28), annotationsOffset: b.u32(p + 20), staticFields: [], fields: [], methods: new Map(), flags: b.u32(p + 4) };
+    Object.defineProperty(cls, 'dex', { value: this });
+    const c = { p: b.u32(p + 24) };
+    if (c.p) {
+      const ns = b.uleb(c), ni = b.uleb(c), nd = b.uleb(c), nv = b.uleb(c);
+      this.definitions += ns + ni + nd + nv;
+      // Each field_id and method_id is defined by at most one class, so the id tables bound the total.
+      if (ns > fn || ni > fn || nd > mn || nv > mn || this.definitions > fn + mn) fail('Invalid/excessive DEX class data');
+      for (const [count, target] of [[ns, cls.staticFields], [ni, cls.fields]]) {
+        let index = 0;
+        for (let j = 0; j < count; j++) {
+          index += b.uleb(c); const flags = b.uleb(c);
+          if (index >= fn) fail(`Invalid DEX encoded field index ${index}`); target.push({ index, flags });
         }
       }
-      if (this.classes.has(name)) fail(`Duplicate DEX class ${name}`);
-      this.classes.set(name, cls);
+      for (const count of [nd, nv]) {
+        let index = 0;
+        for (let j = 0; j < count; j++) {
+          index += b.uleb(c);
+          if (index >= mn) fail(`Invalid DEX encoded method index ${index}`);
+          const m = this.method(index), flags = b.uleb(c), offset = b.uleb(c);
+          let code = null;
+          if (offset) {
+            const registers = b.u16(offset), incoming = b.u16(offset + 2), tries = b.u16(offset + 6), units = b.u32(offset + 12);
+            // registers and ins are u16 in the format; b.check below bounds the code by the file.
+            if (incoming > registers) fail('DEX code has more incoming than total registers');
+            b.check(offset + 16, units * 2);
+            code = { registers, incoming, tries, units, offset: offset + 16 };
+          }
+          const key = m.name + m.signature;
+          if (cls.methods.has(key)) fail(`Duplicate DEX method ${m.key}`);
+          cls.methods.set(key, { method: m, flags, code });
+        }
+      }
     }
+    this.materializedClasses++;
+    return this.classes.records[i] = cls;
   }
   annotationSet(offset,visibilityFilter=1){
     if(!offset)return [];const b=this.reader,count=b.u32(offset);if(count>100000)fail('Excessive DEX annotations');b.table(count,offset+4,4);const values=[];
@@ -201,7 +345,7 @@ export class DexFile {
     if(depth>32)fail('DEX annotation nesting limit exceeded');
     const index=this.reader.uleb(cursor),type=this.types[index],size=this.reader.uleb(cursor);
     if(!type||size>100000)fail('Invalid/excessive DEX annotation');
-    const values=new Map();for(let i=0;i<size;i++){const name=this.strings[this.reader.uleb(cursor)];if(name===undefined||values.has(name))fail('Invalid annotation element name');values.set(name,this.encodedValue(cursor,depth+1));}
+    const values=new Map();for(let i=0;i<size;i++){const nameIndex=this.reader.uleb(cursor),name=nameIndex<this.strings.length?this.string(nameIndex):undefined;if(name===undefined||values.has(name))fail('Invalid annotation element name');values.set(name,this.encodedValue(cursor,depth+1));}
     return {encoded:'annotation',type,values};
   }
   encodedValue(cursor, depth = 0) {
@@ -222,9 +366,10 @@ export class DexFile {
     if (type === 0x11) return BigInt.asIntN(64, read(8) << BigInt((7 - arg) * 8));
     if ([0x17, 0x18, 0x19, 0x1a, 0x1b].includes(type)) {
       const index = Number(read(4));
-      const list = type === 0x17 ? this.strings : type === 0x18 ? this.types : type === 0x1a ? this.methods : this.fields;
-      if (index >= list.length) fail('Invalid encoded DEX reference');
-      return type === 0x17 ? list[index] : { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: list[index] };
+      const count = type === 0x17 ? this.strings.length : type === 0x18 ? this.types.length : type === 0x1a ? this.methods.length : this.fields.length;
+      if (index >= count) fail('Invalid encoded DEX reference');
+      if (type === 0x17) return this.string(index);
+      return { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: type === 0x18 ? this.types[index] : type === 0x1a ? this.method(index) : this.field(index) };
     }
     if(type===0x1d&&arg===0)return this.encodedAnnotation(cursor,depth+1);
     if (type === 0x1c && arg === 0) {
@@ -241,48 +386,53 @@ export class DexFile {
 export class DexProgram {
   constructor(files, { bootFiles = [] } = {}) {
     if (!Array.isArray(files) || !files.length || files.length > 1024) fail('DEX program requires 1–1024 DEX files');
-    this.files = []; this.classes = new Map(); this.methods = []; this.fields = []; this.types = []; this.strings = [];
+    this.files = []; this.classes = new ClassTable(); this.types = []; this.internTable = new Map();
+    this.methodCount = 0; this.fieldCount = 0; this.stringCount = 0; this.allIds = null;
     let bytes = 0;
     for (let i = 0; i < files.length; i++) {
       const item = files[i], dex = item instanceof DexFile ? item : item.dex;
       if (!(dex instanceof DexFile)) fail('DexProgram requires parsed DexFile instances');
       const filename = item.filename ?? item.name ?? dex.filename ?? `classes${i ? i + 1 : ''}.dex`;
-      dex.filename = filename; bytes += dex.reader.length;
+      dex.filename = filename; dex.internTable = this.internTable; bytes += dex.reader.length;
       if (bytes > 768 * 1024 * 1024) fail('Aggregate DEX size exceeds 768 MiB limit');
       this.files.push({ filename, dex });
-      for (const [name, cls] of dex.classes) {
+      for (const name of dex.classes.keys()) {
         // DexPathList searches its dex elements in order, so the first definition wins and later ones are never loaded.
-        if (this.classes.has(name)) { (this.duplicateClasses ??= []).push({ name, kept: this.classes.get(name).dex.filename, ignored: filename }); continue; }
-        this.classes.set(name, cls);
+        if (this.classes.has(name)) { (this.duplicateClasses ??= []).push({ name, kept: this.classes.dexOf(name).filename, ignored: filename }); continue; }
+        this.classes.set(name, dex);
       }
-      this.methods = this.methods.concat(dex.methods); this.fields = this.fields.concat(dex.fields);
-      this.types = this.types.concat(dex.types); this.strings = this.strings.concat(dex.strings);
+      this.methodCount += dex.methods.length; this.fieldCount += dex.fields.length; this.stringCount += dex.strings.length;
+      this.types = this.types.concat(dex.types);
     }
     if (!Array.isArray(bootFiles) || bootFiles.length > 16) fail('Framework layer requires at most 16 DEX files');
-    this.bootFiles = []; this.bootClasses = new Map(); this.bootDexes = new Set(); let bootBytes = 0;
+    this.bootFiles = []; this.bootClasses = new ClassTable(); this.bootDexes = new Set(); let bootBytes = 0;
     for (let i = 0; i < bootFiles.length; i++) {
       const item = bootFiles[i], dex = item instanceof DexFile ? item : item.dex;
       if (!(dex instanceof DexFile)) fail('Framework layer requires parsed DexFile instances');
       if (this.files.some(file => file.dex === dex)) fail('A DEX instance cannot belong to both APK and framework layers');
       const filename = item.filename ?? item.name ?? dex.filename ?? `framework-${i}.dex`;
-      dex.filename = filename; bootBytes += dex.reader.length;
+      dex.filename = filename; dex.internTable = this.internTable; bootBytes += dex.reader.length;
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
-      for (const [name, cls] of dex.classes) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/collect|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+      for (const name of dex.classes.keys()) {
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
-        this.bootClasses.set(name, cls);
+        this.bootClasses.set(name, dex);
       }
       if (this.bootClasses.size > 100000) fail('Framework class count limit exceeded');
     }
     // APK inventory is deliberately separate. Curated boot definitions win even if an APK
     // embeds a same-named android/java class, matching the parent-first boot lookup policy.
-    this.resolvedClasses = new Map(this.classes);
-    for (const [name, cls] of this.bootClasses) this.resolvedClasses.set(name, cls);
+    this.resolvedClasses = new ClassTable(this.classes);
+    for (const [name, value] of this.bootClasses.map) this.resolvedClasses.set(name, value);
     this.dynamicFiles = [];
     this.frameworkSummary = { enabled: this.bootFiles.length > 0, dexFiles: this.bootFiles.map(file => file.filename), classes: this.bootClasses.size, bytes: bootBytes,
       shadowedAPKClasses: [...this.bootClasses.keys()].filter(name => this.classes.has(name)), policy: this.bootFiles.length ? 'curated-boot-parent-first' : 'no-boot-layer' };
   }
+  /** Every method / field id / string of the APK layer, decoded (tests and whole-program inventories; the run itself never needs them all). */
+  get methods() { return (this.allIds ??= {}).methods ??= this.files.flatMap(file => file.dex.allMethods()); }
+  get fields() { return (this.allIds ??= {}).fields ??= this.files.flatMap(file => file.dex.allFields()); }
+  get strings() { return (this.allIds ??= {}).strings ??= this.files.flatMap(file => file.dex.allStrings()); }
   /**
    * Adds a DEX loaded at run time (InMemoryDexClassLoader / DexClassLoader / DexFile). Classes join the shared class namespace after the
    * boot layer and the APK; a name that already exists is an error (the VM has one class table, so shadowing would silently change behavior).
@@ -295,11 +445,11 @@ export class DexProgram {
     const added = [];
     for (const name of dex.classes.keys()) {
       if (skip.has(name)) continue; // shadowed by a parent loader (parent-first delegation): that definition stays authoritative
-      if (this.resolvedClasses.has(name)) throw new APKError(`Dynamic DEX class ${name} already exists in ${this.resolvedClasses.get(name).dex.filename}; the ClassLoader must alias or shadow it first`, { kind: 'duplicate-dynamic-class' });
+      if (this.resolvedClasses.has(name)) throw new APKError(`Dynamic DEX class ${name} already exists in ${this.resolvedClasses.dexOf(name).filename}; the ClassLoader must alias or shadow it first`, { kind: 'duplicate-dynamic-class' });
       added.push(name);
     }
-    dex.filename = filename; this.dynamicFiles.push({ filename, dex });
-    for (const name of added) { const cls = dex.classes.get(name); this.classes.set(name, cls); this.resolvedClasses.set(name, cls); }
+    dex.filename = filename; dex.internTable = this.internTable; this.dynamicFiles.push({ filename, dex });
+    for (const name of added) { this.classes.set(name, dex); this.resolvedClasses.set(name, dex); }
     return added;
   }
 }
@@ -461,6 +611,9 @@ addBridge(COLOR_FILTER_CLEANER.slice(1,-1),['run()V']);
 EXTERNAL_PARENTS.set(RENDER_NODE_CLEANER,'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set(RENDER_NODE_CLEANER,['Ljava/lang/Runnable;']);
 addBridge(RENDER_NODE_CLEANER.slice(1,-1),['run()V']);
+EXTERNAL_PARENTS.set(HARDWARE_BUFFER_CLEANER,'Ljava/lang/Object;');
+EXTERNAL_INTERFACES.set(HARDWARE_BUFFER_CLEANER,['Ljava/lang/Runnable;']);
+addBridge(HARDWARE_BUFFER_CLEANER.slice(1,-1),['run()V']);
 EXTERNAL_PARENTS.set(REGEX_CLEANER,'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set(REGEX_CLEANER,['Ljava/lang/Runnable;']);
 addBridge(REGEX_CLEANER.slice(1,-1),['run()V']);
@@ -479,11 +632,11 @@ for(const [owner,type]of [['Float','F'],['Double','D']])addBridge('java/lang/'+o
 addBridge('android/os/Trace', ['traceBegin(JLjava/lang/String;)V', 'traceEnd(J)V', 'isTagEnabled(J)Z']);
 addBridge('java/lang/Object',['notify()V','notifyAll()V','wait()V','wait(J)V','wait(JI)V']);
 addBridge('java/lang/Object', ['getClass()Ljava/lang/Class;', 'hashCode()I', 'equals(Ljava/lang/Object;)Z', 'toString()Ljava/lang/String;', 'clone()Ljava/lang/Object;', 'finalize()V']);
-addBridge('java/lang/Class', ['getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
+addBridge('java/lang/Class', ['toString()Ljava/lang/String;', 'getPackageName()Ljava/lang/String;', 'isSynthetic()Z', 'isAnnotation()Z', 'getDeclaredClasses()[Ljava/lang/Class;', 'getClasses()[Ljava/lang/Class;', 'getName()Ljava/lang/String;', 'getSimpleName()Ljava/lang/String;', 'getSuperclass()Ljava/lang/Class;', 'isInterface()Z',
   'isArray()Z', 'isPrimitive()Z', 'getComponentType()Ljava/lang/Class;', 'isAssignableFrom(Ljava/lang/Class;)Z', 'isInstance(Ljava/lang/Object;)Z',
   'forName(Ljava/lang/String;)Ljava/lang/Class;', 'forName(Ljava/lang/String;ZLjava/lang/ClassLoader;)Ljava/lang/Class;',
   'desiredAssertionStatus()Z', 'isEnum()Z', 'getEnumConstants()[Ljava/lang/Object;']);
-addBridge('java/lang/Class',['getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
+addBridge('java/lang/Class',['getAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getDeclaredAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;']);
 addBridge('java/lang/Class', ['getCanonicalName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getEnclosingClass()Ljava/lang/Class;',
   'getResource(Ljava/lang/String;)Ljava/net/URL;','getResourceAsStream(Ljava/lang/String;)Ljava/io/InputStream;','getProtectionDomain()Ljava/security/ProtectionDomain;','getEnclosingMethod()Ljava/lang/reflect/Method;', 'getEnclosingConstructor()Ljava/lang/reflect/Constructor;', 'isAnonymousClass()Z', 'isLocalClass()Z', 'isMemberClass()Z', 'getInterfaces()[Ljava/lang/Class;', 'getModifiers()I', 'getClassLoader()Ljava/lang/ClassLoader;']);
 addBridge('java/lang/Class', ['newInstance()Ljava/lang/Object;', 'getDeclaredConstructor([Ljava/lang/Class;)Ljava/lang/reflect/Constructor;',
@@ -503,7 +656,7 @@ EXTERNAL_PARENTS.set('Ljava/lang/reflect/Executable;', 'Ljava/lang/reflect/Acces
 for (const name of ['Method', 'Constructor', 'Field']) {
   EXTERNAL_PARENTS.set(`Ljava/lang/reflect/${name};`, name === 'Field' ? 'Ljava/lang/reflect/AccessibleObject;' : 'Ljava/lang/reflect/Executable;');
   addBridge(`java/lang/reflect/${name}`, ['getName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getModifiers()I']);
-  addBridge(`java/lang/reflect/${name}`, ['equals(Ljava/lang/Object;)Z', 'hashCode()I','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z']);
+  addBridge(`java/lang/reflect/${name}`, ['equals(Ljava/lang/Object;)Z', 'hashCode()I','getAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getDeclaredAnnotationsByType(Ljava/lang/Class;)[Ljava/lang/annotation/Annotation;','getAnnotations()[Ljava/lang/annotation/Annotation;','getDeclaredAnnotations()[Ljava/lang/annotation/Annotation;','getAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','getDeclaredAnnotation(Ljava/lang/Class;)Ljava/lang/annotation/Annotation;','isAnnotationPresent(Ljava/lang/Class;)Z']);
 }
 // java.lang.reflect.Member (interface of Method/Constructor/Field); AccessibleObject implements AnnotatedElement.
 EXTERNAL_PARENTS.set('Ljava/lang/reflect/Member;', 'Ljava/lang/Object;');
@@ -542,7 +695,7 @@ for(const builder of ['StringBuilder','StringBuffer']){
  // The synthetic covariant bridges javac emits for Appendable (what an Appendable.append call resolves to).
  addBridge('java/lang/'+builder, ['append(Ljava/lang/CharSequence;)Ljava/lang/Appendable;', 'append(Ljava/lang/CharSequence;II)Ljava/lang/Appendable;', 'append(C)Ljava/lang/Appendable;']);
  const self=`Ljava/lang/${builder};`;
- addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
+ addBridge('java/lang/'+builder, [`delete(II)${self}`,`deleteCharAt(I)${self}`,'setCharAt(IC)V','setLength(I)V',`replace(IILjava/lang/String;)${self}`,`reverse()${self}`,'indexOf(Ljava/lang/String;)I','indexOf(Ljava/lang/String;I)I','lastIndexOf(Ljava/lang/String;)I','lastIndexOf(Ljava/lang/String;I)I','capacity()I','ensureCapacity(I)V','trimToSize()V','substring(I)Ljava/lang/String;','substring(II)Ljava/lang/String;','codePointAt(I)I','codePointBefore(I)I','codePointCount(II)I','offsetByCodePoints(II)I',`appendCodePoint(I)${self}`,'getChars(II[CI)V',`insert(I[C)${self}`,`insert(I[CII)${self}`,`insert(ILjava/lang/CharSequence;II)${self}`]);
  for (const t of ['Ljava/lang/String;','Ljava/lang/Object;','Ljava/lang/CharSequence;','I','J','Z','C']) addBridge('java/lang/'+builder, [`insert(I${t})${self}`]);
 }
 for (const type of ['Ljava/lang/String;', 'Ljava/lang/Object;', 'Ljava/lang/CharSequence;', 'I', 'J', 'F', 'D', 'Z', 'C']) {
@@ -565,7 +718,7 @@ addBridge('java/lang/String', ['length()I', 'isEmpty()Z', 'charAt(I)C', 'equals(
 addBridge('java/lang/String', ['indexOf(II)I', 'indexOf(Ljava/lang/String;I)I', 'lastIndexOf(I)I', 'lastIndexOf(II)I',
   'lastIndexOf(Ljava/lang/String;)I', 'lastIndexOf(Ljava/lang/String;I)I', 'startsWith(Ljava/lang/String;I)Z',
   'compareTo(Ljava/lang/String;)I', 'trim()Ljava/lang/String;', 'subSequence(II)Ljava/lang/CharSequence;']);
-addBridge('java/lang/String', ['contains(Ljava/lang/CharSequence;)Z', 'equalsIgnoreCase(Ljava/lang/String;)Z', 'compareToIgnoreCase(Ljava/lang/String;)I', 'codePointAt(I)I', 'intern()Ljava/lang/String;', 'repeat(I)Ljava/lang/String;', 'isBlank()Z',
+addBridge('java/lang/String', ['contains(Ljava/lang/CharSequence;)Z', 'equalsIgnoreCase(Ljava/lang/String;)Z', 'compareToIgnoreCase(Ljava/lang/String;)I', 'codePointAt(I)I', 'codePointBefore(I)I', 'codePointCount(II)I', 'offsetByCodePoints(II)I', 'intern()Ljava/lang/String;', 'repeat(I)Ljava/lang/String;', 'isBlank()Z',
   'contentEquals(Ljava/lang/CharSequence;)Z', 'toLowerCase()Ljava/lang/String;', 'toUpperCase()Ljava/lang/String;']);
 addBridge('java/lang/String', ['copyValueOf([C)Ljava/lang/String;']);
 addBridge('java/lang/String', ['split(Ljava/lang/String;I)[Ljava/lang/String;', 'split(Ljava/lang/String;)[Ljava/lang/String;']);
@@ -586,7 +739,13 @@ for (const [name, type] of [['AtomicReference', 'Ljava/lang/Object;'], ['AtomicI
     `getAndSet(${type})${type}`, `compareAndSet(${type}${type})Z`, `weakCompareAndSet(${type}${type})Z`]);
   if (type === 'I' || type === 'J') addBridge(owner, [`getAndIncrement()${type}`, `incrementAndGet()${type}`, `getAndDecrement()${type}`, `decrementAndGet()${type}`, `getAndAdd(${type})${type}`, `addAndGet(${type})${type}`, 'intValue()I', 'longValue()J']);
 }
-const MAP_TYPES = ['HashMap', 'WeakHashMap', 'LinkedHashMap', 'concurrent/ConcurrentHashMap'];
+const ABSTRACT_GUARD = globalThis.process?.env?.APKWEB_GUARD_ABSTRACT === '1', ABSTRACT_HOST_TYPES = new Set(['Ljava/util/AbstractMap;', 'Ljava/util/AbstractList;', 'Ljava/util/AbstractCollection;', 'Ljava/util/AbstractSet;']);
+const FINAL_BOX_TYPES = new Set(['Ljava/lang/Long;', 'Ljava/lang/Integer;', 'Ljava/lang/Short;', 'Ljava/lang/Byte;', 'Ljava/lang/Character;', 'Ljava/lang/Boolean;', 'Ljava/lang/Double;', 'Ljava/lang/Float;']);
+/** APKWEB_GC_STRESS=1: collect at every safepoint and before every queued platform task, so a Java reference held only by host code (a closure, a table the collector cannot see) fails at once instead of weeks later. */
+const GC_STRESS = globalThis.process?.env?.APKWEB_GC_STRESS === '1';
+/** Consecutive IllegalMonitorStateExceptions from monitor-exit on one thread before the lab treats it as a loop (APKRuntime.monitorExit). */
+const MONITOR_EXIT_FAILURE_LIMIT = 2000;
+const MAP_TYPES = ['HashMap', 'LinkedHashMap'];
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', 'Ljava/lang/Object;');
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/atomic/AtomicReferenceArray;', ['Ljava/io/Serializable;']);
 addBridge('java/util/concurrent/atomic/AtomicReferenceArray', ['<init>(I)V','<init>([Ljava/lang/Object;)V','length()I','get(I)Ljava/lang/Object;','set(ILjava/lang/Object;)V','lazySet(ILjava/lang/Object;)V','getAndSet(ILjava/lang/Object;)Ljava/lang/Object;','compareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z','weakCompareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z']);
@@ -602,22 +761,26 @@ for (const name of [...MAP_TYPES, ...LIST_TYPES]) {
     'remove(I)Ljava/lang/Object;', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z', 'indexOf(Ljava/lang/Object;)I', 'iterator()Ljava/util/Iterator;', 'toArray()[Ljava/lang/Object;']);
 }
 for (const name of MAP_TYPES) addBridge(`java/util/${name}`, ['<init>(IF)V', '<init>(Ljava/util/Map;)V']);
+// Map views (keySet/values/entrySet of the bridged maps) are objects of concrete classes that mirror libcore's (HashMap$KeySet, ...), never of the abstract interface types: a receiver whose runtime
+// type is java.util.Set has no code for most of the interface, so every call on it failed. Each view class is an AbstractSet/AbstractCollection with the full Collection API bridged.
+const MAP_VIEW_NAMES = { HashMap: ['HashMap$HostKeySet', 'HashMap$HostValues', 'HashMap$HostEntrySet'], LinkedHashMap: ['LinkedHashMap$HostKeySet', 'LinkedHashMap$HostValues', 'LinkedHashMap$HostEntrySet'] };   // names that do not collide with the libcore originals in framework.dex (HashMap$KeySet ...), which expect an original HashMap
+const MAP_VIEW_OWNERS = new Set();
+const VIEW_METHODS = ['size()I', 'isEmpty()Z', 'contains(Ljava/lang/Object;)Z', 'iterator()Ljava/util/Iterator;', 'toArray()[Ljava/lang/Object;', 'toArray([Ljava/lang/Object;)[Ljava/lang/Object;', 'add(Ljava/lang/Object;)Z',
+  'remove(Ljava/lang/Object;)Z', 'containsAll(Ljava/util/Collection;)Z', 'addAll(Ljava/util/Collection;)Z', 'removeAll(Ljava/util/Collection;)Z', 'retainAll(Ljava/util/Collection;)Z', 'clear()V', 'equals(Ljava/lang/Object;)Z', 'hashCode()I', 'toString()Ljava/lang/String;'];
+for (const [family, names] of Object.entries(MAP_VIEW_NAMES)) names.forEach((name, kind) => {
+  if (!name) return;
+  const owner = `java/util/${name}`, type = `L${owner};`;
+  MAP_VIEW_OWNERS.add(type);
+  EXTERNAL_PARENTS.set(type, kind === 1 ? 'Ljava/util/AbstractCollection;' : 'Ljava/util/AbstractSet;');
+  EXTERNAL_INTERFACES.set(type, kind === 1 ? ['Ljava/util/Collection;', 'Ljava/lang/Iterable;'] : ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
+  addBridge(owner, VIEW_METHODS);
+});
+const viewTypeOf = (mapType, kind) => {   // kind: 0 keys, 1 values, 2 entries
+  const family = mapType === 'Ljava/util/LinkedHashMap;' ? 'LinkedHashMap' : 'HashMap';
+  return `Ljava/util/${MAP_VIEW_NAMES[family][kind]};`;
+};
 addBridge('java/util/LinkedHashMap', ['<init>(IFZ)V']);
 addBridge('java/util/LinkedHashMap', ['eldest()Ljava/util/Map$Entry;']);
-EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ConcurrentHashMap;', ['Ljava/util/concurrent/ConcurrentMap;', 'Ljava/util/Map;', 'Ljava/io/Serializable;']);
-EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ConcurrentMap;', ['Ljava/util/Map;']);
-addBridge('java/util/concurrent/ConcurrentHashMap', ['<init>(IFI)V', 'putIfAbsent(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;',
-  'remove(Ljava/lang/Object;Ljava/lang/Object;)Z', 'replace(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;',
-  'replace(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z', 'mappingCount()J', 'containsValue(Ljava/lang/Object;)Z']);
-// ConcurrentHashMap.KeySetView (newKeySet, keySet(), keySet(mappedValue)): a live key view over the map, with add() only when a mapped value is set.
-const CHM_KEY_SET = 'Ljava/util/concurrent/ConcurrentHashMap$KeySetView;';
-EXTERNAL_PARENTS.set(CHM_KEY_SET, 'Ljava/lang/Object;');
-EXTERNAL_INTERFACES.set(CHM_KEY_SET, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;', 'Ljava/io/Serializable;']);
-addBridge('java/util/concurrent/ConcurrentHashMap', [`newKeySet()${CHM_KEY_SET}`, `newKeySet(I)${CHM_KEY_SET}`, `keySet()${CHM_KEY_SET}`, `keySet(Ljava/lang/Object;)${CHM_KEY_SET}`]);
-addBridge('java/util/concurrent/ConcurrentHashMap$KeySetView', ['add(Ljava/lang/Object;)Z', 'addAll(Ljava/util/Collection;)Z', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z',
-  'containsAll(Ljava/util/Collection;)Z', 'removeAll(Ljava/util/Collection;)Z', 'retainAll(Ljava/util/Collection;)Z', 'size()I', 'isEmpty()Z', 'clear()V', 'iterator()Ljava/util/Iterator;',
-  'toArray()[Ljava/lang/Object;', 'toArray([Ljava/lang/Object;)[Ljava/lang/Object;', 'getMap()Ljava/util/concurrent/ConcurrentHashMap;', 'getMappedValue()Ljava/lang/Object;',
-  'toString()Ljava/lang/String;', 'equals(Ljava/lang/Object;)Z', 'hashCode()I']);
 for (const name of ['AbstractMap', 'AbstractList', 'AbstractCollection', 'AbstractSet']) {
   EXTERNAL_PARENTS.set(`Ljava/util/${name};`, ['AbstractList', 'AbstractSet'].includes(name) ? 'Ljava/util/AbstractCollection;' : 'Ljava/lang/Object;');
   addBridge(`java/util/${name}`, ['<init>()V']);
@@ -634,6 +797,9 @@ for(const owner of ['java/util/Collection','java/util/Set','java/util/AbstractCo
 addBridge('java/util/Collection',['contains(Ljava/lang/Object;)Z','remove(Ljava/lang/Object;)Z']);
 addBridge('java/util/Set',['remove(Ljava/lang/Object;)Z','clear()V']);
 addBridge('java/util/Iterator', ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
+const HOST_ITERATOR = 'Ljava/util/HostIterator;';   // the concrete class of every iterator the host creates over its collections and map views (never the Iterator interface itself)
+EXTERNAL_PARENTS.set(HOST_ITERATOR, 'Ljava/lang/Object;'); EXTERNAL_INTERFACES.set(HOST_ITERATOR, ['Ljava/util/Iterator;']);
+addBridge('java/util/HostIterator', ['hasNext()Z', 'next()Ljava/lang/Object;', 'remove()V']);
 const HOST_MAP_ENTRY='Lapkweb/bridge/MapEntry;';
 EXTERNAL_PARENTS.set(HOST_MAP_ENTRY,'Ljava/lang/Object;');EXTERNAL_INTERFACES.set(HOST_MAP_ENTRY,['Ljava/util/Map$Entry;']);
 for(const owner of ['java/util/Map$Entry',HOST_MAP_ENTRY.slice(1,-1)])addBridge(owner,['getKey()Ljava/lang/Object;','getValue()Ljava/lang/Object;','setValue(Ljava/lang/Object;)Ljava/lang/Object;','equals(Ljava/lang/Object;)Z','hashCode()I','toString()Ljava/lang/String;']);
@@ -659,10 +825,8 @@ for (const name of ['WeakReference', 'SoftReference']) {
 }
 addBridge('java/lang/ref/Reference', ['get()Ljava/lang/Object;', 'clear()V', 'refersTo(Ljava/lang/Object;)Z']);
 EXTERNAL_PARENTS.set('Ljava/lang/Thread;', 'Ljava/lang/Object;');
-EXTERNAL_PARENTS.set('Landroid/os/Looper;', 'Ljava/lang/Object;');
 EXTERNAL_PARENTS.set('Landroid/view/Choreographer;', 'Ljava/lang/Object;');
 addBridge('java/lang/Thread', ['currentThread()Ljava/lang/Thread;', 'getName()Ljava/lang/String;', 'isAlive()Z', 'getId()J']);
-addBridge('android/os/Looper', ['getMainLooper()Landroid/os/Looper;', 'myLooper()Landroid/os/Looper;', 'getThread()Ljava/lang/Thread;', 'isCurrentThread()Z']);
 // ContextImpl.getMainLooper() returns the process main thread's Looper for every Context (Activity, Application, Service, wrappers).
 addBridge('android/content/Context', ['getMainLooper()Landroid/os/Looper;']);
 addBridge('android/content/ContextWrapper', ['getMainLooper()Landroid/os/Looper;']);
@@ -674,7 +838,11 @@ for (const name of ['Throwable', 'Error', 'LinkageError', 'UnsatisfiedLinkError'
 }
 for(const name of ['ConcurrentModificationException','NoSuchElementException'])addBridge('java/util/'+name,['<init>()V','<init>(Ljava/lang/String;)V','<init>(Ljava/lang/Throwable;)V','<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
 addBridge('java/lang/ArrayIndexOutOfBoundsException',['<init>(I)V']);
-addBridge('java/lang/AssertionError', ['<init>()V', '<init>(Ljava/lang/Object;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V']);
+addBridge('java/lang/AssertionError', ['<init>()V', '<init>(Ljava/lang/Object;)V', '<init>(Ljava/lang/String;Ljava/lang/Throwable;)V', '<init>(I)V', '<init>(J)V', '<init>(Z)V', '<init>(C)V']);
+addBridge('java/lang/reflect/InvocationTargetException', ['<init>(Ljava/lang/Throwable;Ljava/lang/String;)V']);
+addBridge('java/lang/Short', ['decode(Ljava/lang/String;)Ljava/lang/Short;']); addBridge('java/lang/Byte', ['decode(Ljava/lang/String;)Ljava/lang/Byte;']);
+addBridge('java/lang/IllegalThreadStateException', ['<init>()V', '<init>(Ljava/lang/String;)V']);
+addBridge('java/lang/reflect/AccessibleObject', ['setAccessible([Ljava/lang/reflect/AccessibleObject;Z)V']);
 // Further platform exception types with the four standard Throwable constructors (parents declared by their hosts or EXTERNAL_PARENTS above).
 for (const name of ['java/util/concurrent/ExecutionException', 'java/util/concurrent/TimeoutException', 'java/util/concurrent/CancellationException', 'java/util/concurrent/RejectedExecutionException', 'java/io/IOException', 'java/io/FileNotFoundException', 'java/io/EOFException', 'java/io/UnsupportedEncodingException', 'java/util/zip/ZipException', 'java/net/MalformedURLException', 'java/lang/SecurityException',
   'java/lang/ReflectiveOperationException', 'java/lang/ClassNotFoundException', 'java/lang/NoSuchMethodException', 'java/lang/NoSuchFieldException', 'java/lang/InstantiationException', 'java/lang/IllegalAccessException', 'java/lang/InterruptedException', 'java/lang/CloneNotSupportedException',
@@ -706,11 +874,10 @@ for (const [name, parent] of Object.entries({
   if (!EXTERNAL_PARENTS.has(`L${name};`)) EXTERNAL_PARENTS.set(`L${name};`, `L${parent};`);
   addBridge(name, STD_THROWABLE_CTORS);
 }
-const SET_TYPES = ['java/util/HashSet', 'java/util/LinkedHashSet', 'java/util/concurrent/CopyOnWriteArraySet', 'java/util/Collections$SingletonSet'];
+const SET_TYPES = ['java/util/concurrent/CopyOnWriteArraySet', 'java/util/Collections$SingletonSet'];   // host sets (over obj.set). HashSet and LinkedHashSet are the libcore originals of framework.dex; so is Collections$SingletonSet whenever the original Collections is loaded (this host one only answers the host Collections.singleton bridge of a VM without framework.dex)
 for (const owner of SET_TYPES) {
-  EXTERNAL_PARENTS.set(`L${owner};`, owner==='java/util/LinkedHashSet'?'Ljava/util/HashSet;':'Ljava/util/AbstractSet;'); EXTERNAL_INTERFACES.set(`L${owner};`, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
-  if (owner.endsWith('HashSet') || owner.endsWith('CopyOnWriteArraySet')) addBridge(owner, ['<init>(Ljava/util/Collection;)V']);
-  if (owner.endsWith('HashSet')) addBridge(owner, ['<init>(IF)V']);
+  EXTERNAL_PARENTS.set(`L${owner};`, 'Ljava/util/AbstractSet;'); EXTERNAL_INTERFACES.set(`L${owner};`, ['Ljava/util/Set;', 'Ljava/util/Collection;', 'Ljava/lang/Iterable;']);
+  if (owner.endsWith('CopyOnWriteArraySet')) addBridge(owner, ['<init>(Ljava/util/Collection;)V']);
   addBridge(owner, ['<init>()V', '<init>(I)V', 'add(Ljava/lang/Object;)Z', 'remove(Ljava/lang/Object;)Z', 'contains(Ljava/lang/Object;)Z', 'size()I', 'isEmpty()Z', 'clear()V', 'iterator()Ljava/util/Iterator;']);
 }
 EXTERNAL_PARENTS.set('Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/lang/Object;');
@@ -755,11 +922,9 @@ EXTERNAL_PARENTS.set('Ljava/util/concurrent/ThreadPoolExecutor;', 'Ljava/lang/Ob
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ThreadPoolExecutor;', ['Ljava/util/concurrent/Executor;', 'Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/Executors', ['newFixedThreadPool(I)Ljava/util/concurrent/ExecutorService;', 'newFixedThreadPool(ILjava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/ThreadPoolExecutor', ['execute(Ljava/lang/Runnable;)V', 'shutdown()V', 'isShutdown()Z']);
-EXTERNAL_PARENTS.set('Landroid/os/Handler;', 'Ljava/lang/Object;');
-addBridge('android/os/Handler', ['<init>()V', '<init>(Landroid/os/Looper;)V', '<init>(Landroid/os/Looper;Landroid/os/Handler$Callback;)V',
-  '<init>(Landroid/os/Handler$Callback;)V', 'getLooper()Landroid/os/Looper;', 'createAsync(Landroid/os/Looper;)Landroid/os/Handler;', 'post(Ljava/lang/Runnable;)Z']);
 addBridge('android/util/Log', ['isLoggable(Ljava/lang/String;I)Z', 'println(ILjava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;)I', 'wtf(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I', 'wtf(Ljava/lang/String;Ljava/lang/Throwable;)I', 'getStackTraceString(Ljava/lang/Throwable;)Ljava/lang/String;']);
 addBridge('android/util/Log', ['w(Ljava/lang/String;Ljava/lang/Throwable;)I']);
+addBridge('android/util/Log', ['println_native(IILjava/lang/String;Ljava/lang/String;)I']);   // the native every Log method ends in (bufID, priority, tag, msg): android.util.LogPrinter calls it directly
 for (const name of ['v', 'd', 'i', 'w', 'e']) addBridge('android/util/Log', [`${name}(Ljava/lang/String;Ljava/lang/String;)I`, `${name}(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;)I`]);
 const descriptor = name => name.startsWith('L') && name.endsWith(';') ? name : `L${name.replaceAll('.', '/')};`;
 // Classes redefined by a second ClassLoader live under an internal alias descriptor (Lfoo/Bar$$ldr2;); every user-visible name is the original.
@@ -767,11 +932,21 @@ export const LOADER_ALIAS = /\$\$ldr\d+;$/;
 const PRIMITIVE_NAMES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 export const dottedName = name => name.replace(LOADER_ALIAS, ';').slice(1, -1).replaceAll('/', '.');
 const ref = id => ({ ref: id });
+/** A Java array in the heap. `cells` is its storage (java-arrays.js: a typed array for a primitive array, an Array of references otherwise); the interpreter and the compiled code read it directly.
+ *  `elements` is the same storage for host code: reading it answers the storage, assigning a plain or typed array converts it to the array's representation (ownership passes to the record). */
+class ArrayRecord {
+  constructor(id, type, cells) { this.id = id; this.type = type; this.fields = NO_FIELDS; this.cells = cells; }
+  get slots() { return EMPTY_SLOTS; }   // no instance fields: a slot store falls back to `fields`, which refuses it
+  get fieldShape() { return EMPTY_SHAPE; }
+  get elements() { return this.cells; }
+  set elements(values) { this.cells = cellsFrom(this.type, values); }
+}
 const isNull = value => value === null || value === 0;
 const describeRegister = value => value === undefined ? 'an uninitialized register' : value === null ? 'null' : typeof value === 'bigint' ? `a long (${value})` : typeof value === 'object' ? (value.ref !== undefined ? 'an object reference' : 'a host object') : `${typeof value} ${String(value).slice(0, 40)}`;
 const int = value => { if (typeof value !== 'number' || !Number.isInteger(value)) fail(`Expected int register, got ${describeRegister(value)}`); return value | 0; };
 // Dalvik keeps boolean/byte/short/char/int results as 32-bit ints; host bridges written in JS may answer
 // with true/false, so results are normalized by the method's declared return type at the boundary.
+export const FRAMEWORK_NATIVE_GONE = Symbol('framework native binding gone');
 const hostReturn = (method, value) => {
   const type = method?.result ?? method?.signature?.slice(method.signature.indexOf(')') + 1);
   return typeof value === 'boolean' && /^[ZBSCI]$/.test(type ?? '') ? (value ? 1 : 0) : value;
@@ -782,6 +957,27 @@ const signed8 = n => (n << 24) >> 24;
 const WIDE_HIGH = Symbol('wide-high');
 const defaultValue = type => type === 'J' || type === 'D' ? 0n : type.startsWith('L') || type.startsWith('[') ? null : 0;
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
+const LIFECYCLE_CALLBACKS = 'Landroid/app/Application$ActivityLifecycleCallbacks;';
+const noop = () => undefined;
+const PLATFORM_INTERFACE_DEFAULTS = new Map();
+for (const event of ['Created', 'Started', 'Resumed', 'Paused', 'Stopped', 'SaveInstanceState', 'Destroyed'])
+  for (const phase of ['Pre', 'Post']) PLATFORM_INTERFACE_DEFAULTS.set(`${LIFECYCLE_CALLBACKS}->onActivity${phase}${event}(Landroid/app/Activity;${event === 'Created' || event === 'SaveInstanceState' ? 'Landroid/os/Bundle;' : ''})V`, noop);   // API 29
+for (const [owner, signatures] of Object.entries({
+  'Landroid/view/Window$Callback;': ['onProvideKeyboardShortcuts(Ljava/util/List;Landroid/view/Menu;I)V', 'onPointerCaptureChanged(Z)V'],
+  'Landroid/content/ServiceConnection;': ['onBindingDied(Landroid/content/ComponentName;)V', 'onNullBinding(Landroid/content/ComponentName;)V'],
+  'Landroid/location/LocationListener;': ['onProviderEnabled(Ljava/lang/String;)V', 'onProviderDisabled(Ljava/lang/String;)V', 'onStatusChanged(Ljava/lang/String;ILandroid/os/Bundle;)V', 'onFlushComplete(I)V'],
+  'Landroid/location/Geocoder$GeocodeListener;': ['onError(Ljava/lang/String;)V'],
+})) for (const signature of signatures) PLATFORM_INTERFACE_DEFAULTS.set(`${owner}->${signature}`, noop);
+// LocationListener.onLocationChanged(List<Location>) (API 31): the default hands each location to onLocationChanged(Location)
+PLATFORM_INTERFACE_DEFAULTS.set('Landroid/location/LocationListener;->onLocationChanged(Ljava/util/List;)V', (runtime, args) => {
+  const list = args[1]; if (list === null || list === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null);
+  const size = runtime.dispatch({ owner: 'Ljava/util/List;', name: 'size', parameters: [], result: 'I', signature: '()I' }, [list], 'virtual');
+  for (let i = 0; i < size; i++) {
+    const location = runtime.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: 'Ljava/lang/Object;', signature: '(I)Ljava/lang/Object;' }, [list, i], 'virtual');
+    runtime.dispatch({ owner: runtime.typeOf(args[0]), name: 'onLocationChanged', parameters: ['Landroid/location/Location;'], result: 'V', signature: '(Landroid/location/Location;)V' }, [args[0], location], 'virtual');
+  }
+});
+const PLATFORM_DEFAULT_NAMES = new Set([...PLATFORM_INTERFACE_DEFAULTS.keys()].map(key => key.slice(key.indexOf('->') + 2)));
 const EXTERNAL_INTERFACE_NAMES=new Set([...EXTERNAL_INTERFACES.values()].flat());
 // Float/double registers carry IEEE bit patterns; typed-array views reinterpret them (little-endian hosts only, which every browser and Node target is).
 const BITS = new ArrayBuffer(8), F32 = new Float32Array(BITS), I32 = new Int32Array(BITS), F64 = new Float64Array(BITS), B64 = new BigInt64Array(BITS);
@@ -839,28 +1035,108 @@ function longArithmetic(op, x, y) {
 }
 
 /** The VM heap: object records by id. Ids are allocated sequentially and objects are never freed (no GC), so an array indexed by id replaces the Map. */
+const HEAP_CHUNK_SHIFT = 12, HEAP_CHUNK_MASK = 4095;   // 4096 ids per chunk
+/**
+ * The object table. Ids are never reused (a stale id resolves to "dead", never to another object), so a flat array indexed by id would keep a slot for every object ever allocated -- tens of
+ * millions of mostly empty slots after a long run. Records live in 4096-slot chunks that are allocated on demand and dropped when their last record is released: memory and the collector's
+ * walk follow the live objects (and the chunks they are spread over), not the number of ids ever handed out.
+ */
 class Heap {
-  constructor() { this.list = []; this.size = 0; }
-  get(id) { return this.list[id]; }
-  has(id) { return this.list[id] !== undefined; }
-  set(id, record) { if (this.list[id] === undefined) this.size++; this.list[id] = record; return this; }
-  *values() { for (const record of this.list) if (record !== undefined) yield record; }
+  constructor() { this.chunks = []; this.chunkLive = []; this.size = 0; }
+  get(id) { const chunk = this.chunks[id >>> HEAP_CHUNK_SHIFT]; return chunk === undefined ? undefined : chunk[id & HEAP_CHUNK_MASK]; }
+  has(id) { return this.get(id) !== undefined; }
+  set(id, record) {
+    const ci = id >>> HEAP_CHUNK_SHIFT; let chunk = this.chunks[ci];
+    if (chunk === undefined) { chunk = this.chunks[ci] = new Array(HEAP_CHUNK_MASK + 1).fill(undefined); this.chunkLive[ci] = 0; }
+    if (chunk[id & HEAP_CHUNK_MASK] === undefined) { this.size++; this.chunkLive[ci]++; }
+    chunk[id & HEAP_CHUNK_MASK] = record; return this;
+  }
+  /** Removes a record (the collector's sweep): size follows, and an emptied chunk is dropped. */
+  release(id) {
+    const ci = id >>> HEAP_CHUNK_SHIFT, chunk = this.chunks[ci]; chunk[id & HEAP_CHUNK_MASK] = undefined; this.size--;
+    if (--this.chunkLive[ci] === 0) this.chunks[ci] = undefined;
+  }
+  /** Chunk indexes that hold at least one record. */
+  usedChunks() { const out = []; for (let ci = 0; ci < this.chunks.length; ci++) if (this.chunks[ci] !== undefined) out.push(ci); return out; }
+  *values() { for (const chunk of this.chunks) if (chunk !== undefined) for (const record of chunk) if (record !== undefined) yield record; }
 }
 
 /** Returned by a chunk of APKRuntime.bridge() when none of its branches applies to the call. */
 const BRIDGE_NEXT = Symbol('bridge-next');
 const OBJECT_INIT_KEY = 'Ljava/lang/Object;-><init>()V';
+const BOOLEAN_TRUE_FIELD = { owner: 'Ljava/lang/Boolean;', name: 'TRUE', type: 'Ljava/lang/Boolean;', key: 'Ljava/lang/Boolean;->TRUE:Ljava/lang/Boolean;' }, BOOLEAN_FALSE_FIELD = { owner: 'Ljava/lang/Boolean;', name: 'FALSE', type: 'Ljava/lang/Boolean;', key: 'Ljava/lang/Boolean;->FALSE:Ljava/lang/Boolean;' };
+/** Primitive type letter by box class (the inverse of BOX_TYPES), looked up once per bridged call instead of searching the table. */
+const BOX_TYPE_OF = new Map(Object.entries(BOX_TYPES).map(([type, owner]) => [owner, type]));
+const popCount32 = n => { n = n - ((n >>> 1) & 0x55555555); n = (n & 0x33333333) + ((n >>> 2) & 0x33333333); return Math.imul((n + (n >>> 4)) & 0x0f0f0f0f, 0x01010101) >>> 24; };
+const trailingZeros32 = n => n === 0 ? 32 : 31 - Math.clz32(n & -n);
+/** The two 32-bit halves of a long's two's-complement image, as unsigned numbers. */
+const longLow = n => Number(n & 0xffffffffn), longHigh = n => Number((n >> 32n) & 0xffffffffn);
+const minMaxAbs = (name, decode, encode, x, y) => { const a = decode(x), b = y === undefined ? 0 : decode(y); if (Number.isNaN(a)) return x; if (Number.isNaN(b)) return y; return encode(name === 'min' ? Math.min(a, b) : name === 'max' ? Math.max(a, b) : Math.abs(a)); };
+// The receiver checks of the stateful bridges below are those of the chunks that serve them (bridgeC0: the receiver is an instance of the owner; the field-updater block of bridgeC1).
+const ARFU = 'Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;', ARFU_GET = `${ARFU}->get(Ljava/lang/Object;)Ljava/lang/Object;`, ARFU_CAS = `${ARFU}->compareAndSet(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z`;
+const ATOMIC_INTEGER = 'Ljava/util/concurrent/atomic/AtomicInteger;', ATOMIC_INTEGER_GET = `${ATOMIC_INTEGER}->get()I`, ATOMIC_INTEGER_CAS = `${ATOMIC_INTEGER}->compareAndSet(II)Z`;
+const bridgeReceiver = (rt, word, owner, key) => { const obj = rt.object(word); if (!rt.isSubtype(obj.type, owner)) fail(`Receiver does not match ${key}`); return obj; };
+const updaterTarget = (rt, updater, word) => { const field = updater.updaterField, target = rt.object(word); if (!field || !rt.isSubtype(target.type, field.owner)) rt.throwJava('Ljava/lang/ClassCastException;', 'Atomic field updater receiver mismatch'); return target; };
+const updaterValue = (field, target) => target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
+/**
+ * Direct bodies of the pure java.lang bridges that UI toolkits call tens of thousands of times per frame (identity hash and equality, bit twiddling, float/int bit casts, Math.min/max/abs).
+ * Each is the branch of the bridge chunks below for that key, written over the raw argument words (a long is its BigInt word, a reference is the value or 0) with the same checks, results and
+ * exceptions, so a call reaches it without walking the chunks: APKRuntime.directBridge binds one to a resolution the first time that resolution is bridged, only when no Skia, platform or ICU
+ * host claims the key (those are consulted before the chunks). Everything around the body -- the call-site cache, trace entry, host time, profile counters -- is unchanged.
+ */
+const DIRECT_BRIDGES = new Map([
+  ['Ljava/lang/Object;->hashCode()I', (rt, w) => typeof w[0] === 'string' ? stringHash(w[0]) : rt.object(w[0]).id],
+  ['Ljava/lang/Object;->equals(Ljava/lang/Object;)Z', (rt, w) => equal(w[0], w[1]) ? 1 : 0],
+  ['Ljava/lang/Integer;->bitCount(I)I', (rt, w) => popCount32(int(w[0]) >>> 0)],
+  ['Ljava/lang/Integer;->numberOfLeadingZeros(I)I', (rt, w) => Math.clz32(int(w[0]))],
+  ['Ljava/lang/Integer;->numberOfTrailingZeros(I)I', (rt, w) => trailingZeros32(int(w[0]))],
+  ['Ljava/lang/Integer;->rotateLeft(II)I', (rt, w) => { const n = int(w[0]), d = int(w[1]) & 31; return (n << d) | (n >>> (32 - d)); }],
+  ['Ljava/lang/Integer;->rotateRight(II)I', (rt, w) => { const n = int(w[0]), d = int(w[1]) & 31; return (n >>> d) | (n << (32 - d)); }],
+  ['Ljava/lang/Long;->bitCount(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); return popCount32(longLow(n)) + popCount32(longHigh(n)); }],
+  ['Ljava/lang/Long;->numberOfLeadingZeros(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); if (n === 0n) return 64; const high = longHigh(n); return high !== 0 ? Math.clz32(high) : 32 + Math.clz32(longLow(n)); }],
+  ['Ljava/lang/Long;->numberOfTrailingZeros(J)I', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])); if (n === 0n) return 64; const low = longLow(n); return low !== 0 ? trailingZeros32(low) : 32 + trailingZeros32(longHigh(n)); }],
+  ['Ljava/lang/Long;->rotateLeft(JI)J', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])), d = BigInt(int(w[2]) & 63); return BigInt.asIntN(64, (n << d) | (n >> (64n - d))); }],
+  ['Ljava/lang/Long;->rotateRight(JI)J', (rt, w) => { const n = BigInt.asUintN(64, wide(w[0])), d = BigInt(int(w[2]) & 63); return BigInt.asIntN(64, (n >> d) | (n << (64n - d))); }],
+  ['Ljava/lang/Float;->intBitsToFloat(I)F', (rt, w) => int(w[0])],
+  ['Ljava/lang/Float;->floatToRawIntBits(F)I', (rt, w) => int(w[0])],
+  ['Ljava/lang/Float;->floatToIntBits(F)I', (rt, w) => { const bits = int(w[0]); return (bits & 0x7f800000) === 0x7f800000 && (bits & 0x7fffff) !== 0 ? 0x7fc00000 : bits; }],
+  ['Ljava/lang/Double;->doubleToRawLongBits(D)J', (rt, w) => wide(w[0])],
+  ['Ljava/lang/Double;->longBitsToDouble(J)D', (rt, w) => wide(w[0])],
+  ['Ljava/lang/Double;->doubleToLongBits(D)J', (rt, w) => { const bits = wide(w[0]); return Number.isNaN(doubleNumber(bits)) ? 0x7ff8000000000000n : bits; }],
+  ['Ljava/lang/Math;->min(II)I', (rt, w) => Math.min(int(w[0]), int(w[1]))],
+  ['Ljava/lang/Math;->max(II)I', (rt, w) => Math.max(int(w[0]), int(w[1]))],
+  ['Ljava/lang/Math;->abs(I)I', (rt, w) => Math.abs(int(w[0])) | 0],
+  ['Ljava/lang/Math;->min(JJ)J', (rt, w) => { const a = wide(w[0]), b = wide(w[2]); return a < b ? a : b; }],
+  ['Ljava/lang/Math;->max(JJ)J', (rt, w) => { const a = wide(w[0]), b = wide(w[2]); return a > b ? a : b; }],
+  ['Ljava/lang/Math;->abs(J)J', (rt, w) => { const a = wide(w[0]); return a < 0n ? wide(-a) : a; }],
+  ['Ljava/lang/Math;->min(FF)F', (rt, w) => minMaxAbs('min', floatNumber, floatBits, w[0], w[1])],
+  ['Ljava/lang/Math;->max(FF)F', (rt, w) => minMaxAbs('max', floatNumber, floatBits, w[0], w[1])],
+  ['Ljava/lang/Math;->abs(F)F', (rt, w) => minMaxAbs('abs', floatNumber, floatBits, w[0], undefined)],
+  ['Ljava/lang/Math;->min(DD)D', (rt, w) => minMaxAbs('min', doubleNumber, doubleBits, w[0], w[2])],
+  ['Ljava/lang/Math;->max(DD)D', (rt, w) => minMaxAbs('max', doubleNumber, doubleBits, w[0], w[2])],
+  ['Ljava/lang/Math;->abs(D)D', (rt, w) => minMaxAbs('abs', doubleNumber, doubleBits, w[0], undefined)],
+  // Field updaters and atomics (lock-free state of coroutine and snapshot machinery): the value lives on the heap record, read and written as the chunks do.
+  [ARFU_GET, (rt, w) => { const updater = bridgeReceiver(rt, w[0], ARFU, ARFU_GET), target = updaterTarget(rt, updater, w[1]); return updaterValue(updater.updaterField, target); }],
+  [ARFU_CAS, (rt, w) => {
+    const updater = bridgeReceiver(rt, w[0], ARFU, ARFU_CAS), target = updaterTarget(rt, updater, w[1]), field = updater.updaterField, same = equal(updaterValue(field, target), w[2]);
+    if (same) rt.storeField(target.fields, field.key, w[3] === 0 ? null : w[3]);
+    return same ? 1 : 0;
+  }],
+  [ATOMIC_INTEGER_GET, (rt, w) => bridgeReceiver(rt, w[0], ATOMIC_INTEGER, ATOMIC_INTEGER_GET).atomicValue ?? 0],
+  [ATOMIC_INTEGER_CAS, (rt, w) => { const atomic = bridgeReceiver(rt, w[0], ATOMIC_INTEGER, ATOMIC_INTEGER_CAS), same = equal(atomic.atomicValue ?? 0, w[1]); if (same) atomic.atomicValue = w[2]; return same ? 1 : 0; }],
+]);
 
 /**
  * JDK methods that the bridged host classes (SHIMS: collections, atomics, String, Math, Random...) do not implement natively are written in Java (framework-aosp/lab-java/dev/apkweb/util)
  * with the semantics of libcore android-13.0.0_r1, over the public API the host class does serve. A helper type lists static methods: for an instance method of the owner the helper
  * takes the receiver as its first parameter (`name(LOwner;<params>)ret`); a static method of the owner has the identical descriptor. Resolution consults the helpers of each class on
  * the receiver's chain before it falls to bridges or interface defaults, so a helper can also stand in for a non-atomic Map/Collection default. Helpers hold no static state: they run
- * without class initialisation.
+ * without class initialisation. One helper serves an original class: ChmBulkOps, the parallel bulk operations (forEach/search/reduce with a parallelismThreshold) of the original
+ * ConcurrentHashMap, which build ForkJoin tasks the VM cannot run (no ForkJoinPool); every other ConcurrentHashMap method is the libcore original.
  */
 const UTIL = 'Ldev/apkweb/util/';
 const LAB_HELPERS = new Map([
-  ['Ljava/util/concurrent/ConcurrentHashMap;', [`${UTIL}ChmOps;`]],
+  ['Ljava/util/concurrent/ConcurrentHashMap;', [`${UTIL}ChmBulkOps;`]],
   ['Ljava/util/concurrent/atomic/AtomicInteger;', [`${UTIL}AtomicIntegerOps;`]], ['Ljava/util/concurrent/atomic/AtomicLong;', [`${UTIL}AtomicLongOps;`]],
   ['Ljava/util/concurrent/atomic/AtomicBoolean;', [`${UTIL}AtomicBooleanOps;`]], ['Ljava/util/concurrent/atomic/AtomicReference;', [`${UTIL}AtomicReferenceOps;`]],
   ['Ljava/util/concurrent/atomic/AtomicReferenceArray;', [`${UTIL}AtomicReferenceArrayOps;`]],
@@ -868,19 +1144,40 @@ const LAB_HELPERS = new Map([
   ['Ljava/lang/String;', [`${UTIL}StringOps;`]], ['Ljava/lang/Integer;', [`${UTIL}IntegerOps;`]], ['Ljava/lang/Long;', [`${UTIL}LongOps;`]], ['Ljava/lang/Boolean;', [`${UTIL}BooleanOps;`]],
   ['Ljava/lang/Math;', [`${UTIL}MathOps;`]], ['Ljava/lang/Character;', [`${UTIL}CharacterOps;`]], ['Ljava/lang/StringBuilder;', [`${UTIL}StringBuilderOps;`]], ['Ljava/lang/StringBuffer;', [`${UTIL}StringBuilderOps;`]],
   ['Ljava/util/Random;', [`${UTIL}RandomOps;`]], ['Ljava/util/concurrent/ThreadLocalRandom;', [`${UTIL}RandomOps;`]],
-  ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]], ['Ljava/util/HashSet;', [`${UTIL}CollectionOps;`]], ['Ljava/util/LinkedHashSet;', [`${UTIL}CollectionOps;`]],
+  ['Ljava/util/concurrent/CopyOnWriteArrayList;', [`${UTIL}CollectionOps;`]],
 ]);
 
+export const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Message|ThreadLocalWorkSource)(?:\$[^;]*)?;$/;
+// Properties other modules attach to the runtime after it is constructed (memos, collector state, host tables). They are declared here, in this order, by the constructor so the
+// runtime object keeps one hidden class from the start: every property the interpreter, the compiled code and the hosts read on it (steps, q, heap, gcOldBound, traceRing ...) is then a
+// monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
+// interpreter's time on a Compose flow). tests/interpreter-fast-paths.test.mjs fails when a launch adds a property that is not listed. `key in runtime` is not used for any of them.
+export const LATE_RUNTIME_PROPERTIES = Object.freeze([
+  'hostTaskTrace', 'labDefaultSslContext', 'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
+  'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
+  'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
+  'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
+  'loadTiming', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
+  'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
+  'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
+  'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
+  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal',
+]);
 export class APKRuntime {
-  constructor(dex, { apkEntries = new Set(), apkReader = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off' } = {}) {
+  constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
     if (!Number.isInteger(maxCallDepth) || maxCallDepth < 16 || maxCallDepth > 100000) fail('VM maxCallDepth must be an integer from 16 to 100000');
-    if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>262144)fail('VM maxHeapObjects must be an integer from 1024 to 262144');
-    this.maxHeapObjects=maxHeapObjects; this.gcSafepointFloor=Math.floor(maxHeapObjects*0.5); this.apkEntries=apkEntries; this.apkReader=apkReader;
+    // The engine (docs/WASM-CORE-PLANO.md, decision 1): 'js' is this VM; 'wasm' keeps this runtime as the host side (class model, bridges, platform) of core.wasm, which holds the Java heap,
+    // the frames and the interpreter. vmcore/js/host-bridge.js attachWasmEngine(runtime) attaches the core to a runtime created with 'wasm' before anything runs, and redirects the entry points
+    // hosts use (object, makeObject, newArray, execute, initialize, readStatic...). Nothing in this class changes with the engine.
+    if (engine !== 'js' && engine !== 'wasm') fail("VM engine must be 'js' or 'wasm'");
+    this.engine = engine;
+    if(!Number.isInteger(maxHeapObjects)||maxHeapObjects<1024||maxHeapObjects>2097152)fail('VM maxHeapObjects must be an integer from 1024 to 2097152');
+    this.maxHeapObjects=maxHeapObjects; { const scale = Math.max(1, maxHeapObjects / 262144); this.maxFieldSlots = Math.round(3000000 * scale); this.maxArrayCells = Math.round(8000000 * scale); this.maxCollectionCells = Math.round(8000000 * scale); } /* storage budgets grow with the object limit: about 11 field slots, 30 array cells and 30 collection cells per object (a Kotlin/Compose object carries many fields; the old 3.8 slots per object made the field budget run out at half the object limit) */ this.gcSafepointFloor=Math.floor(maxHeapObjects*0.25); this.apkEntries=apkEntries; this.apkReader=apkReader; this.apkEntryRange = apkEntryRange;
     // Opt-in tolerant mode for platform methods the lab does not implement: 'void' skips void ones; 'primitives' also answers
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
     if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
-    this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
+    this.methodOverrides = null; this.methodInterceptors = null; this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 200000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 200000000');
     // Default fuse: 100M instructions per thread between blocking points, x8 across the threads of one host event. Measured on React Native 0.79 startup (Wellhub 10.22): one
@@ -889,7 +1186,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.profile = new ExecutionProfile(this); this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(); if (GC_STRESS) this.gcEnabled = true; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.sampler = new SamplingProfiler(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -898,7 +1195,12 @@ export class APKRuntime {
     this.platform = platform; this.resources = resources; this.clock = platform?.clock ?? new VMClock();
     this.nativeBindings = nativeBindings instanceof Map ? nativeBindings : new Map(Object.entries(nativeBindings));
     this.executionByOrigin = { apk: { methods: 0, instructions: 0 }, framework: { methods: 0, instructions: 0 }, host: { calls: 0 } };
-    this.heap = new Heap(); this.nextId = 1; this.fieldSlots = 0;
+    this.heap = new Heap(); this.nextId = 1; this.fieldSlots = 0; this.shapeMemo = undefined; this.shapeEpoch = -1;
+    // Generations (heap-gc.js, "Young generation"): ids below gcOldBound are old, those in [gcOldBound, gcAgeBound) survived one minor collection; gcRemList/gcRemBits is the remembered set (old
+    // records a write barrier saw a reference store into), gcTouchList/gcTouchBits the old records handed to host code through object() since the last quiescent point, gcHostful the old records
+    // with host state of their own: the next minor collection rescans all three.
+    this.gcGenerational = globalThis.process?.env?.APKWEB_GC_GENERATIONS !== '0';   // APKWEB_GC_GENERATIONS=0 (Node tools): every collection is a major one, for comparisons
+    this.gcOldBound = 0; this.gcAgeBound = 0; this.gcRemList = []; this.gcRemBits = []; this.gcTouchList = []; this.gcTouchBits = []; this.gcHostful = []; this.gcHostBits = [];
     this.jni = null; // JniBridge, installed by loadAPK when the lab supplies a nativeLibraryProvider
     this.classOwners = new Map(); this.dynamicPlain = new Map(); // defining ClassLoader of run-time-loaded classes (table type -> loader ref); first definer per plain name
     this.nextThreadId = 1n;
@@ -909,12 +1211,56 @@ export class APKRuntime {
     this.depth = 0; this.steps = 0; this.trace = []; this.activity = null; this.root = null; this.clicks = 0;
     this.initialized = new Map(); this.staticFields = new Map(); this.classObjects = new Map(); this.arrayCells = 0; this.initDepth = 0;
     this.collectionCells = 0;
-    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.q = 20000; this.jitDepth = 0; this.thread = null; this.multiThreaded = false; this.monitors = new Map();
+    this.nativeArrays = new Map(); this.nextNativeArrayHandle = 0x100000000n; this.nativeRanges = []; this.nestedRuns = 0; this.maxNestedRuns = 160; this.scheduler = new Scheduler(this); this.callStats = { cached: 0, dispatched: 0, bridged: 0 }; this.lastBridge = null; this.lastBridgeDepth = -1; this.lastNative = null; this.lastNativeDepth = -1; this.jit = true; this.fastCallPaths = true; this.jitThreshold = JIT_THRESHOLD; this.jitLoops = JIT_LOOPS; this.jitCompiled = 0; this.jitInstructions = 0; this.jitBridged = 0; this.jitPolymorphic = 0; this.q = 20000; this.jitDepth = 0; this.tier2 = TIER2; this.t2Threshold = TIER2 ? T2_THRESHOLD : 0; this.t2Compiled = 0; this.t2Deopts = 0; this.t2Slow = 0; this.t2Headroom = 0; this.t2Site = null; this.deoptNeed = false; this.dstart = 0; this.dlimit = 0; this.t2TooDeep = false; this.t2Dirty = []; this.onThreadIdentity = null; this.threadSlot = null; this.multiThreaded = false; this.monitors = new Map();
     this.skia=skia;this.skiaHost=skia?.createHost?.(this)??null;
     this.icuBreakBackend=icuBreakBackend;this.sqliteBackend=sqliteBackend;this.tzdata=tzdata;this.zlibBackend=zlibBackend;this.icuConverterBackend=icuConverterBackend;
+
+    this.shadowDeviceClasses();
+    for (const key of LATE_RUNTIME_PROPERTIES) if (!(key in this)) this[key] = undefined;   // one hidden class from the start (see LATE_RUNTIME_PROPERTIES)
   }
-  parent(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : this.classes.get(type)?.superclass ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
-  interfaces(type) { return this.classes.get(type)?.interfaces ?? [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; }
+  /**
+   * Is `type` a class of the device itself: one the boot layer defines, or a platform class the hosts implement without a DEX definition (android.graphics.Paint, Shader...)?
+   * Android's loaders delegate parent-first (BaseDexClassLoader -> BootClassLoader), so such a name is always the device's class, whatever a DEX file of an APK defines under it.
+   * android.support.* was never on the boot class path, and org.apache.http and junit left it (optional libraries since API 28): an APK's own copies of those are its classes.
+   */
+  deviceProvidesClass(type) {
+    if (this.dex.bootClasses?.has(type)) return true;
+    if (!APKRuntime.isPlatformSpace(type) || /^L(?:android\/support|org\/apache\/http|junit)\//.test(type)) return false;
+    return !!(BRIDGE_OWNERS.has(type) || EXTERNAL_PARENTS.has(type) || EXTERNAL_INTERFACE_NAMES.has(type) || EXTERNAL_INTERFACES.has(type) || this.skiaHost?.parent?.(type) || this.platform?.parent?.(type) || this.platform?.fallbackParent?.(type));   // not constantFields: a table of an SDK class's constants is no implementation of it
+  }
+  /**
+   * Parent-first delegation for the classes the hosts implement: a definition the APK carries under the name of such a class is never loaded (the boot layer's DEX classes
+   * already win in DexProgram). Build tools emit these for library classes newer than the APK's minSdk, with an initializer that throws NoClassDefFoundError: on a device
+   * that has the class it must never run. A name the device lacks (a class of a newer API level) stays the APK's class.
+   */
+  shadowDeviceClasses() {
+    const apk = this.dex.classes, resolved = this.dex.resolvedClasses; if (!resolved || !apk || resolved === apk) return;
+    const shadowed = [];
+    for (const name of apk.keys()) if (APKRuntime.isPlatformSpace(name) && !this.dex.bootClasses.has(name) && resolved.dexOf(name) && this.deviceProvidesClass(name)) shadowed.push(name);
+    for (const name of shadowed) resolved.delete(name);
+    if (shadowed.length && this.dex.frameworkSummary) this.dex.frameworkSummary.shadowedAPKClasses = [...new Set([...this.dex.frameworkSummary.shadowedAPKClasses, ...shadowed])];
+  }
+  /** Superclass of `type` (DEX classes, then every host registry): memoised per class-graph epoch, since the lookup asks about thirty host registries and runs for every hashCode/equals/toString of a host object. */
+  parent(type) {
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    if (this.parentEpoch !== epoch) { this.parentEpoch = epoch; this.parentMemo = new Map(); this.overrideMemo = new Map(); this.externalMemo = new Map(); }
+    if (typeof type === 'string' && type.charCodeAt(0) === 91) return 'Ljava/lang/Object;';   // arrays: no memo entry per array type
+    let answer = this.parentMemo.get(type); if (answer === undefined) { answer = this.parentUncached(type); if (this.parentMemo.size < 200000) this.parentMemo.set(type, answer); }
+    return answer;
+  }
+  parentUncached(type) { return type?.startsWith('[') ? 'Ljava/lang/Object;' : (this.classes.superclassOf ? this.classes.superclassOf(type) : this.classes.get(type)?.superclass) ?? this.skiaHost?.parent?.(type) ?? this.platform?.parent?.(type) ?? EXTERNAL_PARENTS.get(type) ?? this.platform?.fallbackParent?.(type) ?? (type === 'Ljava/lang/Object;' || type.length === 1 ? null : 'Ljava/lang/Object;'); }   // every reference type reaches Object (a host class declared without a parent, e.g. Resources$Theme, still answers Object.hashCode/equals)
+  /** Whether `type` is an interface: a DEX interface, or a class without DEX code that some type names as its interface (EXTERNAL_INTERFACES; Class.isInterface answers the same). */
+  isInterfaceType(type) { return ((this.classes.get(type)?.flags ?? 0) & 0x200) !== 0 || EXTERNAL_INTERFACE_NAMES.has(type); }
+  /** The interfaces `type` declares: its DEX class's list, else what the host registries declare for it (memoised per class-graph epoch as parent() is: the registries are fixed
+   *  when the runtime is built, and asking every one of them was most of the subtype walks of a launch). Callers only read the list. */
+  interfaces(type) {
+    const declared = this.classes.interfacesOf ? this.classes.interfacesOf(type) : this.classes.get(type)?.interfaces; if (declared != null) return declared;
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    if (this.hostInterfacesEpoch !== epoch) { this.hostInterfacesEpoch = epoch; this.hostInterfacesMemo = new Map(); }
+    let answer = this.hostInterfacesMemo.get(type);
+    if (answer === undefined) { answer = [...new Set([...(EXTERNAL_INTERFACES.get(type) ?? []), ...(this.skiaHost?.interfaces?.(type) ?? []), ...(this.platform?.interfaces?.(type) ?? [])])]; if (this.hostInterfacesMemo.size < 200000) this.hostInterfacesMemo.set(type, answer); }
+    return answer;
+  }
   /** Memoized subtype test (the class graph only grows when more DEX files are loaded, which clears the memo). */
   isSubtype(child, ancestor) {
     const epoch = this.dex.dynamicFiles?.length ?? 0;
@@ -956,20 +1302,28 @@ export class APKRuntime {
   activities() { return [...this.dex.classes.keys()].filter(t => this.isSubtype(t, 'Landroid/app/Activity;')); }
   // Execution trace: the first 128 entries are kept forever and the most recent 384 in a ring (the former splice(128,1)-per-call kept exactly this
   // content but moved ~380 elements on every VM call). Entries may be strings or {method, origin} pairs, rendered to text only when `trace` is read.
-  record(line) {
-    if (this.traceMuted) return; // host plumbing that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
+  record(line, quiet = false) {
+    if (this.traceMuted) return; // host plumbing
+    if (this.logSink !== undefined && quiet !== true && typeof line === 'string' && line.charCodeAt(0) === 76 && line.startsWith('LOG ')) this.logSink(line);   // src/logcat.js: every log line is also a logcat entry
+    if (typeof line === 'object') { if (line.exempt === true) return; }
+    else { const frames = this.thread?.frames, method = frames?.length ? frames[frames.length - 1].method : null; if (method && this.hostTaskTrace !== true && (method.plumbing ??= LOOPER_PLUMBING.test(method.owner))) return; }   // a host call made by the pump's own Looper/MessageQueue/Handler code that must not evict APK-visible trace entries (e.g. building WindowInsets for the virtual system bars)
     const ring = this.traceRing ??= { head: [], tail: new Array(384), start: 0, length: 0 };
     if (ring.head.length < 128) { ring.head.push(line); return; }
     if (ring.length === 384) { ring.tail[ring.start] = line; ring.start = (ring.start + 1) % 384; this.traceDropped = (this.traceDropped ?? 0) + 1; return; }
     ring.tail[(ring.start + ring.length++) % 384] = line;
   }
+  /** The green thread running now (src/scheduler.js VMThread). Assigning another one tells `onThreadIdentity` (the WebAssembly core keeps what Thread.currentThread() answers). */
+  get thread() { return this.threadSlot; }
+  set thread(value) { if (value !== this.threadSlot) { this.threadSlot = value; if (this.onThreadIdentity !== null) this.onThreadIdentity(); } }
+  /** What Thread.currentThread() answers may have changed without a switch of `thread` (a host executor runs a task on behalf of a pool thread: src/concurrency-host.js). */
+  threadIdentityChanged() { if (this.onThreadIdentity !== null) this.onThreadIdentity(); }
   get trace() {
     const ring = this.traceRing; if (!ring) return [];
     const text = entry => typeof entry === 'string' ? entry : `DEX ${entry.method.key}${entry.origin === 'framework' ? ` [AOSP:${entry.method.dex.filename}]` : ''}`, out = ring.head.map(text);
     for (let i = 0; i < ring.length; i++) out.push(text(ring.tail[(ring.start + i) % 384]));
     return out;
   }
-  set trace(entries) { this.traceRing = null; for (const entry of entries) this.record(entry); }
+  set trace(entries) { this.traceRing = null; for (const entry of entries) this.record(entry, true); }
   methodOrigin(method) { return this.dex.bootDexes?.has(method.dex) ? 'framework' : 'apk'; }
   recordMethod(method) {
     // Per-method cache of the origin, its counter object, the evidence row and the (immutable) trace entry: this runs once per Java call.
@@ -981,29 +1335,53 @@ export class APKRuntime {
         if (this.methodEvidence.size < 8192) { evidence = { key: method.key, owner: method.owner, name: method.name, signature: method.signature, origin, filename: method.dex.filename, calls: 0 }; this.methodEvidence.set(evidenceKey, evidence); }
         else this.methodEvidenceTruncated = true;
       }
-      info = method.recordInfo = { origin, stats: this.executionByOrigin[origin], evidence, entry: { method, origin } };
+      const exempt = LOOPER_PLUMBING.test(method.owner);   // the original Looper/MessageQueue/Handler/Message code the pump runs around every message is plumbing: counted, but not part of the APK-visible trace
+      info = method.recordInfo = { origin, stats: this.executionByOrigin[origin], evidence, exempt, entry: { method, origin, exempt } };
     }
     info.stats.methods++;
     if (info.evidence !== undefined && info.evidence.calls < Number.MAX_SAFE_INTEGER) info.evidence.calls++;
     this.record(info.entry);
   }
   executionSnapshot() {
+    foldDirectCalls(this);
     return { framework: { ...(this.dex.frameworkSummary ?? { dexFiles: [], classes: 0, bytes: 0, shadowedAPKClasses: [], policy: 'no-boot-layer' }) },
-      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
+      missingVoid: [...this.missingVoid].map(([key, count]) => ({ key, count })), missingReturns: [...this.missingReturns].map(([key, count]) => ({ key, count })), missingClasses: [...this.missingClasses].map(([key, count]) => ({ key, count })), missingLibraries: [...this.missingLibraries].map(([key, count]) => ({ key, count })), executionByOrigin: { apk: { ...this.executionByOrigin.apk }, framework: { ...this.executionByOrigin.framework }, host: { ...this.executionByOrigin.host } }, callDepth: { limit: this.maxCallDepth, peak: this.peakCallDepth }, heapBudget: { oomCount: this.oomCount ?? 0, objects: this.heap.size, limit: this.maxHeapObjects, arrayCells: this.arrayCells, fieldSlots: this.fieldSlots, collectionCells: this.collectionCells, garbageCollection: !!this.gcEnabled, collections: this.gcStats?.collections ?? 0, freedObjects: this.gcStats?.freed ?? 0, peakLiveAfterCollection: this.gcStats?.peakLiveAfterGc ?? 0 }, instructionBudget: { limit: this.maxInstructionsPerEvent, currentEvent: this.steps }, unicodeCaseBackend: this.unicodeCaseBackend ?? null, deviceOptions: this.platform?.deviceOptionsSnapshot?.() ?? null, methodEvidenceSummary:{uniqueMethods:this.methodEvidence?.size??0,truncated:!!this.methodEvidenceTruncated} };
   }
   compactArguments(method, words, mode) {
     const staticCall = mode === 'static';
-    if (words.length !== wordCount(method.parameters) + (staticCall ? 0 : 1)) fail(`Invalid argument count: ${methodKey(method)}`);
+    const parameters = method.parameters; let count = parameters.wordCount; if (count === undefined) { count = wordCount(parameters); if (Object.isExtensible(parameters)) parameters.wordCount = count; }   // cached on the parameter list (shared by the copies of a reference): one reduce per list, not per call
+    if (words.length !== count + (staticCall ? 0 : 1)) fail(`Invalid argument count: ${methodKey(method)}`);
     const args = []; let position = 0;
     if (!staticCall) args.push(words[position++]);
     // A null reference is the register value 0 in bytecode; host code receives it as null (the same value Java's own `== null` sees), never as a number it must remember to test.
     for (const type of method.parameters) { const word = words[position]; args.push(word === 0 && type.length > 1 ? null : word); position += type === 'J' || type === 'D' ? 2 : 1; }
     return args;
   }
+  /** The record of a Java object for host code. Host code may write into what it gets (fields, array cells, its own host state), so an old record handed out here joins the touched list: the
+   *  next minor collection rescans it (heap-gc.js, "Young generation"). The interpreter and the compiled code use vmObject, with explicit write barriers on their stores. */
   object(value) {
-    if (value !== null && typeof value === 'object') { const record = this.heap.list[value.ref]; if (record !== undefined) return record; }
+    if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) { if (value.ref < this.gcOldBound) this.touch(record); return record; } }
+    return this.vmObject(value);
+  }
+  /** Write barrier: `record` (old) may now hold a reference to a young object; the next minor collection rescans it. */
+  remember(record) {
+    const id = record.id, ci = id >>> 12, bits = this.gcRemBits[ci] ?? (this.gcRemBits[ci] = new Uint8Array(4096)), i = id & 4095;
+    if (bits[i] === 0) { bits[i] = 1; this.gcRemList.push(id); }
+  }
+  /** An old record handed to host code, which may write into it (field, cell or host state) without a barrier: rescanned by every minor collection until host code is quiescent again. */
+  touch(record) {
+    const id = record.id, ci = id >>> 12, bits = this.gcTouchBits[ci] ?? (this.gcTouchBits[ci] = new Uint8Array(4096)), i = id & 4095;
+    if (bits[i] === 0) { bits[i] = 1; this.gcTouchList.push(id); }
+  }
+  /** object() without the remembered-set entry: for VM code that only reads the record or stores through a write barrier. */
+  vmObject(value) {
+    if (value !== null && typeof value === 'object') { const record = this.heap.get(value.ref); if (record !== undefined) return record; }
     if (isNull(value)) this.throwJava('Ljava/lang/NullPointerException;', 'null object reference');
-    fail('Null or invalid object reference');
+    const id = value !== null && typeof value === 'object' ? value.ref : value;
+    const dead = typeof id === 'number' ? freedBy(this, id) : null, collected = typeof id === 'number' && id > 0 && id < this.nextId;
+    const message = dead ? `Use of a collected object: #${id} of class ${String(dead.type).replace(/^L|;$/g, '').replaceAll('/', '.')} was freed by ${dead.minor ? 'minor ' : ''}collection ${dead.collection} (the last collection is ${this.gcStats?.collections ?? 0}): a root the collector did not see${dead.minor ? ' or a store into an old object that no write barrier recorded' : ''}`
+      : collected ? `Null or invalid object reference: #${id} was allocated (ids up to ${this.nextId - 1}) but is not on the heap now (freed by a collection older than the ${this.gcFreedRing?.length ?? 0} whose freed ids are kept, of ${this.gcStats?.collections ?? 0}, or released)` : `Null or invalid object reference: ${JSON.stringify(value)}`;
+    throw new APKError(message, { kind: 'invalid-object-reference', ref: id, collectedBy: dead?.collection ?? null, type: dead?.type ?? null, jsStack: `Error: ${message}\n` + String(new Error().stack ?? '').split('\n').slice(2, 12).join('\n'), vmContext: this.monitor?.context?.() ?? null });
   }
   /**
    * Class initialization (JLS 12.4.2). The nested form for host callers: it completes the interpreter-frame protocol of initStep() synchronously, waiting (and letting other
@@ -1012,7 +1390,8 @@ export class APKRuntime {
   initialize(type) {
     const state = this.initialized.get(type);
     if (state?.status === 'initialized') return;
-    for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step);
+    const tb = this.tb, previous = tb.enter(BUCKET.INIT);
+    try { for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step); } finally { tb.leave(previous); }
   }
   /**
    * Returns undefined when `type` is usable by the current thread now (initialized, or being initialized by this very thread), a Blocked(retry) while another thread
@@ -1081,13 +1460,13 @@ export class APKRuntime {
   initWait(type) { return new Blocked({ ready: () => this.initialized.get(type)?.status !== 'initializing', retry: true, reason: `class initialization of ${type}` }); }
   prepareStatics(cls, type) {
     for (const entry of cls.staticFields) {
-      const field = cls.dex.fields[entry.index]; this.storeField(this.staticFields, field.key, defaultValue(field.type));
+      const field = cls.dex.field(entry.index); this.storeField(this.staticFields, field.key, defaultValue(field.type));
     }
     if (cls.staticValuesOffset) {
       const cursor = { p: cls.staticValuesOffset }, count = cls.dex.reader.uleb(cursor);
       if (count > cls.staticFields.length) fail(`Invalid encoded static values in ${type}`);
       for (let i = 0; i < count; i++) {
-        const field = cls.dex.fields[cls.staticFields[i].index];
+        const field = cls.dex.field(cls.staticFields[i].index);
         this.staticFields.set(field.key, this.materialize(cls.dex.encodedValue(cursor), field.type));
       }
     }
@@ -1108,6 +1487,33 @@ export class APKRuntime {
       else if (this.initialized.get(t)?.status === 'initializing') this.initialized.delete(t);
     }
     return thrown;
+  }
+  /** The class path ART prints in "Didn't find class" messages: the app's base APK and native library directory (virtual filesystem). */
+  classPathText() {
+    let code = '/data/app/base'; try { code = this.platform.javaIo.fs().codePath ?? code; } catch { /* no filesystem model */ }
+    return `DexPathList[[zip file "${code}/base.apk"], nativeLibraryDirectories=[${code}/lib/wasm32, /system/lib64, /system_ext/lib64]]`;
+  }
+  /** A class outside the platform's own namespaces (androidx, third-party libraries, the app): when it is not in the APK it does not exist anywhere. Platform namespaces the lab may lack stay "unsupported". */
+  static isPlatformSpace(type) { return /^L(android|java|javax|dalvik|libcore|sun|jdk|com\/android|org\/(w3c|xml\/sax|json|apache\/http|apache\/harmony|ccil\/cowan)|junit)\//.test(type); }
+  /** ClassNotFoundException as the class loader raises it: Didn't find class "a.b.C" on path: DexPathList[...]. */
+  classNotFound(type) {
+    const name = type.replace(/^\[+/, '').replace(/^L(.*);$/, '$1').replaceAll('/', '.'), value = this.makeObject('Ljava/lang/ClassNotFoundException;'), obj = this.object(value);
+    obj.message = `Didn't find class "${name}" on path: ${this.classPathText()}`; obj.cause = null; obj.causeInitialized = true; obj.stack = this.captureStack();
+    return value;
+  }
+  /** NoClassDefFoundError: Failed resolution of: Lx/Y; caused by the ClassNotFoundException above -- what ART throws when bytecode names a class that cannot be resolved. */
+  throwNoClassDef(type) {
+    const cause = this.classNotFound(type), message = `Failed resolution of: ${type.replace(/^\[+/, '')}`, value = this.makeObject('Ljava/lang/NoClassDefFoundError;'), obj = this.object(value);
+    obj.message = message; obj.cause = cause; obj.causeInitialized = true; obj.stack = this.captureStack();
+    throw new JavaException(value, message);
+  }
+  /** Bytecode touches `type`: a class that cannot be resolved and is not in a platform namespace throws NoClassDefFoundError (catchable), whatever the tolerance mode. Platform classes the lab lacks keep their own errors. */
+  assertResolvable(type) {
+    if (this.classes.has(type) || typeof type !== 'string') return;
+    const component = type.replace(/^\[+/, ''); if (component.length === 1 || this.classes.has(component)) return;
+    const memo = this.resolvableMemo ??= new Set(); if (memo.has(component)) return;
+    if (APKRuntime.isPlatformSpace(component) || this.classResolvable(component)) { memo.add(component); return; }
+    this.throwNoClassDef(component);
   }
   throwErroneous(type, state) {
     const message = `Could not initialize class ${type.slice(1, -1).replaceAll('/', '.')}`;
@@ -1131,9 +1537,50 @@ export class APKRuntime {
     object.modCount=((object.modCount??0)+1)|0;
     if(this.isSubtype(object.type,'Ljava/util/AbstractList;'))this.storeField(object.fields,'Ljava/util/AbstractList;->modCount:I',object.modCount);
   }
+  /** Member.getAnnotationsByType (AnnotatedElements.getDirectOrIndirectAnnotationsByType over the member's declared annotations, @Repeatable containers unfolded). */
+  annotationsByType(definition, member, classArg) {
+    const target = classArg === null || classArg === 0 ? null : this.object(classArg).classType; if (!target) this.throwJava('Ljava/lang/NullPointerException;', 'annotationClass');
+    const annotations = definition.dex ? definition.dex.memberAnnotations(member) : [];
+    const repeatable = this.classAnnotations(target).find(marker => marker.type === 'Ljava/lang/annotation/Repeatable;');
+    const container = repeatable ? this.object(this.dispatch({ owner: 'Ljava/lang/annotation/Repeatable;', name: 'value', parameters: [], result: 'Ljava/lang/Class;', signature: '()Ljava/lang/Class;' }, [this.annotationObject(repeatable)], 'virtual'))?.classType ?? null : null;
+    const found = [];
+    for (const a of annotations) {
+      if (a.type === target) found.push(this.annotationObject(a));
+      else if (container && a.type === container) { const members = this.dispatch({ owner: container, name: 'value', parameters: [], result: `[${target}`, signature: `()[${target}` }, [this.annotationObject(a)], 'virtual'); if (members !== null && members !== 0) found.push(...this.object(members).elements); }
+    }
+    const value = this.newArray(`[${target}`, found.length); this.object(value).elements = found; return value;
+  }
   storeField(storage, key, value) {
-    if (!storage.has(key) && ++this.fieldSlots > 1000000) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    if (!storage.has(key) && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('fields'), !storage.has(key) && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
     storage.set(key, value);
+    const record = storage.record;   // a FieldMap (an object's fields; staticFields are roots)
+    if (record !== undefined && record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
+  }
+  /** The first store into slot `slot` (of the field `key`) of an object record: the field-storage budget of storeField, then the slot. A record without that slot (an array) goes through
+   *  storeField, which refuses it. The interpreter and the compiled code store into an already-stored slot directly. */
+  storeSlot(record, slot, key, value) {
+    const slots = record.slots;
+    if (!(slot < slots.length)) { this.storeField(record.fields, key, value); return; }
+    if (slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots && (this.fieldSlots--, this.emergencyCollect('fields'), slots[slot] === undefined && ++this.fieldSlots > this.maxFieldSlots)) { this.fieldSlots--; this.outOfMemory('Object/static field storage limit exceeded'); }
+    slots[slot] = value;
+    if (record.id < this.gcOldBound && value !== null && typeof value === 'object' && !(value.ref < this.gcOldBound)) this.remember(record);   // write barrier
+  }
+  /** The field layout of instances of `type` (src/object-shapes.js): the superclass's shape followed by the instance fields the class declares. Classes without own instance fields share
+   *  their superclass's shape. Memoized per class-graph epoch; a layout never changes, so a shape rebuilt after a new DEX file has the same slots. */
+  shapeOf(type) {
+    const epoch = this.dex.dynamicFiles?.length ?? 0;
+    let shapes = this.shapeMemo; if (shapes === undefined || this.shapeEpoch !== epoch) { shapes = this.shapeMemo = new Map(); this.shapeEpoch = epoch; }
+    const shape = shapes.get(type); return shape !== undefined ? shape : this.buildShape(type, 0);
+  }
+  buildShape(type, depth) {
+    const memo = this.shapeMemo.get(type); if (memo !== undefined) return memo;
+    let parent = EMPTY_SHAPE;
+    if (typeof type === 'string' && type !== 'Ljava/lang/Object;' && depth < 256) { const up = this.parent(type); if (typeof up === 'string' && up !== type) parent = this.buildShape(up, depth + 1); }
+    const cls = typeof type === 'string' && this.classes.has(type) ? this.classes.get(type) : undefined, own = [];
+    if (cls?.fields?.length) for (const entry of cls.fields) own.push(cls.dex.field(entry.index).key);
+    const shape = own.length === 0 ? parent : new Shape(parent, own);
+    if (shape !== EMPTY_SHAPE) shape.owner = this;   // FieldMap.set's write barrier reaches the runtime through the shape
+    this.shapeMemo.set(type, shape); return shape;
   }
   resolveField(field) {
     const epoch = this.dex.dynamicFiles?.length ?? 0, cached = field.resolvedField;
@@ -1149,7 +1596,7 @@ export class APKRuntime {
     const declaredIn = owner => {
       const cls = this.classes.get(owner); if (!cls) return undefined;
       let index = cls.fieldIndex;
-      if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.fields[entry.index]; const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
+      if (index === undefined) { index = cls.fieldIndex = new Map(); for (const entry of [...cls.fields, ...cls.staticFields]) { const declared = cls.dex.field(entry.index); const key = declared.name + ':' + declared.type; if (!index.has(key)) index.set(key, declared); } }
       return index.get(field.ntKey ??= field.name + ':' + field.type);
     };
     const inInterfaces = (owner, depth = 0) => {
@@ -1168,6 +1615,7 @@ export class APKRuntime {
     return field;
   }
   readStatic(reference) {
+    this.assertResolvable(reference.owner);
     const field = this.resolveField(reference); this.initialize(field.owner);
     if (this.staticFields.has(field.key)) return this.staticFields.get(field.key);
     const skiaValue=this.skiaHost?.readStatic?.(this,field);if(skiaValue?.handled)return skiaValue.value;
@@ -1205,9 +1653,11 @@ export class APKRuntime {
     }
     const constant = constantField(field.owner, field.name);
     if (constant && constant.type === field.type) return constant.value;   // SDK compile-time constant read through reflection
+    { const hidden = hiddenStatic(this, field); if (hidden.handled) return hidden.value; }   // tabled member of a host-modelled class (src/hidden-members.js)
     fail(`Unsupported external static field: ${field.key}`);
   }
   writeStatic(reference, value) {
+    this.assertResolvable(reference.owner);
     const field = this.resolveField(reference); this.initialize(field.owner);
     if (!this.classes.has(field.owner) || !this.staticFields.has(field.key)) fail(`Unresolved static field: ${field.key}`);
     this.staticFields.set(field.key, value);
@@ -1235,12 +1685,13 @@ export class APKRuntime {
     const count = b.u32(annotations); b.table(count, annotations + 4, 4);
     for (let i = 0; i < count; i++) {
       const cursor = { p: b.u32(annotations + 4 + i * 4) + 1 }, annotationType = cls.dex.types[b.uleb(cursor)];
-      if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;'].includes(annotationType)) continue;
+      if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;', 'Ldalvik/annotation/MemberClasses;'].includes(annotationType)) continue;
       const size = b.uleb(cursor); if (size > 32) fail('Malformed class nesting annotation');
       const attributes = new Map();
-      for (let j = 0; j < size; j++) attributes.set(cls.dex.strings[b.uleb(cursor)], cls.dex.encodedValue(cursor));
+      for (let j = 0; j < size; j++) attributes.set(cls.dex.string(b.uleb(cursor)), cls.dex.encodedValue(cursor));
       if (annotationType.endsWith('/InnerClass;')) { info.inner = true; info.simpleName = attributes.get('name'); info.modifiers = attributes.get('accessFlags'); }
       if (annotationType.endsWith('/EnclosingClass;')) info.declaringClass = attributes.get('value')?.value;
+      if (annotationType.endsWith('/MemberClasses;')) info.members = (attributes.get('value')?.values ?? []).map(entry => entry.value).filter(value => typeof value === 'string');
       if (annotationType.endsWith('/EnclosingMethod;')) { info.enclosingMethod = attributes.get('value')?.value; info.enclosingClass = info.enclosingMethod?.owner; }
     }
     return info;
@@ -1255,36 +1706,89 @@ export class APKRuntime {
     }
     if (kind === 'binary') return dottedName(type);
     const info = this.classNesting(type);
+    if (kind === 'simple' && !info.inner && !this.classes.has(type)) { const bare = dottedName(type).split('.').pop(), dollar = bare.lastIndexOf('$'); if (dollar >= 0) { const tail = bare.slice(dollar + 1); return /^\d+$/.test(tail) ? '' : tail; } return bare; }   // a host-modelled nested class: the part after the last $
     if (kind === 'simple') return info.inner ? info.simpleName ?? '' : dottedName(type).split('.').pop();
     if (info.enclosingMethod || (info.inner && info.simpleName === null)) return null;
     if (info.declaringClass) { const outer = this.className(info.declaringClass, 'canonical', depth + 1); return outer === null ? null : outer + '.' + info.simpleName; }
     return dottedName(type);
   }
-  typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.object(value).type; }
-  makeObject(type) {
-    if (this.heap.size >= this.maxHeapObjects) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
+  typeOf(value) { return typeof value === 'string' ? 'Ljava/lang/String;' : this.vmObject(value).type; }
+  /** The object-limit check (after an emergency collection when the limit is reached), the next id and the allocation-driven collection trigger shared by every heap allocation. */
+  allocateId(type) {
+    if (this.heap.size >= this.maxHeapObjects && !(this.emergencyCollect('objects') && this.heap.size < this.maxHeapObjects) && !this.oomHeadroom()) this.outOfMemory(`Object limit (${this.maxHeapObjects}) exceeded`);
+    if (ABSTRACT_GUARD && !this.bytecodeAlloc) this.assertConcreteHostType(type);
     const id = this.nextId++;
-    this.heap.set(id, { id, type, fields: new Map(), text: '', orientation: 0, textSize: 20, children: [], listener: null });
+    if ((id & 511) === 0) { this.sampleAllocation(); if (this.gcEnabled && this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null) { this.q = 0; this.dlimit = 0; } }   // allocation-driven: the next back-edge or call reaches the safepoint instead of waiting out the quantum (a loop that allocates 5 objects per iteration filled the heap inside one)
+    return id;
+  }
+  makeObject(type) {
+    if (type.charCodeAt(0) === 91) return this.newArray(type, 0);   // an array made as a bare object (host code then assigns its elements) is still an array record
+    const id = this.allocateId(type);
+    this.heap.set(id, new ObjectRecord(id, type, this.shapeOf(type)));
+    if (!this.bytecodeAlloc) this.hostAllocs.push(id);   // allocated by host code (a native, the platform): its JavaScript locals may hold it where no Java frame does -- see hostAllocs in heap-gc.js
     return ref(id);
   }
-  newArray(type, length) {
+  /** Roots for a host task whose closure may capture Java values nobody annotated: the references in the enqueuing frame's registers plus the last host allocations (what the native just created for it).
+   *  Never the whole heap. The collector keeps them alive until the task has run. */
+  conservativeTaskRoots() {
+    const out = [], regs = this.thread?.frames?.at(-1)?.regs;
+    if (regs) for (const value of regs) if (value !== null && typeof value === 'object' && typeof value.ref === 'number' && out.length < 256) out.push(value);
+    for (let i = Math.max(0, this.hostAllocs.length - 64); i < this.hostAllocs.length; i++) out.push(ref(this.hostAllocs[i]));
+    return out;
+  }
+  /** Test guard (APKWEB_GUARD_ABSTRACT=1): host code must never create an object whose runtime type is an interface or an abstract class -- such an object has no code for most of its API and every call on it fails
+   *  as "abstract/missing-code". Every view, iterator or wrapper the host makes gets a concrete class. */
+  assertConcreteHostType(type) {
+    if (typeof type !== 'string' || type[0] !== 'L') return;
+    const flags = this.classes.get(type)?.flags ?? 0;
+    if (flags & 0x2000) return;   // an annotation instance is a proxy of the annotation interface
+    if ((flags & (0x200 | 0x400)) || EXTERNAL_INTERFACE_NAMES.has(type) || ABSTRACT_HOST_TYPES.has(type)) fail(`Host code allocated an object of the interface/abstract type ${type}`);
+  }
+  /** One allocation in 512 records the executing method and its caller (since the last collection): the allocation-site hint of the heap census. */
+  sampleAllocation() {
+    const frames = this.thread?.frames, samples = this.allocationSamples ??= new Map();
+    const name = method => (method ? `${method.owner.replace(/^L|;$/g, '').replaceAll('/', '.')}.${method.name}` : null);
+    const top = frames?.length ? name(frames[frames.length - 1].method) : null, caller = frames?.length > 1 ? name(frames[frames.length - 2].method) : null;
+    const site = top ? (caller ? `${top} <- ${caller}` : top) : 'host code (no Java method running)';
+    if (samples.size < 2000 || samples.has(site)) samples.set(site, (samples.get(site) ?? 0) + 1);
+  }
+  newArray(type, length, cells = null) {
     length = int(length);
     if (length < 0) this.throwJava('Ljava/lang/NegativeArraySizeException;', `negative array length ${length}`);
-    if (!type.startsWith('[') || length > 1000000 || this.arrayCells + length > 4000000) fail('Invalid/excessive array allocation');
-    this.arrayCells += length;
-    const array = this.makeObject(type); this.object(array).elements = new Array(length).fill(defaultValue(type.slice(1))); return array;
+    if (!type.startsWith('[')) fail('Invalid/excessive array allocation');
+    const weighted = cellsOf(type, length);   // weighted by element width (heap-gc.js cellsOf): the one place that charges; the collector's recount uses it too
+    if (length <= 16777216 && this.arrayCells + weighted > this.maxArrayCells) this.emergencyCollect('array cells');   // the collection recounts the cell counters
+    if (length > 16777216 || this.arrayCells + weighted > this.maxArrayCells) this.outOfMemory(length > 16777216 ? `Array of ${length} elements exceeds the array size limit` : `Array storage limit (${this.maxArrayCells} cells) exceeded: ${type} of ${length} elements (${weighted} cells) requested with ${this.arrayCells} in use`);
+    const id = this.allocateId(type); this.arrayCells += weighted;   // after allocateId: an object-limit OutOfMemoryError there must not leave cells counted for an array that never existed
+    this.heap.set(id, new ArrayRecord(id, type, cells ?? newCells(type, length)));
+    if (!this.bytecodeAlloc) this.hostAllocs.push(id);
+    // The collector is paced by the object count, so garbage arrays (a big buffer built and dropped again and again) hold their cells until a collection that nothing else would ask for:
+    // past half of the cell budget, ask for one at the next safepoint / event boundary (heap-gc.js collectionDue honours cellPressure).
+    if (this.arrayCells > this.maxArrayCells >> 1 && this.gcEnabled) { this.gcPressure = true; this.gcCellPressure = true; }
+    return ref(id);
   }
-  array(value, index) {
-    const obj = this.object(value);
-    if (!obj.elements) fail('Expected array reference');
-    if (index !== undefined && (index < 0 || index >= obj.elements.length)) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `array index ${index} outside length ${obj.elements.length}`);
+  /** A new Java array of `type` holding a copy of `values` (a typed array, bit-exact when of the same element width, or a plain array; a reference array adopts a plain array). */
+  arrayOf(type, values) {
+    if (type.length === 2) { const cells = newCells(type, values.length); copyCells(cells, values); return this.newArray(type, values.length, cells); }
+    return this.newArray(type, values.length, Array.isArray(values) ? values : Array.from(values));
+  }
+  /** The storage of a Java array: a typed array for a primitive array (java-arrays.js), an Array of references otherwise. Fails like array() on null or a non-array. */
+  elementsOf(value) { return this.array(value).cells; }
+  /** The bytes of a byte[] (or boolean[]) as an unsigned view over its storage, no copy; `from`/`to` bound the range (unchecked: the caller validated them as the Java API requires). */
+  bytesOf(value, from, to) { const array = this.array(value); if (array.type !== '[B' && array.type !== '[Z') fail(`Expected a byte[] (got ${array.type})`); return unsignedBytes(array.cells, from, to); }
+  array(value, index) { return this.checkedArray(this.object(value), index); }
+  /** array() for VM code (no remembered-set entry: the interpreter and the compiled code store through a write barrier). */
+  vmArray(value, index) { return this.checkedArray(this.vmObject(value), index); }
+  checkedArray(obj, index) {
+    if (obj.cells === undefined) fail('Expected array reference');
+    if (index !== undefined && (index < 0 || index >= obj.cells.length)) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `array index ${index} outside length ${obj.cells.length}`);
     return obj;
   }
   nativeArrayHandle(value) {
     const array = this.array(value);
     if (array.opaqueNativeHandle === undefined) {
       // The handle is the address of array[0]; the range covers the array's whole byte image so address arithmetic (Memory.peek*, Unsafe) stays inside it.
-      const bytes = array.elements.length * ({ '[Z': 1, '[B': 1, '[C': 2, '[S': 2, '[I': 4, '[F': 4, '[J': 8, '[D': 8 }[array.type] ?? 4);
+      const bytes = array.cells.length * (ELEMENT_BYTES[array.type[1]] ?? 4);
       array.opaqueNativeHandle = this.nextNativeArrayHandle; this.nextNativeArrayHandle += BigInt(((bytes + 15) & ~15) + 16);
       this.nativeArrays.set(array.opaqueNativeHandle, value); this.nativeRanges.push({ base: array.opaqueNativeHandle, end: array.opaqueNativeHandle + BigInt(bytes), value });
     }
@@ -1309,10 +1813,11 @@ export class APKRuntime {
       && type!=='Ljava/lang/StringBuffer;'
       && !Object.values(BOX_TYPES).includes(type)
       && !/^Ljava\/util\/concurrent\/atomic\/Atomic(Reference|Integer|Long|Boolean|ReferenceArray);$/.test(type)
-      && !/^Ljava\/util\/(HashMap|WeakHashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
+      && !/^Ljava\/util\/(HashMap|LinkedHashMap|ArrayList|Vector|Stack);$/.test(type)
       && !/^Ljava\/lang\/ref\/(WeakReference|SoftReference);$/.test(type)
       && !SET_TYPES.some(owner => type === `L${owner};`)
-      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/concurrent/ConcurrentHashMap;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;', 'Landroid/os/Handler;'].includes(type)
+      && !['Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/lang/ThreadLocal;', 'Ljava/lang/InheritableThreadLocal;', 'Ljava/util/Random;'].includes(type)
+      && type !== 'Llibcore/util/NativeAllocationRegistry;'   // `new NativeAllocationRegistry(loader, finalizer, size)`: its constructor is bridged per native finalizer (an unknown one fails by name)
       && !this.skiaHost?.canAllocate?.(type) && !this.platform?.canAllocate?.(type)
       && !this.isSubtype(type, 'Ljava/lang/Throwable;'));
   }
@@ -1320,7 +1825,8 @@ export class APKRuntime {
     if (this.allocatable(type) === false) {
       // Tolerant mode 'all': a platform class the lab lacks becomes an opaque object whose every call is a traced stub.
       const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' });
-      if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type}`);
+      if (!APKRuntime.isPlatformSpace(type)) this.throwNoClassDef(type);   // not a platform class: it does not exist, tolerance never stubs it
+      if (this.tolerateMissing !== 'all') fail(`Unsupported allocation: ${type} (a platform class the lab lacks; searched ${this.dex.files?.length ?? '?'} DEX file(s)${(this.dex.files ?? []).slice(0, 6).map(f => ' ' + (f.filename ?? '?')).join(',')} and the framework tables: framework DEX, host contract registries, bridge owners, platform allocatable classes)`);
       const count = (this.missingClasses.get(type) ?? 0) + 1; this.missingClasses.set(type, count);
       if (count === 1) this.record(`STUB-CLASS ${type}`);
     }
@@ -1337,11 +1843,17 @@ export class APKRuntime {
     if(this.dex.bootClasses?.has(graphics))this.dispatch({owner:graphics,name:'setTargetSdkVersion',parameters:['I'],result:'V',signature:'(I)V'},[target],'static');
     this.frameworkRuntimeConfigured=true;
   }
-  launch(activity) {
+  launch(activity, options = {}) {
+    this.platform?.looperHost?.hostEventRan(this);   // a launch is a message of the main Looper in Android: the thread is back in MessageQueue.next() afterwards (IdleHandlers)
+    const savedSafeDepth = this.gcSafeDepth; this.gcSafeDepth = 1;   // onCreate/onStart/onResume run as one long event: collect at its safepoints (the JavaScript callers hold only the Activity and rooted frames)
+    try { return this.launchActivity(activity, options); } finally { this.gcSafeDepth = savedSafeDepth; }
+  }
+  launchActivity(activity, { intent = null } = {}) {   // `intent`: the Intent the launcher Activity receives (a deep link) instead of the default one
     if (this.activity) fail('Activity already launched; load the APK again to restart');
     if (this.unsupportedFeatures.length) fail(`Unsupported APK: ${this.unsupportedFeatures.join('; ')}`);
-    const candidates = this.activities();
-    const selected = activity || this.launcherActivity || (candidates.length === 1 ? candidates[0] : null);
+    // the sole Activity of the APK only when neither the caller nor the manifest names one: finding it tests every class of the APK (38 000 subtype walks on a large app)
+    const sole = () => { const candidates = this.activities(); return candidates.length === 1 ? candidates[0] : null; };
+    const selected = activity || this.launcherActivity || sole();
     if (!selected) fail('Choose an Activity explicitly; no unique launcher was found');
     const type = descriptor(selected);
     if (!this.classes.has(type) || !this.isSubtype(type, 'Landroid/app/Activity;')) fail(`Activity absent or not supported: ${type}`);
@@ -1349,6 +1861,7 @@ export class APKRuntime {
     this.configureFrameworkRuntime();
     if(this.dex.bootClasses?.has('Lsun/misc/VM;'))this.dispatch({owner:'Lsun/misc/VM;',name:'booted',parameters:[],result:'V',signature:'()V'},[],'static');
     this.platform?.beforeLaunch?.(this);
+    if (this.platform) this.platform.launchIntent = intent;
     this.activityType = type; this.activity = this.allocate(type);
     const launchedActivity = this.activity;
     this.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [launchedActivity], 'direct');
@@ -1356,27 +1869,47 @@ export class APKRuntime {
     const create = () => this.dispatch({ owner: type, name: 'onCreate', signature: '(Landroid/os/Bundle;)V', parameters: ['Landroid/os/Bundle;'], result: 'V' }, [launchedActivity, null], 'virtual');
     if (this.platform?.performLifecycle) this.platform.performLifecycle(this, launchedActivity, 'onCreate', [null], create); else create();
     this.platform?.afterActivityCreate?.(this, launchedActivity);
-    if (!this.root && !this.platform?.taskClosed) fail('Activity did not call setContentView');
+    if (!this.root && !this.platform?.taskClosed && !this.platform?.launchPending?.()) fail('Activity did not call setContentView');   // a splash without content that started the next screen is fine
     return this.snapshot();
   }
   click(id) {
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
     const view = this.object(ref(id));
     if (view.enabled === false) fail('Cannot click a disabled View');
     this.steps = 0;
     if (this.platform?.performClick?.(this, ref(id)) === true) { this.clicks++; return this.snapshot(); }
-    if (!view.listener) fail('View has no OnClickListener');
+    if (!view.listener) {
+      // A tap is View.performClick(), which a class may override without any OnClickListener (the Toolbar's overflow button opens its menu there; custom Views do the same).
+      let overridden = false; for (let type = view.type, depth = 0; type && depth < 64 && type !== 'Landroid/view/View;'; type = this.parent(type), depth++) if (this.classes.get(type)?.methods.has('performClick()Z')) { overridden = true; break; }
+      if (!overridden) fail('View has no OnClickListener');
+      this.dispatch({ owner: 'Landroid/view/View;', name: 'performClick', signature: '()Z', parameters: [], result: 'Z' }, [ref(id)], 'virtual');
+      this.clicks++;
+      return this.snapshot();
+    }
     const target = this.object(view.listener);
     this.dispatch({ owner: target.type, name: 'onClick', signature: '(Landroid/view/View;)V', parameters: ['Landroid/view/View;'], result: 'V' }, [view.listener, ref(id)], 'virtual');
     this.clicks++;
     return this.snapshot();
   }
+  /** "Recarregar Activity": the current Activity is recreated like Activity.recreate() (src/android-platform.js reloadActivity); the queued relaunch runs with the next drain. */
+  reloadActivity({ mode = 'recreate' } = {}) {
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
+    if (!this.platform?.reloadActivity) fail('Activity reload is not implemented for this runtime');
+    this.steps = 0; this.platform.reloadActivity(this, { mode }); return this.snapshot();
+  }
   back() {
+    this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.();
     if (!this.platform?.back) fail('Back navigation is not implemented for this runtime');
     this.steps = 0; this.platform.back(this); return this.snapshot();
   }
+  /** Home / recents: the task leaves the screen (onUserLeaveHint, onPause, onStop) and stays alive in the background. */
+  home() { this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.(); this.steps = 0; this.platform.goHome(this); return this.snapshot(); }
+  /** The user picks the task again (launcher icon, recents card): onRestart, onStart, onResume. */
+  resumeTask() { this.platform?.looperHost?.hostEventRan(this); this.platform?.noteInput?.(); this.steps = 0; this.platform.resumeTask(this); return this.snapshot(); }
   snapshot() {
-    const navigation = this.platform?.navigationState?.(this) ?? {};
+    const navigation = this.platform?.navigationState?.(this) ?? {}; navigation.taskInBackground = !!this.platform?.taskInBackground;
     if (this.platform?.taskClosed) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: true, canGoBack: false, navigation, ...this.executionSnapshot() };
+    if (!this.root && this.platform?.launchPending?.()) return { activityName: null, views: [], texts: [], counters: {}, trace: [...this.trace], clicks: this.clicks, closed: false, canGoBack: false, navigation, ...this.executionSnapshot() };   // between a content-less caller and the Activity it queued
     if (!this.root) fail('No content view');
     const seen = new Set(), texts = [];
     const build = (value, depth = 0) => {
@@ -1394,7 +1927,7 @@ export class APKRuntime {
       if (!kind) fail(`Unsupported renderer view: ${v.type}`);
       if (['text', 'button', 'input', 'check'].includes(kind)) texts.push(v.text);
       return { id: v.id, type: v.type, kind, text: v.text, orientation: v.orientation === 1 ? 'vertical' : 'horizontal',
-        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, androidId: v.androidId ?? null, enabled: v.enabled !== false,
+        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;') ? { touchInput: true } : {}) /* an original list: the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
         padding: v.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }, layoutWidth: v.layoutWidth ?? null,
         clipChildren: v.clipChildren !== false, clipToPadding: v.clipToPadding !== false,
         layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? null,
@@ -1407,17 +1940,24 @@ export class APKRuntime {
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
         drawableSVG: v.drawableSVG ?? null,
         webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
+        cameraSurface: this.platform?.camera?.nodeState?.(this, v),
+        glSurface: this.platform?.gles?.nodeState?.(this, v),   // a SurfaceView an EGL window surface draws into (src/gles-native.js): the page draws its frames in the box   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
         foregroundSVG: v.foregroundSVG ?? null,
         foregroundBounds: v.foregroundBounds ?? null,
-        contentRaster: v.contentRaster ?? null, canvasChildrenCaptured: !!v.canvasChildrenCaptured,
+        contentRaster: v.contentRaster ? { ...v.contentRaster } : null,   // a copy: the transport (src/raster-cache.js) rewrites the raster object of the message, not the View's
+         canvasChildrenCaptured: !!v.canvasChildrenCaptured,
+        textInContent: !!(v.contentRaster && v.nativeCanvasText),   // the View drew its own text on the Canvas that became contentRaster (a TextView/EditText subclass with its own onDraw): the page must not draw the text again
         transformMatrix: this.platform?.viewTransformHost?.snapshot(this, value) ?? null,
         shadow: this.platform?.viewTransformHost?.shadow?.(this, value) ?? null,
         contentDescription: v.contentDescription ?? null,
         focused: !!v.focused, displayText: v.displayText ?? v.text,
         textFontWeight: v.textFontWeight ?? null, textFontItalic: !!v.textFontItalic,
+        textCss: kind === 'input' || kind === 'check' ? this.platform?.textViewApi?.pageTextStyle?.(this, value) ?? null : null,   // the letter spacing, shadow layer and font features of an EditText or a compound button's label, for the page's own element
         bounds: v.bounds ?? null, laidOut: !!v.laidOut, textLineHeight: v.textLineHeight ?? null, textMetrics: v.textMetrics ?? null, textRaster: v.textRaster ?? null, textParagraph: v.textParagraph ?? null,
-        children: v.children.map(child => build(child, depth + 1)) };
+        // after the children: a group's disappearing children (removed, still animated) and the Views of the View's overlay (View.getOverlay(): the list fast scroller's
+        // thumb, track and preview), in the View's coordinates
+        children: (v.overlay || v.vg?.disappearing?.length ? [...v.children, ...(this.platform?.extraChildren?.(this, value) ?? [])] : v.children).map(child => build(child, depth + 1)) };
     };
     const roots = this.platform?.viewRoots?.(this) ?? [{ root: this.root, window: null }];
     const views = roots.map(({root, window, windowBackground}) => ({ ...build(root), ...(window ? { windowSurface: window } : {}), ...(windowBackground ? { windowBackground } : {}) })), counters = Object.create(null), activity = this.object(this.activity), seenClasses = new Set();
@@ -1425,38 +1965,214 @@ export class APKRuntime {
     while (owner && !seenClasses.has(owner)) {
       seenClasses.add(owner); const cls = this.classes.get(owner);
       if (cls) for (const entry of cls.fields) {
-        const field = cls.dex.fields[entry.index]; if (field.type !== 'I') continue;
+        const field = cls.dex.field(entry.index); if (field.type !== 'I') continue;
         const key = Object.hasOwn(counters, field.name) ? `${dottedName(field.owner)}.${field.name}` : field.name;
         counters[key] = activity.fields.get(field.key) ?? 0;
       }
       owner = this.parent(owner);
     }
-    return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, activityName: dottedName(this.activityType), views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
+    return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, actionModes: this.platform?.actionModes?.snapshot?.(this) ?? [], activityName: dottedName(this.activityType), views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
+  }
+  /**
+   * The end of a host call: its host allocations stop being roots. The most recent 8192 of them stay protected in a ring anyway (a platform closure queued by the call -- a listener delivery, a
+   * posted task -- may capture a value the call just made and run a moment later); beyond that, a host closure that must outlive its call has to declare what it holds.
+   */
+  releaseHostAllocs(mark) {
+    const list = this.hostAllocs, ring = this.hostGrace;
+    for (let i = Math.max(mark, list.length - 8192); i < list.length; i++) ring[this.hostGraceAt++ & 8191] = list[i];
+    list.length = mark;
   }
   dispatch(method, args, mode, callerOwner = null, wantFrame = false) {
+    if (wantFrame) {
+      // A call from an interpreter call site: whatever the native allocated is either returned (and lands in a register, a real root, right away), kept by a Java frame or a continuation, or
+      // garbage. The host-allocation set protects values that JavaScript locals hold *while a host native is in flight*; it is scoped to this call, so a long nested wait elsewhere (a main
+      // thread parked in a native) cannot make every boxed Long and String result of the other threads immortal. Entries of natives further out stay below `mark`.
+      const mark = this.hostAllocs.length; let keep = false;
+      try { const outcome = this.dispatchCore(method, args, mode, callerOwner, true); keep = outcome instanceof Blocked || outcome instanceof Invoke; return outcome; }
+      finally { if (!keep && this.hostAllocs.length > mark) this.releaseHostAllocs(mark); }
+    }
     const outcome = this.dispatchCore(method, args, mode, callerOwner, wantFrame);
-    if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) return outcome;
+    if (wantFrame || (!(outcome instanceof Blocked) && !(outcome instanceof Invoke))) { if (!wantFrame && outcome !== null && typeof outcome === 'object' && typeof outcome.ref === 'number') this.hostAllocs.push(outcome.ref); return outcome; }   // a result handed to host code may sit in a JavaScript local while the next call runs
     // A blocking or call-back native reached through host code (not an interpreter call site) cannot park its thread or push frames: finish it inside the scheduler.
-    return this.finishHostStep(outcome);
+    const finished = this.finishHostStep(outcome);
+    if (finished !== null && typeof finished === 'object' && typeof finished.ref === 'number') this.hostAllocs.push(finished.ref);
+    return finished;
   }
   /** Heap-pressure collection at a thread-switch safepoint of a scheduling run (no host native is in flight there; see heap-gc.js). A no-op unless collection is enabled and the heap passed half its limit. */
   /** Called every scheduling quantum by the interpreter: records the peak budget use of one thread and enforces the wall-clock limit of an event. */
   /** Throws the instruction-budget / wall-clock failure with the execution profile of the event (src/execution-profile.js): the message names the busiest methods, `details.profile.text` is the full section of the diagnostic report. */
+  /**
+   * Runs read-only diagnostic code (the screen-state report asks Java for Compose semantics) with a fresh budget: the operation that is being diagnosed has usually just exhausted its own,
+   * and the report must still be built. The instruction counters and the event wall clock are saved and restored, no app thread is scheduled, and any error returns `fallback` (with the
+   * message in `onError`) instead of propagating, so a report always carries what could be read.
+   */
+  runDiagnostic(fn, fallback = null, onError = null) {
+    const scheduler = this.scheduler, saved = { steps: this.steps, wall: this.maxEventWallMs, eventWallStart: this.eventWallStart, total: scheduler?.eventTotal, last: scheduler?.lastSteps };
+    this.steps = 0; this.maxEventWallMs = 0; if (scheduler) { scheduler.eventTotal = 0; scheduler.lastSteps = 0; }
+    this.diagnosticDepth = (this.diagnosticDepth ?? 0) + 1;
+    try { return fn(); } catch (error) { onError?.(error); return fallback; } finally {
+      this.diagnosticDepth--;
+      this.steps = saved.steps; this.maxEventWallMs = saved.wall; this.eventWallStart = saved.eventWallStart; if (scheduler) { scheduler.eventTotal = saved.total; scheduler.lastSteps = saved.last; }
+    }
+  }
   budgetExceeded(message, details = {}) {
     const profile = this.profile.report(), summary = this.profile.summary();
     throw new APKError(message + summary, { kind: 'instruction-budget', ...details, profile });
   }
+  /** An exception reached a catch block of app/framework code: counted by class and message (the first distinct ones are kept) for "Screen state", since libraries often swallow them. */
+  /** An exception reached Thread.dispatchUncaughtException (whether the thread's handler swallows it or not): the last one per thread, with class, message, cause and the top of its stack. */
+  /** Class, message, cause and the top frames of a throwable, as plain text for the reports. */
+  describeThrowable(value) {
+    const name = type => String(type).replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
+    try {
+      const object = this.object(value);
+      const text = o => { let m = o.message; if (m === undefined || m === null) for (const [key, field] of o.fields ?? []) if (key.endsWith('->detailMessage:Ljava/lang/String;')) { m = field; break; } return typeof m === 'string' ? m.slice(0, 240) : (m && typeof m === 'object' && m.ref !== undefined ? (() => { try { return this.stringCharacters(m).slice(0, 240); } catch { return ''; } })() : ''); };
+      const stack = (Array.isArray(object.stack) ? object.stack : []).slice(0, 10).map(method => `${name(method.owner)}.${method.name}`);
+      let cause = null; try { if (object.cause && object.cause.ref !== undefined && object.cause.ref !== value.ref) { const c = this.object(object.cause); cause = `${name(this.typeOf(object.cause))}: ${text(c)}`; } } catch { /* no cause */ }
+      return { type: name(this.typeOf(value)), message: text(object), stack, cause };
+    } catch { return { type: '?', message: '', stack: [], cause: null }; }
+  }
+  /** An exception reached Thread.dispatchUncaughtException or a ThreadGroup/default handler (whether the handler swallows it or not): the last one per thread, recorded BEFORE any handler runs. */
+  noteUncaught(threadName, value) {
+    const table = this.uncaughtExceptions ??= new Map(), key = String(threadName), previous = table.get(key);
+    if (previous && value && (previous.ref === value.ref || previous.handlerFailure?.ref === value.ref)) return;   // the same throwable reaching a second dispatch point, or the failure of the handler that was just recorded as such   // the same throwable reaching a second dispatch point (thread death, then the ThreadGroup)
+    const entry = { thread: key, ref: value?.ref, ...this.describeThrowable(value), count: (previous?.count ?? 0) + 1, handlerFailure: null };
+    table.delete(key); table.set(key, entry); if (table.size > 60) table.delete(table.keys().next().value);
+  }
+  /** Tolerant mode: a fatal exception the default handler let pass. Counted per distinct exception (class, message, top frame) so the report says it once with a count. */
+  noteTolerated(threadName, value) {
+    const table = this.toleratedFatals ??= new Map(), described = this.describeThrowable(value), key = `${described.type}|${described.message}|${described.stack[0] ?? ''}`;
+    const entry = table.get(key) ?? (table.size < 40 ? table.set(key, { ...described, threads: new Set(), count: 0, firstAtMs: Math.round(this.platform?.clock?.now?.() ?? 0), phase: this.monitor?.op?.name ?? null }).get(key) : null);
+    if (entry) { entry.count++; entry.threads.add(String(threadName)); }
+  }
+  /** The uncaught-exception handler itself threw: keeps the original and records what the handler threw. */
+  noteHandlerFailure(threadName, value) {
+    const key = String(threadName), entry = this.uncaughtExceptions?.get(key);
+    const failure = { ...this.describeThrowable(value), ref: value?.ref };
+    if (entry) entry.handlerFailure = failure; else this.noteUncaught(key, value);
+  }
+  /**
+   * A lab error (an API the lab does not model, a VM limit, an internal failure: anything that is not a Java exception the app could catch) ended the run of a background thread.
+   * Java has no caller to deliver it to, and whoever happens to be pumping the scheduler when the thread runs (a scheduled event, a page request, a nested wait of the main thread,
+   * a diagnostic read) may drop what it catches, so the failure is recorded here, where it happens: a logcat error line (and the trace), the table the reports print, and
+   * `pendingThreadFailure` for the Worker to show the page whatever became of the JavaScript exception. Once per error object.
+   */
+  noteThreadFailure(thread, error) {
+    if (error === null || typeof error !== 'object' || error.looperYield === true || error.name === 'CoreStop') return;
+    if (error.threadFailureNoted === true || (this.diagnosticDepth ?? 0) > 0 && error.details?.kind === 'instruction-budget') return;
+    try { error.threadFailureNoted = true; } catch { /* a frozen error object: noted again at most */ }
+    const name = String(thread?.name ?? '?'), text = String(error.message ?? error), brief = text.length > 700 ? '... ' + text.slice(-700) : text;
+    const entry = { thread: name, message: brief, kind: error.details?.kind ?? (error.name === 'APKError' ? 'lab-error' : error.name ?? 'error'), atMs: Math.round(this.platform?.clock?.now?.() ?? 0), phase: this.monitor?.op?.name ?? null };
+    const table = this.threadFailures ??= []; table.push(entry); if (table.length > 20) table.shift();
+    this.pendingThreadFailure = { ...entry, full: text };
+    try { this.record(`LOG E ApkLab: thread "${name}" stopped by a lab error (${entry.kind}): ${brief}`); } catch { /* the log is detached */ }
+  }
+  threadFailureText() {
+    const table = this.threadFailures; if (!table?.length) return '';
+    return ['Threads stopped by a lab error (an API that is not modelled or a VM limit reached outside the main thread):', ...table.slice(-8).map(entry => `  thread "${entry.thread}" at ${entry.atMs} ms [${entry.kind}]: ${entry.message}`)].join('\n');
+  }
+  uncaughtText() {
+    const table = this.uncaughtExceptions; if (!table?.size) return '';
+    const lines = ['Uncaught exceptions (the last of each thread; they reached Thread.dispatchUncaughtException, even if the app handler discards them):'];
+    for (const entry of [...table.values()].reverse().slice(0, 12)) {
+      lines.push(`  thread "${entry.thread}" (${entry.count}x): original exception ${entry.type}${entry.message ? ': ' + entry.message : ''}${entry.cause ? ' [cause: ' + entry.cause + ']' : ''}`);
+      for (const frame of entry.stack) lines.push(`      at ${frame}`);
+      if (entry.handlerFailure) { const h = entry.handlerFailure; lines.push(`    the handler also failed: ${h.type}${h.message ? ': ' + h.message : ''}${h.cause ? ' [cause: ' + h.cause + ']' : ''}`); for (const frame of h.stack) lines.push(`      at ${frame}`); }
+    }
+    return lines.join('\n');
+  }
+  noteCaught(value, where) {
+    const caught = this.caughtExceptions ??= { total: 0, distinct: new Map() }; caught.total++;
+    let type = '?', message = '';
+    try {
+      type = String(this.typeOf(value)).replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.'); const object = this.object(value);
+      let text = object.message; if (text === undefined || text === null) for (const [key, field] of object.fields ?? []) if (key.endsWith('->detailMessage:Ljava/lang/String;')) { text = field; break; }
+      message = typeof text === 'string' ? text.slice(0, 160) : '';
+    } catch { /* the exception object is not inspectable */ }
+    const key = type + '|' + message, entry = caught.distinct.get(key);
+    if (entry) entry.count++; else if (caught.distinct.size < 200) caught.distinct.set(key, { type, message, count: 1, where: String(where).replace(/^L/, '').replace(/;->/, '.') });
+  }
   budgetTick() {
     if (this.steps > this.peakThreadSteps) this.peakThreadSteps = this.steps;
-    this.profile.tick();
+    if (this.monitor.active || this.monitor.mainEvent !== null) this.monitor.tick();
+    this.profile.tick(); this.sampler.tick();
     if (this.maxEventWallMs > 0 && this.eventWallStart > 0) {
       const elapsed = performance.now() - this.eventWallStart;
-      if (elapsed > this.maxEventWallMs) this.budgetExceeded(`Instruction budget exceeded: the event ran ${Math.round(elapsed)} ms of host time (limit ${this.maxEventWallMs} ms); ${this.steps} instructions on the running thread; threads: ${this.scheduler?.describe?.() ?? 'n/a'}`, { kind: 'event-wall-budget' }, { kind: 'event-wall-budget' });
+      if (elapsed > this.maxEventWallMs && !this.stormMitigation && this.scheduler && this.scheduler.stats.wakeups > 1000 && this.scheduler.stats.wakeups * 20 > (this.scheduler.eventTotal ?? 0)) {
+        // The time went into the scheduler, not into Java code: a wake-up storm (threads waking from timed parks and re-parking at once). Parks are stretched to 5 ms of virtual time from now on and the
+        // event gets another half-limit instead of failing; the report says what happened.
+        this.stormMitigation = true; this.eventWallStart += this.maxEventWallMs / 2;
+        this.record(`SCHEDULER wake-up storm: ${this.scheduler.stats.wakeups} wake-ups, ${this.scheduler.stats.rounds} rounds in ${Math.round(elapsed)} ms for ${this.scheduler.eventTotal ?? 0} instructions; timed parks stretched to 5 ms`);
+      } else if (elapsed > this.maxEventWallMs) this.budgetExceeded(`Instruction budget exceeded: the event ran ${Math.round(elapsed)} ms of host time (limit ${this.maxEventWallMs} ms); ${this.steps} instructions on the running thread; threads: ${this.scheduler?.describe?.() ?? 'n/a'}`, { kind: 'event-wall-budget' }, { kind: 'event-wall-budget' });
     }
   }
+  /** True when a collection is due and a long run should reach a safepoint for it (checked at every scheduling quantum, not only at thread switches). */
+  gcWanted() { return this.gcEnabled && (GC_STRESS || (this.heap.size > this.gcSafepointFloor && collectionKind(this) !== null)); }
+  /** Stress mode only: a collection at an event boundary (nothing in flight), before the next queued task runs. */
+  /** A host's table of native handles is full: collect now, so the cleaners of unreachable owners release theirs (record.onFree). False when no collection could run. */
+  /**
+   * Native memory a host holds for a Java object (a Bitmap's pixels...), as libcore's NativeAllocationRegistry reports it to VMRuntime.registerNativeAllocation: the collector is paced
+   * by Java allocation, so an app that drops many small Java objects owning large native buffers would otherwise grow the page's memory long before any collection. Once the native
+   * bytes grew past max(NATIVE_PACE_MIN, what was registered at the last collection) since that collection, a collection is requested (ART: native allocation watermark). Returns
+   * the release function the owner's cleaner calls (idempotent).
+   */
+  registerNativeAllocation(bytes) {
+    if (!(bytes > 0)) return () => {};
+    this.nativeBytesRegistered(bytes);
+    let released = false;
+    return () => { if (!released) { released = true; this.nativeBytes -= bytes; } };
+  }
+  /** Native bytes registered (delta > 0) or freed (delta < 0) with the VM, as ART's Heap::RegisterNativeAllocation / RegisterNativeFree keep them: growth past the watermark asks for
+   *  a collection; a free of more than is registered leaves zero (ART clamps it the same way). Returns what the registered total changed by. */
+  nativeBytesRegistered(delta) {
+    const before = this.nativeBytes ?? 0, after = Math.max(0, before + delta); this.nativeBytes = after;
+    const base = this.nativeBytesAtCollection ?? 0;
+    if (delta > 0 && after - base > Math.max(NATIVE_PACE_MIN, base)) this.requestNativeCollection('native');
+    return after - before;
+  }
+  /** Asks for a collection at the next safepoint because native resources that only a collection frees have grown (`reason` names them in the core's stats). */
+  requestNativeCollection(reason = 'native') {
+    if (this.engine === 'wasm') this.wasm?.requestCollection(reason);
+    else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
+  }
+  /** A collection finished: native growth is measured from here (registerNativeAllocation), and every native table that paces itself by collections hears it (nativeCollectionHooks). */
+  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; for (const hook of this.nativeCollectionHooks ?? []) hook(); }
+  collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
+  stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
-    if (!this.gcEnabled || !collectionDue(this)) return;
-    collectGarbage(this, { reason: 'safepoint', safepoint: true });
+    const tries = this.gcSafepointTries ??= { calls: 0, notDue: 0, deferred: 0, disabled: 0 }; tries.calls++;   // reported by OperationMonitor.gcLine: a heap that fills with no collection says whether safepoints were reached at all
+    if (!this.gcEnabled) { tries.disabled++; return; }
+    const held = this.gcDeferral?.held ?? 0;
+    const generation = GC_STRESS ? auditGeneration(this) : collectionKind(this);   // a major collection, or a minor one (heap-gc.js, "Young generation"); stress mode alternates them
+    if (!generation) { if ((this.gcDeferral?.held ?? 0) > held) tries.deferred++; else tries.notDue++; return; }   // deferred: due, but the main thread is in motion (heap-gc.js deferral)
+    collectGarbage(this, { reason: 'safepoint', safepoint: true, generation });
+  }
+  /**
+   * Emergency collection at the allocation site: a budget (objects, field slots, array or collection cells) is exhausted, so before granting headroom or throwing OutOfMemoryError (ART collects
+   * and retries the same way) collect right here. Safe for the same reason a safepoint collection is (heap-gc.js quiescent): every Java frame of every thread, the allocating one included, is a root
+   * (registers live in frame.regs, interpreted and compiled code alike), and host code up the JavaScript stack holds only values it allocated or received, which `hostAllocs` protects -- an
+   * emergency collection never drops that list, because the allocating native may be mid-way through its work. Returns true when a collection ran and freed something. Bounded: not re-entrant, not
+   * while the OutOfMemoryError itself is being built, and after an emergency collection that freed little (< 1% of the limit) not again until a normal collection ran or 2% of the limit was
+   * allocated, so a genuinely full heap costs one collection, not one per allocation. The counters (gcEmergency) go into the OOM report. An emergency collection is a pressured one: SoftReference referents
+   * are cleared in it (heap-gc.js softPolicy 'emergency'), so every OutOfMemoryError raised from a budget stands only after one collection that also emptied the soft caches and freed nothing more.
+   */
+  emergencyCollect(budget) {
+    if (!this.gcEnabled || this.inOutOfMemory || this.inEmergency) return false;
+    const stats = this.gcEmergency ??= { attempts: 0, ran: 0, freed: 0, lastFreed: null, blocked: {}, budgets: {} };
+    const extra = Math.floor((this.headroomBase || this.maxHeapObjects) * 0.02), collections = this.gcStats?.collections ?? 0, last = this.emergencyLast;
+    if (last && last.freed < extra / 2 && last.collections === collections && this.nextId - last.nextId < extra) { stats.blocked.recent = (stats.blocked.recent ?? 0) + 1; return false; }   // it just freed (almost) nothing and little was allocated since
+    stats.attempts++; stats.budgets[budget] = (stats.budgets[budget] ?? 0) + 1;
+    const why = gcBlockReason(this);
+    if (why) { stats.blocked[why] = (stats.blocked[why] ?? 0) + 1; return false; }
+    this.inEmergency = true;
+    try {
+      const result = collectGarbage(this, { reason: 'emergency', safepoint: true, emergency: true });
+      if (!result.collected) { stats.blocked[result.reason] = (stats.blocked[result.reason] ?? 0) + 1; return false; }
+      stats.ran++; stats.freed += result.freed; stats.lastFreed = result.freed;
+      this.emergencyLast = { freed: result.freed, collections: this.gcStats?.collections ?? 0, nextId: this.nextId };
+      this.record(`GC emergency (${budget}): ${result.before} -> ${result.after} objects, ${result.freed} freed`);
+      return result.freed > 0;
+    } finally { this.inEmergency = false; }
   }
   /** Completes a native's Blocked / Invoke result synchronously for a host caller (nested waits and nested runs). */
   finishHostStep(step) {
@@ -1474,7 +2190,7 @@ export class APKRuntime {
     this.depth++;
     try {
       if(mode==='virtual'&&!isNull(args[0])&&typeof args[0]!=='string'){
-        const proxy=this.object(args[0]);if(proxy.annotationValues){
+        const proxy=this.vmObject(args[0]);if(proxy.annotationValues){
           this.record(`ANNOTATION ${methodKey(method)} [DEX metadata]`);
           if(method.name==='annotationType'&&method.signature==='()Ljava/lang/Class;')return this.classObject(proxy.type);
           if(method.name==='hashCode'&&method.signature==='()I')return annotationHash(this,proxy);
@@ -1500,15 +2216,22 @@ export class APKRuntime {
       let slot = byMode[mode]; if (slot === undefined) slot = byMode[mode] = new Map();
       let resolution = slot.get(ownerKey);
       if (resolution === undefined) { resolution = this.resolveInvoke(method, args, mode, callerOwner); slot.set(ownerKey, resolution); }
+      if (resolution.kind === 'platform-default') return resolution.run(this, args);
       if (resolution.kind === 'missing-stub') return this.noteMissingStub(resolution.key, resolution.result);
-      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
+      if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.monitor.hostEnter(resolution.key, resolution); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
+        if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(defaultMethod.method.key); if (overridden !== undefined) return overrideHit(this, overridden, defaultMethod, mode); }   // src/method-overrides.js
+        if (this.methodInterceptors !== null) { const intercept = this.methodInterceptors.get(defaultMethod.method.key); if (intercept !== undefined) { const value = intercept(this, defaultMethod, args, mode); if (value !== RUN_BODY) return value; } }   // src/method-overrides.js setMethodInterceptor
         this.recordMethod(defaultMethod.method);
         if (wantFrame) return new PendingCall(defaultMethod.method, defaultMethod.code, args);
         return this.execute(defaultMethod.method, defaultMethod.code, args);
       }
       const definition = resolution.definition;
+      if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(definition.method.key); if (overridden !== undefined) return overrideHit(this, overridden, definition, mode); }   // src/method-overrides.js: the body does not run
+      let intercepted = false;   // src/method-overrides.js setMethodInterceptor: the interceptor answers the value, or the body runs without filling a call-site cache (every call reaches it)
+      if (this.methodInterceptors !== null) { const intercept = this.methodInterceptors.get(definition.method.key); if (intercept !== undefined) { const value = intercept(this, definition, args, mode); if (value !== RUN_BODY) return value; intercepted = true; } }
+      if (resolution.fast !== undefined) { const fast = resolution.fast(this, args); if (fast !== FALLTHROUGH) return fast; }   // host fast path of a framework method (src/io-fast-paths.js); FALLTHROUGH runs the DEX body
       if (!!(definition.flags & 8) !== (mode === 'static')) fail(`Invalid static/instance invoke: ${definition.method.key}`);
       if (mode === 'static') this.initialize(definition.method.owner);
       if (definition.flags & 0x100) {
@@ -1522,17 +2245,35 @@ export class APKRuntime {
           if (this.tolerateMissing === 'all' && this.missingLibraries.size && !this.refusedProtectedLibrary) return this.noteMissingStub(definition.method.key, definition.method.result);
           this.nativeRequired(definition.method.key);
         }
-        this.executionByOrigin.host.calls++;
-        this.record(`HOST ${definition.method.key} [AOSP:${definition.method.dex.filename}]`); this.lastHostCall = definition.method.key;
-        const result = binding(this, this.hostArguments(definition.method, args, mode), definition.method);
-        if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${definition.method.key}`);
-        return hostReturn(definition.method, result);
+        this.lastNative = resolution; this.lastNativeDepth = this.depth;   // a call site of the WebAssembly core remembers it (vmcore/js/host-bridge.js call)
+        return this.frameworkNative(resolution, binding, args, mode);
       }
       if (!definition.code) fail(`Unsupported abstract/missing-code method: ${definition.method.key}${mode === 'virtual' && args[0] && typeof args[0] === 'object' && args[0].ref !== undefined ? ` (receiver ${this.typeOf(args[0])})` : ''}`);
       this.recordMethod(definition.method);
-      if (wantFrame) return new PendingCall(definition.method, definition.code, args, definition);   // the run loop pushes the frame itself
+      if (wantFrame) return new PendingCall(definition.method, definition.code, args, intercepted ? null : definition);   // the run loop pushes the frame itself (and caches the callee when a definition comes with it)
       return this.execute(definition.method, definition.code, args);
     } finally { this.depth--; }
+  }
+  /** A framework native with its curated host binding: what dispatchCore does once the resolution names one (`resolution.definition`, flags & 0x100). */
+  frameworkNative(resolution, binding, args, mode) {
+    const method = resolution.definition.method;
+    this.executionByOrigin.host.calls++;
+    this.record(resolution.hostText ??= `HOST ${method.key} [AOSP:${method.dex.filename}]`); this.lastHostCall = method.key; this.monitor.hostEnter(method.key, method);
+    const tb = this.tb, previousBucket = tb.enter(BUCKET.HOST), startedAt = tb.last; let result; try { result = binding(this, this.hostArguments(method, args, mode), method); } finally { tb.leave(previousBucket); tb.hostCall(method.key, tb.last - startedAt); } this.hostCall = null;   // a framework native counts in the host table as a bridged call does
+    if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${method.key}`);
+    return hostReturn(method, result);
+  }
+  /**
+   * dispatchCore again for a call whose resolution a call site remembered (`resolution` named a framework native with a curated binding for the same receiver class, in the same
+   * resolution epoch, with no method overrides): its depth bookkeeping, the class initialization of a static call and the binding (looked up again: undefined when it is gone,
+   * and the caller then dispatches).
+   */
+  frameworkNativeAgain(resolution, args, mode) {
+    const binding = this.nativeBindings.get(resolution.definition.method.key); if (binding === undefined) return FRAMEWORK_NATIVE_GONE;
+    if (this.depth + currentThread(this).frames.length >= this.maxCallDepth) this.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+    this.depth++;
+    try { if (mode === 'static') this.initialize(resolution.definition.method.owner); return this.frameworkNative(resolution, binding, args, mode); }
+    finally { this.depth--; }
   }
   /** The static Java helper (LAB_HELPERS) that implements `method` for `owner`, or null. */
   labHelper(helpers, owner, method, mode) {
@@ -1555,6 +2296,7 @@ export class APKRuntime {
       const selected = { ...method, owner }, key = methodKey(selected);
       // Packaged Kotlin/Java library bytecode always takes precedence over a bridge fallback -- except a method of an interface reached through a host-typed receiver (a host
       // iterator whose runtime type is the java.util.Iterator interface itself, a class chain never contains interfaces otherwise): the host serves that call.
+      if (definition && FAST_PATHS.has(key) && this.dex.bootDexes?.has(definition.method.dex)) return { kind: 'definition', definition, fast: FAST_PATHS.get(key) };
       if (definition && !(cls.flags & 0x200 && (SHIMS.has(key) || this.platform?.supports?.(key)))) return { kind: 'definition', definition };
       if (SHIMS.has(key) || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key)) {
         // A loaded Java class is authoritative about its declared methods.
@@ -1570,9 +2312,28 @@ export class APKRuntime {
     // Java 8 default methods: after the class chain, a concrete method inherited from a (super)interface of the receiver's class.
     const defaultMethod = this.findInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
     if (defaultMethod?.code) return { kind: 'default', defaultMethod };
+    // Default methods that framework interfaces gained in later API levels: an app compiled against an older SDK implements the interface without them and the platform's default runs.
+    const platformDefault = this.platformInterfaceDefault(mode === 'virtual' ? this.typeOf(args[0]) : method.owner, method);
+    if (platformDefault) return { kind: 'platform-default', run: platformDefault, key: methodKey(method) };
     if (method.name === '<init>') { const widget = this.platform?.unimplementedWidgetMessage?.(method.owner, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // never a stubbed constructor: a half-working View
+    // Tolerance stubs gaps of the PLATFORM, never code of the app or its libraries: a class that cannot be resolved is NoClassDefFoundError; a method missing from a class whose whole chain is
+    // app/library code is NoSuchMethodError (the code that is there runs, the code that is not there does not exist).
+    this.assertResolvable(method.owner);
+    if (!APKRuntime.isPlatformSpace(method.owner)) {
+      let platformAncestor = false;
+      for (let at = method.owner, depth = 0; at && at !== 'Ljava/lang/Object;' && depth < 64; at = this.parent(at), depth++) { const cls = this.classes.get(at); if (!cls || this.dex.bootDexes?.has(cls.dex)) { platformAncestor = true; break; } }
+      if (!platformAncestor) this.throwJava('Ljava/lang/NoSuchMethodError;', `No ${mode === 'static' ? 'static' : mode === 'direct' ? 'direct' : 'virtual'} method ${method.name}${method.signature} in class ${method.owner} or its super classes`);
+    }
     if (this.toleratesMissing(method)) return { kind: 'missing-stub', key: methodKey(method), result: method.result };
     fail(`Unsupported API/method: ${methodKey(method)}`);
+  }
+  /** The platform's body of an interface default method, for a receiver whose class (or a superinterface) is the framework interface declaring it. */
+  platformInterfaceDefault(type, method) {
+    const key = `${method.name}${method.signature}`;
+    if (!PLATFORM_INTERFACE_DEFAULTS.has(key) && !PLATFORM_DEFAULT_NAMES.has(key)) return null;
+    const owners = new Set(this.ancestorSet(type)); owners.add(method.owner);
+    for (const owner of owners) { const found = PLATFORM_INTERFACE_DEFAULTS.get(`${owner}->${key}`); if (found) return found; }
+    return null;
   }
   toleratesMissing(method) { const mode = this.tolerateMissing; return mode === 'all' || (mode !== 'off' && method.result === 'V') || (mode === 'primitives' && /^[ZBSCIJFD]$/.test(method.result)); }
   /** Tolerant mode: count a stubbed call and answer with the return type's default; the first call per method is traced. */
@@ -1603,6 +2364,7 @@ export class APKRuntime {
       const type = queue.shift();
       for (const child of this.descendantIndex.children.get(type) ?? []) {
         if (seen.has(child)) continue;
+        if (this.dex.classes.has(child) && !this.dex.bootClasses?.has(child)) continue;   // an APK / library subclass inherits the gap: it provides nothing the platform lacks
         seen.add(child); queue.push(child);
         if (((this.classes.get(child)?.flags ?? 0) & 0x600) === 0) {   // concrete: neither abstract nor interface
           const available = this.methodAvailability({ owner: child, name, signature });
@@ -1632,6 +2394,9 @@ export class APKRuntime {
       owner = this.parent(owner);
     }
     if (EXTERNAL_INTERFACE_NAMES.has(method.owner) || (this.classes.get(method.owner)?.flags ?? 0) & 0x200) return 'interface';
+    // resolveInvoke's last two steps: a Java 8 default method inherited from a superinterface, and the platform's body of an interface default method added in a later API level
+    if (this.findInterfaceDefault(method.owner, method)?.code) return 'framework-dex';
+    if (this.platformInterfaceDefault(method.owner, method)) return 'platform-default';
     return null;
   }
   findInterfaceDefault(startType, method) {
@@ -1661,6 +2426,7 @@ export class APKRuntime {
   nativeRequired(method, requestedLibrary = null) {
     const libraries = this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown');
     const basenames = [...new Set(libraries.map(path => path.split('/').pop()))];
+    if (requestedLibrary) this.platform?.onNativeLibraryUnavailable?.(this, requestedLibrary, null);   // a device component may need to make a swallowed failure visible (src/microg-device.js)
     const message = `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
     this.throwJava('Ljava/lang/UnsatisfiedLinkError;', message, { kind: 'jni-required', method, requestedLibrary, nativeLibraries: libraries });
   }
@@ -1680,12 +2446,44 @@ export class APKRuntime {
    * heapBudget of executionSnapshot and the Worker's snapshot), so an app that catches Throwable cannot hide it from the page, the harness or the validation flows.
    * The collector (src/heap-gc.js) runs between events; an event that allocates more than the free headroom still fails here.
    */
+  /** Every OutOfMemoryError the VM raises, with what ran: which limit (objects, field slots, array size or cells, collection cells), the budgets at that moment, the thread and the allocating Java frame. */
+  noteOom(reason) {
+    const log = this.oomLog ??= []; const frames = this.thread?.frames ?? [], top = []; 
+    for (let i = frames.length - 1; i >= 0 && top.length < 3; i--) { const m = frames[i].method; if (m) top.push(`${String(m.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${m.name}`); }
+    const kind = /^Object limit|^Reflected multi-array allocation exceeds VM heap limits: object/.test(reason) ? 'object limit' : /field storage/.test(reason) ? 'field limit' : /^Array of|^Reflected multi-array allocation exceeds VM heap limits: dimension/.test(reason) ? 'array size' : /^Array storage|^Reflected multi-array allocation exceeds VM heap limits: array cell/.test(reason) ? 'array cell budget' : /^Collection storage/.test(reason) ? 'collection budget' : 'other';
+    log.push({ kind, reason: String(reason).slice(0, 220), thread: this.thread?.name ?? null, frames: top, hostCall: this.hostCall ? String(this.hostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').slice(0, 80) : null, objects: this.heap.size, maxObjects: this.maxHeapObjects, fieldSlots: this.fieldSlots, maxFieldSlots: this.maxFieldSlots, arrayCells: this.arrayCells, maxArrayCells: this.maxArrayCells, collectionCells: this.collectionCells, maxCollectionCells: this.maxCollectionCells, gcTries: { ...(this.gcSafepointTries ?? {}) }, gcSkips: { ...(this.gcSkips ?? {}) }, sinceGc: Math.max(0, this.nextId - (this.gcLastNextId ?? 0)), gcEmergency: this.gcEmergency ? { ...this.gcEmergency, blocked: { ...this.gcEmergency.blocked }, budgets: { ...this.gcEmergency.budgets } } : null, soft: this.gcSoftLast ? { ...this.gcSoftLast, collections: this.gcStats?.softCollections ?? 0, totalCleared: this.gcStats?.softCleared ?? 0 } : null });   // soft: the last collection that cleared SoftReferences (heap-gc.js softPolicy): policy and how many referents it cleared
+    if (log.length > 12) log.shift();
+  }
+  /**
+   * ART lets an allocation that failed once succeed when a collection freed enough, and lets the unwinding handlers allocate. The collector only runs at safepoints, so a full heap whose last
+   * collection did free something is granted 2% of the limit (once per collection, undone by the next collection) and a collection is requested; a heap the last collection could not shrink
+   * throws OutOfMemoryError at once.
+   */
+  oomHeadroom() {
+    if (!this.gcEnabled || this.inOutOfMemory) return false;
+    // Direct activations hold the collector off (heap-gc.js, 'direct-frames'): the allocation goes on above the limit, by at most a quarter of it, until their next poll rebuilds the
+    // frames and the collection that is due runs (this.q = 0 makes that the next backward branch or call).
+    if (this.t2Compiled > 0 && this.heap.size < (this.headroomBase || this.maxHeapObjects) * 1.25 && directFrames(this)) { this.gcPressure = true; this.q = 0; this.dlimit = 0; this.t2Headroom++; return true; }
+    const collections = this.gcStats?.collections ?? 0, last = this.gcPhases?.[0], base = this.headroomBase || this.maxHeapObjects, extra = Math.floor(base * 0.02);
+    if (this.headroomGrantedAt === collections || (last && last.before - last.after < extra / 2)) return false;
+    this.headroomBase = base; this.headroomGrantedAt = collections; this.maxHeapObjects = base + extra; this.gcPressure = true; this.q = 0; this.dlimit = 0;   // the next back-edge or call reaches the safepoint that collects
+    this.record(`OOM headroom +${extra} objects until the next collection (${this.heap.size} live of ${base})`);
+    return true;
+  }
   outOfMemory(reason) {
-    this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount };
+    this.noteOom(reason);
+    this.oomCount = (this.oomCount ?? 0) + 1; this.lastOom = { reason, liveObjects: this.heap.size, limit: this.maxHeapObjects, fieldSlots: this.fieldSlots, count: this.oomCount, softCleared: this.gcSoftLast?.cleared ?? 0, softClearedTotal: this.gcStats?.softCleared ?? 0, softPolicy: this.gcSoftLast?.policy ?? null };
     this.record(`OOM java.lang.OutOfMemoryError: ${reason}; ${this.heap.size} live objects`);
     if (this.inOutOfMemory) fail(reason);
+    // The first few exhaustions get a heap census (src/heap-gc.js heapCensus): what is alive, who keeps it alive, who allocated it. Later ones reuse it (a census is a full mark).
+    if ((this.oomCount ?? 0) <= 3 || !this.lastOom.census) { try { const census = heapCensus(this); this.lastOom.census = { text: census.text, live: census.live, garbage: census.garbage, estimatedBytes: census.estimatedBytes, limit: census.limit, arrays: census.arrays }; const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry) entry.arrays = census.arrays; } catch (error) { this.lastOom.census = { text: `Heap census unavailable: ${error.message}` }; } }
+    else this.lastOom.census = this.prevCensus;
+    this.prevCensus = this.lastOom.census;
+    { const entry = this.oomLog?.[this.oomLog.length - 1]; if (entry && !entry.arrays && this.lastOom.census?.arrays) entry.arrays = this.lastOom.census.arrays; }
     this.inOutOfMemory = true; this.maxHeapObjects += 64;   // headroom for the throwable itself
-    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)`, { kind: 'java-heap-exhausted', limit: this.maxHeapObjects - 64, liveObjects: this.heap.size }); }
+    const em = this.gcEmergency, emergencyNote = !em?.attempts ? '' : em.lastFreed === null ? `; emergency collection tried ${em.attempts}x and blocked (${Object.entries(em.blocked).map(([k, n]) => `${k} ${n}x`).join(', ') || '?'})` : em.lastFreed === 0 ? '; the emergency collection freed nothing (heap full of live objects)' : `; the emergency collection freed ${em.lastFreed} objects, not enough`;
+    const sl = this.gcSoftLast, softNote = sl ? `; soft references: the last collection under pressure (policy ${sl.policy}) cleared ${sl.cleared} of ${sl.softReferences}, ${this.gcStats?.softCleared ?? 0} in total` : '; no soft reference was cleared';
+    try { this.throwJava('Ljava/lang/OutOfMemoryError;', `Failed to allocate: ${reason} (${this.heap.size} live objects)${this.gcPhases?.[0] ? `; collection before the OOM: ${this.gcPhases[0].before} → ${this.gcPhases[0].after}` : '; no collection before the OOM'}${emergencyNote}${softNote}`, { kind: 'java-heap-exhausted', softCleared: sl?.cleared ?? 0, softPolicy: sl?.policy ?? null, limit: this.maxHeapObjects - 64, liveObjects: this.heap.size, heap: this.lastOom.census }); }
     finally { this.maxHeapObjects -= 64; this.inOutOfMemory = false; }
   }
   throwJava(type, message, details = null) {
@@ -1736,16 +2534,45 @@ export class APKRuntime {
     return `${obj.type.startsWith('[') ? obj.type.replaceAll('/', '.') : dottedName(obj.type)}@${obj.id.toString(16)}`;
   }
   objectOverride(type, signature) {
+    this.parent(type);   // refreshes the memo tables when the class graph changed
+    let row = this.overrideMemo.get(type); if (row === undefined) this.overrideMemo.set(type, row = new Map());
+    let answer = row.get(signature); if (answer === undefined) row.set(signature, answer = this.objectOverrideUncached(type, signature));
+    return answer;
+  }
+  objectOverrideUncached(type, signature) {
     const seen = new Set();
     while (type && !seen.has(type)) { seen.add(type); const definition = this.classes.get(type)?.methods.get(signature); if (definition) return definition.method; type = this.parent(type); }
     return null;
   }
   externalObjectMethod(type,name,parameters,result){
+    this.parent(type);
+    let row=this.externalMemo.get(type);if(row===undefined)this.externalMemo.set(type,row=new Map());
+    const memoKey=name+'('+parameters.join('')+')'+result;let answer=row.get(memoKey);if(answer===undefined)row.set(memoKey,answer=this.externalObjectMethodUncached(type,name,parameters,result));
+    return answer;
+  }
+  externalObjectMethodUncached(type,name,parameters,result){
     const signature=`(${parameters.join('')})${result}`,seen=new Set();while(type&&type!=='Ljava/lang/Object;'){
       if(seen.has(type)||seen.size>=128)fail('Invalid external object hierarchy');seen.add(type);const key=`${type}->${name}${signature}`;
       const labHelpers=LAB_HELPERS.get(type);if(labHelpers!==undefined&&this.labHelper(labHelpers,type,{name,signature},'virtual')!==null)return {owner:type,name,parameters,result,signature};
       if(SHIMS.has(key)||this.platform?.supports?.(key)||this.skiaHost?.supports?.(key))return {owner:type,name,parameters,result,signature};type=this.parent(type);
     }return null;
+  }
+  /** String / AbstractStringBuilder codePointBefore, codePointCount and offsetByCodePoints over UTF-16 text, with the exceptions of libcore. */
+  codePointOps(text, name, args) {
+    const bad = (type, message) => this.throwJava(type, message), high = c => c >= 0xd800 && c <= 0xdbff, low = c => c >= 0xdc00 && c <= 0xdfff;
+    if (name === 'codePointBefore') {
+      const index = int(args[1]); if (index < 1 || index > text.length) bad('Ljava/lang/StringIndexOutOfBoundsException;', `index=${index}, length=${text.length}`);
+      const l = text.charCodeAt(index - 1); if (low(l) && index > 1) { const h = text.charCodeAt(index - 2); if (high(h)) return ((h - 0xd800) << 10) + (l - 0xdc00) + 0x10000; } return l;
+    }
+    if (name === 'codePointCount') {
+      const begin = int(args[1]), end = int(args[2]); if (begin < 0 || begin > end || end > text.length) bad('Ljava/lang/IndexOutOfBoundsException;', `begin ${begin}, end ${end}, length ${text.length}`);
+      let count = end - begin; for (let i = begin; i < end - 1; i++) if (high(text.charCodeAt(i)) && low(text.charCodeAt(i + 1))) { count--; i++; } return count;
+    }
+    let index = int(args[1]); const offset = int(args[2]);   // offsetByCodePoints
+    if (index < 0 || index > text.length) bad('Ljava/lang/IndexOutOfBoundsException;', `index ${index}, length ${text.length}`);
+    if (offset >= 0) { let n = offset; for (; n > 0 && index < text.length; n--) { if (high(text.charCodeAt(index++)) && index < text.length && low(text.charCodeAt(index))) index++; } if (n > 0) bad('Ljava/lang/IndexOutOfBoundsException;', null); }
+    else { let n = -offset; for (; n > 0 && index > 0; n--) { if (low(text.charCodeAt(--index)) && index > 0 && high(text.charCodeAt(index - 1))) index--; } if (n > 0) bad('Ljava/lang/IndexOutOfBoundsException;', null); }
+    return index;
   }
   boxedHash(object){
     if(object.type==='Ljava/lang/Boolean;')return object.boxed?1231:1237;
@@ -1763,7 +2590,8 @@ export class APKRuntime {
   javaHash(value) {
     if (isNull(value)) return 0;
     if (typeof value === 'string') return stringHash(value);
-    const obj = this.object(value);if(obj.annotationValues)return annotationHash(this,obj);const method = this.objectOverride(obj.type, 'hashCode()I');
+    const obj = this.object(value);if(obj.boxed!==undefined&&FINAL_BOX_TYPES.has(obj.type))return this.boxedHash(obj);   // final java.lang box classes: no override to look up, no call to make
+    if(obj.annotationValues)return annotationHash(this,obj);const method = this.objectOverride(obj.type, 'hashCode()I');
     if (method) return int(this.dispatch(method, [value], 'virtual'));
     const external=this.externalObjectMethod(obj.type,'hashCode',[],'I');if(external)return int(this.dispatch(external,[value],'virtual'));
     if (obj.member) { const member = obj.member, owner = member.field?.owner ?? member.method.owner; return stringHash(dottedName(owner)) ^ (member.kind === 'constructor' ? 0 : stringHash(member.field?.name ?? member.method.name)); }
@@ -1774,7 +2602,9 @@ export class APKRuntime {
     if (equal(a, b)) return true;
     if (isNull(a) || isNull(b)) return false;
     if(typeof a==='string')return this.isStringValue(b)&&a===this.stringCharacters(b);
-    const obj = this.object(a), method = this.objectOverride(obj.type, 'equals(Ljava/lang/Object;)Z');
+    const obj = this.object(a);
+    if (obj.boxed !== undefined && FINAL_BOX_TYPES.has(obj.type)) { if (typeof b === 'string') return false; const other = this.object(b); return other.boxed !== undefined && this.boxedEquals(obj, other); }
+    const method = this.objectOverride(obj.type, 'equals(Ljava/lang/Object;)Z');
     if (method) return int(this.dispatch(method, [a, b], 'virtual')) !== 0;
     if(typeof b==='string')return obj.type==='Ljava/lang/String;'&&this.stringCharacters(a)===b;
     if(obj.annotationValues)return annotationEquals(this,obj,b);
@@ -1802,7 +2632,8 @@ export class APKRuntime {
     if (obj.tailSerial === entry.serial) { obj.tailSerial = null; for (const serial of obj.map.keys()) obj.tailSerial = serial; }
   }
   reserveCollection(delta) {
-    if (delta > 0 && this.collectionCells + delta > 4000000) fail('Aggregate Java collection storage limit exceeded');
+    if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.emergencyCollect('collection cells');
+    if (delta > 0 && this.collectionCells + delta > this.maxCollectionCells) this.outOfMemory(`Collection storage limit (${this.maxCollectionCells} cells) exceeded`);
     this.collectionCells = Math.max(0, this.collectionCells + delta);
   }
   collectionValues(obj) {
@@ -1828,28 +2659,39 @@ export class APKRuntime {
   classResolvable(component) {
     return !(!this.classes.has(component) && !BRIDGE_OWNERS.has(component) && !EXTERNAL_PARENTS.has(component) && !EXTERNAL_INTERFACE_NAMES.has(component) && !EXTERNAL_INTERFACES.has(component) && component.length !== 1 && !['Ljava/lang/Object;', 'Ljava/lang/CharSequence;'].includes(component) && !this.skiaHost?.parent?.(component) && !this.platform?.parent?.(component) && !this.platform?.fallbackParent?.(component) && !constantFields(component));   // an SDK class with compile-time constants exists on the device even without a body in the VM
   }
+  /** The defining loader of the code calling into the host now (the JavaScript VM's current frame; the core's frames through captureStack when no JavaScript frame is current). */
+  callerDefiningLoader() {
+    const current = this.currentMethod; if (current) return current.dex?.definingLoader ?? null;
+    if (!this.classOwners?.size) return null;
+    for (const method of this.captureStack?.() ?? []) { const owner = method?.owner; if (!owner) continue; if (this.classOwners.has(owner)) return this.classes.get(owner)?.dex?.definingLoader ?? this.classOwners.get(owner); if (this.classes.has(owner) && !this.dex?.bootClasses?.has(owner)) return null; }
+    return null;
+  }
   resolveClass(name, initialize = false, loader = undefined) {
     if (typeof name !== 'string') this.throwJava('Ljava/lang/NullPointerException;', 'null class name');
     let type = name.startsWith('[') ? name.replaceAll('.', '/') : descriptor(name);
     let component = type.replace(/^\[+/, '');
     if (this.classOwners?.size && component.length > 1) {
       // Class identity is (defining loader, name): resolve through the requesting loader's delegation chain (the caller's own loader unless one is given).
-      const mapped = this.platform.classLoaders.mapType(this, loader === undefined ? (this.currentMethod?.dex?.definingLoader ?? null) : loader, component);
+      const mapped = this.platform.classLoaders.mapType(this, loader === undefined ? this.callerDefiningLoader() : loader, component);
       if (mapped === false) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
     }
-    if (!this.classResolvable(component)) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
+    if (!this.classResolvable(component)) {   // Class.forName: ClassNotFoundException(name) caused by the class loader's Didn't find class ... on path message
+      { const widget = this.platform?.unimplementedWidgetMessage?.(component, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // a widget of a framework profile that is not loaded: Android has the class
+      const value = this.makeObject('Ljava/lang/ClassNotFoundException;'), obj = this.object(value); obj.message = name; obj.cause = this.classNotFound(component); obj.causeInitialized = true; obj.stack = this.captureStack();
+      throw new JavaException(value, name);
+    }
     if (initialize && !type.startsWith('[')) this.initialize(type);
     return this.classObject(type);
   }
   boxPrimitive(type, value) {
     if (type === 'V') return null;
     if (type.length !== 1) return value;
-    if (type === 'Z') return this.readStatic({ owner: 'Ljava/lang/Boolean;', name: value ? 'TRUE' : 'FALSE', type: 'Ljava/lang/Boolean;', key: `Ljava/lang/Boolean;->${value ? 'TRUE' : 'FALSE'}:Ljava/lang/Boolean;` });
+    if (type === 'Z') return this.readStatic(value ? BOOLEAN_TRUE_FIELD : BOOLEAN_FALSE_FIELD);   // one reference object per constant, so its resolution is cached across calls (resolveField)
     const owner = BOX_TYPES[type]; if (!owner) fail(`Cannot box primitive ${type}`);
     const cacheable = ['B', 'S', 'I', 'J'].includes(type) ? value >= -128 && value <= 127 : type === 'C' && value >= 0 && value <= 127;
-    this.boxCache ??= new Map(); const key = `${type}:${value}`;
-    if (cacheable && this.boxCache.has(key)) return this.boxCache.get(key);
+    let key = null;
+    if (cacheable) { key = `${type}:${value}`; const hit = (this.boxCache ??= new Map()).get(key); if (hit !== undefined) return hit; }   // Android's cache: -128..127 (and \u0000..\u007f for Character) are the same object
     const boxed = this.makeObject(owner), obj = this.object(boxed); obj.boxed = value; obj.primitiveType = type;
     if (cacheable) this.boxCache.set(key, boxed);
     return boxed;
@@ -1879,12 +2721,19 @@ export class APKRuntime {
     return this.array(value).elements.map(element => { const type = this.object(element).classType; if (!type) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Expected Class[]'); return type; });
   }
   reflectionLookup(type, kind, name, parameters, publicOnly) {
+    // A widget class the lab only declares has no constructor of its own, and a superclass constructor is not a constructor of the class (Class.getConstructor never inherits):
+    // LayoutInflater.createView of such a tag fails naming the class instead of building its nearest implemented ancestor under the tag's name.
+    if (kind === 'constructor') { const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }
     const seen = new Set(), pending = [type];
     while (pending.length) {
       const owner = pending.shift(); if (!owner || seen.has(owner)) continue;
       if (seen.size > 512) fail('Reflection hierarchy limit exceeded'); seen.add(owner);
       const cls = this.classes.get(owner);
+      // An array class (Class.getDeclaredField / getDeclaredMethod / getDeclaredConstructor / getField on Foo[].class) declares no field, method or constructor on Android:
+      // the lookup ends in NoSuchFieldException / NoSuchMethodException below; getMethod finds only Object's public methods (what libraries probing for a Companion meet).
+      if (!cls && owner.startsWith('[')) { if (publicOnly && kind === 'method') pending.push('Ljava/lang/Object;'); continue; }
       if (!cls) {
+        if (publicOnly && kind === 'field') { const up = this.parent(owner); if (up && up !== 'Ljava/lang/Object;') pending.push(up); }   // Class.getField also finds the public fields a host-modelled class inherits (ApplicationInfo.metaData is declared by PackageItemInfo)
         // Class can reflect on these same implemented Class APIs. Compose on
         // API 28 uses this two-stage lookup; invocation still goes through the
         // normal checked reflection dispatcher, never an app-specific shortcut.
@@ -1895,12 +2744,10 @@ export class APKRuntime {
         }
         const external=this.platform?.reflectionDefinition?.(owner,kind,name,parameters,publicOnly);
         if(external){const member=kind==='field'?external.field:external.method;if(!member||member.owner!==owner||member.name!==name||(publicOnly&&!(external.flags&1)))fail('Invalid host reflection metadata');return external;}
+        { const hidden = hiddenReflection(owner, kind, name, parameters, publicOnly); if (hidden) return hidden; }   // members of host-modelled classes: src/hidden-members.js
         if(kind==='constructor'&&name==='<init>'&&this.isSubtype(owner,'Landroid/view/View;')&&parameters[0]==='Landroid/content/Context;'){
           const signature=`(${parameters.join('')})V`;
           if(this.platform?.supports?.(`${owner}-><init>${signature}`))return {method:{owner,name,parameters,result:'V',signature,key:`${owner}->${name}${signature}`},flags:1};
-        }
-        if(kind==='method'&&owner==='Landroid/os/Handler;'&&name==='createAsync'&&parameters.join('')==='Landroid/os/Looper;'){
-          const result=owner,signature=`(${parameters.join('')})${result}`;return {method:{owner,name,parameters,result,signature,key:`${owner}->${name}${signature}`},flags:9};
         }
         if(kind==='field'&&owner==='Landroid/os/Build$VERSION;'&&['SDK_INT','SDK','CODENAME'].includes(name)){
           const type=name==='SDK_INT'?'I':'Ljava/lang/String;';return {field:{owner,name,type,key:`${owner}->${name}:${type}`},flags:0x19};
@@ -1926,12 +2773,21 @@ export class APKRuntime {
           if (other && (!publicOnly || (other.flags & 1))) return { field: { owner, name, type: other.type, key: `${owner}->${name}:${other.type}` }, flags: other.flags };
           if (owner === type && knownClass(owner)) continue;
         }
-        if (owner === type && !bootClassLacksMember(owner, kind, name)) fail(`External reflection metadata is not implemented: ${owner}->${name}${parameters ? '(' + parameters.join('') + ')' : ''} (${kind})`);
+        if (owner === type && isTabled(owner)) continue;   // the member tables are complete: it does not exist on Android 13 (NoSuchFieldException / NoSuchMethodException below)
+        if (owner === type && !bootClassLacksMember(owner, kind, name)) {
+          // A framework class the lab hosts without a member table (no complete original in the DEX, not in src/hidden-member-tables.js): whether the member exists on Android 13 is
+          // unknown here. The lookup ends as a missing member would on a device, in the Java exception the app's own try/catch can handle (window-tracking, leak-detection and
+          // compatibility libraries all guard these lookups), never in a VM stop; the message and the run's report (reflectionGaps, "Reflection gaps" in the summary) name the member.
+          const label = `${owner}->${name}${kind === 'field' ? '' : '(' + (parameters ?? []).join('') + ')'} (${kind})`;
+          (this.reflectionGaps ??= new Map()).set(label, (this.reflectionGaps.get(label) ?? 0) + 1); this.record(`REFLECTION gap ${label}: no member metadata, answered as missing`);
+          const missing = kind === 'field' ? `No field ${name} in class ${type}` : `${dottedName(type)}.${kind === 'constructor' ? '<init>' : name} [${(parameters ?? []).join(', ')}]`;
+          this.throwJava(kind === 'field' ? 'Ljava/lang/NoSuchFieldException;' : 'Ljava/lang/NoSuchMethodException;', `${missing} (the lab has no reflection metadata for this member of a framework class it hosts: ${label})`, { kind: 'reflection-gap', member: label });
+        }
         continue;
       }
       if (kind === 'field') {
         for (const item of [...cls.fields, ...cls.staticFields]) {
-          const field = cls.dex.fields[item.index]; if (field.name === name && (!publicOnly || item.flags & 1)) return { field, flags: item.flags };
+          const field = cls.dex.field(item.index); if (field.name === name && (!publicOnly || item.flags & 1)) return { field, flags: item.flags };
         }
       } else {
         const matches = [...cls.methods.values()].filter(def => def.method.name === name && def.method.parameters.join('') === parameters.join('') && (!publicOnly || def.flags & 1));
@@ -1984,6 +2840,8 @@ export class APKRuntime {
     // The target runs as a continuation of the calling green thread (an Invoke), not through a nested dispatch on the JavaScript stack: a reflective call that blocks (a lock, a
     // Future.get, a park) then parks only this thread, and the scheduler can resume every other one, including the thread that holds what this one waits for.
     const wrapError = error => {
+      // A framework View constructor that an attribute value of its tag made throw is run again without that attribute (AndroidPlatform.recoverViewConstruction).
+      if (constructor && (error instanceof JavaException || error instanceof APKError)) { const recovered = this.platform?.recoverViewConstruction?.(this, method, words, error); if (recovered !== undefined) return recovered; }
       if (!wrap || !(error instanceof JavaException)) throw error;
       const value = this.makeObject('Ljava/lang/reflect/InvocationTargetException;'), obj = this.object(value);
       obj.cause = error.value; obj.message = error.message; obj.exceptionDetails = error.details;
@@ -1998,10 +2856,27 @@ export class APKRuntime {
     return words;
   }
   bridge(method, words, mode, knownKey, resolution) {
+    const tb = this.tb, previous = tb.enter(BUCKET.HOST);
+    const startedAt = tb.last;
+    try {
+      if (resolution !== undefined && knownKey != null && this.fastCallPaths !== false) {   // a pure java.lang bridge (DIRECT_BRIDGES): its body runs over the words, without the argument compaction and the chunk walk
+        let direct = resolution.direct; if (direct === undefined) direct = resolution.direct = this.directBridge(knownKey);
+        if (direct !== null && words.length === (resolution.wordCount ??= wordCount(method.parameters) + (mode === 'static' ? 0 : 1))) return direct(this, words);
+      }
+      return this.bridgeCore(method, words, mode, knownKey, resolution);
+    } finally { tb.leave(previous); if (knownKey !== undefined && knownKey !== null) tb.hostCall(knownKey, tb.last - startedAt); }
+  }
+  /** The direct body (DIRECT_BRIDGES) for a bridge key that no Skia, platform or ICU host claims, or null: those hosts are consulted before the bridge chunks and must keep winning. */
+  directBridge(key) {
+    const direct = DIRECT_BRIDGES.get(key);
+    if (direct === undefined || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key) || ICU_BREAK_KEYS.has(key)) return null;
+    return direct;
+  }
+  bridgeCore(method, words, mode, knownKey, resolution) {
     // Object.<init>() on a live object does nothing: no registry, Skia or platform bridge claims it and the generic tail only validates the receiver.
     if (knownKey === OBJECT_INIT_KEY && words.length === 1 && this.fastCallPaths !== false) {
       const receiver = words[0];
-      if (receiver !== null && typeof receiver === 'object' && this.heap.list[receiver.ref] !== undefined && (this.objectInitIsPlain ??= !(this.skiaHost?.supports?.(OBJECT_INIT_KEY) || this.platform?.supports?.(OBJECT_INIT_KEY) || ICU_BREAK_KEYS.has(OBJECT_INIT_KEY)))) return undefined;
+      if (receiver !== null && typeof receiver === 'object' && this.heap.get(receiver.ref) !== undefined && (this.objectInitIsPlain ??= !(this.skiaHost?.supports?.(OBJECT_INIT_KEY) || this.platform?.supports?.(OBJECT_INIT_KEY) || ICU_BREAK_KEYS.has(OBJECT_INIT_KEY)))) return undefined;
     }
     const staticCall = mode === 'static', args = this.hostArguments(method, words, mode);
     const key = knownKey ?? methodKey(method), name = method.name;
@@ -2011,12 +2886,21 @@ export class APKRuntime {
     if(name==='createMalloced'||name==='registerNativeAllocation'||name==='run'||name==='<init>'){
       const charsetRegistry=charsetRegistryCreation(this,method,args)??charsetRegistryRegistration(this,method,args);if(charsetRegistry)return charsetRegistry.value;
       const nodeRegistry=renderNodeRegistryBridge(this,method,args);if(nodeRegistry)return nodeRegistry.value;
+      const bufferRegistry=hardwareBufferRegistryBridge(this,method,args);if(bufferRegistry)return bufferRegistry.value;
       const regexRegistry=regexRegistryBridge(this,method,args);if(regexRegistry)return regexRegistry.value;
       const colorRegistry=colorFilterRegistryBridge(this,method,args);if(colorRegistry)return colorRegistry.value;
       const textRegistry=textLayoutRegistryBridge(this,method,args);if(textRegistry)return textRegistry.value;
     }
-    if(this.skiaHost?.supports?.(key))return this.skiaHost.invoke(this,method,args,mode);
-    if ((resolution === undefined ? this.platform?.supports?.(key) : (resolution.platformSupports ??= !!this.platform?.supports?.(key)))) return this.platform.invoke(this, method, args, mode);
+    if (resolution === undefined ? this.skiaHost?.supports?.(key) : (resolution.skiaSupports ??= !!this.skiaHost?.supports?.(key))) return this.skiaHost.invoke(this, method, args, mode);   // memoized per resolution like the platform's answer below: the Skia host's key set is fixed
+    if ((resolution === undefined ? this.platform?.supports?.(key) : (resolution.platformSupports ??= !!this.platform?.supports?.(key)))) {
+      if (resolution !== undefined) {
+        // The contract host that serves the key is the first step of AndroidPlatform.invoke (a host that serves a key keeps serving it); remembered on the resolution with the body itself, so the
+        // repeated call neither rebuilds the key text nor searches the hosts.
+        let host = resolution.contractHost; if (host === undefined) host = resolution.contractHost = this.platform.contractHosts?.find(candidate => candidate.supports(key)) ?? null;
+        if (host !== null && host.callWith !== undefined) return host.callWith(this, method, args, resolution.contractFn ??= host.fnFor(key));
+      }
+      return this.platform.invoke(this, method, args, mode, key);
+    }
     // The former single if-chain is split into consecutive chunks (each returns BRIDGE_NEXT when none of its branches applies): V8 refuses to optimize a function this large,
     // which left every bridged call in the bytecode interpreter.
     let result;
@@ -2031,13 +2915,12 @@ export class APKRuntime {
     return this.bridgeC3(method, args, staticCall, key, name);
   }
   bridgeA0(method, args, staticCall, key, name) {
-    if (method.owner === CHM_KEY_SET || (method.owner === 'Ljava/util/concurrent/ConcurrentHashMap;' && (name === 'newKeySet' || method.result === CHM_KEY_SET))) return this.concurrentKeySet(method, args, staticCall, name);
     if(method.owner==='Landroid/content/res/Configuration;'&&name==='isLayoutSizeAtLeast'){
       const size=(this.object(args[0]).fields.get('Landroid/content/res/Configuration;->screenLayout:I')??0)&0x0f;return size!==0&&size>=int(args[1])?1:0;
     }
     if(method.owner==='Ljava/lang/Object;'&&['notify','notifyAll','wait'].includes(name)){
       const object=this.object(args[0]),thread=this.thread??this.scheduler.mainThread(),monitor=this.monitors.get(object.id);
-      if(!monitor||monitor.owner!==thread)this.throwJava('Ljava/lang/IllegalMonitorStateException;','object not locked by thread before '+name+'()');
+      if(!monitor||monitor.owner!==thread)this.throwJava('Ljava/lang/IllegalMonitorStateException;','object not locked by thread before '+name+'()'+this.monitorDiagnostic(monitor,thread));
       if(name==='wait'){
         const millis=args[1]??0n,nanos=args[2]??0;
         if(millis<0n||nanos<0||nanos>999999)this.throwJava('Ljava/lang/IllegalArgumentException;',millis<0n?'timeout value is negative':'nanosecond timeout value out of range');
@@ -2045,7 +2928,7 @@ export class APKRuntime {
         const waiter={thread,notified:false},saved=monitor.count;object.waiters??=[];object.waiters.push(waiter);this.monitors.delete(object.id);   // wait() releases the monitor completely
         const deadline=millis===0n&&nanos===0?Infinity:this.platform.clock.now()+Number(millis)+(nanos?1:0);
         const reacquire=()=>new Blocked({ready:()=>this.monitorFree(args[0]),reason:'Object.wait (reacquire)',finish:()=>{if(!this.monitorTryEnter(args[0],thread))return reacquire();this.monitors.get(object.id).count=saved;if(thread.interrupted){thread.interrupted=false;this.throwJava('Ljava/lang/InterruptedException;',null);}return undefined;}});
-        return new Blocked({ready:()=>waiter.notified,deadline,interruptible:true,reason:'Object.wait',finish:()=>{const i=object.waiters.indexOf(waiter);if(i>=0)object.waiters.splice(i,1);return reacquire();}});
+        return new Blocked({ready:()=>waiter.notified,deadline,interruptible:true,reason:'Object.wait',blocker:args[0],roots:[args[0]],finish:()=>{const i=object.waiters.indexOf(waiter);if(i>=0)object.waiters.splice(i,1);return reacquire();}});
       }
       const waiters=object.waiters??[];
       if(name==='notify'){const waiter=waiters.find(w=>!w.notified);if(waiter)waiter.notified=true;}else for(const waiter of waiters)waiter.notified=true;
@@ -2138,7 +3021,7 @@ export class APKRuntime {
       if(method.parameters[1]==='[I'&&this.typeOf(args[1])!=='[I')this.throwJava('Ljava/lang/ClassCastException;','Array dimensions require int[]');
       if(!dimensions.length||component.match(/^\[*/)[0].length+dimensions.length>255)this.throwJava('Ljava/lang/IllegalArgumentException;','Array dimensions must total1..255');
       for(const length of dimensions)if(length<0)this.throwJava('Ljava/lang/NegativeArraySizeException;','negative reflected array dimension');
-      let nodes=1,totalArrays=0,totalCells=0;for(const length of dimensions){if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*length;if(length>1000000||totalCells+this.arrayCells>4000000||totalArrays+this.heap.size>this.maxHeapObjects)fail('Reflected multi-array allocation exceeds VM heap limits');nodes*=length;}
+      let nodes=1,totalArrays=0,totalCells=0;for(let d=0;d<dimensions.length;d++){const length=dimensions[d];if(nodes===0)break;totalArrays+=nodes;totalCells+=nodes*cellsOf('['.repeat(dimensions.length-d)+component,length);if(length>1000000)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: dimension of ${length} elements exceeds the 1000000-element limit`);if(totalCells+this.arrayCells>this.maxArrayCells)this.emergencyCollect('array cells');if(totalCells+this.arrayCells>this.maxArrayCells)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: array cell budget (${this.maxArrayCells}) needs ${totalCells} weighted cells for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.arrayCells} in use`);if(totalArrays+this.heap.size>this.maxHeapObjects)this.emergencyCollect('objects');if(totalArrays+this.heap.size>this.maxHeapObjects)this.outOfMemory(`Reflected multi-array allocation exceeds VM heap limits: object budget (${this.maxHeapObjects}) needs ${totalArrays} arrays for ${component}${'[]'.repeat(dimensions.length)} (dimensions ${dimensions.join('x')}) with ${this.heap.size} live objects`);nodes*=length;}
       const allocate=depth=>{const value=this.newArray('['.repeat(dimensions.length-depth)+component,dimensions[depth]);if(depth+1<dimensions.length){const values=this.array(value).elements;for(let i=0;i<values.length;i++)values[i]=allocate(depth+1);}return value;};return allocate(0);
     }
     if(staticCall&&['Ljava/lang/Integer;','Ljava/lang/Long;'].includes(method.owner)&&['toString','toHexString','toOctalString','toBinaryString','toUnsignedString'].includes(name)){
@@ -2200,64 +3083,40 @@ export class APKRuntime {
     }
     return BRIDGE_NEXT;
   }
-  /** ConcurrentHashMap.KeySetView (libcore ConcurrentHashMap.java): every operation goes through the backing map, so null keys throw as the map does. */
-  concurrentKeySet(method, args, staticCall, name) {
-    const MAP = 'Ljava/util/concurrent/ConcurrentHashMap;', O = 'Ljava/lang/Object;', Z = 'Z';
-    const call = (receiver, owner, callName, signature, parameters, result, ...rest) => this.dispatch({ owner, name: callName, signature, parameters, result }, [receiver, ...rest], 'virtual');
-    const view = (map, mapped) => { const value = this.makeObject(CHM_KEY_SET), state = this.object(value); state.mapSource = map; state.viewKind = 'keys'; state.mappedValue = mapped; return value; };
-    if (method.owner === MAP) {
-      if (name === 'newKeySet') {
-        if (method.parameters.length && int(args[0]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;');
-        const map = this.makeObject(MAP); call(map, MAP, '<init>', '()V', [], 'V');
-        return view(map, this.readStatic({ owner: 'Ljava/lang/Boolean;', name: 'TRUE', type: 'Ljava/lang/Boolean;' }));
-      }
-      if (method.parameters.length && isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;');
-      return view(args[0], method.parameters.length ? args[1] : null);
-    }
-    const self = this.object(args[0]), map = self.mapSource;
-    const has = item => int(call(map, MAP, 'containsKey', `(${O})Z`, [O], Z, item)) !== 0;
-    const removeKey = item => !isNull(call(map, MAP, 'remove', `(${O})${O}`, [O], O, item));
-    const addKey = item => { if (isNull(self.mappedValue)) this.throwJava('Ljava/lang/UnsupportedOperationException;'); return isNull(call(map, MAP, 'putIfAbsent', `(${O}${O})${O}`, [O, O], O, item, self.mappedValue)); };
-    const keys = () => [...this.object(map).map.values()].map(entry => entry.key);
-    const elementsOf = collection => {
-      if (isNull(collection)) this.throwJava('Ljava/lang/NullPointerException;');
-      const type = this.typeOf(collection), iterator = call(collection, type, 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'), out = [];
-      while (int(call(iterator, this.typeOf(iterator), 'hasNext', '()Z', [], Z))) { if (out.length >= 1000000) fail('Collection iteration limit exceeded'); out.push(call(iterator, this.typeOf(iterator), 'next', `()${O}`, [], O)); }
-      return out;
+  /** keySet()/values()/entrySet() of the bridged maps (libcore HashMap$KeySet ...): the Collection operations beyond iteration, over the backing map. Removal writes through; add is unsupported. */
+  mapViewOperation(obj, method, args, name) {
+    const source = this.object(obj.mapSource), O = 'Ljava/lang/Object;';
+    const values = () => this.collectionValues(obj), elementsOf = collection => { if (isNull(collection)) this.throwJava('Ljava/lang/NullPointerException;', null); return this.collectionValues(this.object(collection)).slice(); };
+    const has = item => {
+      if (obj.viewKind === 'keys') return !!this.mapEntry(source, item).entry;
+      return values().some(value => this.javaEquals(item, value));
     };
+    const removeOne = item => this.dispatch({ owner: obj.type, name: 'remove', parameters: [O], result: 'Z', signature: '(Ljava/lang/Object;)Z' }, [ref(obj.id), item], 'virtual');
     switch (name) {
-      case 'getMap': return map;
-      case 'getMappedValue': return self.mappedValue ?? null;
-      case 'size': return this.object(map).map.size;
-      case 'isEmpty': return this.object(map).map.size ? 0 : 1;
       case 'contains': return has(args[1]) ? 1 : 0;
-      case 'remove': return removeKey(args[1]) ? 1 : 0;
-      case 'add': return addKey(args[1]) ? 1 : 0;
-      case 'clear': call(map, MAP, 'clear', '()V', [], 'V'); return undefined;
-      case 'addAll': { let changed = false; for (const item of elementsOf(args[1])) changed = addKey(item) || changed; return changed ? 1 : 0; }
       case 'containsAll': return elementsOf(args[1]).every(has) ? 1 : 0;
-      case 'removeAll': { let changed = false; for (const item of elementsOf(args[1])) changed = removeKey(item) || changed; return changed ? 1 : 0; }
+      case 'removeAll': { if (source.readOnly) this.throwJava('Ljava/lang/UnsupportedOperationException;', null); let changed = false; for (const item of elementsOf(args[1])) while (removeOne(item)) changed = true; return changed ? 1 : 0; }
       case 'retainAll': {
+        if (source.readOnly) this.throwJava('Ljava/lang/UnsupportedOperationException;', null);
         const keep = elementsOf(args[1]); let changed = false;
-        for (const item of keys()) if (!keep.some(other => this.javaEquals(item, other))) changed = removeKey(item) || changed;
+        for (const item of values().slice()) if (!keep.some(other => this.javaEquals(item, other))) { removeOne(item); changed = true; }
         return changed ? 1 : 0;
       }
-      case 'iterator': { const keySet = this.makeObject('Ljava/util/Set;'), state = this.object(keySet); state.mapSource = map; state.viewKind = 'keys'; return call(keySet, 'Ljava/util/Set;', 'iterator', '()Ljava/util/Iterator;', [], 'Ljava/util/Iterator;'); }
       case 'toArray': {
-        const items = keys();
+        const items = values().slice();
         if (!method.parameters.length) { const array = this.newArray('[Ljava/lang/Object;', items.length); this.object(array).elements = items; return array; }
-        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;');
+        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null);
         const target = this.array(args[1]);
         if (target.elements.length >= items.length) { items.forEach((item, index) => { target.elements[index] = item; }); if (target.elements.length > items.length) target.elements[items.length] = null; return args[1]; }
         const array = this.newArray(this.typeOf(args[1]), items.length); this.object(array).elements = items; return array;
       }
-      case 'toString': return `[${keys().map(item => equal(item, args[0]) ? '(this Collection)' : this.javaString(item)).join(', ')}]`;
-      case 'hashCode': return keys().reduce((sum, item) => (sum + (isNull(item) ? 0 : this.javaHash(item))) | 0, 0);
+      case 'hashCode': return values().reduce((sum, item) => (sum + (isNull(item) ? 0 : this.javaHash(item))) | 0, 0);
+      case 'toString': return `[${values().map(item => equal(item, ref(obj.id)) ? '(this Collection)' : this.javaString(item)).join(', ')}]`;
       case 'equals': {
         if (equal(args[0], args[1])) return 1;
-        if (isNull(args[1]) || typeof args[1] === 'string' || !this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Set;')) return 0;
+        if (obj.viewKind === 'values' || isNull(args[1]) || typeof args[1] === 'string' || !this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Set;')) return 0;
         const other = elementsOf(args[1]);
-        return other.length === this.object(map).map.size && other.every(has) ? 1 : 0;
+        return other.length === source.map.size && other.every(has) ? 1 : 0;
       }
     }
     return BRIDGE_NEXT;
@@ -2280,6 +3139,13 @@ export class APKRuntime {
       const digits=(match[3]??match[5]??match[6]).replace(/^0+/,'')||'0';if(digits.length>22)return invalid();
       const number=BigInt((match[3]?'0x':match[5]?'0o':'')+digits)*(match[1]==='-'?-1n:1n);
       return number<-(1n<<63n)||number>(1n<<63n)-1n?invalid():this.boxPrimitive('J',number);
+    }
+    // Short.decode / Byte.decode: Integer.decode, then the range of the type (java.lang.Short / java.lang.Byte)
+    if((method.owner==='Ljava/lang/Short;'||method.owner==='Ljava/lang/Byte;')&&staticCall&&name==='decode'){
+      const short=method.owner==='Ljava/lang/Short;',limit=short?32768:128;
+      const value=this.object(this.dispatch({owner:'Ljava/lang/Integer;',name:'decode',parameters:['Ljava/lang/String;'],result:'Ljava/lang/Integer;',signature:'(Ljava/lang/String;)Ljava/lang/Integer;'},[args[0]],'static')).boxed;
+      if(value<-limit||value>=limit)this.throwJava('Ljava/lang/NumberFormatException;',`Value ${value} out of range from input ${args[0]}`);
+      return this.boxPrimitive(short?'S':'B',value);
     }
     // Integer.getInteger / Integer.decode (java.lang.Integer): a system property decoded like Integer.decode ("0x", "#", leading-0 octal,
     // sign); a missing or malformed property yields the default (boxed), decode throws NumberFormatException instead.
@@ -2375,7 +3241,7 @@ export class APKRuntime {
       if (name === 'arrayOffset' || name === 'isReadOnly') return 0;
       if (name === 'hasArray') return 1;
       if (name === 'charAt') { const at = int(args[1]); if (at < 0 || at >= limit - position) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'CharBuffer.charAt bounds'); return array.elements[position + at] & 65535; }
-      if (name === 'toString') return utf16String(array.elements.slice(position, limit));
+      if (name === 'toString') return utf16String(cellRange(array.cells, position, limit));
       if (name === 'subSequence') { const start = int(args[1]), end = int(args[2]); if (start < 0 || end < start || end > limit - position) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'CharBuffer.subSequence bounds'); const value = this.makeObject('Ljava/nio/CharBuffer;'); Object.assign(this.object(value), {charArray: buffer.charArray, bufferPosition: position + start, bufferLimit: position + end, bufferCapacity: buffer.bufferCapacity}); return value; }
       if (name === 'position' || name === 'limit') { if (args.length === 1) return name === 'position' ? position : limit; const n = int(args[1]), max = name === 'position' ? limit : buffer.bufferCapacity; if (n < 0 || n > max) this.throwJava('Ljava/lang/IllegalArgumentException;', 'CharBuffer position/limit bounds'); if (name === 'position') buffer.bufferPosition = n; else { buffer.bufferLimit = n; buffer.bufferPosition = Math.min(position, n); } return args[0]; }
       if (['clear', 'flip', 'rewind'].includes(name)) { buffer.bufferPosition = 0; if (name === 'clear') buffer.bufferLimit = buffer.bufferCapacity; else if (name === 'flip') buffer.bufferLimit = position; return args[0]; }
@@ -2412,7 +3278,7 @@ export class APKRuntime {
         // ByteBuffer.asCharBuffer(): a live view of the remaining bytes (position..limit) as UTF-16 units in the buffer's current byte order.
         const count = (limit - pos) >> 1, little = buffer.littleEndian, base = pos, storage = bytes.elements, view = this.newArray('[C', 0);
         const unit = index => little ? ((storage[base + index * 2 + 1] & 255) << 8) | (storage[base + index * 2] & 255) : ((storage[base + index * 2] & 255) << 8) | (storage[base + index * 2 + 1] & 255);
-        this.object(view).elements = new Proxy(new Array(count).fill(0), {
+        this.object(view).cells = new Proxy(new Array(count).fill(0), {   // a live view, not storage of its own: set directly (the elements setter would convert it)
           get: (target, property, receiver) => typeof property === 'string' && /^\d+$/.test(property) ? (Number(property) < count ? unit(Number(property)) : undefined) : Reflect.get(target, property, receiver),
           set: (target, property, value) => {
             if (typeof property === 'string' && /^\d+$/.test(property)) { const index = Number(property); if (index >= count) return false; const c = value & 65535, hi = (c >> 8 << 24) >> 24, lo = ((c & 255) << 24) >> 24; storage[base + index * 2] = little ? lo : hi; storage[base + index * 2 + 1] = little ? hi : lo; return true; }
@@ -2429,7 +3295,7 @@ export class APKRuntime {
         const array = this.array(args[1]), from = method.parameters.length === 3 ? int(args[2]) : 0, count = method.parameters.length === 3 ? int(args[3]) : array.elements.length;
         if (from < 0 || count < 0 || from > array.elements.length - count) this.throwJava('Ljava/lang/IndexOutOfBoundsException;', 'ByteBuffer bulk range');
         if (count > limit - pos) this.throwJava(name === 'get' ? 'Ljava/nio/BufferUnderflowException;' : 'Ljava/nio/BufferOverflowException;', null);
-        for (let i = 0; i < count; i++) { if (name === 'get') array.elements[from + i] = bytes.elements[pos + i]; else bytes.elements[pos + i] = array.elements[from + i]; }
+        if (name === 'get') array.cells.set(bytes.cells.subarray(pos, pos + count), from); else bytes.cells.set(array.cells.subarray(from, from + count), pos);
         buffer.bufferPosition += count; return args[0];
       }
       if (name === 'isReadOnly') return 0;
@@ -2445,15 +3311,19 @@ export class APKRuntime {
       if (['clear','flip','rewind'].includes(name)) {buffer.bufferPosition=0;if(name==='clear')buffer.bufferLimit=buffer.bufferCapacity;else if(name==='flip')buffer.bufferLimit=pos;return args[0];}
       const writing=name.startsWith('put'),suffix=name.slice(3),width=['Long','Double'].includes(suffix)?8:['Short','Char'].includes(suffix)?2:suffix?4:1,indexed=method.parameters[0]==='I' && (writing?method.parameters.length===2:method.parameters.length===1),at=indexed?int(args[1]):pos;
       if(at<0||at>limit-width)this.throwJava(indexed?'Ljava/lang/IndexOutOfBoundsException;':writing?'Ljava/nio/BufferOverflowException;':'Ljava/nio/BufferUnderflowException;', 'ByteBuffer access outside limit');
-      const data=new DataView(new ArrayBuffer(width)),little=buffer.littleEndian;
-      for(let i=0;i<width;i++)data.setInt8(i,bytes.elements[at+i]);
-      if(writing){const value=args[indexed?2:1];if(suffix==='Long'||suffix==='Double')data.setBigInt64(0,wide(value),little);else if(width===4)data.setInt32(0,int(value),little);else if(width===2)data.setInt16(0,int(value),little);else data.setInt8(0,int(value));for(let i=0;i<width;i++)bytes.elements[at+i]=data.getInt8(i);}
+      const cells=bytes.cells,data=new DataView(cells.buffer,cells.byteOffset+at,width),little=buffer.littleEndian;   // a view straight over the byte[]'s storage
+      if(writing){const value=args[indexed?2:1];if(suffix==='Long'||suffix==='Double')data.setBigInt64(0,wide(value),little);else if(width===4)data.setInt32(0,int(value),little);else if(width===2)data.setInt16(0,int(value),little);else data.setInt8(0,int(value));}
       if(!indexed)buffer.bufferPosition+=width;
       if(writing)return args[0];return width===8?data.getBigInt64(0,little):width===4?data.getInt32(0,little):width===2?(suffix==='Char'?data.getUint16(0,little):data.getInt16(0,little)):data.getInt8(0);
     }
     return BRIDGE_NEXT;
   }
   bridgeA2(method, args, staticCall, key, name) {
+    if (staticCall && name === 'setAccessible' && method.owner === 'Ljava/lang/reflect/AccessibleObject;') {   // AccessibleObject.setAccessible(AccessibleObject[] array, boolean flag): the flag on every element
+      if (isNull(args[0])) this.throwJava('Ljava/lang/NullPointerException;', null);
+      for (const element of this.object(args[0]).elements) { if (isNull(element)) this.throwJava('Ljava/lang/NullPointerException;', null); this.object(element).accessible = !!args[1]; }
+      return undefined;
+    }
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;' && staticCall) {
       const constant = name => this.readStatic({ owner: method.owner, name, type: method.owner, key: `${method.owner}->${name}:${method.owner}` });
       if (name === 'values') { const array = this.newArray(`[${method.owner}`, TIME_UNITS.length); this.object(array).elements = TIME_UNITS.map(constant); return array; }
@@ -2474,8 +3344,13 @@ export class APKRuntime {
       if (isNull(requested)) this.throwJava('Ljava/lang/NullPointerException;', name === 'load' ? 'filename == null' : 'nativeLibraryName == null');
       const text = this.stringCharacters(requested);
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);
+      // A companion package's code (src/package-registry.js) never links the app's libraries, and its own are not offered to JNI.
+      // The class that calls System.loadLibrary decides whose library it is: framework code (Conscrypt's javacrypto, media_jni ...) loads the platform's own libraries for any package.
+      const directOwner = this.currentMethod?.owner, frameworkCaller = !!directOwner && this.platform?.packages?.multi && this.platform.packages.entryOfClass(this, directOwner) === null;
+      if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); } if (!caller.main) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); }
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
+      if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
       if (this.stubNativeLibrary(text)) return undefined;
       this.nativeRequired(key, text);
     }
@@ -2483,6 +3358,13 @@ export class APKRuntime {
       if (['getProperty','setProperty','clearProperty'].includes(name)) {
         if(isNull(args[0]))this.throwJava('Ljava/lang/NullPointerException;','Property key is null');
         if(typeof args[0]!=='string'||!args[0].length)this.throwJava('Ljava/lang/IllegalArgumentException;','Property key is empty/invalid');
+        if(this.systemPropertiesObject){   // System.getProperties() was handed out: that Properties object is the table
+          const via=(method,parameters,result,values)=>this.dispatch({owner:'Ljava/util/Properties;',name:method,parameters,result,signature:`(${parameters.join('')})${result}`},[this.systemPropertiesObject,...values],'virtual');
+          if(name==='getProperty')return args.length>1?via('getProperty',['Ljava/lang/String;','Ljava/lang/String;'],'Ljava/lang/String;',[args[0],args[1]]):via('getProperty',['Ljava/lang/String;'],'Ljava/lang/String;',[args[0]]);
+          if(name==='clearProperty'){const old=via('getProperty',['Ljava/lang/String;'],'Ljava/lang/String;',[args[0]]);via('remove',['Ljava/lang/Object;'],'Ljava/lang/Object;',[args[0]]);return old;}
+          if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','Property value is null');
+          return via('setProperty',['Ljava/lang/String;','Ljava/lang/String;'],'Ljava/lang/Object;',[args[0],args[1]]);
+        }
         const old=this.javaProperties.has(args[0])?this.javaProperties.get(args[0]):null;
         if(name==='getProperty')return old??args[1]??null;
         if(name==='clearProperty')this.javaProperties.delete(args[0]);else{if(isNull(args[1]))this.throwJava('Ljava/lang/NullPointerException;','Property value is null');if(typeof args[1]!=='string')fail('Expected Java property String');this.javaProperties.set(args[0],args[1]);}return old;
@@ -2497,8 +3379,11 @@ export class APKRuntime {
         if(!source.type.startsWith('[')||!target.type.startsWith('['))this.throwJava('Ljava/lang/ArrayStoreException;','System.arraycopy requires arrays');
         if((source.type.slice(1).length===1||target.type.slice(1).length===1)&&source.type!==target.type)this.throwJava('Ljava/lang/ArrayStoreException;','System.arraycopy primitive array type mismatch');
         if(from<0||to<0||length<0||from+length>source.elements.length||to+length>target.elements.length)this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','System.arraycopy bounds error');
-        const values = source.elements.slice(from, from + length);
-        for (let i = 0; i < length; i++) { this.checkArrayValue(target, values[i]); target.elements[to + i] = values[i]; }
+        const src = source.cells, dst = target.cells;
+        if (ArrayBuffer.isView(dst)) { if (ArrayBuffer.isView(src)) dst.set(src.subarray(from, from + length), to); else for (let i = 0; i < length; i++) dst[to + i] = src[from + i]; return undefined; }   // typed storage: one copy (overlap-safe when source and target share the buffer)
+        if (source.type === target.type || target.type === '[Ljava/lang/Object;') { if (src === dst) dst.copyWithin(to, from, from + length); else for (let i = 0; i < length; i++) dst[to + i] = src[from + i]; return undefined; }   // every element of the source is assignable
+        const values = src.slice(from, from + length);
+        for (let i = 0; i < length; i++) { this.checkArrayValue(target, values[i]); dst[to + i] = values[i]; }
         return undefined;
       }
     }
@@ -2571,6 +3456,7 @@ export class APKRuntime {
         if (name === 'sort' && method.parameters.length <= 3 && source.type.length === 2 && component !== 'Z' && (method.parameters.length === 1 || method.parameters[1] === 'I')) {
           const ranged = method.parameters.length === 3, from = ranged ? int(args[1]) : 0, to = ranged ? int(args[2]) : source.elements.length;
           if (from > to) this.throwJava('Ljava/lang/IllegalArgumentException;', `fromIndex(${from}) > toIndex(${to})`); if (from < 0 || to > source.elements.length) this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `Array index out of range: ${from < 0 ? from : to}`);
+          if (ArrayBuffer.isView(source.cells)) { source.cells.subarray(from, to).sort((a, b) => order(numeric(a), numeric(b))); return; }
           const part = source.elements.slice(from, to).sort((a, b) => order(numeric(a), numeric(b))); for (let i = 0; i < part.length; i++) source.elements[from + i] = part[i]; return;
         }
         if (name === 'toString' && source.type.length === 2) {
@@ -2613,8 +3499,10 @@ export class APKRuntime {
       const classArgument=method.parameters.at(-1)==='Ljava/lang/Class;'?this.object(args.at(-1)).classType:null;
       if(classArgument&&!classArgument.startsWith('['))this.throwJava('Ljava/lang/NullPointerException;','Array class has no component type');
       if(classArgument&&!classArgument.startsWith('[L')&&!classArgument.startsWith('[['))this.throwJava('Ljava/lang/ClassCastException;','Typed copy requires a reference array class');
-      const result = this.newArray(classArgument??source.type, length), target = this.object(result);
-      for (let i = 0; i < Math.min(length, source.elements.length - from); i++){const value=source.elements[from+i];this.checkArrayValue(target,value);target.elements[i]=value;}
+      const result = this.newArray(classArgument??source.type, length), target = this.object(result), count = Math.min(length, source.cells.length - from);
+      if (ArrayBuffer.isView(target.cells)) target.cells.set(cellRange(source.cells, from, from + count));
+      else if (!classArgument || classArgument === source.type || classArgument === '[Ljava/lang/Object;') for (let i = 0; i < count; i++) target.cells[i] = source.cells[from + i];
+      else for (let i = 0; i < count; i++){const value=source.cells[from+i];this.checkArrayValue(target,value);target.cells[i]=value;}
       return result;
     }
     return BRIDGE_NEXT;
@@ -2636,17 +3524,15 @@ export class APKRuntime {
       const wanted = this.stringCharacters(args[1]);
       for (const entry of cls.staticFields) {
         if (!(entry.flags & 0x4000)) continue;
-        const field = cls.dex.fields[entry.index], value = this.staticFields.get(field.key);
+        const field = cls.dex.field(entry.index), value = this.readStatic(field);   // readStatic, not the static table: on the WebAssembly core a DEX class's statics live in its metaspace
         if (value && typeof value === 'object' && this.object(value).enumName !== undefined && this.stringCharacters(this.object(value).enumName) === wanted) return value;
       }
       this.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant ${type.slice(1, -1).replaceAll('/', '.').replaceAll('$', '.')}.${wanted}`);
     }
     if (method.owner === 'Ljava/lang/ThreadLocal;' && name === 'withInitial') { const local = this.makeObject('Ljava/lang/ThreadLocal;'); this.object(local).threadLocalSupplier = args[0]; return local; } // SuppliedThreadLocal
     if (method.owner === 'Ljava/lang/Thread;' && name === 'currentThread') return this.mainThread ??= this.makeObject('Ljava/lang/Thread;');
-    if ((method.owner === 'Landroid/os/Looper;' || method.owner === 'Landroid/content/Context;' || method.owner === 'Landroid/content/ContextWrapper;') && name === 'getMainLooper') return this.mainLooper ??= this.makeObject('Landroid/os/Looper;');
-    // The main thread's Looper is the platform event queue; any other thread has one only after Looper.prepare() (HandlerThread does that) -- see concurrency-host.js.
-    if (method.owner === 'Landroid/os/Looper;' && name === 'myLooper') return this.thread === null || this.thread === this.scheduler.main ? (this.mainLooper ??= this.makeObject('Landroid/os/Looper;')) : (this.thread.looper ?? null);
-    if (method.owner === 'Landroid/os/Looper;' && name === 'isCurrentThread') return this.thread === null || this.thread === this.scheduler.main ? 1 : (this.thread.looper ? 1 : 0);
+    // ContextImpl.getMainLooper(): the process main thread's Looper (the original android.os.Looper prepared at process start, see looper-host.js).
+    if ((method.owner === 'Landroid/content/Context;' || method.owner === 'Landroid/content/ContextWrapper;') && name === 'getMainLooper') return this.platform.looperHost.mainLooper(this);
     if (method.owner === 'Landroid/os/SystemClock;') {
       if (name === 'sleep') {   // SystemClock.sleep: Thread.sleep that swallows InterruptedException, finishing the wait and restoring the interrupt flag
         const until = this.clock.now() + Number(wide(args[0])); let interrupted = false;
@@ -2676,14 +3562,13 @@ export class APKRuntime {
         }
         return lines.join('\n') + '\n';
       }
+      if (name === 'println_native') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[1])] ?? 'V', text = `${args[2]}: ${args[3] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }
       if (name === 'println') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[0])] ?? 'V', text = `${args[1]}: ${args[2] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }
+      if (name === 'println_native') { const level = ({ 2: 'V', 3: 'D', 4: 'I', 5: 'W', 6: 'E', 7: 'A' })[int(args[1])] ?? 'V', text = `${args[2]}: ${args[3] ?? ''}`; this.record(`LOG ${level} ${text}`); return new TextEncoder().encode(text).length; }   // Log.println_native(bufID, priority, tag, msg) (hidden; android.util.LogPrinter writes through it): every log buffer is the one logcat of the lab
       // Log.x(tag, msg, tr) logs msg + '\n' + getStackTraceString(tr); Log.w(tag, tr) / Log.wtf(tag, tr) log just the stack trace string.
       const trace = throwable => this.dispatch({ owner: 'Landroid/util/Log;', name: 'getStackTraceString', parameters: ['Ljava/lang/Throwable;'], result: 'Ljava/lang/String;', signature: '(Ljava/lang/Throwable;)Ljava/lang/String;' }, [throwable], 'static');
       const text = method.parameters.length === 3 ? `${args[1] ?? ''}\n${trace(args[2])}` : method.parameters[1] === 'Ljava/lang/Throwable;' ? trace(args[1]) : (args[1] ?? '');
       const message = `${args[0]}: ${text}`; this.record(`LOG ${name === 'wtf' ? 'A' : name.toUpperCase()} ${message}`); return new TextEncoder().encode(message).length;
-    }
-    if (method.owner === 'Landroid/os/Handler;' && name === 'createAsync') {
-      this.object(args[0]); const value = this.makeObject(method.owner); this.object(value).looper = args[0]; this.object(value).async = true; return value;
     }
     if (method.owner === 'Ljava/util/concurrent/Executors;') {
       const count = int(args[0]); if (count <= 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Executor pool size must be positive');
@@ -2696,9 +3581,9 @@ export class APKRuntime {
     if (method.owner.endsWith('FieldUpdater;') && name === 'newUpdater') {
       const owner = this.object(args[0]).classType, fieldName = args[args.length - 1], cls = this.classes.get(owner);
       const expected = method.owner.includes('Reference') ? this.object(args[1]).classType : method.owner.includes('Integer') ? 'I' : 'J';
-      const entry = cls?.fields.find(item => { const field = cls.dex.fields[item.index]; return field.name === fieldName && field.type === expected; });
+      const entry = cls?.fields.find(item => { const field = cls.dex.field(item.index); return field.name === fieldName && field.type === expected; });
       if (!entry || !(entry.flags & 0x40)) this.throwJava('Ljava/lang/IllegalArgumentException;', `Atomic updater requires volatile field ${owner}->${fieldName}:${expected}`);
-      const value = this.makeObject(method.owner); this.object(value).updaterField = cls.dex.fields[entry.index]; return value;
+      const value = this.makeObject(method.owner); this.object(value).updaterField = cls.dex.field(entry.index); return value;
     }
     if (method.owner === 'Ljava/lang/Class;' && name === 'forName') {
       return this.resolveClass(args[0], args.length === 1 || !!args[1], args.length === 3 ? (isNull(args[2]) ? 'boot' : args[2]) : undefined); // explicit null = the boot loader
@@ -2708,7 +3593,7 @@ export class APKRuntime {
     return BRIDGE_NEXT;
   }
   bridgeB0(method, args, staticCall, key, name) {
-    const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
+    const primitiveBoxType = BOX_TYPE_OF.get(method.owner);
     if(primitiveBoxType&&!staticCall&&name==='<init>'){
       const object=this.object(args[0]);if(object.boxed!==undefined)fail('Primitive wrapper constructor cannot run twice');
       if(method.parameters[0]==='Ljava/lang/String;'){   // Integer(String) etc: parse exactly as the matching parseXxx(String) would
@@ -2762,26 +3647,27 @@ export class APKRuntime {
           else{if(offset>length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','offset '+offset+', count '+count+', length '+length);
             for(let i=offset;i<offset+count;i++){const cp=source.elements[i]|0;if(cp<0||cp>0x10ffff)this.throwJava('Ljava/lang/IllegalArgumentException;',String(cp));text+=String.fromCodePoint(cp);}}
         }
-        else if(method.parameters[0]==='[C'){const source=this.array(args[1]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires char[]');const from=method.parameters.length===3?int(args[2]):0,count=method.parameters.length===3?int(args[3]):source.elements.length;if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String char array range');text=utf16String(source.elements.slice(from,from+count));}
+        else if(method.parameters[0]==='[C'){const source=this.array(args[1]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires char[]');const from=method.parameters.length===3?int(args[2]):0,count=method.parameters.length===3?int(args[3]):source.elements.length;if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String char array range');text=utf16String(cellRange(source.cells,from,from+count));}
         else if(method.parameters[0]==='[B'&&method.parameters[method.parameters.length-1]==='I'&&(method.parameters.length===2||method.parameters.length===4)){
           // Deprecated String(byte[] ascii, int hibyte[, offset, count]): each char is (hibyte << 8) | (byte & 0xff).
           const source=this.array(args[1]);if(source.type!=='[B')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires byte[]');
           const quad=method.parameters.length===4,hibyte=(int(args[quad?2:2])&255)<<8,from=quad?int(args[3]):0,count=quad?int(args[4]):source.elements.length;
           if(quad&&method.parameters[1]!=='I')fail('Unexpected String(byte[],...) signature');
           if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String byte array range');
-          text=String.fromCharCode(...source.elements.slice(from,from+count).map(byte=>hibyte|(byte&255)));
+          {const cells=source.cells,units=new Uint16Array(count);for(let i=0;i<count;i++)units[i]=hibyte|(cells[from+i]&255);text=utf16String(units);}
         }
         else if(method.parameters[0]==='[B'){
           const source=this.array(args[1]);if(source.type!=='[B')this.throwJava('Ljava/lang/ClassCastException;','String constructor requires byte[]');
           const ranged=method.parameters[1]==='I',from=ranged?int(args[2]):0,count=ranged?int(args[3]):source.elements.length,selector=method.parameters.length>(ranged?3:1)?args[ranged?4:2]:null;
           if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String byte array range');
-          text=decodeBytes(Uint8Array.from(source.elements.slice(from,from+count),byte=>byte&255),this.stringCodec(selector,true));
+          text=decodeBytes(unsignedBytes(source.cells,from,from+count),this.stringCodec(selector,true));
         }
         const units=(this.constructedStringUnits??0)+text.length;if(text.length>4000000||units>16*1024*1024)fail('Constructed String UTF-16 storage limit exceeded');this.constructedStringUnits=units;object.stringValue=text;return;
       }
-      if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.elements.slice());}
+      if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.cells);}
       const value = this.stringCharacters(args[0]);
-      if(name==='getBytes'){const bytes=encodeString(value,this.stringCodec(method.parameters.length?args[1]:null,false)),result=this.newArray('[B',bytes.length);this.array(result).elements=Array.from(bytes);return result;}
+      if(name==='getBytes')return this.arrayOf('[B',encodeString(value,this.stringCodec(method.parameters.length?args[1]:null,false)));
+      if(['codePointBefore','codePointCount','offsetByCodePoints'].includes(name)&&!isNull(args[0])&&this.isStringValue(args[0]))return this.codePointOps(this.stringCharacters(args[0]),name,args);
       if(['contains','equalsIgnoreCase','compareToIgnoreCase','codePointAt','intern','repeat','isBlank','contentEquals'].includes(name)||(['toLowerCase','toUpperCase'].includes(name)&&method.parameters.length===0)){
         const sequence=x=>{if(isNull(x))this.throwJava('Ljava/lang/NullPointerException;',null);return this.isStringValue(x)?this.stringCharacters(x):this.javaString(x);};
         // java.lang.String semantics (libcore android-13.0.0_r1): case folding for equalsIgnoreCase/compareToIgnoreCase is per UTF-16 unit (Character.toUpperCase then toLowerCase).
@@ -2808,9 +3694,9 @@ export class APKRuntime {
         return changed===value?args[0]:changed;
       }
       if(name==='getChars'){
-        const begin=int(args[1]),end=int(args[2]);if(begin<0||end<begin||end>value.length)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String source range');const target=this.array(args[3]),offset=int(args[4]);if(target.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String.getChars requires char[]');if(offset<0||offset>target.elements.length-(end-begin))this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','String.getChars target range');for(let i=begin;i<end;i++)target.elements[offset+i-begin]=value.charCodeAt(i);return;
+        const begin=int(args[1]),end=int(args[2]);if(begin<0||end<begin||end>value.length)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String source range');const target=this.array(args[3]),offset=int(args[4]);if(target.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','String.getChars requires char[]');if(offset<0||offset>target.elements.length-(end-begin))this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;','String.getChars target range');const cells=target.cells;for(let i=begin;i<end;i++)cells[offset+i-begin]=value.charCodeAt(i);return;
       }
-      if(name==='toCharArray'){const result=this.newArray('[C',value.length);this.array(result).elements=Array.from({length:value.length},(_,i)=>value.charCodeAt(i));return result;} if (typeof value !== 'string') fail('Expected String receiver');
+      if(name==='toCharArray'){const result=this.newArray('[C',value.length),cells=this.object(result).cells;for(let i=0;i<value.length;i++)cells[i]=value.charCodeAt(i);return result;} if (typeof value !== 'string') fail('Expected String receiver');
       if(name==='regionMatches'){
         const conditional=method.parameters[0]==='Z',shift=conditional?1:0,ignoreCase=conditional&&!!args[1],offset=int(args[1+shift]),other=args[2+shift],from=int(args[3+shift]),length=int(args[4+shift]);
         // Preserve Java's short-circuit bounds checks, including negative length.
@@ -2883,20 +3769,26 @@ export class APKRuntime {
       if (name === 'getClass') return this.classObject(this.typeOf(args[0]));
       if (name === 'equals') return equal(args[0], args[1]) ? 1 : 0;
       if (name === 'hashCode') return typeof args[0] === 'string' ? stringHash(args[0]) : this.object(args[0]).id;
-      if (name === 'toString') return this.javaString(args[0]);
+      if (name === 'toString') {
+        // Object.toString for an instance of a class loaded from DEX: getClass().getName() + "@" + Integer.toHexString(hashCode()). It must not go back through virtual toString: a class's own
+        // toString reaches this method through invoke-super (super.toString()) and would call itself forever.
+        const type = typeof args[0] === 'string' ? null : this.typeOf(args[0]);
+        if (type && !type.startsWith('[') && this.classes.has(type)) { const hash = this.dispatch({ owner: 'Ljava/lang/Object;', name: 'hashCode', parameters: [], result: 'I', signature: '()I' }, [args[0]], 'virtual'); return this.className(type, 'binary') + '@' + (hash >>> 0).toString(16); }
+        return this.javaString(args[0]);
+      }
       if (name === 'finalize') return undefined;   // Object.finalize() does nothing; the VM never runs finalizers on its own (the collector reclaims objects without them)
       if (name === 'clone') {
         const original = this.object(args[0]);
         if (original.elements) { const value = this.newArray(original.type, original.elements.length); this.object(value).elements = original.elements.slice(); return value; }
         if (!this.isSubtype(original.type, 'Ljava/lang/Cloneable;')) this.throwJava('Ljava/lang/CloneNotSupportedException;', original.type);
         const value = this.makeObject(original.type), target = this.object(value);
-        Object.assign(target, original, { id: value.ref, fields: new Map(original.fields), children: [...original.children] }); return value;
+        Object.assign(target, original, { id: value.ref, slots: original.slots.length ? original.slots.slice() : original.slots, fieldExtra: original.fieldExtra === null ? null : new Map(original.fieldExtra) }); if (Object.hasOwn(original, 'children')) target.children = [...original.children]; return value;
       }
     }
     return BRIDGE_NEXT;
   }
   bridgeC0(method, args, staticCall, key, name) {
-    const primitiveBoxType = Object.keys(BOX_TYPES).find(type => BOX_TYPES[type] === method.owner);
+    const primitiveBoxType = BOX_TYPE_OF.get(method.owner);
     const obj = this.object(args[0]);
     if (!this.isSubtype(obj.type, method.owner)) fail(`Receiver does not match ${methodKey(method)}`);
     if (method.owner === 'Ljava/util/concurrent/TimeUnit;') {
@@ -2922,6 +3814,7 @@ export class APKRuntime {
     if (['Ljava/lang/reflect/Method;', 'Ljava/lang/reflect/Constructor;', 'Ljava/lang/reflect/Field;', 'Ljava/lang/reflect/Member;'].includes(method.owner)) {
       const member = obj.member; if (!member) fail('Missing reflected member metadata');
       const owner = member.field?.owner ?? member.method.owner;
+      if (name === 'getAnnotationsByType' || name === 'getDeclaredAnnotationsByType') return this.annotationsByType(member.field ?? member.method, member, args[1]);   // a member inherits nothing: both are the declared ones
       if(['getAnnotations','getDeclaredAnnotations','getAnnotation','getDeclaredAnnotation','isAnnotationPresent'].includes(name)){
         const definition=member.field??member.method;
         // Platform members registered as bridges/hosts carry no run-time-visible annotation metadata in this VM (documented gap: @Deprecated and friends on JDK members).
@@ -2945,7 +3838,8 @@ export class APKRuntime {
         if (!staticField && !this.isSubtype(target.type, owner)) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Reflection field receiver mismatch');
         this.reflectionAccess(member, obj.accessible, args[1]);
         if (name.startsWith('get')) {
-          const value = staticField ? this.readStatic(field) : target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
+          const accessor = staticField ? null : HIDDEN_ACCESSORS.get(field.key);
+          const value = staticField ? this.readStatic(field) : accessor ? accessor.get(this, args[1]) : target.fields.has(field.key) ? target.fields.get(field.key) : defaultValue(field.type);
           if (name === 'get') return this.boxPrimitive(field.type, value);
           return this.unboxReflection(this.boxPrimitive(field.type, value), method.result);
         }
@@ -2953,7 +3847,8 @@ export class APKRuntime {
           if (member.flags & 0x10 && (staticField || !obj.accessible)) this.throwJava('Ljava/lang/IllegalAccessException;', `Final field ${field.key}`);
           const sourceType = method.parameters[1], boxed = name === 'set' ? args[2] : this.boxPrimitive(sourceType, args[2]);
           const value = this.unboxReflection(boxed, field.type);
-          if (staticField) this.writeStatic(field, value); else this.storeField(target.fields, field.key, value);
+          const accessor = staticField ? null : HIDDEN_ACCESSORS.get(field.key);
+          if (staticField) this.writeStatic(field, value); else if (accessor?.set) accessor.set(this, args[1], value); else if (accessor) this.throwJava('Ljava/lang/IllegalAccessException;', `Field ${field.key} is read-only in the lab`); else this.storeField(target.fields, field.key, value);
           return undefined;
         }
       }
@@ -2963,7 +3858,7 @@ export class APKRuntime {
       return undefined;
     }
     if (method.owner === 'Ljava/util/AbstractList;' && name === 'iterator') {
-      const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+      const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
       iterator.virtualList = args[0]; iterator.index = 0; iterator.last = -1; iterator.expectedListMod = obj.fields.get('Ljava/util/AbstractList;->modCount:I') ?? 0; return value;
     }
     if (method.owner === 'Ljava/util/AbstractCollection;' && name === 'isEmpty') {
@@ -2977,15 +3872,6 @@ export class APKRuntime {
       this.monitorEnter(args[0]);
       try { return this.dispatch({ ...method, owner: this.typeOf(obj.delegate) }, [obj.delegate, ...words.slice(1)], 'virtual'); }
       finally { this.monitorExit(args[0]); }
-    }
-    if (method.owner === 'Landroid/os/Handler;') {
-      if (name === '<init>') {
-        if (method.parameters[0] === 'Landroid/os/Looper;') { this.object(args[1]); obj.looper = args[1]; obj.callback = args[2] ?? null; }
-        else { obj.looper = this.mainLooper ??= this.makeObject('Landroid/os/Looper;'); obj.callback = args[1] ?? null; }
-        return undefined;
-      }
-      if (name === 'getLooper') return obj.looper;
-      throw new APKError('Handler message queue scheduling is not implemented; no Runnable was executed or discarded.', { kind: 'unsupported-messagequeue', method: key });
     }
     if (method.owner === 'Ljava/util/concurrent/ThreadPoolExecutor;') {
       if (name === 'shutdown') { obj.shutdown = true; return undefined; }
@@ -3065,7 +3951,6 @@ export class APKRuntime {
       if (name === 'getId') return obj.threadId ??= this.nextThreadId++;
       return name === 'getName' ? 'APK main' : 1;
     }
-    if (method.owner === 'Landroid/os/Looper;' && name === 'getThread') { const looper = this.object(args[0]); return looper.thread?.javaObject ?? (this.mainThread ??= this.makeObject('Ljava/lang/Thread;')); }
     if (method.owner.startsWith('Ljava/lang/ref/')) {
       if (name === '<init>') { obj.referent = args[1]; return undefined; }
       if (name === 'get') return obj.referent ?? null;
@@ -3076,6 +3961,13 @@ export class APKRuntime {
       if (name === '<init>' && method.owner === 'Ljava/lang/AssertionError;' && method.parameters[0] === 'Ljava/lang/Object;') {   // AssertionError(Object detail): message = String.valueOf(detail); a Throwable detail is also the cause
         obj.stack = this.captureStack(); obj.message = this.javaString(args[1]); obj.causeInitialized = true; obj.cause = !isNull(args[1]) && this.isSubtype(this.typeOf(args[1]), 'Ljava/lang/Throwable;') ? args[1] : null; return undefined;
       }
+      if (name === '<init>' && method.owner === 'Ljava/lang/AssertionError;' && ['I', 'J', 'Z', 'C'].includes(method.parameters[0])) {   // AssertionError(int|long|boolean|char detail): message = String.valueOf(detail), no cause
+        const kind = method.parameters[0]; obj.stack = this.captureStack(); obj.causeInitialized = false; obj.cause = null;
+        obj.message = kind === 'J' ? String(wide(args[1])) : kind === 'Z' ? (args[1] ? 'true' : 'false') : kind === 'C' ? String.fromCharCode(args[1] & 0xffff) : String(int(args[1])); return undefined;
+      }
+      if (name === '<init>' && method.owner === 'Ljava/lang/reflect/InvocationTargetException;' && method.parameters[0] === 'Ljava/lang/Throwable;') {   // InvocationTargetException(Throwable target[, String s]): super((Throwable) null) or super(s, null); getCause() answers the target
+        obj.stack = this.captureStack(); obj.message = typeof args[2] === 'string' ? args[2] : null; obj.cause = isNull(args[1]) ? null : args[1]; obj.causeInitialized = true; return undefined;
+      }
       if (name === '<init>') { obj.stack = this.captureStack(); obj.message = method.owner==='Ljava/lang/ArrayIndexOutOfBoundsException;'&&method.parameters[0]==='I'?'Array index out of range: '+int(args[1]):method.parameters[0]==='Ljava/lang/Throwable;'&&!isNull(args[1])?this.javaString(args[1]):typeof args[1] === 'string' ? args[1] : null;obj.causeInitialized=method.parameters.includes('Ljava/lang/Throwable;');obj.cause=method.parameters[0]==='Ljava/lang/Throwable;'?args[1]:obj.causeInitialized?args[2]:null;return undefined; }
       if(name==='initCause'){if(obj.causeInitialized)this.throwJava('Ljava/lang/IllegalStateException;','Cause already initialized');if(equal(args[0],args[1]))this.throwJava('Ljava/lang/IllegalArgumentException;','Self-causation not permitted');obj.cause=args[1];obj.causeInitialized=true;return args[0];}
       if (name === 'getMessage') return obj.message ?? null;
@@ -3085,11 +3977,7 @@ export class APKRuntime {
     if (SET_TYPES.some(owner => method.owner === `L${owner};`)) {
       if (name === '<init>') {
         obj.set = []; obj.setHashes = []; obj.modCount = 0;
-        if (method.parameters[0] === 'I') {   // HashSet(int[, float]) -> new HashMap(initialCapacity, loadFactor)
-          if (int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal initial capacity: ' + int(args[1]));
-          if (method.parameters.length === 2) { const loadFactor = floatNumber(args[2]); if (loadFactor <= 0 || Number.isNaN(loadFactor)) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Illegal load factor: ' + this.javaString(args[2], 'F')); }
-        }
-        if (method.parameters[0] === 'Ljava/util/Collection;') { // AOSP HashSet(Collection) = addAll, de-duplicating with hashCode/equals
+        if (method.parameters[0] === 'Ljava/util/Collection;') { // CopyOnWriteArraySet(Collection) = addAllAbsent, de-duplicating with hashCode/equals
           if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke interface method on a null Collection');
           for (const value of this.collectionValues(this.object(args[1])).slice()) { const hash = this.javaHash(value); if (obj.set.some((existing, i) => obj.setHashes[i] === hash && this.javaEquals(value, existing))) continue; if (obj.set.length >= 1000000) fail('Set size limit exceeded'); this.reserveCollection(1); obj.set.push(value); obj.setHashes.push(hash); }
         }
@@ -3098,7 +3986,7 @@ export class APKRuntime {
       if (name === 'size') return obj.set.length;
       if (name === 'isEmpty') return obj.set.length ? 0 : 1;
       if (name === 'iterator') {
-        const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+        const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
         iterator.source = args[0]; iterator.expectedModCount = obj.modCount;
         iterator.snapshotIterator = method.owner.includes('CopyOnWrite'); iterator.index = 0; iterator.last = -1; iterator.values = obj.set.slice(); return value;
       }
@@ -3129,14 +4017,11 @@ export class APKRuntime {
         if (method.parameters[1] === 'F') { const load = floatNumber(args[2]); if (!(load > 0)) this.throwJava('Ljava/lang/IllegalArgumentException;', 'invalid map load factor'); obj.loadFactor = load; }
         obj.map = new Map(); obj.mapBuckets = new Map(); obj.nextEntry = 1; obj.modCount = 0; obj.tailSerial = null;
         obj.accessOrder = method.parameters.length === 3 && !!args[3];
-        obj.concurrentMap = method.owner === 'Ljava/util/concurrent/ConcurrentHashMap;';
-        if (obj.concurrentMap) { obj.accessOrder = false; if (method.parameters.length === 3 && int(args[3]) <= 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'invalid map concurrency level'); }
         if (method.parameters[0] === 'Ljava/util/Map;') this.dispatch({ owner: obj.type, name: 'putAll', signature: '(Ljava/util/Map;)V', parameters: ['Ljava/util/Map;'], result: 'V' }, [args[0], args[1]], 'virtual');
         return undefined;
       }
       if (!obj.map) fail('Map used before constructor');
       if (name === 'size') return obj.map.size;
-      if (name === 'mappingCount') return BigInt(obj.map.size);
       if (name === 'isEmpty') return obj.map.size ? 0 : 1;
       if (name === 'eldest') {
         const entry = obj.map.values().next().value; if (!entry) return null;
@@ -3161,15 +4046,10 @@ export class APKRuntime {
         return undefined;
       }
       if (['entrySet', 'keySet', 'values'].includes(name)) {
-        const value = this.makeObject(name === 'values' ? 'Ljava/util/Collection;' : 'Ljava/util/Set;');
+        const value = this.makeObject(viewTypeOf(obj.type, name === 'keySet' ? 0 : name === 'values' ? 1 : 2));
         const view = this.object(value); view.mapSource = args[0]; view.viewKind = name === 'keySet' ? 'keys' : name === 'values' ? 'values' : 'entries'; return value;
       }
       if (name === 'clear') { if (obj.readOnly) fail('Read-only Map'); this.reserveCollection(-obj.map.size); obj.map.clear(); obj.mapBuckets?.clear(); this.bumpModCount(obj); return undefined; }
-      if (obj.concurrentMap) {
-        if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', 'ConcurrentHashMap does not permit null keys or queried values');
-        if (['put', 'putIfAbsent', 'replace'].includes(name) && (isNull(args[2]) || (args.length === 4 && isNull(args[3])))) this.throwJava('Ljava/lang/NullPointerException;', 'ConcurrentHashMap does not permit null values');
-        if (name === 'containsValue') { for (const entry of obj.map.values()) if (this.javaEquals(args[1], entry.value)) return 1; return 0; }
-      }
       const { hash, bucket, entry: previous } = this.mapEntry(obj, args[1]);
       if (name === 'get') { this.mapAccess(obj, previous); return previous?.value ?? null; }
       if (name === 'containsKey') return previous ? 1 : 0;
@@ -3195,7 +4075,7 @@ export class APKRuntime {
   }
   bridgeC2(method, args, staticCall, key, name) {
     const obj = this.object(args[0]);
-    if (method.owner === 'Ljava/util/Iterator;') {
+    if (method.owner === 'Ljava/util/Iterator;' || method.owner === HOST_ITERATOR) {
       if (obj.virtualList) {
         const list = this.object(obj.virtualList);
         if (name !== 'hasNext' && (list.fields.get('Ljava/util/AbstractList;->modCount:I') ?? 0) !== obj.expectedListMod) this.throwJava('Ljava/util/ConcurrentModificationException;', 'Java list changed during iteration');
@@ -3210,7 +4090,7 @@ export class APKRuntime {
         obj.index = obj.last; obj.last = -1; obj.expectedListMod = list.fields.get('Ljava/util/AbstractList;->modCount:I') ?? 0; return undefined;
       }
       const source = this.object(obj.source);
-      if (name !== 'hasNext' && !obj.snapshotIterator && !obj.weakIterator && (source.modCount ?? 0) !== obj.expectedModCount) this.throwJava('Ljava/util/ConcurrentModificationException;', 'Java collection changed during iteration');
+      if (name !== 'hasNext' && !obj.snapshotIterator && (source.modCount ?? 0) !== obj.expectedModCount) this.throwJava('Ljava/util/ConcurrentModificationException;', 'Java collection changed during iteration');
       const values = obj.liveList ? source.list : obj.values;
       if (name === 'hasNext') return obj.index < values.length ? 1 : 0;
       if (name === 'next') {
@@ -3221,7 +4101,7 @@ export class APKRuntime {
       if (name === 'remove') {
         if (obj.snapshotIterator || source.readOnly || source.fixedSize) this.throwJava('Ljava/lang/UnsupportedOperationException;', 'Iterator removal is unsupported by this collection');
         if (obj.last < 0) this.throwJava('Ljava/lang/IllegalStateException;', 'Iterator.remove requires next');
-        if (source.map) this.mapRemove(source, obj.weakIterator ? this.mapEntry(source, obj.mapKeys[obj.last]).entry : source.map.get(obj.mapSerials[obj.last]));
+        if (source.map) this.mapRemove(source, source.map.get(obj.mapSerials[obj.last]));
         else if (source.set) { const at = source.set.findIndex(value => equal(value, obj.values[obj.last])); if (at < 0) this.throwJava('Ljava/util/ConcurrentModificationException;', 'Set entry missing'); source.set.splice(at, 1); source.setHashes.splice(at, 1); this.reserveCollection(-1); this.bumpModCount(source); }
         else if (obj.liveList) { source.list.splice(obj.last, 1); this.reserveCollection(-1); this.bumpModCount(source); obj.index = obj.last; }
         else fail('Iterator source is unsupported for removal');
@@ -3240,7 +4120,7 @@ export class APKRuntime {
       if (name === 'getValue') return obj.entry.value;
       const previous = obj.entry.value; obj.entry.value = args[1]; return previous;
     }
-    if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner)) {
+    if (['Ljava/util/ArrayList;', 'Ljava/util/Vector;', 'Ljava/util/concurrent/CopyOnWriteArrayList;', 'Ljava/util/Collection;', 'Ljava/util/Set;', 'Ljava/util/Arrays$ArrayList;'].includes(method.owner) || MAP_VIEW_OWNERS.has(method.owner)) {
       if (name === '<init>') {
         if (method.parameters[0] === '[Ljava/lang/Object;') { if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null); obj.list = this.array(args[1]).elements.slice(); }   // CopyOnWriteArrayList(E[])
         else obj.list = method.parameters[0] === 'Ljava/util/Collection;' ? this.collectionValues(this.object(args[1])).slice() : [];
@@ -3248,15 +4128,16 @@ export class APKRuntime {
         this.reserveCollection(obj.list.length); obj.modCount = 0; return undefined;
       }
       if ((name === 'size' || name === 'isEmpty') && obj.mapSource) { const count = this.object(obj.mapSource).map.size; return name === 'size' ? count : count ? 0 : 1; }
+      if (obj.mapSource) { const served = this.mapViewOperation(obj, method, args, name); if (served !== BRIDGE_NEXT) return served; }
       const values = this.collectionValues(obj);
       if (name === 'size') return values.length;
       if (name === 'isEmpty') return values.length ? 0 : 1;
       if (name === 'iterator') {
-        const value = this.makeObject('Ljava/util/Iterator;'), iterator = this.object(value);
+        const value = this.makeObject(HOST_ITERATOR), iterator = this.object(value);
         iterator.source = obj.mapSource ?? args[0]; iterator.expectedModCount = this.object(iterator.source).modCount ?? 0;
         iterator.snapshotIterator = method.owner.includes('CopyOnWrite');
         iterator.liveList = !obj.mapSource && !iterator.snapshotIterator;
-        if (obj.mapSource) { const source = this.object(obj.mapSource); iterator.mapSerials = [...source.map.keys()]; iterator.mapKeys = [...source.map.values()].map(entry => entry.key); iterator.mapViewKind = obj.viewKind; iterator.weakIterator = !!source.concurrentMap; }
+        if (obj.mapSource) { const source = this.object(obj.mapSource); iterator.mapSerials = [...source.map.keys()]; iterator.mapViewKind = obj.viewKind; }
         iterator.index = 0; iterator.last = -1; iterator.values = values.slice(); return value;
       }
       if (name === 'toArray') { const value = this.newArray('[Ljava/lang/Object;', values.length); this.object(value).elements = values.slice(); return value; }
@@ -3270,7 +4151,7 @@ export class APKRuntime {
         if (name === 'clear') { this.reserveCollection(-source.map.size); source.map.clear(); source.mapBuckets?.clear(); this.bumpModCount(source); return undefined; }
         if (name === 'remove') {
           let target;
-          if (obj.viewKind === 'keys') { if (source.concurrentMap && isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null); target = this.mapEntry(source, args[1]).entry; }
+          if (obj.viewKind === 'keys') target = this.mapEntry(source, args[1]).entry;
           else if (obj.viewKind === 'values') { for (const entry of source.map.values()) if (this.javaEquals(args[1], entry.value)) { target = entry; break; } }
           else if (!isNull(args[1]) && this.isSubtype(this.typeOf(args[1]), 'Ljava/util/Map$Entry;')) {
             const call = (receiver, member) => this.dispatch({ owner: 'Ljava/util/Map$Entry;', name: member, parameters: [], result: 'Ljava/lang/Object;', signature: '()Ljava/lang/Object;' }, [receiver], 'virtual'), found = this.mapEntry(source, call(args[1], 'getKey')).entry;
@@ -3315,9 +4196,33 @@ export class APKRuntime {
         if(all){const value=this.newArray('[Ljava/lang/annotation/Annotation;',annotations.size);this.object(value).elements=[...annotations.values()].map(a=>this.annotationObject(a));return value;}
         const annotation=annotations.get(target);return name==='isAnnotationPresent'?(annotation?1:0):annotation?this.annotationObject(annotation):null;
       }
+      // Class.getDeclaredAnnotationsByType / getAnnotationsByType (Java 8, Android 24+; libcore AnnotatedElements.getDirectOrIndirectAnnotationsByType): the annotations of that
+      // type present on the class itself, in declaration order, with the members of a @Repeatable container unfolded in place; getAnnotationsByType then looks at the superclass
+      // when none is present and the annotation type is @Inherited. The result is an array of the annotation type (empty when none).
+      if (name === 'getDeclaredAnnotationsByType' || name === 'getAnnotationsByType') {
+        const target = args[1] === null || args[1] === 0 ? null : this.object(args[1]).classType; if (!target) this.throwJava('Ljava/lang/NullPointerException;', 'annotationClass');
+        const repeatable = this.classAnnotations(target).find(marker => marker.type === 'Ljava/lang/annotation/Repeatable;');
+        const container = repeatable ? this.object(this.dispatch({ owner: 'Ljava/lang/annotation/Repeatable;', name: 'value', parameters: [], result: 'Ljava/lang/Class;', signature: '()Ljava/lang/Class;' }, [this.annotationObject(repeatable)], 'virtual'))?.classType ?? null : null;
+        const collect = owner => {
+          const found = [];
+          for (const a of this.classAnnotations(owner)) {
+            if (a.type === target) found.push(this.annotationObject(a));
+            else if (container && a.type === container) { const members = this.dispatch({ owner: container, name: 'value', parameters: [], result: `[${target}`, signature: `()[${target}` }, [this.annotationObject(a)], 'virtual'); if (members !== null && members !== 0) found.push(...this.object(members).elements); }
+          }
+          return found;
+        };
+        let found = collect(type);
+        if (!found.length && name === 'getAnnotationsByType' && this.classAnnotations(target).some(marker => marker.type === 'Ljava/lang/annotation/Inherited;')) {
+          for (let parent = this.parent(type), depth = 0; parent && !found.length && depth < 64; parent = this.parent(parent), depth++) found = collect(parent);
+        }
+        const value = this.newArray(`[${target}`, found.length); this.object(value).elements = found; return value;
+      }
       if (['getDeclaredMethod', 'getMethod', 'getDeclaredConstructor', 'getConstructor', 'getDeclaredField', 'getField'].includes(name)) {
         const kind = name.includes('Constructor') ? 'constructor' : name.includes('Field') ? 'field' : 'method';
         const memberName = kind === 'constructor' ? '<init>' : args[1];
+        // A declared-only widget (hierarchy without a body) has no constructor of its own: the lookup would answer its superclass's and LayoutInflater.createView would build that class
+        // under the widget's tag. The explicit error of `new` applies to the reflective path too.
+        if (kind === 'constructor') { const widget = this.platform?.unimplementedWidgetMessage?.(type, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }
         const parameters = kind === 'field' ? null : this.reflectionParameterTypes(args[kind === 'constructor' ? 1 : 2]);
         const member = this.reflectionLookup(type, kind, memberName, parameters, !name.startsWith('getDeclared'));
         return this.reflectionObject(kind, member);
@@ -3327,7 +4232,7 @@ export class APKRuntime {
         while (pending.length && seen.size < 256) {
           const owner = pending.shift(); if (!owner || seen.has(owner)) continue; seen.add(owner);
           const cls = this.classes.get(owner);
-          if (cls) { for (const item of [...cls.fields, ...cls.staticFields]) if (item.flags & 1) out.push({ field: cls.dex.fields[item.index], flags: item.flags }); pending.push(cls.superclass, ...cls.interfaces); }
+          if (cls) { for (const item of [...cls.fields, ...cls.staticFields]) if (item.flags & 1) out.push({ field: cls.dex.field(item.index), flags: item.flags }); pending.push(cls.superclass, ...cls.interfaces); }
           else { for (const c of constantFields(owner) ?? []) if (c.flags & 1) out.push({ field: { owner, name: c.name, type: c.type, key: `${owner}->${c.name}:${c.type}` }, flags: c.flags }); const parent = this.parent(owner); if (parent) pending.push(parent); }
         }
         const result = this.newArray('[Ljava/lang/reflect/Field;', out.length); this.object(result).elements = out.map(member => this.reflectionObject('field', member)); return result;
@@ -3338,17 +4243,19 @@ export class APKRuntime {
           // Platform classes without DEX bodies: the members are the registered bridge signatures (static-ness unknown, see bridgeReflection).
           const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
           if (kind === 'field') {   // SDK classes without a body: their compile-time constants
-            const rows = constantFields(type) ?? [], result = this.newArray('[Ljava/lang/reflect/Field;', rows.length);
-            this.object(result).elements = rows.map(c => this.reflectionObject('field', { field: { owner: type, name: c.name, type: c.type, key: `${type}->${c.name}:${c.type}` }, flags: c.flags })); return result;
+            const rows = constantFields(type) ?? [], tabled = hiddenFields(type), names = new Set(tabled.map(item => item.field.name));
+            const members = [...tabled, ...rows.filter(c => !names.has(c.name)).map(c => ({ field: { owner: type, name: c.name, type: c.type, key: `${type}->${c.name}:${c.type}` }, flags: c.flags }))], result = this.newArray('[Ljava/lang/reflect/Field;', members.length);
+            this.object(result).elements = members.map(member => this.reflectionObject('field', member)); return result;
           }
           this.bridgeReflection(type, '<init>', []); // builds BRIDGE_INDEX
           const members = [...BRIDGE_INDEX.entries()].filter(([key]) => key.startsWith(type + '\0')).flatMap(([key, list]) => list.map(entry => ({ name: key.slice(type.length + 1), entry })))
             .filter(item => (kind === 'constructor') === (item.name === '<init>')).map(item => this.bridgeReflection(type, item.name, parseParameters(item.entry.params)));
-          const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : 'Method'};`, members.length);
-          this.object(result).elements = members.map(member => this.reflectionObject(kind, member)); return result;
+          const tabled = hiddenMethods(type, kind === 'constructor').filter(item => name !== 'getConstructors' || (item.flags & 1)), seen = new Set(tabled.map(item => item.method.key)), merged = [...tabled, ...members.filter(item => item && !seen.has(item.method?.key))];
+          const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : 'Method'};`, merged.length);
+          this.object(result).elements = merged.map(member => this.reflectionObject(kind, member)); return result;
         }
         const kind = name.includes('Constructors') ? 'constructor' : name.includes('Fields') ? 'field' : 'method';
-        const members = kind === 'field' ? [...cls.fields, ...cls.staticFields].map(item => ({ field: cls.dex.fields[item.index], flags: item.flags }))
+        const members = kind === 'field' ? [...cls.fields, ...cls.staticFields].map(item => ({ field: cls.dex.field(item.index), flags: item.flags }))
           : [...cls.methods.values()].filter(def => (kind === 'constructor' ? def.method.name === '<init>' : !def.method.name.startsWith('<'))&&(name!=='getConstructors'||!!(def.flags&1)));
         const result = this.newArray(`[Ljava/lang/reflect/${kind === 'constructor' ? 'Constructor' : kind === 'field' ? 'Field' : 'Method'};`, members.length);
         this.object(result).elements = members.map(member => this.reflectionObject(kind, member)); return result;
@@ -3358,8 +4265,17 @@ export class APKRuntime {
         const constructor = cls.methods.get('<init>()V'); if (!constructor) this.throwJava('Ljava/lang/InstantiationException;', `No no-arg constructor: ${type}`);
         return this.reflectionInvoke(constructor, false, null, null, false);
       }
+      if (name === 'toString') { const primitive = type.length === 1, flags = this.classes.get(type)?.flags ?? 0; return (primitive ? '' : (flags & 0x200) || EXTERNAL_INTERFACE_NAMES.has(type) ? 'interface ' : 'class ') + this.className(type, 'binary'); }   // Class.toString: "interface "/"class " + getName(); primitives print just their name
       if (name === 'getName' || name === 'getSimpleName' || name === 'getCanonicalName') return this.className(type, name === 'getSimpleName' ? 'simple' : name === 'getCanonicalName' ? 'canonical' : 'binary');
       if (name === 'getModifiers') return this.classNesting(type).modifiers ?? this.classes.get(type)?.flags ?? (EXTERNAL_INTERFACE_NAMES.has(type)?0x601:1);
+      if (name === 'getPackageName') { let base = type; while (base.startsWith('[')) base = base.slice(1); if (!base.startsWith('L')) return 'java.lang'; const slash = base.lastIndexOf('/'); return slash < 0 ? '' : base.slice(1, slash).replaceAll('/', '.'); }
+      if (name === 'isSynthetic') return (this.classes.get(type)?.flags ?? 0) & 0x1000 ? 1 : 0;
+      if (name === 'isAnnotation') return (this.classes.get(type)?.flags ?? 0) & 0x2000 ? 1 : 0;
+      if (name === 'getDeclaredClasses' || name === 'getClasses') {   // Class.getDeclaredClasses: the dalvik.annotation.MemberClasses of the class; getClasses: the public member classes of the class and its superclasses
+        const collect = owner => (this.classNesting(owner).members ?? []).filter(member => name === 'getDeclaredClasses' || ((this.classNesting(member).modifiers ?? this.classes.get(member)?.flags ?? 0) & 1));
+        const members = []; for (let current = type, guard = 0; current && guard < 64; current = name === 'getClasses' ? this.parent(current) : null, guard++) members.push(...collect(current));
+        const array = this.newArray('[Ljava/lang/Class;', members.length); this.object(array).elements = members.map(member => this.classObject(member)); return array;
+      }
       if (name === 'getDeclaringClass' || name === 'getEnclosingClass') { const info = this.classNesting(type), enclosing = name === 'getDeclaringClass' ? info.declaringClass : info.enclosingClass ?? info.declaringClass; return enclosing ? this.classObject(enclosing) : null; }
       if (name === 'getProtectionDomain') {
         // ART's Class.getProtectionDomain: every class has the one all-permissions domain without a code source (java.lang.Class.allPermDomain), which is what the provider
@@ -3431,7 +4347,7 @@ export class APKRuntime {
         const start=method.parameters.length===1?0:int(args[2]),count=method.parameters.length===1?array.elements.length:int(args[3]);
         if(start<0||count<0||start>array.elements.length-count)this.throwJava('Ljava/lang/IndexOutOfBoundsException;','Invalid char-array append range');
         if((obj.builder??'').length+count>4000000)fail('StringBuilder length limit exceeded');
-        obj.builder=(obj.builder??'')+utf16String(array.elements.slice(start,start+count));return args[0];
+        obj.builder=(obj.builder??'')+utf16String(cellRange(array.cells,start,start+count));return args[0];
       }
       if(name==='append'&&method.parameters.length===3){
         const sequence=isNull(args[1])?'null':args[1],start=int(args[2]),end=int(args[3]);
@@ -3445,6 +4361,7 @@ export class APKRuntime {
         }
         obj.builder=(obj.builder??'')+value;return args[0];
       }
+      if (['codePointBefore','codePointCount','offsetByCodePoints'].includes(name)) return this.codePointOps(obj.builder ?? '', name, args);
       if (['delete','deleteCharAt','setCharAt','setLength','replace','reverse','indexOf','lastIndexOf','capacity','ensureCapacity','trimToSize','substring','codePointAt','appendCodePoint','getChars','insert'].includes(name)) {
         const text = obj.builder ?? '', bad = (kind, message) => this.throwJava(kind, message), limit = value => { if (value.length > 4000000) fail('StringBuilder length limit exceeded'); return value; };
         if (name === 'delete') { const start = int(args[1]); let end = int(args[2]); if (end > text.length) end = text.length; if (start < 0 || start > end) bad('Ljava/lang/StringIndexOutOfBoundsException;', `start ${start}, end ${end}, length ${text.length}`); obj.builder = text.slice(0, start) + text.slice(end); return args[0]; }
@@ -3542,7 +4459,7 @@ export class APKRuntime {
     return null;
   }
   /** Runs a DEX body to completion on the current thread's frame stack (src/interpreter.js). */
-  execute(method, code, args) { return runNested(this, method, code, args); }
+  execute(method, code, args) { const tb = this.tb, previous = tb.enter(BUCKET.INTERP); try { return runNested(this, method, code, args); } finally { tb.leave(previous); } }
   get currentMethod() { const frames = currentThread(this).frames; return frames.length ? frames[frames.length - 1].method : null; }
   set currentMethod(value) { /* derived from the frame stack; kept assignable for legacy callers */ }
   get methodStack() { return currentThread(this).frames.map(frame => frame.method); }
@@ -3563,8 +4480,22 @@ export class APKRuntime {
   }
   monitorExit(value, thread = this.thread ?? this.scheduler.mainThread()) {
     const id = this.monitorId(value), monitor = this.monitors.get(id);
-    if (monitor === undefined || monitor.owner !== thread) this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned');
+    if (monitor === undefined || monitor.owner !== thread) {
+      // A synchronized block's catch-all handler runs monitor-exit and rethrows; when the thread does not own the monitor, that monitor-exit throws IllegalMonitorStateException into the same handler,
+      // forever (ART would loop the same way; the lab never reaches that state unless its own monitor bookkeeping is wrong). After MONITOR_EXIT_FAILURE_LIMIT failures in a row on one thread the loop
+      // ends in a named internal error that carries the bookkeeping, instead of allocating exceptions until the object limit.
+      const streak = thread.monitorExitFailures = (thread.monitorExitFailures ?? 0) + 1, detail = this.monitorDiagnostic(monitor, thread);
+      if (streak >= MONITOR_EXIT_FAILURE_LIMIT) { thread.monitorExitFailures = 0; throw new APKError(`monitor-exit threw IllegalMonitorStateException ${streak} times in a row on thread ${thread.name}: a synchronized block's handler keeps releasing a monitor the thread does not own${detail}`, { kind: 'monitor-exit-loop' }); }
+      this.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned' + detail);
+    }
+    thread.monitorExitFailures = 0;
     if (monitor.count > 1) monitor.count--; else this.monitors.delete(id);
+  }
+  /** What the lab knows about a monitor whose ownership check failed: its owner, the thread that asked, the nesting of host calls and waits (appended to the IllegalMonitorStateException message). */
+  monitorDiagnostic(monitor, thread) {
+    const owner = monitor ? `owned by thread ${monitor.owner?.name ?? '?'} (count ${monitor.count})` : 'held by no thread';
+    const frame = thread?.frames?.at(-1)?.method?.key ?? '-';
+    return ` [lab: monitor ${owner}; asking thread ${thread?.name ?? '?'} (${thread?.state ?? '?'}, ${thread?.frames?.length ?? 0} frames, top ${frame}); current thread ${this.thread?.name ?? 'none'}; nested runs ${this.nestedRuns}; nested host waits ${this.scheduler?.waitingNested?.size ?? 0}]`;
   }
   ownsMonitor(value, thread = this.thread ?? this.scheduler.mainThread()) { return this.monitors.get(this.monitorId(value))?.owner === thread; }
   /** An exception left a thread's run(): the thread's UncaughtExceptionHandler runs, otherwise the fatal exception ends the process like Android's default handler. */

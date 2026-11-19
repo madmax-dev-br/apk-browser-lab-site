@@ -1,0 +1,304 @@
+import { APKError } from './apk-runtime.js?v=d03508f39110';
+
+const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
+const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
+/** Minikin-style font itemization (Android 13 fallback chain) for text Roboto alone cannot shape; null keeps the Roboto-only path. */
+const itemizeFonts = (backend, text, weight, italic, state = null) => backend.fallback?.itemize(text, { weight, italic, typeface: state?.families?.length ? state.nativeTypeface ?? null : null }) ?? null;
+const makeParagraphBuilder = (backend, CK, paragraphStyle, itemized, custom = false) => itemized || custom ? backend.fallback.makeBuilder(paragraphStyle) : CK.ParagraphBuilder.Make(paragraphStyle, backend.fontManager);
+/** The family chain of a Typeface built from app fonts (registered with the paragraph font provider) followed by Roboto, the system fallback; Roboto alone otherwise. */
+const familiesOf = families => families?.length ? [...families, 'Roboto'] : ['Roboto'];
+/** Variation-axis coordinates of the Typeface's font (Font.Builder.setFontVariationSettings), applied by the shaper through the text style. */
+const variationsOf = fontVariations => fontVariations?.length ? { fontVariations } : {};
+const addParagraphText = (backend, builder, text, textStyle, itemized) => backend.fallback.addRuns(builder, text, textStyle, itemized);
+/**
+ * Paint.setFontFeatureSettings: the text is a comma-separated list of OpenType feature settings, each parsed by HarfBuzz's hb_feature_from_string (Minikin FontFeature.cpp): an
+ * optional + or -, a tag of up to four characters (quoted or not), then an optional value after a space or '=' (a number, on or off). An entry HarfBuzz would not parse is left
+ * out, as Minikin leaves it out. A character range (`[3:5]`) is parsed and not applied: the paragraph shaper sets a feature for the whole run.
+ */
+export function parseFontFeatureSettings(settings) {
+  if (typeof settings !== 'string' || !settings) return [];
+  const features = [];
+  for (const part of settings.split(',')) {
+    const m = /^\s*([+-]?)\s*(?:"([ -~]{1,4})"|'([ -~]{1,4})'|([A-Za-z0-9_]{1,4}))\s*(?:\[[0-9:\s]*\])?\s*(?:=?\s*(\d+|on|off))?\s*$/.exec(part);
+    if (!m) continue;
+    const tag = (m[2] ?? m[3] ?? m[4]).padEnd(4, ' '), value = m[5] === undefined ? (m[1] === '-' ? 0 : 1) : m[5] === 'on' ? 1 : m[5] === 'off' ? 0 : Number(m[5]);
+    features.push({ name: tag, value });
+  }
+  return features;
+}
+/** The features a paint state hands the shaper: kerning by the paint's flag, then the paint's font feature settings (a later entry of the same tag wins, as in HarfBuzz). */
+export const featuresOf = state => [{ name: 'kern', value: state.flags & 0x100 ? 1 : 0 }, ...parseFontFeatureSettings(state.fontFeatureSettings)];
+/**
+ * The font a paint state shapes with. A Roboto face of the Skia backend is a small subset without the optional OpenType features (small capitals, tabular figures, stylistic
+ * sets); Android's Roboto has them. A paint that sets font features on such a face therefore shapes with the Roboto of Android's system font map at the same weight and slant
+ * (read on demand: src/system-fonts.js); every other paint keeps its face.
+ */
+export function shapingFace(backend, state) {
+  if (state.families || !state.fontFeatureSettings || parseFontFeatureSettings(state.fontFeatureSettings).length === 0 || !backend.systemFonts) return state;
+  const full = backend.systemFonts.fullRoboto(state.weight ?? 400, !!state.italic);
+  return { ...state, families: [full.name], fontVariations: [...full.fontVariations, ...(state.fontVariations ?? []).filter(v => !full.fontVariations.some(f => f.axis === v.axis))] };
+}
+/**
+ * The SkParagraph text style of a paint state at `size`. Paint.setTextScaleX scales the glyphs and their advances horizontally: the callers shape at scale 1 and multiply the
+ * advances (letter spacing, in ems, scales with them; word spacing, in pixels, does not, so it is divided here).
+ */
+export const runTextStyle = (backend, CK, state, size) => {
+  const face = shapingFace(backend, state), scale = state.textScaleX || 1;
+  return { fontFamilies: familiesOf(face.families), fontSize: size, ...variationsOf(face.fontVariations), locale: state.textLocaleTag ?? 'en-US', fontStyle: { weight: fontWeightOf(CK, state.weight ?? 400), width: CK.FontWidth.Normal, slant: state.italic ? CK.FontSlant.Italic : CK.FontSlant.Upright },
+    letterSpacing: (state.letterSpacing ?? 0) * size, wordSpacing: (state.wordSpacing ?? 0) / scale, fontFeatures: featuresOf(state) };
+};
+/** Whether a paint state's text is shaped with a registered font (an app or system font, or the full Roboto of shapingFace) instead of the backend's Roboto alone. */
+const registeredFace = (backend, state) => !!shapingFace(backend, state).families;
+/** Code points a shaper reports as unresolved although no glyph is drawn for them (default ignorables, layout controls). */
+const drawable = codepoint => !(codepoint === 0xad || codepoint === 0x34f || codepoint === 0x61c || (codepoint >= 0x200b && codepoint <= 0x200f) || (codepoint >= 0x202a && codepoint <= 0x202e) || (codepoint >= 0x2060 && codepoint <= 0x206f) || codepoint === 0xfeff || (codepoint >= 0xfe00 && codepoint <= 0xfe0f) || (codepoint >= 0xe0100 && codepoint <= 0xe01ef) || codepoint === 10 || codepoint === 13 || codepoint === 9);
+const unresolved = paragraph => paragraph.unresolvedCodepoints().filter(drawable);
+const base64 = bytes => { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384)); return btoa(binary); };
+
+/** Original SkParagraph CPU implementation from the verified CanvasKit bundle.
+ * This is an explicit web text backend, not Android StaticLayout/Minikin. No OS
+ * fonts, character-width estimates, or silently substituted glyphs are used.
+ */
+export function measureSkiaParagraph(backend, text, { width, textSize = 14, weight = 400, italic = false, direction = 0, color = 0xff000000, maxLines = null, raster = false, alignment = 'start', ellipsis = null, families = null, fontVariations = null, nativeTypeface = null, letterSpacing = 0, shadow = null, lineSpacing = null } = {}) {
+  // TextView text properties the paragraph carries (textViewApi.paragraphStyle): letterSpacing in pixels between the glyphs (Paint.setLetterSpacing is in ems), shadow as
+  // Paint.setShadowLayer { radius, dx, dy, color }, lineSpacing { add, mult, firstTop } as StaticLayout applies android:lineSpacingExtra / lineSpacingMultiplier (below).
+  if (!Number.isFinite(letterSpacing) || Math.abs(letterSpacing) > 512) fail('Paragraph letter spacing exceeds the web text backend limits');
+  if (typeof text !== 'string' || text.length > 65536) fail('Paragraph text exceeds 65536 characters');
+  if (!Number.isFinite(width) || width <= 0 || width > 4096 || !Number.isFinite(textSize) || textSize <= 0 || textSize > 512) fail('Paragraph extent exceeds the web text backend limits');
+  if (maxLines !== null && (!Number.isInteger(maxLines) || maxLines < 1)) fail('Paragraph maxLines must be a positive integer');
+  if (!['start','left','right','center'].includes(alignment)) fail('Unsupported paragraph alignment');
+  if (![0, 1].includes(direction)) fail('Invalid paragraph direction');
+  const CK = backend?.CanvasKit;
+  if (!CK?.ParagraphBuilder || !backend.fontManager) fail('Verified Skia ParagraphBuilder and font manager are required');
+  backend.selectTypeface(weight, italic); // Reject unavailable faces before SkParagraph fallback selection.
+  if (CK.ParagraphBuilder.RequiresClientICU()) fail('This Skia build requires external Unicode segmentation data');
+  const fontWeight = fontWeightOf(CK, weight);
+  const argb = color >>> 0;
+  // SkPaint's shadow looper blurs with sigma = 0.57735 * radius + 0.5 (the conversion skia-canvas-host.js uses for Paint.setShadowLayer)
+  const shadows = shadow && shadow.radius > 0 ? { shadows: [{ color: CK.Color(shadow.color >>> 16 & 255, shadow.color >>> 8 & 255, shadow.color & 255, (shadow.color >>> 24) / 255), offset: [shadow.dx, shadow.dy], blurRadius: 0.57735 * shadow.radius + 0.5 }] } : {};
+  const textStyle = { color: CK.Color(argb >>> 16 & 255, argb >>> 8 & 255, argb & 255, (argb >>> 24) / 255), fontFamilies: familiesOf(families), fontSize: textSize, ...variationsOf(fontVariations), ...(letterSpacing ? { letterSpacing } : {}), ...shadows,
+    fontStyle: { weight: fontWeight, width: CK.FontWidth.Normal, slant: italic ? CK.FontSlant.Italic : CK.FontSlant.Upright } };
+  const itemized = itemizeFonts(backend, text, weight, italic, { families, nativeTypeface });
+  // Android's Roboto is one variable font: every weight and slant has the vertical metrics of the regular face (hhea 1900 / -500 in 2048 units). The pinned bold / medium / italic
+  // faces here are separate static files whose own ascent / descent are larger, which would make a line of medium text taller than a line of regular text. For text set in Roboto
+  // alone (no app font, no fallback run) the line box therefore comes from the regular face, as a strut; the glyphs still come from the requested face.
+  const regularBox = !itemized && !families && (fontWeight.value !== 400 || italic) ? { strutStyle: { strutEnabled: true, forceStrutHeight: true, fontFamilies: ['Roboto'], fontSize: textSize, fontStyle: { weight: fontWeightOf(CK, 400), width: CK.FontWidth.Normal, slant: CK.FontSlant.Upright } } } : {};
+  const style = new CK.ParagraphStyle({ ...(maxLines === null ? {} : { maxLines }), ...(ellipsis ? { ellipsis } : {}), ...regularBox, textDirection: direction ? CK.TextDirection.RTL : CK.TextDirection.LTR, textAlign: {start:CK.TextAlign.Start,left:CK.TextAlign.Left,right:CK.TextAlign.Right,center:CK.TextAlign.Center}[alignment], textStyle });
+  let builder, paragraph;
+  try {
+    builder = makeParagraphBuilder(backend, CK, style, itemized, !!families);
+    if (!builder) fail('Skia paragraph allocation failed');
+    if (itemized) addParagraphText(backend, builder, text, textStyle, itemized); else builder.addText(text);
+    paragraph = builder.build(); paragraph.layout(width);
+    const missing = unresolved(paragraph);
+    if (missing.length) fail('The supplied Roboto fonts lack paragraph glyphs: ' + missing.slice(0, 8).map(codepoint => 'U+' + codepoint.toString(16)).join(', '));
+    const lines = paragraph.getLineMetrics().map(line => ({ ...line }));
+    if (lines.length > 1024) fail('Paragraph exceeds 1024 lines');
+    // StaticLayout.out: every line but the last is followed by extra = round((descent - ascent) * (spacingmult - 1) + spacingadd) pixels, where the first line's height includes
+    // the font padding above its ascent when the layout includes it (firstTop). SkParagraph has no such spacing: the lines are drawn one by one, each moved down by the extras before it.
+    const extras = lineSpacing && lines.length > 1 && (lineSpacing.add !== 0 || lineSpacing.mult !== 1) ? lines.slice(0, -1).map((line, index) => { const extra = (Math.round(line.ascent + line.descent) + (index === 0 ? lineSpacing.firstTop ?? 0 : 0)) * (lineSpacing.mult - 1) + lineSpacing.add; return extra >= 0 ? Math.trunc(extra + 0.5) : -Math.trunc(-extra + 0.5); }) : null;
+    const height = paragraph.getHeight() + (extras ? extras.reduce((sum, extra) => sum + extra, 0) : 0);
+    if (!Number.isFinite(height) || height < 0 || height > 65536) fail('Invalid or excessive paragraph height');
+    const result = { width: Math.min(width, Math.max(0, paragraph.getLongestLine())), layoutWidth: width, height,
+      baseline: lines[0]?.baseline ?? paragraph.getAlphabeticBaseline(), lineCount: paragraph.getNumberOfLines(), lines,
+      intrinsicWidth: paragraph.getMaxIntrinsicWidth(), maxLines, exceededMaxLines: paragraph.didExceedMaxLines(), source: 'official-Skia-SkParagraph/Roboto', scope: 'SkParagraph web backend; not Android StaticLayout/Minikin' };
+    if (raster && height > 0) {
+      const rasterWidth = Math.max(1, Math.ceil(width)), rasterHeight = Math.max(1, Math.ceil(height));
+      if (rasterHeight > 4096 || rasterWidth * rasterHeight > 4 * 1024 * 1024) fail('Paragraph raster exceeds4096px/4Mpixel VM limit');
+      const surface = CK.MakeSurface(rasterWidth, rasterHeight);
+      if (!surface) fail('Skia paragraph raster allocation failed');
+      let image;
+      try {
+        const canvas = surface.getCanvas(); canvas.clear(CK.TRANSPARENT);
+        if (!extras) canvas.drawParagraph(paragraph, 0, 0);
+        else {
+          let shift = 0;
+          lines.forEach((line, index) => {
+            const top = line.baseline - line.ascent, bottom = index + 1 < lines.length ? lines[index + 1].baseline - lines[index + 1].ascent : paragraph.getHeight();
+            canvas.save(); canvas.clipRect(CK.LTRBRect(0, top + shift, rasterWidth, bottom + shift), CK.ClipOp.Intersect, false); canvas.drawParagraph(paragraph, 0, shift); canvas.restore();
+            shift += extras[index] ?? 0;
+          });
+        }
+        surface.flush();
+        image = surface.makeImageSnapshot(); const bytes = image.encodeToBytes();
+        if (!bytes || bytes.length > 8 * 1024 * 1024) fail('Invalid or excessive paragraph PNG');
+        result.raster = { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(bytes), width: rasterWidth, height: rasterHeight };
+      } finally { image?.delete(); surface.dispose(); }
+    }
+    return result;
+  } finally { paragraph?.delete(); builder?.delete(); }
+}
+
+/** A single complete LTR run, shaped with original SkParagraph/SkShaper.
+ * Partial shaping items, bidi/complex-script boundaries and Android Minikin
+ * hyphen edits remain explicit gaps; slicing context and estimating widths
+ * would change kerning and cluster advances.
+ */
+/**
+ * A shaping run is one line: Minikin lays out a drawn or measured run on a single line, and only StaticLayout breaks lines (at '\n'). SkParagraph, which shapes the runs here, would
+ * also start a new line at the other Unicode hard breaks (VT, FF, NEL U+0085, LINE SEPARATOR U+2028, PARAGRAPH SEPARATOR U+2029), which a run may carry (text that came from a
+ * server). On a device they draw nothing visible inside a run, so they are shaped as ZERO WIDTH SPACE (U+200B, one UTF-16 unit like them: every index and cluster offset of the run
+ * stays the same). '\n', '\r' and '\t' are not mapped: the callers refuse them by name.
+ */
+const RUN_HARD_BREAKS=/[\u000B\u000C\u0085\u2028\u2029]/g;
+export const oneLineRun=text=>RUN_HARD_BREAKS.test(text)?(RUN_HARD_BREAKS.lastIndex=0,text.replace(RUN_HARD_BREAKS,'\u200B')):text;
+export function measureSkiaRun(backend,text,{isRtl=false,start=0,offset=text.length,textSize=12,weight=400,italic=false,letterSpacing=0,wordSpacing=0,textScaleX=1,hinting=1,flags=0x503,textLocaleTag='en-US',families=null,fontVariations=null,fontFeatureSettings=null,nativeTypeface=null}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
+  if(typeof text!=='string'||text.length>65536||/[\u0000-\u001f]/.test(text))fail('Run advance currently requires a complete single-line shaping run without control characters');
+  if(!Number.isInteger(offset)||offset<0||offset>text.length||!Number.isInteger(start)||start<0||start>offset)fail('Invalid UTF16 run offset');
+  if(![textSize,letterSpacing,wordSpacing,textScaleX].every(Number.isFinite)||textSize<0||textSize>512||textScaleX<0||textScaleX>16)fail('Run advance font state exceeds backend limits');
+  if(flags&0x20||flags&0x800)fail('Run advance requires a backend for synthetic bold/forced auto-hinting');
+  if(!text.length||textSize===0||textScaleX===0)return 0;
+  const CK=backend.CanvasKit;if(CK.ParagraphBuilder.RequiresClientICU())fail('Run shaping requires original ICU segmentation support');
+  backend.selectTypeface(weight,italic);
+  let builder,paragraph;
+  const state={weight,italic,letterSpacing,wordSpacing,textScaleX,flags,textLocaleTag,families,fontVariations,fontFeatureSettings,nativeTypeface},textStyle=runTextStyle(backend,CK,state,textSize),itemized=itemizeFonts(backend,text,weight,italic,state);
+  try{
+    builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:hinting===0,textStyle}),itemized,registeredFace(backend,state));
+    if(itemized)addParagraphText(backend,builder,text,textStyle,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,textSize*(text.length+1)*4+Math.abs(letterSpacing*textSize+wordSpacing)*(text.length+1)));
+    const missing=unresolved(paragraph);if(missing.length)fail('Run font lacks glyphs: '+missing.slice(0,8).map(code=>'U+'+code.toString(16)).join(','));
+    if(paragraph.getNumberOfLines()!==1)fail('Run shaping unexpectedly produced multiple lines');
+    const boxes=paragraph.getRectsForRange(start,offset,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight);
+    let advance=0;for(const box of boxes)advance+=box.rect[2]-box.rect[0];
+    if(!Number.isFinite(advance))fail('SkParagraph returned a non-finite run advance');
+    return Math.fround(advance*textScaleX);
+  }finally{paragraph?.delete();builder?.delete();}
+}
+
+/** Paint.measureText for a complete single line that Roboto's simple glyph run cannot represent (complex scripts, emoji, symbols, CJK,
+ * combining marks, letter/word spacing): itemized through the Android fallback chain and shaped run by run by SkParagraph/HarfBuzz.
+ * Returns the advance, the glyph count and the font metrics of every font used (Minikin extents are the union over the fonts of a run). */
+export function measureSkiaShapedText(backend,text,{isRtl=false,textSize=12,weight=400,italic=false,letterSpacing=0,wordSpacing=0,textScaleX=1,hinting=1,flags=0x503,textLocaleTag='en-US',families=null,fontVariations=null,fontFeatureSettings=null,nativeTypeface=null}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
+  if(typeof text!=='string'||text.length>65536||/[\u0000-\u001f]/.test(text))fail('Shaped text measurement needs one line without control characters');
+  if(![textSize,letterSpacing,wordSpacing,textScaleX].every(Number.isFinite)||textSize<0||textSize>512||textScaleX<0||textScaleX>16)fail('Shaped text font state exceeds backend limits');
+  if(flags&0x20||flags&0x800)fail('Shaped text needs a backend for synthetic bold/forced auto-hinting');
+  if(!text.length||textSize===0||textScaleX===0)return{width:0,glyphCount:0,fontMetrics:[]};
+  const CK=backend.CanvasKit;if(CK.ParagraphBuilder.RequiresClientICU())fail('Run shaping requires original ICU segmentation support');
+  backend.selectTypeface(weight,italic);
+  const state={weight,italic,letterSpacing,wordSpacing,textScaleX,flags,textLocaleTag,families,fontVariations,fontFeatureSettings,nativeTypeface},textStyle=runTextStyle(backend,CK,state,textSize),itemized=itemizeFonts(backend,text,weight,italic,state);
+  let builder,paragraph;
+  try{
+    builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:hinting===0,textStyle}),itemized,registeredFace(backend,state));
+    if(itemized)addParagraphText(backend,builder,text,textStyle,itemized);else builder.addText(text);
+    paragraph=builder.build();paragraph.layout(Math.max(4096,textSize*(text.length+1)*4+Math.abs(letterSpacing*textSize+wordSpacing)*(text.length+1)));
+    const missing=unresolved(paragraph);if(missing.length)fail('Run font lacks glyphs: '+missing.slice(0,8).map(code=>'U+'+code.toString(16)).join(','));
+    if(paragraph.getNumberOfLines()!==1)fail('Run shaping unexpectedly produced multiple lines');
+    let advance=0;for(const box of paragraph.getRectsForRange(0,text.length,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight))advance+=box.rect[2]-box.rect[0];
+    if(!Number.isFinite(advance))fail('SkParagraph returned a non-finite run advance');
+    const fontMetrics=[];let glyphCount=0;
+    for(const line of paragraph.getShapedLines())for(const run of line.runs){
+      glyphCount+=run.glyphs.length;const font=new CK.Font(run.typeface,run.size);try{fontMetrics.push(font.getMetrics());}finally{font.delete();run.typeface.delete();}
+    }
+    return{width:Math.fround(advance*textScaleX),glyphCount,fontMetrics};
+  }finally{paragraph?.delete();builder?.delete();}
+}
+
+/** Ink bounds of an actual shaped Latin glyph run; no character-box estimate. */
+export function measureSkiaTextBounds(backend,text,state={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
+  // The run validator establishes the same installed font/script/state contract.
+  measureSkiaRun(backend,text,{...state,offset:0});
+  if(!text.length||state.textSize===0||state.textScaleX===0)return[0,0,0,0];
+  const CK=backend.CanvasKit,textSize=state.textSize??12,scaleX=state.textScaleX??1;
+  let builder,paragraph;
+  const textStyle=runTextStyle(backend,CK,state,textSize),itemized=itemizeFonts(backend,text,state.weight??400,!!state.italic,state);
+  try{
+    builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:state.hinting===0,textStyle}),itemized,registeredFace(backend,state));
+    if(itemized)addParagraphText(backend,builder,text,textStyle,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,textSize*(text.length+1)*4+Math.abs((state.letterSpacing??0)*textSize+(state.wordSpacing??0))*(text.length+1)));
+    let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+    for(const line of paragraph.getShapedLines())for(const run of line.runs){
+      const font=new CK.Font(run.typeface,run.size);try{
+        font.setScaleX((run.scaleX??1)*scaleX);font.setSkewX((state.textSkewX??0)+(state.fakeItalic?-0.25:0));font.setEmbolden(!!state.fakeBold);font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);
+        font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));
+        const bounds=font.getGlyphBounds(run.glyphs);
+        for(let i=0;i<run.glyphs.length;i++){
+          const box=Array.from(bounds.slice(4*i,4*i+4));if(box.every(value=>value===0))continue;
+          const x=run.positions[2*i]*scaleX,y=run.positions[2*i+1]-line.baseline;
+          left=Math.min(left,x+box[0]);top=Math.min(top,y+box[1]);right=Math.max(right,x+box[2]);bottom=Math.max(bottom,y+box[3]);
+        }
+      }finally{font.delete();run.typeface.delete();}
+    }
+    return left===Infinity?[0,0,0,0]:[Math.floor(left),Math.floor(top),Math.ceil(right),Math.ceil(bottom)];
+  }finally{paragraph?.delete();builder?.delete();}
+}
+
+/** Shape the complete context with original SkParagraph/ICU, then draw its
+ * actual glyph IDs/positions. UTF16 ranges map to UTF8 cluster offsets; splitting
+ * a cluster and partial RTL origins remain explicit unsupported boundaries. */
+export function drawSkiaTextRun(backend,canvas,text,x,y,state={},isRtl=false,paint=null,{start=0,end=text.length}={}){
+  if(typeof text==='string')text=oneLineRun(text);   // see oneLineRun
+ const CK=backend.CanvasKit;
+ if(typeof text!=='string'||text.length>65536||/[\r\n\t]/.test(text))fail('Recorded text needs one bounded shaping item');
+ if(text.isWellFormed&&!text.isWellFormed())fail('Ill-formed UTF16 text requires a lossless native text boundary');
+ if(!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>text.length)fail('Invalid shaping item draw range');
+ if(state.hyphenEdit||state.flags&0x20||state.flags&0x800)fail('Recorded text synthetic-bold/force-autohint/hyphen state needs a native Minikin draw boundary');
+ const size=state.textSize??12,scale=state.textScaleX??1,skew=(state.textSkewX??0)+(state.fakeItalic?-0.25:0);
+ if(![size,scale,skew].every(Number.isFinite)||size<0||size>512||Math.abs(scale)>16||Math.abs(skew)>16)fail('Recorded text font state exceeds limits');
+ if(start===end||!size||!scale)return;
+ const weight=state.weight??400,italic=!!state.italic;backend.selectTypeface(weight,italic);
+ const decorated=(state.flags&0x18)!==0,cache=shapedRunsOf(CK);
+ // the shaping of a run depends only on these inputs (and on the fonts registered with the paragraph font provider so far): a list re-recorded every frame draws the same runs again
+ const inputs=`${start}|${end}|${isRtl?1:0}|${size}|${weight}|${italic?1:0}|${state.families?.join('\u0002')??''}|${state.fontVariations?.length?JSON.stringify(state.fontVariations):''}|${state.textLocaleTag??'en-US'}|${state.letterSpacing??0}|${state.wordSpacing??0}|${state.flags&0x100?1:0}|${state.hinting===0?1:0}|${scale}|${state.fontFeatureSettings??''}|`;
+ let key=inputs+(backend.fallback?.generation??0)+'|'+text,entry=cache.entries.get(key);
+ if(entry!==undefined&&decorated&&entry.advance===undefined){evictShaped(cache,key,entry);entry=undefined;}   // shaped without the decoration advance: shape again
+ if(entry===undefined){
+  entry=shapeRun(backend,CK,text,state,isRtl,start,end,size,weight,italic,decorated);
+  key=inputs+(backend.fallback?.generation??0)+'|'+text;   // the shaping may have registered the fallback fonts it needed: it is the result for the fonts registered now
+  const stale=cache.entries.get(key);if(stale!==undefined)evictShaped(cache,key,stale);
+  rememberShaped(cache,key,entry);
+ }
+ else{cache.entries.delete(key);cache.entries.set(key,entry);}   // least recently used order
+ if(entry.selected.length===0)return;
+ const fonts=fontsFor(CK,entry,state,skew);
+ canvas.save();try{canvas.translate(x,y);canvas.scale(scale,1);for(let i=0;i<entry.selected.length;i++)canvas.drawGlyphs(entry.selected[i].glyphs,entry.selected[i].positions,0,0,fonts.fonts[i],paint);
+    if(decorated){const metrics=fonts.metrics,advance=entry.advance,decoration=paint.copy();decoration.setStyle(CK.PaintStyle.Fill);if(state.flags&8)canvas.drawRect(CK.XYWHRect(0,metrics.underlinePosition,advance,metrics.underlineThickness),decoration);if(state.flags&16)canvas.drawRect(CK.XYWHRect(0,metrics.strikeoutPosition,advance,metrics.strikeoutThickness),decoration);decoration.delete();}
+ }finally{canvas.restore();}
+}
+/** SkParagraph's shaping of one recorded run: the glyphs and positions of the selected range (origin applied), the typefaces they use (kept), the decoration advance when asked. */
+function shapeRun(backend,CK,text,state,isRtl,start,end,size,weight,italic,decorated){
+ const style=runTextStyle(backend,CK,{...state,weight,italic},size);
+ let builder,paragraph,shapedLines,kept=null;const itemized=itemizeFonts(backend,text,weight,italic,state);
+ try{builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:state.hinting===0,textStyle:style}),itemized,registeredFace(backend,state));if(itemized)addParagraphText(backend,builder,text,style,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,size*(text.length+1)*4+Math.abs((state.letterSpacing??0)*size+(state.wordSpacing??0))*(text.length+1)));
+  const missing=unresolved(paragraph);if(missing.length)fail('Recorded text font lacks glyphs: '+missing.slice(0,8).map(c=>'U+'+c.toString(16)).join(','));
+  const lines=shapedLines=paragraph.getShapedLines();if(lines.length===0&&/^[\s\u200B\u2060\uFEFF]*$/u.test(text))return {selected:[],glyphCount:0,advance:decorated?0:undefined,fonts:new Map()};   // only whitespace (a run of spaces between words): SkParagraph gives no shaped line, and there is nothing to draw, as for a glyphless range below
+  if(lines.length!==1)fail(`Recorded shaping item unexpectedly wraps (${lines.length} shaped lines)`);const line=lines[0],encoder=new TextEncoder(),from=encoder.encode(text.slice(0,start)).length,to=encoder.encode(text.slice(0,end)).length,clusters=new Set([0,encoder.encode(text).length]);for(const run of line.runs)for(const offset of run.offsets)clusters.add(offset);
+  if(!clusters.has(from)||!clusters.has(to))fail('Draw range splits a shaped glyph cluster; native Minikin cluster slicing is required');
+  const selected=line.runs.map(run=>{const glyphs=[],positions=[];for(let i=0;i<run.glyphs.length;i++)if(run.offsets[i]>=from&&run.offsets[i]<to){glyphs.push(run.glyphs[i]);positions.push(run.positions[i*2],run.positions[i*2+1]-line.baseline);}return{run,glyphs,positions};}).filter(v=>v.glyphs.length);
+  if(!selected.length)return {selected:[],glyphCount:0,advance:decorated?0:undefined,fonts:new Map()};
+  const origin=start===0&&!isRtl||start===0&&end===text.length?0:Math.min(...selected.flatMap(v=>v.positions.filter((_,i)=>!(i&1))))-(state.letterSpacing??0)*size/2;
+  kept=new Set(selected.map(v=>v.run));
+  const entry={selected:selected.map(({run,glyphs,positions})=>({typeface:run.typeface,size:run.size,scaleX:run.scaleX,glyphs:Uint16Array.from(glyphs),positions:Float32Array.from(positions,(v,i)=>i&1?v:v-origin)})),glyphCount:selected.reduce((n,v)=>n+v.glyphs.length,0),advance:undefined,fonts:new Map()};
+  if(decorated)entry.advance=paragraph.getRectsForRange(start,end,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight).reduce((n,v)=>n+v.rect[2]-v.rect[0],0);
+  return entry;
+ }finally{for(const line of shapedLines??[])for(const run of line.runs)if(kept===null||!kept.has(run))run.typeface.delete();paragraph?.delete();builder?.delete();}
+}
+/** The Fonts a shaped run draws with under the draw's font state (skew, embolden, metrics, subpixel, bitmaps, edging, hinting), made once per state; the first one's metrics place decorations. */
+function fontsFor(CK,entry,state,skew){
+ const signature=`${skew}|${state.fakeBold?1:0}|${state.flags&0x4c1}|${state.hinting===0?1:0}`;
+ let made=entry.fonts.get(signature);
+ if(made===undefined){
+  const fonts=entry.selected.map(run=>{const font=new CK.Font(run.typeface,run.size);font.setScaleX(run.scaleX);font.setSkewX(skew);font.setEmbolden(!!state.fakeBold);font.setLinearMetrics(!!(state.flags&0x40));font.setSubpixel(!!(state.flags&0x80));font.setEmbeddedBitmaps(!!(state.flags&0x400));font.setEdging(state.flags&1?CK.FontEdging.AntiAlias:{value:0});font.setHinting(state.hinting===0?CK.FontHinting.None:CK.FontHinting.Normal);return font;});
+  made={fonts,metrics:fonts.length?fonts[0].getMetrics():null};
+  if(entry.fonts.size>=8){for(const old of entry.fonts.values())for(const font of old.fonts)font.delete();entry.fonts.clear();}
+  entry.fonts.set(signature,made);
+ }
+ return made;
+}
+/**
+ * Shaped runs kept between replays, per CanvasKit instance: SkParagraph shaping (builder, layout, shaped lines) was most of the cost of drawing text, and a screen re-records
+ * and replays the same runs frame after frame. Bounded by entries and glyphs, least recently used first; an evicted entry frees its typefaces and fonts. A run whose shaping
+ * fails is not kept (the next draw fails the same way).
+ */
+const SHAPED_ENTRIES=4096,SHAPED_GLYPHS=262144,shapedRuns=new WeakMap();
+const shapedRunsOf=CK=>{let cache=shapedRuns.get(CK);if(!cache)shapedRuns.set(CK,cache={entries:new Map(),glyphs:0});return cache;};
+function rememberShaped(cache,key,entry){
+ cache.entries.set(key,entry);cache.glyphs+=entry.glyphCount;
+ for(const [oldKey,old] of cache.entries){if(cache.entries.size<=SHAPED_ENTRIES&&cache.glyphs<=SHAPED_GLYPHS)break;if(old!==entry)evictShaped(cache,oldKey,old);}
+}
+function evictShaped(cache,key,entry){
+ cache.entries.delete(key);cache.glyphs-=entry.glyphCount;
+ for(const made of entry.fonts.values())for(const font of made.fonts)font.delete();entry.fonts.clear();
+ for(const run of entry.selected)run.typeface.delete();
+}
+/** Frees every shaped run of a CanvasKit instance (the Skia host is being disposed). */
+export function disposeShapedRuns(CK){const cache=shapedRuns.get(CK);if(!cache)return;for(const [key,entry] of [...cache.entries])evictShaped(cache,key,entry);shapedRuns.delete(CK);}
