@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=bcf03886254c';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=bcf03886254c';
-import {getVectorGraphics} from './vector-native.js?v=bcf03886254c';
-import {deferRaster} from './deferred-raster.js?v=bcf03886254c';
+import {APKError} from './apk-runtime.js?v=4e2253570bf4';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=4e2253570bf4';
+import {getVectorGraphics} from './vector-native.js?v=4e2253570bf4';
+import {deferRaster} from './deferred-raster.js?v=4e2253570bf4';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -43,10 +43,10 @@ export function createComposeCanvasHost(platform){
      call(r,node,NODE,'setElevation',['F'],'Z',[raw(elevation)]);call(r,node,NODE,'setTranslationZ',['F'],'Z',[raw(translationZ)]);
      const outline=elevation+translationZ>0||view.clipToOutline?platform.viewOutlineHost.outlineObject(r,receiver):null;
      call(r,node,NODE,'setOutline',['Landroid/graphics/Outline;'],'Z',[outline??null]);call(r,node,NODE,'setClipToOutline',['Z'],'Z',[view.clipToOutline?1:0]);}
-    const target=call(r,node,NODE,'beginRecording',['I','I'],DISPLAY,[width,height]);view.updatingDisplayList=true;platform.uiWorkDepth=(platform.uiWorkDepth??0)+1;/* a wait inside the draw serves host tasks only (Scheduler.mainImplicitWait) */view.displayListDirty=false;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);
+    const target=call(r,node,NODE,'beginRecording',['I','I'],DISPLAY,[width,height]);view.updatingDisplayList=true;view.displayListDirty=false;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);
     try{const sx=view.fields.get(`${VIEW}->mScrollX:I`)??0,sy=view.fields.get(`${VIEW}->mScrollY:I`)??0;if(sx||sy)canvas(r,target,'translate',['F','F'],'V',[raw(-sx),raw(-sy)]);call(r,receiver,VIEW,'draw',[CANVAS],'V',[target]);}
     catch(error){view.displayListDirty=true;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);throw error;}
-    finally{view.updatingDisplayList=false;platform.uiWorkDepth--;call(r,node,NODE,'endRecording',[],'V',[]);r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,view.displayListDirty?1:0);}
+    finally{view.updatingDisplayList=false;call(r,node,NODE,'endRecording',[],'V',[]);r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,view.displayListDirty?1:0);}
     view.displayListGeneration=(view.displayListGeneration??0)+1;r.record(`HOST View.updateDisplayListIfDirty [original RenderNode/RecordingCanvas DEX; generation${view.displayListGeneration}]`);return node;
   };
   const textStyleValue=(r,receiver,attribute,method,result,fallback)=>{
@@ -275,7 +275,7 @@ export function createComposeCanvasHost(platform){
           return;
         }
         for(const child of view.children??[])visit(child,depth+1);
-      };if(root){platform.uiWorkDepth=(platform.uiWorkDepth??0)+1;/* the window's draw: a wait inside it serves host tasks only (Scheduler.mainImplicitWait) */try{visit(root);}finally{platform.uiWorkDepth--;}}
+      };if(root)visit(root);
     },
     invoke(r,method,args){
       if(method.owner===CANVAS&&/^insert(Reorder|Inorder)Barrier$/.test(method.name)){

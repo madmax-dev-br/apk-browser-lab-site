@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=bcf03886254c';
+import { APKError } from './apk-runtime.js?v=4e2253570bf4';
 
 const VIEW = 'Landroid/view/View;', MATRIX = 'Landroid/graphics/Matrix;';
 const keys = new Set(['getLocationOnScreen([I)V', 'getLocationOnScreen()[I', 'getLocationInWindow([I)V', 'transformFromViewToWindowSpace([I)V', 'transformMatrixToGlobal(Landroid/graphics/Matrix;)V'].map(signature => VIEW + '->' + signature));

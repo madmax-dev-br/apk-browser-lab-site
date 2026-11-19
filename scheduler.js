@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=bcf03886254c';
+import { APKError } from './apk-error.js?v=4e2253570bf4';
 
 // Green-thread scheduler for the VM.
 //
@@ -29,7 +29,6 @@ export class VMThread {
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
-const IMPLICIT_WAIT = /^(?:monitor|class initialization|Object\.wait \(reacquire\)|spin-wait)/;   // spin-wait: OperationMonitor.spinYield (no main-thread message runs inside the event that spins)
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
   constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
@@ -165,28 +164,18 @@ export class Scheduler {
     try { const processed = this.serveEvents(platform); if (processed) { this.stats.events += processed; this.quietIdles = 0; } } finally { this.rt.thread = previous; }
   }
   /**
-   * Main-Looper messages are served on the main thread's stack while it is parked in a Java wait (a lab allowance: host tasks such as network results and posted work keep flowing; a device
-   * would run none of them until main returned to its Looper). One level only: a served message that blocks parks main again, and serving the next message on top of it, and the next, nested
-   * one JavaScript run per queued message until the stack overflowed (a real app: "RangeError: Maximum call stack size exceeded" in the event pump). While a message served that way is on
-   * the stack and main is parked again, the queue waits; it runs when main is back in its Looper.
+   * Main is parked in a wait: a contended monitor, a class another thread initializes, Object.wait, park, sleep, join, a latch, Future.get, runBlocking. On Android a waiting main
+   * thread runs nothing; its Handler messages, coroutine continuations on Dispatchers.Main, View.post Runnables, frames and traversals wait until it is back in its Looper. The
+   * lab serves only its own host tasks on top of it (looper-host.js hostOnly: what other processes and threads do on a device, such as a network result or a service answer).
+   * It used to serve every main-Looper message during an explicit wait, and frames during any wait: a Handler message or a frame then composed again in the middle of a
+   * composition that waited (Compose: ComposeRuntimeError from CompositionImpl.drainPendingModificationsForCompositionLocked in composeInitial, "pending composition has not
+   * been applied"), drew during a measure ("performMeasureAndLayout called during measure layout") and re-entered a View's draw (RenderNode "Recording currently in progress").
+   * One level only: a host task served that way that blocks parks main again, and the queue waits until main is back in its Looper (serving the next one on top of it nested one
+   * JavaScript run per queued task until the stack overflowed: "RangeError: Maximum call stack size exceeded" in the event pump).
    */
   mainParked() { const main = this.main; return main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); }
-  /**
-   * Main is in a wait its own code did not ask for: entering a contended monitor (also reacquiring one after Object.wait) or using a class another thread is initializing. Code
-   * between two statements can never expect main-thread work to run there, so nothing of the app's main thread runs: not a Handler message, not a frame (a frame served during
-   * such a wait re-entered a Compose composition in progress: ComposeRuntimeError "pending composition has not been applied"). Explicit waits (Object.wait, park, sleep, join,
-   * Future.get) keep the allowance described at mainParked.
-   */
-  // Any wait, explicit or not, that main entered inside view-tree work (a layout pass, a Choreographer frame, a touch: platform.uiWorkDepth) is treated the same way: Android
-  // never runs a frame, an input event or a posted message inside a measure, a layout or a draw. Served there, a frame drew during a measure (Compose:
-  // IllegalArgumentException "performMeasureAndLayout called during measure layout"), a scroll remeasured inside one, and a View's draw re-entered its own (RenderNode
-  // IllegalStateException "Recording currently in progress").
-  mainImplicitWait() {
-    const main = this.main, parked = main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); if (!parked) return false;
-    const reason = main.blocked?.reason; return (typeof reason === 'string' && IMPLICIT_WAIT.test(reason)) || (this.rt.platform?.uiWorkDepth ?? 0) > 0;
-  }
-  /** The delay until an event that may be served now: during an implicit wait of main only the lab's host tasks count. */
-  servableEventDelay() { const platform = this.rt.platform; return this.mainImplicitWait() && platform.nextParkedEventDelay ? platform.nextParkedEventDelay() : platform.nextEventDelay?.(); }
+  /** The delay until an event that may be served now: while main is parked only the lab's host tasks count. */
+  servableEventDelay() { const platform = this.rt.platform; return this.mainParked() && platform.nextParkedEventDelay ? platform.nextParkedEventDelay() : platform.nextEventDelay?.(); }
   mayServeEvents() { return !(this.parkedServing > 0 && this.mainParked()); }
   serveEvents(platform) {
     const parked = this.mainParked(); if (parked) this.parkedServing = (this.parkedServing ?? 0) + 1;

@@ -1,136 +1,136 @@
-import { createPackageRegistry } from './package-registry.js?v=bcf03886254c';
-import { describeMicrogEntryPoints } from './microg-device.js?v=bcf03886254c';
-import { hostDefinitions } from './host-contract.js?v=bcf03886254c';
-import { Invoke } from './interpreter.js?v=bcf03886254c';
-import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=bcf03886254c';
-import { createComposeCanvasHost } from './compose-canvas-host.js?v=bcf03886254c';
-import { createViewTransformHost } from './view-transform-host.js?v=bcf03886254c';
-import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=bcf03886254c';
-import { createViewOutlineHost } from './view-outline-host.js?v=bcf03886254c';
-import { createShaderHost } from './shader-host.js?v=bcf03886254c';
-import { createSystemBarsHost } from './system-bars-host.js?v=bcf03886254c';
-import { createDeviceStateHost } from './device-state-host.js?v=bcf03886254c';
-import { createJobSchedulerHost } from './job-scheduler-host.js?v=bcf03886254c';
-import { createPendingIntentHost } from './pending-intent-host.js?v=bcf03886254c';
-import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=bcf03886254c';
-import { ignoreActivityStart } from './ignored-activities.js?v=bcf03886254c';
-import { resolveIntentFields } from './intent-resolver.js?v=bcf03886254c';
-import { createBinderHost } from './binder-host.js?v=bcf03886254c';
-import { createInputManagerHost } from './input-native.js?v=bcf03886254c';
-import { createBackDispatcherHost } from './back-dispatcher-host.js?v=bcf03886254c';
-import { createRenderThreadAnimators } from './rt-animators.js?v=bcf03886254c';
-import { renderNodeByHandle } from './rendernode-native.js?v=bcf03886254c';
-import { resolveDevice } from './device-profile.js?v=bcf03886254c';
-import { configurationFor } from './device-configuration.js?v=bcf03886254c';
-import { createViewCoordinateHost } from './view-coordinate-host.js?v=bcf03886254c';
-import { createEditableTextHost } from './editable-text-host.js?v=bcf03886254c';
-import { createComponentCallbacksHost } from './component-callbacks-host.js?v=bcf03886254c';
-import { createViewStateHost } from './view-state-host.js?v=bcf03886254c';
-import { createLocaleServiceHost } from './locale-service-host.js?v=bcf03886254c';
-import { APKError, dottedName } from './apk-runtime.js?v=bcf03886254c';
-import { HOST_STYLEABLES, LAYOUTS_PROFILE_ATTRIBUTES, ANDROID_13_LAST_ATTRIBUTE_ID } from './host-styleables.js?v=bcf03886254c';
-import { ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT } from './original-attribute-page-gaps.js?v=bcf03886254c';
+import { createPackageRegistry } from './package-registry.js?v=4e2253570bf4';
+import { describeMicrogEntryPoints } from './microg-device.js?v=4e2253570bf4';
+import { hostDefinitions } from './host-contract.js?v=4e2253570bf4';
+import { Invoke } from './interpreter.js?v=4e2253570bf4';
+import { PACKAGE_VALUE_PARENTS } from './package-value-fields.js?v=4e2253570bf4';
+import { createComposeCanvasHost } from './compose-canvas-host.js?v=4e2253570bf4';
+import { createViewTransformHost } from './view-transform-host.js?v=4e2253570bf4';
+import { createViewPropertyAnimatorHost } from './view-property-animator-host.js?v=4e2253570bf4';
+import { createViewOutlineHost } from './view-outline-host.js?v=4e2253570bf4';
+import { createShaderHost } from './shader-host.js?v=4e2253570bf4';
+import { createSystemBarsHost } from './system-bars-host.js?v=4e2253570bf4';
+import { createDeviceStateHost } from './device-state-host.js?v=4e2253570bf4';
+import { createJobSchedulerHost } from './job-scheduler-host.js?v=4e2253570bf4';
+import { createPendingIntentHost } from './pending-intent-host.js?v=4e2253570bf4';
+import { ActivityStarter, activityInfoOf, FLAG as LAUNCH_FLAG } from './activity-starter.js?v=4e2253570bf4';
+import { ignoreActivityStart } from './ignored-activities.js?v=4e2253570bf4';
+import { resolveIntentFields } from './intent-resolver.js?v=4e2253570bf4';
+import { createBinderHost } from './binder-host.js?v=4e2253570bf4';
+import { createInputManagerHost } from './input-native.js?v=4e2253570bf4';
+import { createBackDispatcherHost } from './back-dispatcher-host.js?v=4e2253570bf4';
+import { createRenderThreadAnimators } from './rt-animators.js?v=4e2253570bf4';
+import { renderNodeByHandle } from './rendernode-native.js?v=4e2253570bf4';
+import { resolveDevice } from './device-profile.js?v=4e2253570bf4';
+import { configurationFor } from './device-configuration.js?v=4e2253570bf4';
+import { createViewCoordinateHost } from './view-coordinate-host.js?v=4e2253570bf4';
+import { createEditableTextHost } from './editable-text-host.js?v=4e2253570bf4';
+import { createComponentCallbacksHost } from './component-callbacks-host.js?v=4e2253570bf4';
+import { createViewStateHost } from './view-state-host.js?v=4e2253570bf4';
+import { createLocaleServiceHost } from './locale-service-host.js?v=4e2253570bf4';
+import { APKError, dottedName } from './apk-runtime.js?v=4e2253570bf4';
+import { HOST_STYLEABLES, LAYOUTS_PROFILE_ATTRIBUTES, ANDROID_13_LAST_ATTRIBUTE_ID } from './host-styleables.js?v=4e2253570bf4';
+import { ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT } from './original-attribute-page-gaps.js?v=4e2253570bf4';
 export { ORIGINAL_ATTRIBUTES_WITHOUT_PAGE_EFFECT };
-import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=bcf03886254c';
-import { createViewTreeHost } from './view-tree-host.js?v=bcf03886254c';
-import { createDialogWindowHost } from './dialog-window-host.js?v=bcf03886254c';
-import { createStrictModeHost } from './strictmode-host.js?v=bcf03886254c';
-import { createProgressBarApiHost } from './progress-bar-api-host.js?v=bcf03886254c';
-import { createViewGroupApiHost } from './viewgroup-api-host.js?v=bcf03886254c';
-import { createViewInternalsHost } from './view-internals-host.js?v=bcf03886254c';
-import { createWindowManagerGlobal } from './window-manager-global.js?v=bcf03886254c';
-import { createViewWindowHost } from './view-window-host.js?v=bcf03886254c';
-import { createVectorCanvasHost } from './vector-native.js?v=bcf03886254c';
-import { createPaintHost, BLUR_STYLE, BLUR_STYLE_NAMES } from './paint-host.js?v=bcf03886254c';
-import { createContentResolverHost } from './content-resolver-host.js?v=bcf03886254c';
-import { createDrawableViewHost } from './drawable-view-host.js?v=bcf03886254c';
-import { createDeviceServicesHost } from './device-services-host.js?v=bcf03886254c';
-import { createSystemServicesHost } from './system-services-host.js?v=bcf03886254c';
-import { createJavaIoHost } from './java-io-host.js?v=bcf03886254c';
-import { createClassLoaderHost } from './class-loader-host.js?v=bcf03886254c';
-import { createAppServicesHost } from './app-services-host.js?v=bcf03886254c';
-import { createConcurrencyHost } from './concurrency-host.js?v=bcf03886254c';
-import { createLooperHost, uiWork } from './looper-host.js?v=bcf03886254c';
-import { createDateTimeHost } from './datetime-host.js?v=bcf03886254c';
+import { AndroidXmlHost, XML_METHODS } from './android-xml-host.js?v=4e2253570bf4';
+import { createViewTreeHost } from './view-tree-host.js?v=4e2253570bf4';
+import { createDialogWindowHost } from './dialog-window-host.js?v=4e2253570bf4';
+import { createStrictModeHost } from './strictmode-host.js?v=4e2253570bf4';
+import { createProgressBarApiHost } from './progress-bar-api-host.js?v=4e2253570bf4';
+import { createViewGroupApiHost } from './viewgroup-api-host.js?v=4e2253570bf4';
+import { createViewInternalsHost } from './view-internals-host.js?v=4e2253570bf4';
+import { createWindowManagerGlobal } from './window-manager-global.js?v=4e2253570bf4';
+import { createViewWindowHost } from './view-window-host.js?v=4e2253570bf4';
+import { createVectorCanvasHost } from './vector-native.js?v=4e2253570bf4';
+import { createPaintHost, BLUR_STYLE, BLUR_STYLE_NAMES } from './paint-host.js?v=4e2253570bf4';
+import { createContentResolverHost } from './content-resolver-host.js?v=4e2253570bf4';
+import { createDrawableViewHost } from './drawable-view-host.js?v=4e2253570bf4';
+import { createDeviceServicesHost } from './device-services-host.js?v=4e2253570bf4';
+import { createSystemServicesHost } from './system-services-host.js?v=4e2253570bf4';
+import { createJavaIoHost } from './java-io-host.js?v=4e2253570bf4';
+import { createClassLoaderHost } from './class-loader-host.js?v=4e2253570bf4';
+import { createAppServicesHost } from './app-services-host.js?v=4e2253570bf4';
+import { createConcurrencyHost } from './concurrency-host.js?v=4e2253570bf4';
+import { createLooperHost } from './looper-host.js?v=4e2253570bf4';
+import { createDateTimeHost } from './datetime-host.js?v=4e2253570bf4';
 const LOCALE_CONSTANTS = { US: 'en-US', UK: 'en-GB', ENGLISH: 'en', ROOT: 'und', CANADA: 'en-CA', CANADA_FRENCH: 'fr-CA', FRANCE: 'fr-FR', FRENCH: 'fr', GERMAN: 'de', GERMANY: 'de-DE', ITALIAN: 'it', ITALY: 'it-IT', JAPAN: 'ja-JP', JAPANESE: 'ja', KOREA: 'ko-KR', KOREAN: 'ko', CHINA: 'zh-CN', CHINESE: 'zh', PRC: 'zh-CN', SIMPLIFIED_CHINESE: 'zh-CN', TAIWAN: 'zh-TW', TRADITIONAL_CHINESE: 'zh-TW' };
-import { createNumberFormatHost } from './number-format-host.js?v=bcf03886254c';
-import { createCookieHost } from './cookie-host.js?v=bcf03886254c';
-import { createViewApiHost } from './view-api-host.js?v=bcf03886254c';
-import { createActionModeHost } from './action-mode-host.js?v=bcf03886254c';
-import { createTextViewApiHost } from './textview-api-host.js?v=bcf03886254c';
-import { createIntentApiHost } from './intent-api-host.js?v=bcf03886254c';
-import { createImageDecoderHost } from './image-decoder-host.js?v=bcf03886254c';
-import { createAnimatedImageHost } from './animated-image-host.js?v=bcf03886254c';
-import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=bcf03886254c';
-import { createToastHost } from './toast-host.js?v=bcf03886254c';
-import { createIcuTextHost } from './icu-text-host.js?v=bcf03886254c';
-import { createMiscPlatformHost } from './misc-platform-host.js?v=bcf03886254c';
-import { createRemoteViewsHost } from './remote-views-host.js?v=bcf03886254c';
-import { createPackageManagerApiHost } from './package-manager-api-host.js?v=bcf03886254c';
-import { createPackageValueObjectsHost } from './package-value-objects.js?v=bcf03886254c';
-import { createNetworkInfoHost } from './network-info-host.js?v=bcf03886254c';
-import { createApkChecksumsHost } from './apk-checksums-host.js?v=bcf03886254c';
-import { createContentResolverApiHost } from './content-resolver-api-host.js?v=bcf03886254c';
-import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=bcf03886254c';
-import { createImageViewApiHost } from './image-view-api-host.js?v=bcf03886254c';
-import { createUriApiHost } from './uri-api-host.js?v=bcf03886254c';
-import { createFormatterHost } from './formatter-host.js?v=bcf03886254c';
-import { createJcaHost } from './jca-host.js?v=bcf03886254c';
-import { createIcuBidiHost } from './icu-bidi-host.js?v=bcf03886254c';
-import { createSecurityHost } from './security-host.js?v=bcf03886254c';
-import { createReflectionHost } from './reflection-host.js?v=bcf03886254c';
-import { createSerializationHost } from './serialization-host.js?v=bcf03886254c';
-import { createBitmapCodecHost } from './bitmap-codec-host.js?v=bcf03886254c';
-import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=bcf03886254c';
-import { createImageViewHost } from './image-view-host.js?v=bcf03886254c';
-import { createWebViewHost } from './webview-host.js?v=bcf03886254c';
-import { createContentExtrasHost } from './content-extras-host.js?v=bcf03886254c';
-import { createPreferenceManagerHost } from './preference-manager-host.js?v=bcf03886254c';
-import { createProcessHost } from './process-host.js?v=bcf03886254c';
-import { createStatsHost } from './stats-host.js?v=bcf03886254c';
-import { createTelephonyHost } from './telephony-host.js?v=bcf03886254c';
-import { createSurfaceTextureHost } from './surface-texture-host.js?v=bcf03886254c';
-import { createCameraHost } from './camera-host.js?v=bcf03886254c';
-import { createScaleGestureHost } from './scale-gesture-host.js?v=bcf03886254c';
-import { createBuildHost } from './build-host.js?v=bcf03886254c';
-import { createSensorHost } from './sensor-host.js?v=bcf03886254c';
-import { createGeocoderHost } from './geocoder-host.js?v=bcf03886254c';
-import { createCoreLangHost } from './core-lang-host.js?v=bcf03886254c';
-import { createResourcesExtrasHost } from './resources-extras-host.js?v=bcf03886254c';
-import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=bcf03886254c';
-import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=bcf03886254c';
-import { createManagersExtrasHost } from './managers-extras-host.js?v=bcf03886254c';
-import { createStrictMathHost } from './strict-math-host.js?v=bcf03886254c';
-import { createLocaleExtrasHost } from './locale-extras-host.js?v=bcf03886254c';
-import { createUnicodeHost } from './unicode-host.js?v=bcf03886254c';
-import { createMessageFormatHost } from './message-format-host.js?v=bcf03886254c';
-import { createSettingsHost } from './settings-host.js?v=bcf03886254c';
-import { createHardwareServicesHost } from './hardware-services-host.js?v=bcf03886254c';
-import { createPermissionHost } from './permission-host.js?v=bcf03886254c';
-import { createPeripheralServicesHost } from './peripheral-services-host.js?v=bcf03886254c';
-import { createStorageServicesHost } from './storage-services-host.js?v=bcf03886254c';
-import { createSharedStorageHost } from './shared-storage-host.js?v=bcf03886254c';
-import { createSystemManagersHost } from './system-managers-host.js?v=bcf03886254c';
-import { createJavaServicesHost } from './java-services-host.js?v=bcf03886254c';
-import { DEVICE_FEATURES } from './service-kit.js?v=bcf03886254c';
-import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=bcf03886254c';
-import { createViewTouchHost } from './view-touch-host.js?v=bcf03886254c';
-import { createMagnifierHost } from './magnifier-host.js?v=bcf03886254c';
-import { createDisplayHost } from './display-host.js?v=bcf03886254c';
-import { createNotificationHost } from './notification-host.js?v=bcf03886254c';
-import { createDatabaseSupportHost } from './database-support-host.js?v=bcf03886254c';
-import { VMClock } from './vm-clock.js?v=bcf03886254c';
-import { createWindowInsetsHost } from './window-insets-host.js?v=bcf03886254c';
-import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=bcf03886254c';
-import { createViewLayoutHost } from './view-layout-host.js?v=bcf03886254c';
-import { createInputMethodServiceHost } from './input-method-service-host.js?v=bcf03886254c';
-import { createAutofillServiceHost } from './autofill-service-host.js?v=bcf03886254c';
-import { createClipboardServiceHost } from './clipboard-service-host.js?v=bcf03886254c';
-import { createViewInputHost } from './view-input-host.js?v=bcf03886254c';
-import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=bcf03886254c';
-import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=bcf03886254c';
-import { maybeCollect, ephemeronMap } from './heap-gc.js?v=bcf03886254c';
-import { BackgroundFloor, BACKGROUND_FLOOR_SLICE_MAX_MS } from './background-floor.js?v=bcf03886254c';
+import { createNumberFormatHost } from './number-format-host.js?v=4e2253570bf4';
+import { createCookieHost } from './cookie-host.js?v=4e2253570bf4';
+import { createViewApiHost } from './view-api-host.js?v=4e2253570bf4';
+import { createActionModeHost } from './action-mode-host.js?v=4e2253570bf4';
+import { createTextViewApiHost } from './textview-api-host.js?v=4e2253570bf4';
+import { createIntentApiHost } from './intent-api-host.js?v=4e2253570bf4';
+import { createImageDecoderHost } from './image-decoder-host.js?v=4e2253570bf4';
+import { createAnimatedImageHost } from './animated-image-host.js?v=4e2253570bf4';
+import { createPlatformDataClassesHost } from './platform-data-classes-host.js?v=4e2253570bf4';
+import { createToastHost } from './toast-host.js?v=4e2253570bf4';
+import { createIcuTextHost } from './icu-text-host.js?v=4e2253570bf4';
+import { createMiscPlatformHost } from './misc-platform-host.js?v=4e2253570bf4';
+import { createRemoteViewsHost } from './remote-views-host.js?v=4e2253570bf4';
+import { createPackageManagerApiHost } from './package-manager-api-host.js?v=4e2253570bf4';
+import { createPackageValueObjectsHost } from './package-value-objects.js?v=4e2253570bf4';
+import { createNetworkInfoHost } from './network-info-host.js?v=4e2253570bf4';
+import { createApkChecksumsHost } from './apk-checksums-host.js?v=4e2253570bf4';
+import { createContentResolverApiHost } from './content-resolver-api-host.js?v=4e2253570bf4';
+import { createActivityApiHost, forcedOrientationOf } from './activity-api-host.js?v=4e2253570bf4';
+import { createImageViewApiHost } from './image-view-api-host.js?v=4e2253570bf4';
+import { createUriApiHost } from './uri-api-host.js?v=4e2253570bf4';
+import { createFormatterHost } from './formatter-host.js?v=4e2253570bf4';
+import { createJcaHost } from './jca-host.js?v=4e2253570bf4';
+import { createIcuBidiHost } from './icu-bidi-host.js?v=4e2253570bf4';
+import { createSecurityHost } from './security-host.js?v=4e2253570bf4';
+import { createReflectionHost } from './reflection-host.js?v=4e2253570bf4';
+import { createSerializationHost } from './serialization-host.js?v=4e2253570bf4';
+import { createBitmapCodecHost } from './bitmap-codec-host.js?v=4e2253570bf4';
+import { createBitmapDrawableHost } from './bitmap-drawable-host.js?v=4e2253570bf4';
+import { createImageViewHost } from './image-view-host.js?v=4e2253570bf4';
+import { createWebViewHost } from './webview-host.js?v=4e2253570bf4';
+import { createContentExtrasHost } from './content-extras-host.js?v=4e2253570bf4';
+import { createPreferenceManagerHost } from './preference-manager-host.js?v=4e2253570bf4';
+import { createProcessHost } from './process-host.js?v=4e2253570bf4';
+import { createStatsHost } from './stats-host.js?v=4e2253570bf4';
+import { createTelephonyHost } from './telephony-host.js?v=4e2253570bf4';
+import { createSurfaceTextureHost } from './surface-texture-host.js?v=4e2253570bf4';
+import { createCameraHost } from './camera-host.js?v=4e2253570bf4';
+import { createScaleGestureHost } from './scale-gesture-host.js?v=4e2253570bf4';
+import { createBuildHost } from './build-host.js?v=4e2253570bf4';
+import { createSensorHost } from './sensor-host.js?v=4e2253570bf4';
+import { createGeocoderHost } from './geocoder-host.js?v=4e2253570bf4';
+import { createCoreLangHost } from './core-lang-host.js?v=4e2253570bf4';
+import { createResourcesExtrasHost } from './resources-extras-host.js?v=4e2253570bf4';
+import { createSimpleTimeZoneHost } from './simple-timezone-host.js?v=4e2253570bf4';
+import { createActivityManagerExtrasHost } from './activity-manager-extras-host.js?v=4e2253570bf4';
+import { createManagersExtrasHost } from './managers-extras-host.js?v=4e2253570bf4';
+import { createStrictMathHost } from './strict-math-host.js?v=4e2253570bf4';
+import { createLocaleExtrasHost } from './locale-extras-host.js?v=4e2253570bf4';
+import { createUnicodeHost } from './unicode-host.js?v=4e2253570bf4';
+import { createMessageFormatHost } from './message-format-host.js?v=4e2253570bf4';
+import { createSettingsHost } from './settings-host.js?v=4e2253570bf4';
+import { createHardwareServicesHost } from './hardware-services-host.js?v=4e2253570bf4';
+import { createPermissionHost } from './permission-host.js?v=4e2253570bf4';
+import { createPeripheralServicesHost } from './peripheral-services-host.js?v=4e2253570bf4';
+import { createStorageServicesHost } from './storage-services-host.js?v=4e2253570bf4';
+import { createSharedStorageHost } from './shared-storage-host.js?v=4e2253570bf4';
+import { createSystemManagersHost } from './system-managers-host.js?v=4e2253570bf4';
+import { createJavaServicesHost } from './java-services-host.js?v=4e2253570bf4';
+import { DEVICE_FEATURES } from './service-kit.js?v=4e2253570bf4';
+import { createTypefaceBuilderHost } from './typeface-builder-host.js?v=4e2253570bf4';
+import { createViewTouchHost } from './view-touch-host.js?v=4e2253570bf4';
+import { createMagnifierHost } from './magnifier-host.js?v=4e2253570bf4';
+import { createDisplayHost } from './display-host.js?v=4e2253570bf4';
+import { createNotificationHost } from './notification-host.js?v=4e2253570bf4';
+import { createDatabaseSupportHost } from './database-support-host.js?v=4e2253570bf4';
+import { VMClock } from './vm-clock.js?v=4e2253570bf4';
+import { createWindowInsetsHost } from './window-insets-host.js?v=4e2253570bf4';
+import { createAccessibilityServiceHost } from './accessibility-service-host.js?v=4e2253570bf4';
+import { createViewLayoutHost } from './view-layout-host.js?v=4e2253570bf4';
+import { createInputMethodServiceHost } from './input-method-service-host.js?v=4e2253570bf4';
+import { createAutofillServiceHost } from './autofill-service-host.js?v=4e2253570bf4';
+import { createClipboardServiceHost } from './clipboard-service-host.js?v=4e2253570bf4';
+import { createViewInputHost } from './view-input-host.js?v=4e2253570bf4';
+import { AndroidStyleBackend, STYLE_METHODS } from './android-style-backend.js?v=4e2253570bf4';
+import { WEB_DEVICE_CONFIGURATION } from './resource-config-provider.js?v=4e2253570bf4';
+import { maybeCollect, ephemeronMap } from './heap-gc.js?v=4e2253570bf4';
+import { BackgroundFloor, BACKGROUND_FLOOR_SLICE_MAX_MS } from './background-floor.js?v=4e2253570bf4';
 
 const ACTIVITY = 'Landroid/app/Activity;', INTENT = 'Landroid/content/Intent;', BUNDLE = 'Landroid/os/Bundle;';
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;';
@@ -2224,7 +2224,7 @@ export class AndroidPlatform {
       const draw=()=>{this.drawableViewHost.drawTree(runtime,root);this.composeCanvasHost.renderTree(runtime,root);};
       if(runtime.classes.has('Landroid/view/ViewTreeObserver;')){if(!this.viewTreeHost.dispatchFrame(runtime,root,draw)){this.requestDraw(runtime,root,1000/60);return;}}else draw();
       runtime.object(root).invalidated=false;
-    },delay,[root]);
+    },delay,[root],{ui:true});   // the traversal's draw is view-tree work of the app's main thread (ViewRootImpl.performDraw), never a host task served on top of a waiting main thread
   }
   /** `roots`: the Java values the callback closes over (the heap collector cannot inspect closures; a task without a roots list blocks collection). */
   queueTask(callback, delay = 0, roots = undefined, { ui = false, deferred = false } = {}) {
@@ -2675,10 +2675,10 @@ export class AndroidPlatform {
     // The priority only applies once the main thread is behind (the head event is overdue by more than UI_FIRST_BEHIND_MS of virtual time -- a flood, not the ordinary jitter of a launch): in the normal flow due-time order is kept, so a launch does not lay out twice.
     // The due time moves with the VM clock while the pump runs (as Looper.loopOnce reads uptimeMillis each time): a frame whose vsync arrives during this pump runs in its next round
     // instead of waiting for the next pump. A frozen or deterministic clock (frames, tests) does not move, so nothing changes there.
-    // Served on the stack of a main thread that is in an implicit wait (a contended monitor, a class another thread initializes: Scheduler.mainImplicitWait): the app's own
-    // main-thread work (Handler messages, frames, traversals) waits for main to come back, as on a device; only the lab's host tasks run. Running a frame there re-entered Compose in the middle of a composition whose thread was waiting for a class
-    // another thread was initializing: ComposeRuntimeError "pending composition has not been applied" and a blank first frame.
-    const parked = (runtime.scheduler?.parkedServing ?? 0) > 0 && runtime.scheduler.mainImplicitWait();
+    // Served on the stack of a main thread that is parked in a wait (Scheduler.mainParked): the app's own main-thread work (Handler messages, frames, traversals, View.post)
+    // waits for main to come back, as on a device; only the lab's host tasks run. Running a frame or a message there re-entered Compose in the middle of a composition that
+    // waited: ComposeRuntimeError "pending composition has not been applied".
+    const parked = (runtime.scheduler?.parkedServing ?? 0) > 0 && runtime.scheduler.mainParked();
     const nextDue = () => parked ? looper.nextDueWhileParked(runtime, Math.max(now, this.clock.now())) : looper.nextDue(runtime, Math.max(now, this.clock.now()), UI_FIRST_BEHIND_MS);
     // Fair scheduling: every round runs the main Looper's due events first (bounded by host time once background work is waiting), then ONE bounded background slice of green threads (coroutine workers, executors:
     // 8 ms of host time, 2 ms until the first frame is committed), and repeats -- so a flood of background work makes steady progress without ever starving the main thread's traversal and frame.
@@ -2714,8 +2714,7 @@ export class AndroidPlatform {
       }
     };
     const runEventCore = due => {
-      const event = due.event, hostMark = runtime.hostAllocs.length, ui = uiWork(event);
-      if (ui) this.uiWorkDepth = (this.uiWorkDepth ?? 0) + 1;   // main is in view-tree work until it returns: a wait inside it serves host tasks only (Scheduler.mainImplicitWait)
+      const event = due.event, hostMark = runtime.hostAllocs.length;
       runtime.monitor.eventRan(event); runtime.monitor.mainEventBegin(this.describeEvent(runtime, event)); const frozen = event.windowFrameTime !== undefined ? this.clock.freeze() : false;   // a Choreographer frame callback runs at its vsync instant (see VMClock)
       try {
         runtime.steps = 0;
@@ -2735,7 +2734,7 @@ export class AndroidPlatform {
           } else throw error;
         }
         finally { runtime.gcSafeDepth = savedSafeDepth; runtime.hostRoots.pop(); }
-      } finally { if (ui) this.uiWorkDepth--; runtime.monitor.mainEventEnd(); if (frozen) this.clock.thaw(); if (runtime.hostAllocs.length > hostMark) runtime.releaseHostAllocs(hostMark); }   // what the event's host code allocated is not in flight any more (natives further out stay below the mark)
+      } finally { runtime.monitor.mainEventEnd(); if (frozen) this.clock.thaw(); if (runtime.hostAllocs.length > hostMark) runtime.releaseHostAllocs(hostMark); }   // what the event's host code allocated is not in flight any more (natives further out stay below the mark)
     };
     for (let round = 0, slices = 0; round < 64 && (round === 0 || performance.now() - drainStart < DRAIN_HOST_BUDGET_MS); round++) {   // one pump returns to its caller within ~DRAIN_HOST_BUDGET_MS of host time (the page, input and the next pump get their turn)
       let ran = 0; const roundStart = performance.now();

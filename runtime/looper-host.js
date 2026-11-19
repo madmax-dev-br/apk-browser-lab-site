@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=bcf03886254c';
-import { GC_ROOTS } from './heap-gc.js?v=bcf03886254c';
-import { LooperYield } from './message-queue-native.js?v=bcf03886254c';
-import { APKError } from './apk-error.js?v=bcf03886254c';
+import { createHostRegistry } from './host-contract.js?v=4e2253570bf4';
+import { GC_ROOTS } from './heap-gc.js?v=4e2253570bf4';
+import { LooperYield } from './message-queue-native.js?v=4e2253570bf4';
+import { APKError } from './apk-error.js?v=4e2253570bf4';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -31,11 +31,10 @@ const K = {
 const isNull = value => value === null || value === undefined || value === 0;
 /**
  * A host task that may run while main is parked (see nextDueWhileParked): the lab's own work (a network result, a service answer, a timer). App work for the main thread that the
- * lab also queues as host tasks is not: a layout pass (ui), a Choreographer frame (windowFrameTime) and a View.post Runnable (windowCallback) run only once main is back in its Looper.
+ * lab also queues as host tasks is not: a layout pass or the window's draw (ui), a Choreographer frame (windowFrameTime) and a View.post Runnable (windowCallback) run only once
+ * main is back in its Looper.
  */
 export const hostOnly = event => !!event.platformTask && !event.ui && event.windowFrameTime === undefined && event.windowCallback === undefined;
-/** Main-thread work of the view tree: a layout pass or a Choreographer frame (measure, layout, draw, animation and input callbacks). */
-export const uiWork = event => !!event.ui || event.windowFrameTime !== undefined;
 
 export function createLooperHost(platform) {
   const registry = createHostRegistry(), { type, def } = registry;

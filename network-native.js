@@ -1,17 +1,17 @@
-import { APKError } from './apk-error.js?v=bcf03886254c';
-import { throwNew } from './java-throw.js?v=bcf03886254c';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=bcf03886254c';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=bcf03886254c';
-import { Blocked } from './scheduler.js?v=bcf03886254c';
-import { captureBody } from './network-capture.js?v=bcf03886254c';
-import { OS_CONSTANTS } from './os-constants-data.js?v=bcf03886254c';
-import { openExchange, describeFailure } from './network-transport.js?v=bcf03886254c';
-import { WorkerExecutor } from './network-worker-executor.js?v=bcf03886254c';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=bcf03886254c';
-import { TransportAuthority } from './transport-ca.js?v=bcf03886254c';
-import { openWebSocketSession } from './websocket-bridge.js?v=bcf03886254c';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=bcf03886254c';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=bcf03886254c';
+import { APKError } from './apk-error.js?v=4e2253570bf4';
+import { throwNew } from './java-throw.js?v=4e2253570bf4';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=4e2253570bf4';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=4e2253570bf4';
+import { Blocked } from './scheduler.js?v=4e2253570bf4';
+import { captureBody } from './network-capture.js?v=4e2253570bf4';
+import { OS_CONSTANTS } from './os-constants-data.js?v=4e2253570bf4';
+import { openExchange, describeFailure } from './network-transport.js?v=4e2253570bf4';
+import { WorkerExecutor } from './network-worker-executor.js?v=4e2253570bf4';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=4e2253570bf4';
+import { TransportAuthority } from './transport-ca.js?v=4e2253570bf4';
+import { openWebSocketSession } from './websocket-bridge.js?v=4e2253570bf4';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=4e2253570bf4';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=4e2253570bf4';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
