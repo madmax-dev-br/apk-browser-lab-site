@@ -24,7 +24,7 @@ export function clientCertHostMatches(rules, host, port) {
 
 /**
  * The entries of the lab KeyMint's database file (KeyDatabase.save: "LKS1", nextId, count, then per entry id, uid, alias (modified UTF-8), algorithm, keySize, origin, material,
- * certificate, chain (int length + bytes, -1 = null), created, modified, and its KeyParameters). -> [{ uid, alias, algorithm, material, certificate, chain }]; [] when absent or unreadable.
+ * certificate, chain (int length + bytes, -1 = null), created, modified, and its KeyParameters). -> [{ id, uid, alias, algorithm, material, certificate, chain }]; [] when absent or unreadable.
  */
 export function parseLabKeystore(bytes) {
   if (!bytes || bytes.length < 16) return [];
@@ -35,13 +35,13 @@ export function parseLabKeystore(bytes) {
     if (int() !== 0x4c4b5331) return [];
     long(); const count = int(), entries = [];
     for (let i = 0; i < count; i++) {
-      long(); const uid = int(), alias = utf(), algorithm = int(); int(); int();
+      const high = int(), id = high * 2 ** 32 + (int() >>> 0), uid = int(), alias = utf(), algorithm = int(); int(); int();
       const material = blob(), certificate = blob(), chain = blob(); long(); long();
       for (let n = int(), j = 0; j < n; j++) {   // KeyParameters: tag, kind, value by kind (KeyParameterValue: 10 boolValue, 12 longInteger, 13 dateTime, 14 blob, else an int)
         int(); const kind = int();
         if (kind === 10) at += 1; else if (kind === 12 || kind === 13) at += 8; else if (kind === 14) blob(); else at += 4;
       }
-      entries.push({ uid, alias, algorithm, material, certificate, chain });
+      entries.push({ id, uid, alias, algorithm, material, certificate, chain });
     }
     return entries;
   } catch { return []; }

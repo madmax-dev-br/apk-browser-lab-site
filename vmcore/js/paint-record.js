@@ -31,7 +31,7 @@
 //
 // The JavaScript VM has no payload: there the state stays as it was and nothing here runs.
 
-import { APKError } from '../../runtime/apk-error.js?v=d03508f39110';
+import { APKError } from '../../runtime/apk-error.js?v=0961072940a6';
 
 /** paint.h: the Paint record's payload. */
 export const PAINT_RECORD = Object.freeze({

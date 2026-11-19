@@ -1,6 +1,9 @@
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=d03508f39110';
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=0961072940a6';
 
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
+// MAX_REGEX_INPUT: the text a Matcher runs over (an app may match a whole JSON or HTML response, which Android does not bound): copied as UTF-16 into the module's 64 MiB, so at
+// most 16 MiB of it; the break iterators keep the 64 Ki units of their wrapper (icu-break-wrapper.cpp).
+const MAX_REGEX_INPUT = 8 * 1024 * 1024;
 const MAX_HANDLES = 16384, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
 const fail = message => { throw new Error(`ICU boundary backend: ${message}`); };
 const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
@@ -63,7 +66,7 @@ function createRegexSessionFactory(api, allocate, errorName) {
       setInput(token, text, start = 0, end = text?.length) {
         const value = get(token, 'matcher');
         if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end < start || end > text?.length) throw new RangeError('Invalid ICU regex input region');
-        const input = utf16(text, MAX_TEXT);
+        const input = utf16(text, MAX_REGEX_INPUT);
         try { native('icu_regex_input', value.pointer, input, text.length, start, end); }
         catch (error) { api.free(input); close(token); throw error; }
         if (value.input) api.free(value.input); value.input = input; value.length = text.length;

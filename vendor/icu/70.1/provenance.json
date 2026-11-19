@@ -135,7 +135,7 @@
   ],
   "regexLimits": {
     "patternUtf16Units": 16384,
-    "inputUtf16Units": 65536,
+    "inputUtf16Units": 8388608,
     "captureGroups": 1024,
     "handlesPerSession": 256,
     "handlesPerBackend": 1024,

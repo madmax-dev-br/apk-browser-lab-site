@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=d03508f39110';
-import { Blocked } from './scheduler.js?v=d03508f39110';
-import { JavaException } from './apk-runtime.js?v=d03508f39110';
-import { networkOf } from './network-native.js?v=d03508f39110';
-import { httpSocketOf } from './libcore-io-native.js?v=d03508f39110';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=d03508f39110';
+import { APKError } from './apk-error.js?v=0961072940a6';
+import { Blocked } from './scheduler.js?v=0961072940a6';
+import { JavaException } from './apk-runtime.js?v=0961072940a6';
+import { networkOf } from './network-native.js?v=0961072940a6';
+import { httpSocketOf } from './libcore-io-native.js?v=0961072940a6';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=0961072940a6';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -179,6 +179,16 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
       return `; it holds ${algorithms.length} private-key entr${algorithms.length === 1 ? 'y' : 'ies'} (${algorithms.join(', ')}), none matching the key types EC, RSA`;
     } catch (error) { if (error instanceof JavaException) return ''; throw error; }
   };
+  /** { id, alias } of an AndroidKeyStore key (android.security.keystore2.AndroidKeyStoreKey: mKeyId and its user descriptor's alias), or null for any other key. */
+  const AKS_KEY = 'Landroid/security/keystore2/AndroidKeyStoreKey;';
+  const androidKeyStoreKey = (r, key) => {
+    try {
+      const object = r.object(key); if (!r.isSubtype(object.type, AKS_KEY)) return null;
+      const id = object.fields.get(`${AKS_KEY}->mKeyId:J`), descriptor = object.fields.get(`${AKS_KEY}->mDescriptor:Landroid/system/keystore2/KeyDescriptor;`);
+      const alias = descriptor ? r.object(descriptor).fields.get('Landroid/system/keystore2/KeyDescriptor;->alias:Ljava/lang/String;') : null;
+      return { id: id === undefined || id === null ? undefined : Number(id), alias: alias === null || alias === undefined || alias === 0 ? null : text(r, alias) };
+    } catch { return null; }
+  };
   const clientIdentity = (r, self, host, port) => {
     const network = networkOf(r); if (!clientCertHostMatches(network.policy?.clientCertHosts, host, port)) return;
     const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
@@ -197,7 +207,10 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
     let material = encoded === null || encoded === 0 ? null : r.bytesOf(encoded);
     if (!material) {   // an AndroidKeyStore key (getEncoded is null on the device too): the lab's software KeyMint holds its PKCS#8 material
       let bytes = null; try { bytes = r.platform.javaIo.fs().bytes(`/data/misc/keystore/user_0/${r.platform.packageName}/keystore.db`); } catch { /* no filesystem */ }
-      material = parseLabKeystore(bytes).find(entry => entry.alias === name && entry.material?.length)?.material ?? null;
+      // the key's own record: an AndroidKeyStoreKey knows its key id and the alias it was loaded under, which need not be the name the app's KeyManager answers with
+      const entries = parseLabKeystore(bytes).filter(entry => entry.material?.length), own = androidKeyStoreKey(r, key);
+      material = (own?.id !== undefined && entries.find(entry => entry.id === own.id)) || (own?.alias && entries.find(entry => entry.alias === own.alias)) || entries.find(entry => entry.alias === name);
+      material = material?.material ?? null;
     }
     if (!material) return note(`none offered: the private key of alias "${name}" is neither a PKCS#8 key nor an AndroidKeyStore key of this device`);
     network.useClientIdentity(where, { key: material, chain }, name);
