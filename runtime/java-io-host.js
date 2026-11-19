@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=645464e2adea';
-import { APKError } from './apk-error.js?v=645464e2adea';
-import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=645464e2adea';
+import { createHostRegistry } from './host-contract.js?v=35dfd9582bd4';
+import { APKError } from './apk-error.js?v=35dfd9582bd4';
+import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=35dfd9582bd4';
 
 // The app's virtual filesystem owner and the little java.io glue the platform still needs. java.io itself (File, the byte/char streams, FileDescriptor, RandomAccessFile,
 // UnixFileSystem) is the original Android 13 libcore in framework.dex; its syscalls land in src/libcore-io-native.js over the VirtualFileSystem created here.
