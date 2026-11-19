@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=0961072940a6';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=0961072940a6';
-import {getVectorGraphics} from './vector-native.js?v=0961072940a6';
-import {deferRaster} from './deferred-raster.js?v=0961072940a6';
+import {APKError} from './apk-runtime.js?v=ad30c2f37025';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=ad30c2f37025';
+import {getVectorGraphics} from './vector-native.js?v=ad30c2f37025';
+import {deferRaster} from './deferred-raster.js?v=ad30c2f37025';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -32,7 +32,10 @@ export function createComposeCanvasHost(platform){
     const view=r.object(receiver);if(!r.skiaHost||!r.classes.has(NODE))fail('View display lists require original RenderNode and verified Skia');
     const node=view.viewRenderNode??=call(r,null,NODE,'create',['Ljava/lang/String;',HOST],NODE,[view.type,animationHost(r,receiver)],'static');
     const valid=!!call(r,node,NODE,'hasDisplayList',[],'Z'),recreate=view.displayListDirty||view.fields.get(`${VIEW}->mRecreateDisplayList:Z`);
-    if(valid&&!recreate)return node;if(view.updatingDisplayList)fail('Recursive updateDisplayListIfDirty on the same View');
+    if(valid&&!recreate)return node;
+    // Again while this View records (its draw asked for its own display list): as on Android, the original RenderNode.beginRecording refuses a second recording with
+    // IllegalStateException("Recording currently in progress - missing #endRecording() call?"), which the caller may catch; the trace names the View.
+    if(view.updatingDisplayList){r.record(`HOST View.updateDisplayListIfDirty re-entered while ${view.type} records its display list: RenderNode.beginRecording throws as on Android`);const [w,h]=dimensions(view);call(r,node,NODE,'beginRecording',['I','I'],DISPLAY,[w,h]);fail('RenderNode.beginRecording accepted a second recording of the same View');}
     const [width,height]=dimensions(view),bounds=view.bounds??{left:0,top:0,right:width,bottom:height};
     call(r,node,NODE,'setPosition',['I','I','I','I'],'Z',[bounds.left,bounds.top,bounds.right,bounds.bottom]);
     // View.updateDisplayListIfDirty -> RenderNode properties: elevation/translationZ cast the HWUI shadow, the Outline shapes it and clips.
