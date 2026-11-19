@@ -1,4 +1,4 @@
-import data from './framework-constants-data.js?v=eb9f345313a7';
+import data from './framework-constants-data.js?v=3f6a8d956a3c';
 
 // Compile-time constants of the SDK classes (public static final primitives and Strings), as the platform's own class files carry them: the values reflection reads on Android
 // (Class.getFields / getField / Field.get over android.Manifest$permission, android.os.Build$VERSION_CODES, Context.*_SERVICE, Settings.*, the framework R classes, ...). The table is

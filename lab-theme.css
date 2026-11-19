@@ -737,3 +737,11 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 @keyframes input-wait{from{left:-35%}to{left:100%}}
 .android-screen .input-wait span{margin-top:8px;padding:3px 10px;border-radius:999px;background:rgba(20,22,30,.82);color:#fff;font:500 12px/16px var(--sans);font-variant-numeric:tabular-nums;box-shadow:0 2px 8px rgba(0,0,0,.25)}
 @media (prefers-reduced-motion:reduce){.android-screen .touch-mark{animation:none;opacity:.5}.android-screen .input-wait i::after{animation:none;left:0;width:100%}}
+
+/* mTLS field: On/Off pill (src/app.js showClientCertState) */
+.cp-grid label:has(>.mtls-pill){flex-wrap:wrap;align-items:flex-start}
+.cp-grid .mtls-pill{display:block;flex:none;align-self:flex-start;margin:4px 0 0;padding:0 6px;border-radius:999px;border:1px solid currentColor;font:600 11px/16px var(--sans);color:var(--muted);vertical-align:1px;white-space:nowrap}
+.cp-grid .mtls-pill[data-state=on]{color:var(--accent-ink)}
+.cp-grid .mtls-pill[data-state=ok]{color:var(--ok)}
+.cp-grid .mtls-pill[data-state=warn]{color:var(--amber-ink)}
+.cp-grid .mtls-pill[data-state=error]{color:var(--warn)}

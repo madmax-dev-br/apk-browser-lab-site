@@ -47,6 +47,30 @@ export function parseLabKeystore(bytes) {
   } catch { return []; }
 }
 
+/**
+ * The line under the mTLS field: { state: 'off' | 'on' | 'ok' | 'warn' | 'error', label, text }.
+ * `hosts` the configured client-certificate hosts, `proxyUrl` the proxy in use, `entries` what the running device did (NetworkBridge.clientIdentitySummary, from vmHealth; null without an app).
+ */
+export function clientIdentityStatus({ hosts = [], proxyUrl = '', entries = null } = {}) {
+  if (!hosts.length) return { state: 'off', label: 'Off', text: 'mTLS off: no client certificate host is listed.' };
+  const list = hosts.join(', ');
+  if (!proxyUrl) return { state: 'warn', label: 'On, not working', text: `mTLS on for ${list}, but no relay is set as the Proxy: the browser cannot present a client certificate by itself.` };
+  const seen = entries ?? [];
+  if (!seen.length) return { state: 'on', label: 'On, waiting', text: `mTLS on for ${list}. Nothing used it yet: it works once the app opens a TLS connection to one of these hosts.` };
+  const describe = entry => {
+    const who = entry.alias ? `alias "${entry.alias}"` : 'the app';
+    if (entry.state === 'presented') return `${entry.dest}: ${who} presented (${entry.uses} request${entry.uses === 1 ? '' : 's'})`;
+    if (entry.state === 'pending') return `${entry.dest}: ${who}, handing to the relay`;
+    if (entry.state === 'none') return `${entry.dest}: the app offered no certificate (${entry.detail})`;
+    return `${entry.dest}: ${who} NOT presented (${entry.detail})`;
+  };
+  const text = seen.map(describe).join('; ');
+  if (seen.some(entry => entry.state === 'failed' || entry.state === 'no-relay')) return { state: 'error', label: 'On, failing', text: `mTLS: ${text}.` };
+  if (seen.some(entry => entry.state === 'presented')) return { state: 'ok', label: 'On, working', text: `mTLS working: ${text}.` };
+  if (seen.every(entry => entry.state === 'none')) return { state: 'warn', label: 'On, no certificate', text: `mTLS on: ${text}.` };
+  return { state: 'on', label: 'On, connecting', text: `mTLS: ${text}.` };
+}
+
 const base64 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 0x8000) text += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(text); };
 /** A short fingerprint of an identity (the leaf certificate's bytes), to register each identity once. */
 export const identityKey = identity => { const leaf = identity.chain[0]; let h = 0x811c9dc5; for (const b of leaf) h = Math.imul(h ^ b, 0x01000193) >>> 0; return `${leaf.length}:${h.toString(16)}`; };

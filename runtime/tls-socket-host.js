@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=eb9f345313a7';
-import { Blocked } from './scheduler.js?v=eb9f345313a7';
-import { JavaException } from './apk-runtime.js?v=eb9f345313a7';
-import { networkOf } from './network-native.js?v=eb9f345313a7';
-import { httpSocketOf } from './libcore-io-native.js?v=eb9f345313a7';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=eb9f345313a7';
+import { APKError } from './apk-error.js?v=3f6a8d956a3c';
+import { Blocked } from './scheduler.js?v=3f6a8d956a3c';
+import { JavaException } from './apk-runtime.js?v=3f6a8d956a3c';
+import { networkOf } from './network-native.js?v=3f6a8d956a3c';
+import { httpSocketOf } from './libcore-io-native.js?v=3f6a8d956a3c';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=3f6a8d956a3c';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -161,7 +161,7 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
   const X509KM = 'Ljavax/net/ssl/X509KeyManager;', PRINCIPAL = 'Ljava/security/Principal;', PRIVATE_KEY = 'Ljava/security/PrivateKey;';
   const clientIdentity = (r, self, host, port) => {
     const network = networkOf(r); if (!clientCertHostMatches(network.policy?.clientCertHosts, host, port)) return;
-    const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } };
+    const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
     const managers = r.object(self).fields.get(KEYS_KEY);
     const manager = managers === null || managers === undefined || managers === 0 ? null : r.object(managers).elements.find(item => item !== null && item !== 0 && r.isSubtype(r.object(item).type, X509KM));
     if (!manager) return note('none offered: the SSLContext of this socket has no X509KeyManager (SSLContext.init with null KeyManagers), as on the device');
