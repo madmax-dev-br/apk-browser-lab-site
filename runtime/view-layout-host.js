@@ -1,8 +1,8 @@
-import { APKError } from './apk-runtime.js?v=c30a36398847';
-import { breakParagraphs } from './text-layout-native.js?v=c30a36398847';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=c30a36398847';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=c30a36398847';
-import { getVectorGraphics } from './vector-native.js?v=c30a36398847';
+import { APKError } from './apk-runtime.js?v=bcf03886254c';
+import { breakParagraphs } from './text-layout-native.js?v=bcf03886254c';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=bcf03886254c';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=bcf03886254c';
+import { getVectorGraphics } from './vector-native.js?v=bcf03886254c';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -70,6 +70,24 @@ export function createViewLayoutHost(platform) {
       if (minWidth > 0 && algorithm(runtime, SPEC, 'getMode', '(I)I', [width]) === (0x80000000 | 0) && (view.measuredWidth & SIZE) < minWidth) call(runtime,root,VIEW,'measure','(II)V',[algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [minWidth, 0x40000000]), height]);
       call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); platform.requestDraw(runtime,root);
     }, 0, [root], { ui: true });
+  };
+  /** View.resolveRtlPropertiesIfNeeded (android-13.0.0_r1), the first thing a measure pass does. */
+  const resolveRtl = (runtime, receiver) => {
+    const view = runtime.object(receiver);
+    // a View that inherits its layout direction takes its parent's, and its relative padding and margins follow
+    if (view.parent && (view.layoutDirectionRaw ?? 2) === 2 && platform.viewXmlAttributes) { const above = runtime.object(view.parent); if (above && ((above.layoutDirection === 1 ? 1 : 0) !== (view.layoutDirection === 1 ? 1 : 0)) && above.type && runtime.isSubtype(above.type, VIEW)) platform.viewXmlAttributes.applyLayoutDirection(runtime, receiver, 2); }
+    // the layout params resolve for the view's layout direction (start / end margins, RelativeLayout's start / end rules) and onRtlPropertiesChanged tells the class.
+    // Left-to-right is what everything starts as (View.setLayoutParams resolved the params for it), so only a view whose direction differs from the last resolution does it.
+    const direction = view.layoutDirection || 0;
+    if ((view.rtlResolvedDirection ?? 0) !== direction) {
+      view.rtlResolvedDirection = direction;
+      if (runtime.objectOverride(view.type, 'onRtlPropertiesChanged(I)V')) call(runtime, receiver, VIEW, 'onRtlPropertiesChanged', '(I)V', [direction]);
+    }
+    if (view.layoutParams && (runtime.object(view.layoutParams).resolvedDirection ?? 0) !== direction) {
+      const params = runtime.object(view.layoutParams); params.resolvedDirection = direction;
+      call(runtime, view.layoutParams, 'Landroid/view/ViewGroup$LayoutParams;', 'resolveLayoutDirection', '(I)V', [direction]);
+      if (view.margin) for (const edge of ['left', 'top', 'right', 'bottom']) view.margin[edge] = params.fields.get(`Landroid/view/ViewGroup$MarginLayoutParams;->${edge}Margin:I`) ?? view.margin[edge];
+    }
   };
   const readLP = (runtime, view, name, fallback = 0) => { const fields = view.layoutParams ? runtime.object(view.layoutParams).fields : null; return fields ? [...fields].find(([key]) => key.endsWith(`->${name}:I`))?.[1] ?? fallback : fallback; };
   const measureChild = (runtime, receiver, childRef, widthSpec, widthUsed, heightSpec, heightUsed, margins) => {
@@ -400,22 +418,12 @@ export function createViewLayoutHost(platform) {
         measured(runtime, receiver, algorithm(runtime, ALGORITHMS, 'getDefaultSize', '(II)I', [width, args[1]]), algorithm(runtime, ALGORITHMS, 'getDefaultSize', '(II)I', [height, args[2]])); return;
       }
       if (name === 'measure') {
-        // View.resolveRtlPropertiesIfNeeded (the first thing a measure pass does): a View that inherits its layout direction takes its parent's, and its relative padding and margins follow
-        if (view.parent && (view.layoutDirectionRaw ?? 2) === 2 && platform.viewXmlAttributes) { const above = runtime.object(view.parent); if (above && ((above.layoutDirection === 1 ? 1 : 0) !== (view.layoutDirection === 1 ? 1 : 0)) && above.type && runtime.isSubtype(above.type, VIEW)) platform.viewXmlAttributes.applyLayoutDirection(runtime, receiver, 2); }
+        resolveRtl(runtime, receiver);
+        // ViewGroup.resolveRtlPropertiesIfNeeded: a group resolves the children that inherit its direction as part of its own resolution, before its onMeasure, which reads
+        // the children's resolved LayoutParams before it measures them (ConstraintLayout builds its constraints from their resolved start / end anchors and bias).
+        for (const child of view.children || []) if (child && (runtime.object(child).layoutDirectionRaw ?? 2) === 2) resolveRtl(runtime, child);
         if (view.layoutModeOptical || view.parent && runtime.object(view.parent).layoutModeOptical) fail('Optical-bound measurement requires the original optical-insets layout path');
         const w = args[1], h = args[2], force = view.layoutRequested !== false, key = `${w}:${h}`; view.measureCache ||= new Map();
-        // View.measure -> resolveRtlPropertiesIfNeeded (android-13.0.0_r1): the layout params resolve for the view's layout direction (start / end margins, RelativeLayout's start / end
-        // rules) and onRtlPropertiesChanged tells the class. Left-to-right is what everything starts as, so only a view whose direction differs from the last resolution does it.
-        const direction = view.layoutDirection || 0;
-        if ((view.rtlResolvedDirection ?? 0) !== direction) {
-          view.rtlResolvedDirection = direction;
-          if (runtime.objectOverride(view.type, 'onRtlPropertiesChanged(I)V')) call(runtime, receiver, VIEW, 'onRtlPropertiesChanged', '(I)V', [direction]);
-        }
-        if (view.layoutParams && (runtime.object(view.layoutParams).resolvedDirection ?? 0) !== direction) {
-          const params = runtime.object(view.layoutParams); params.resolvedDirection = direction;
-          call(runtime, view.layoutParams, 'Landroid/view/ViewGroup$LayoutParams;', 'resolveLayoutDirection', '(I)V', [direction]);
-          if (view.margin) for (const edge of ['left', 'top', 'right', 'bottom']) view.margin[edge] = params.fields.get(`Landroid/view/ViewGroup$MarginLayoutParams;->${edge}Margin:I`) ?? view.margin[edge];
-        }
         const specChanged = view.oldWidthSpec !== w || view.oldHeightSpec !== h, exact = (w & 0xc0000000) === 0x40000000 && (h & 0xc0000000) === 0x40000000, matches = (view.measuredWidth & SIZE) === (w & 0x3fffffff) && (view.measuredHeight & SIZE) === (h & 0x3fffffff);
         const target = Number(platform.manifest?.usesSdk?.targetSdkVersion ?? platform.manifest?.usesSdk?.minSdkVersion ?? 1);
         if (force || specChanged && (target <= 23 || !exact || !matches)) {
