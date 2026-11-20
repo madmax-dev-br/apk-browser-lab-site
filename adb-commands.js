@@ -7,9 +7,10 @@
 // createAdb(device).run({ command | args }, io) -> { stdout, stderr, code, images: [{ blob, type }], notes: [] }
 //   io.localFile(path) -> File of the machine that runs the bridge (adb install / push); io.writeLocal(path, blob, { append }) writes one there (adb pull, `> file`).
 // The command-line syntax (quotes, | grep, &&, >) is src/adb-shell.js. No process.*.
-import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=448e4ced7d81';
-import { formatThreadtime } from './logcat.js?v=448e4ced7d81';
-import { kindOf, directoryOf } from './shared-storage.js?v=448e4ced7d81';
+import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=1c341f498fc5';
+import { formatThreadtime } from './logcat.js?v=1c341f498fc5';
+import { kindOf, directoryOf } from './shared-storage.js?v=1c341f498fc5';
+import { BUILD_PROPS } from './build-properties.js?v=1c341f498fc5';
 
 export const SERIAL = 'apkweb-lab';
 const SHARED_ROOT = '/storage/emulated/0', SHARED_ALIASES = ['/sdcard', '/mnt/sdcard', '/storage/self/primary'];
@@ -167,8 +168,7 @@ screenrecord, install-multiple, interactive shell.
 
 const SETTINGS_KEYS = 'global animator_duration_scale | transition_animation_scale | window_animation_scale; system font_scale | time_12_24 | user_rotation | accelerometer_rotation; secure ui_night_mode';
 const SCALE_KEYS = ['animator_duration_scale', 'transition_animation_scale', 'window_animation_scale'];
-const BUILD_PROPS = [['ro.product.model', 'MODEL'], ['ro.product.manufacturer', 'MANUFACTURER'], ['ro.product.brand', 'BRAND'], ['ro.product.device', 'DEVICE'], ['ro.product.name', 'PRODUCT'], ['ro.hardware', 'HARDWARE'], ['ro.build.fingerprint', 'FINGERPRINT'],
-  ['ro.build.id', 'ID'], ['ro.build.display.id', 'DISPLAY'], ['ro.build.type', 'TYPE'], ['ro.build.tags', 'TAGS'], ['ro.build.version.release', 'VERSION.RELEASE'], ['ro.build.version.sdk', 'VERSION.SDK_INT'], ['ro.build.version.codename', 'VERSION.CODENAME'], ['ro.build.version.incremental', 'VERSION.INCREMENTAL']];
+// BUILD_PROPS: src/build-properties.js
 
 /**
  * The interpreter over a device facade (src/app.js adbDevice; tests pass a fake). Every method of the facade does what the page's own control does:

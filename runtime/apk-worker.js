@@ -1,86 +1,86 @@
-import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=448e4ced7d81';
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=448e4ced7d81';
-import { launcherInfo } from './launcher-info.js?v=448e4ced7d81';
-import { buildScreenState } from './screen-state.js?v=448e4ced7d81';
-import { createLogcat } from './logcat.js?v=448e4ced7d81';
-import { createNetlog } from './netlog.js?v=448e4ced7d81';
-import { reportSummary } from './report-summary.js?v=448e4ced7d81';
-import { nameSilentError } from './error-naming.js?v=448e4ced7d81';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=448e4ced7d81';
-import { installMethodHook, removeMethodHook, removeMethodHooksOf, listMethodHooks, drainHookCalls, setHookCallBudget } from './method-hooks.js?v=448e4ced7d81';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=448e4ced7d81';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=448e4ced7d81';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=448e4ced7d81';
-import { applyMicrogMocks, applyMicrogServices } from './microg-device.js?v=448e4ced7d81';
-import { describeRedirects } from './host-map.js?v=448e4ced7d81';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=448e4ced7d81';
-import { InflatePool } from './zip-inflate-pool.js?v=448e4ced7d81';
-import { warmCrc32 } from './zip-entry.js?v=448e4ced7d81';
-import { createAppStorage } from './app-storage.js?v=448e4ced7d81';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=448e4ced7d81';
-import { createMessageSink } from './audio-native.js?v=448e4ced7d81';
-import { loadAPK } from './apk-loader.js?v=448e4ced7d81';
-import { AndroidPlatform } from './android-platform.js?v=448e4ced7d81';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=448e4ced7d81';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=448e4ced7d81';
-import { firstUseProfile, PrepareAhead } from './prepare-ahead.js?v=448e4ced7d81';
-import { createWebViewBackend } from './webview-backend.js?v=448e4ced7d81';
-import { FrameworkProvider } from './framework-provider.js?v=448e4ced7d81';
-import { createRasterSender } from './raster-cache.js?v=448e4ced7d81';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=448e4ced7d81';
-import { dispatchPointer, pressView } from './pointer-input-host.js?v=448e4ced7d81';
-import { resolveDevice } from './device-profile.js?v=448e4ced7d81';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=448e4ced7d81';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=448e4ced7d81';
-import { SkiaProvider } from './skia-provider.js?v=448e4ced7d81';
-import { inspectCompose } from './compose-inspector.js?v=448e4ced7d81';
-import { DEFAULT_POWER, sanitizePower, powerParams, planPluginServe, withScanDefaults, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=448e4ced7d81';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=448e4ced7d81';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=448e4ced7d81';
-import { readScrollInfo } from './scroll-info.js?v=448e4ced7d81';
-import { SemanticsPacer } from './semantics-pacing.js?v=448e4ced7d81';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=448e4ced7d81';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=448e4ced7d81';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=448e4ced7d81';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=448e4ced7d81';
-import { WorkerTaskLog, rasterMs } from './worker-task-log.js?v=448e4ced7d81';
-import { holdDelay } from './frame-flow.js?v=448e4ced7d81';
-import { disposeTextLayout } from './text-layout-native.js?v=448e4ced7d81';
-import { IcuBreakProvider } from './icu-break-provider.js?v=448e4ced7d81';
-import { SqliteProvider } from './sqlite-native.js?v=448e4ced7d81';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=448e4ced7d81';
-import { TzdataProvider } from './java-time-native.js?v=448e4ced7d81';
-import { ZlibProvider } from './zip-native.js?v=448e4ced7d81';
-import { IcuConverterProvider } from './icu-converter-native.js?v=448e4ced7d81';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=448e4ced7d81';
-import { JavacryptoProvider } from './javacrypto-native.js?v=448e4ced7d81';
-import { disposeColorFilters } from './color-filter-native.js?v=448e4ced7d81';
-import { disposeRegex } from './regex-native.js?v=448e4ced7d81';
-import { disposeRenderNodes } from './rendernode-native.js?v=448e4ced7d81';
-import { startDeepLink } from './deep-link-host.js?v=448e4ced7d81';
-import { attachAppData, attachDeviceData, clearDeviceData, defaultBackend, appKeyFor } from './app-data-store.js?v=448e4ced7d81';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=448e4ced7d81';
-import { probeWebCodecs } from './media-codec-backend.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { MICROG_VERSION, microgFiles } from './microg-device.js?v=448e4ced7d81';
-import { FrameProbe } from './frame-meter.js?v=448e4ced7d81';
-import { encodeAddress } from './telephony-sms.js?v=448e4ced7d81';
-import { composeLayoutBounds } from './compose-layout-bounds.js?v=448e4ced7d81';
-import { ioYieldDue, ioYieldBudget } from './pump-yield.js?v=448e4ced7d81';
+import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=1c341f498fc5';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=1c341f498fc5';
+import { launcherInfo } from './launcher-info.js?v=1c341f498fc5';
+import { buildScreenState } from './screen-state.js?v=1c341f498fc5';
+import { createLogcat } from './logcat.js?v=1c341f498fc5';
+import { createNetlog } from './netlog.js?v=1c341f498fc5';
+import { reportSummary } from './report-summary.js?v=1c341f498fc5';
+import { nameSilentError } from './error-naming.js?v=1c341f498fc5';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=1c341f498fc5';
+import { installMethodHook, removeMethodHook, removeMethodHooksOf, listMethodHooks, drainHookCalls, setHookCallBudget } from './method-hooks.js?v=1c341f498fc5';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=1c341f498fc5';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=1c341f498fc5';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=1c341f498fc5';
+import { applyMicrogMocks, applyMicrogServices } from './microg-device.js?v=1c341f498fc5';
+import { describeRedirects } from './host-map.js?v=1c341f498fc5';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=1c341f498fc5';
+import { InflatePool } from './zip-inflate-pool.js?v=1c341f498fc5';
+import { warmCrc32 } from './zip-entry.js?v=1c341f498fc5';
+import { createAppStorage } from './app-storage.js?v=1c341f498fc5';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=1c341f498fc5';
+import { createMessageSink } from './audio-native.js?v=1c341f498fc5';
+import { loadAPK } from './apk-loader.js?v=1c341f498fc5';
+import { AndroidPlatform } from './android-platform.js?v=1c341f498fc5';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=1c341f498fc5';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=1c341f498fc5';
+import { firstUseProfile, PrepareAhead } from './prepare-ahead.js?v=1c341f498fc5';
+import { createWebViewBackend } from './webview-backend.js?v=1c341f498fc5';
+import { FrameworkProvider } from './framework-provider.js?v=1c341f498fc5';
+import { createRasterSender } from './raster-cache.js?v=1c341f498fc5';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=1c341f498fc5';
+import { dispatchPointer, pressView } from './pointer-input-host.js?v=1c341f498fc5';
+import { resolveDevice } from './device-profile.js?v=1c341f498fc5';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=1c341f498fc5';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=1c341f498fc5';
+import { SkiaProvider } from './skia-provider.js?v=1c341f498fc5';
+import { inspectCompose } from './compose-inspector.js?v=1c341f498fc5';
+import { DEFAULT_POWER, sanitizePower, powerParams, planPluginServe, withScanDefaults, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=1c341f498fc5';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=1c341f498fc5';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=1c341f498fc5';
+import { readScrollInfo } from './scroll-info.js?v=1c341f498fc5';
+import { SemanticsPacer } from './semantics-pacing.js?v=1c341f498fc5';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=1c341f498fc5';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=1c341f498fc5';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=1c341f498fc5';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=1c341f498fc5';
+import { WorkerTaskLog, rasterMs } from './worker-task-log.js?v=1c341f498fc5';
+import { holdDelay } from './frame-flow.js?v=1c341f498fc5';
+import { disposeTextLayout } from './text-layout-native.js?v=1c341f498fc5';
+import { IcuBreakProvider } from './icu-break-provider.js?v=1c341f498fc5';
+import { SqliteProvider } from './sqlite-native.js?v=1c341f498fc5';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=1c341f498fc5';
+import { TzdataProvider } from './java-time-native.js?v=1c341f498fc5';
+import { ZlibProvider } from './zip-native.js?v=1c341f498fc5';
+import { IcuConverterProvider } from './icu-converter-native.js?v=1c341f498fc5';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=1c341f498fc5';
+import { JavacryptoProvider } from './javacrypto-native.js?v=1c341f498fc5';
+import { disposeColorFilters } from './color-filter-native.js?v=1c341f498fc5';
+import { disposeRegex } from './regex-native.js?v=1c341f498fc5';
+import { disposeRenderNodes } from './rendernode-native.js?v=1c341f498fc5';
+import { startDeepLink } from './deep-link-host.js?v=1c341f498fc5';
+import { attachAppData, attachDeviceData, clearDeviceData, defaultBackend, appKeyFor } from './app-data-store.js?v=1c341f498fc5';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=1c341f498fc5';
+import { probeWebCodecs } from './media-codec-backend.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { MICROG_VERSION, microgFiles } from './microg-device.js?v=1c341f498fc5';
+import { FrameProbe } from './frame-meter.js?v=1c341f498fc5';
+import { encodeAddress } from './telephony-sms.js?v=1c341f498fc5';
+import { composeLayoutBounds } from './compose-layout-bounds.js?v=1c341f498fc5';
+import { ioYieldDue, ioYieldBudget } from './pump-yield.js?v=1c341f498fc5';
 installWasmMemoryMeter();   // before anything is instantiated: every WebAssembly memory of this Worker is counted for the page's memory line (src/wasm-memory-meter.js)
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=448e4ced7d81';
-const SPEECH_PROFILE_URL = '../framework-aosp/profiles/speech/framework.dex?v=448e4ced7d81';
-const TELEPHONY_PROFILE_URL = '../framework-aosp/profiles/telephony/framework.dex?v=448e4ced7d81';
-const SERVICES_PROFILE_URL = '../framework-aosp/profiles/services/framework.dex?v=448e4ced7d81';
-const APACHE_HTTP_PROFILE_URL = '../framework-aosp/profiles/apache-http/framework.dex?v=448e4ced7d81';
-const ACCOUNTS_PROFILE_URL = '../framework-aosp/profiles/accounts/framework.dex?v=448e4ced7d81';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=448e4ced7d81';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=1c341f498fc5';
+const SPEECH_PROFILE_URL = '../framework-aosp/profiles/speech/framework.dex?v=1c341f498fc5';
+const TELEPHONY_PROFILE_URL = '../framework-aosp/profiles/telephony/framework.dex?v=1c341f498fc5';
+const SERVICES_PROFILE_URL = '../framework-aosp/profiles/services/framework.dex?v=1c341f498fc5';
+const APACHE_HTTP_PROFILE_URL = '../framework-aosp/profiles/apache-http/framework.dex?v=1c341f498fc5';
+const ACCOUNTS_PROFILE_URL = '../framework-aosp/profiles/accounts/framework.dex?v=1c341f498fc5';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=1c341f498fc5';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=448e4ced7d81';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=448e4ced7d81';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=448e4ced7d81';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '448e4ced7d81';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=1c341f498fc5';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=1c341f498fc5';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=1c341f498fc5';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '1c341f498fc5';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
@@ -600,7 +600,7 @@ async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } 
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=448e4ced7d81').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  import('../vmcore/js/attach.js?v=1c341f498fc5').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
   try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
   sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
   warmLoadCode();
@@ -884,12 +884,12 @@ async function handleMessage({ data }) {
       const nativeLibraryProvider = shared.nativeLibraries, javacryptoProvider = shared.javacrypto;
       // data.microg: the "com microG" device option (src/microg-device.js); its packages are fetched now, only when it is on, and their SHA-256 checked against provenance.json.
       const microg = data.microg === true ? { ...(await microgCompanions()), services: data.microgServices ?? null } : null;
-      const result = await loadAPK(data.buffer, { nativeVersionMismatch: data.nativeVersionMismatch === true, companionPackages: data.companionPackages ?? [], ...(microg ? { microg } : {}), inflatePool: sharedInflatePool(), maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => { loadTiming.mark(progress?.phase); self.postMessage({ type: 'progress', requestId: activeRequestId, progress }); } });
+      const result = await loadAPK(data.buffer, { arm64Native: data.arm64Native === true, nativeVersionMismatch: data.nativeVersionMismatch === true, companionPackages: data.companionPackages ?? [], ...(microg ? { microg } : {}), inflatePool: sharedInflatePool(), maxEventWallMs: timeLimitsFor(data.eventSeconds).eventWallMs ?? EVENT_WALL_LIMIT_MS, maxHeapObjects: heapLimitFor(data), nativeLibraryProvider, javacryptoProvider, device: resolveDevice(data.device || {}), engine: data.engine === 'wasm' ? 'wasm' : 'js', tolerateMissing: ['void', 'primitives', 'all'].includes(data.tolerateMissing) ? data.tolerateMissing : 'off', strictCrash: data.strictCrash === true, enableLayoutProfile: layouts ? true : undefined, forceSkia: skiaProvider ? true : undefined, frameworkProfileProviders, frameworkProvider, frameworkResourceProvider, resourceConfigProvider, skiaProvider, icuBreakProvider, sqliteProvider, sqlcipherProvider: sharedSqlcipherProvider ??= new SqlcipherProvider(), tzdataProvider, zlibProvider, icuConverterProvider, onProgress: (progress) => { loadTiming.mark(progress?.phase); self.postMessage({ type: 'progress', requestId: activeRequestId, progress }); } });
       runtime = result.runtime; archive = result.archive;
       runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
       loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=448e4ced7d81')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=1c341f498fc5')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */

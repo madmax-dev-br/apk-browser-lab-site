@@ -1,17 +1,18 @@
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { JavaException } from './apk-runtime.js?v=448e4ced7d81';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=448e4ced7d81';
-import { buildElfDescriptor } from './native-descriptor.js?v=448e4ced7d81';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=448e4ced7d81';
-import { NativeLinker, LinkError } from './native-linker.js?v=448e4ced7d81';
-import { hostFunction } from './wasm-host-function.js?v=448e4ced7d81';
-import { parseWasm } from './wasm-dylink.js?v=448e4ced7d81';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=448e4ced7d81';
-import { registerWasmMemory } from './unsafe-native.js?v=448e4ced7d81';
-import { writeSkPath } from './skia-path-layout.js?v=448e4ced7d81';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=448e4ced7d81';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=448e4ced7d81';
-import { withVariants } from './native-provider-variants.js?v=448e4ced7d81';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { constantField, nonConstantField } from './framework-constants.js?v=1c341f498fc5';
+import { JavaException } from './apk-runtime.js?v=1c341f498fc5';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=1c341f498fc5';
+import { buildElfDescriptor } from './native-descriptor.js?v=1c341f498fc5';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=1c341f498fc5';
+import { NativeLinker, LinkError } from './native-linker.js?v=1c341f498fc5';
+import { hostFunction } from './wasm-host-function.js?v=1c341f498fc5';
+import { parseWasm } from './wasm-dylink.js?v=1c341f498fc5';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=1c341f498fc5';
+import { registerWasmMemory } from './unsafe-native.js?v=1c341f498fc5';
+import { writeSkPath } from './skia-path-layout.js?v=1c341f498fc5';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=1c341f498fc5';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=1c341f498fc5';
+import { withVariants } from './native-provider-variants.js?v=1c341f498fc5';
 
 // JNI -> WebAssembly bridge.
 //
@@ -107,6 +108,10 @@ export class JniBridge {
   }
 
   // ---- loading ---------------------------------------------------------------------------------------------------------------------------
+  /** The object a JNI reference stands for (for the lab's own native host functions, e.g. jnigraphics in src/arm64/libc-extra.js). */
+  valueOf(handle) { return this.#value(Number(handle)); }
+  /** Runs native code entered from outside a native method (an ARM64 library's JNI_OnLoad, src/arm64/glue.js) inside a JNI local-reference frame; a Java exception it left pending is thrown. */
+  enterNative(body) { const result = this.#enter(null, body); if (this.pending !== null) { const exception = this.pending; this.pending = null; throw new JavaException(exception, this.runtime.object(exception).message ?? null, null); } return result; }
   /** System.loadLibrary(name): returns false when the provider has no such library (caller keeps the genuine UnsatisfiedLinkError path). */
   loadLibrary(name) { const soname = `lib${name}.so`; this.#requireAvailable(soname); this.#requireVersions(soname); return this.#provides(soname) ? (this.#load(soname, 'System.loadLibrary'), true) : false; }
   /** A library is offered to this app when the provider has it and it is not scoped to a different APK (an app's own generated libraries, e.g. libappmodules.so, belong to that app only). */
@@ -357,9 +362,9 @@ export class JniBridge {
     const tracing = JNI_TRACE && nativeTraced < Number(globalThis.process?.env?.APKWEB_JNI_TRACE_MAX ?? 4000) && JNI_TRACE.test(`${method.owner}->${method.name}`);
     if (tracing) { nativeTraced++; r.record(`LOG D JNITrace: native ${String(method.owner).replace(/^L|;$/g, '')}.${method.name}(${parameters.map((t, i) => briefValue(r, t, args[(isStatic ? 0 : 1) + i])).join(', ')})`); }
     return this.#enter(method, () => {
-      const wasmArgs = [this.proc.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
+      const wasmArgs = [binding.lib.envPtr ?? this.proc.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
       parameters.forEach((type, i) => wasmArgs.push(this.#toWasm(type, args[(isStatic ? 0 : 1) + i])));
-      let result = binding.fn(...wasmArgs);
+      let result = binding.lib.callNative ? binding.lib.callNative(binding, method, wasmArgs) : binding.fn(...wasmArgs);   // ARM64 code runs in its interpreter (src/arm64/jni.js)
       if (this.pending !== null) { const exception = this.pending; this.pending = null; throw new JavaException(exception, r.object(exception).message ?? null, r.object(exception).exceptionDetails ?? null); }
       return this.#fromWasm(method.result, result);
     });
@@ -394,7 +399,7 @@ export class JniBridge {
     while (queue.length) {
       const owner = queue.shift(); if (!owner || seen.has(owner)) continue; seen.add(owner);
       const cls = r.classes.get(owner), info = { owner, name, parameters, result, signature, key: `${owner}->${name}${signature}` };
-      if (cls) { const def = cls.methods.get(name + signature); if (def) return { ...info, static: !!(def.flags & 8) }; queue.push(cls.superclass, ...cls.interfaces); }
+      if (cls) { const def = cls.methods.get(name + signature); if (def) return { ...info, static: !!(def.flags & 8) }; if (r.dex?.bootClasses?.has(owner) && (r.platform?.supports?.(info.key) || r.platform?.declaresAbstract?.(info.key))) return { ...info, static: false, host: true }; queue.push(cls.superclass, ...cls.interfaces); }   // a framework class whose DEX body lacks a member the lab serves itself
       else if (r.methodAvailability({ owner, name, signature })) return { ...info, static: false, host: true };
       else queue.push(r.parent(owner), ...r.interfaces(owner));
       if (name === '<init>' && owner === type && !cls && !r.methodAvailability({ owner, name, signature })) break;
@@ -437,6 +442,10 @@ export class JniBridge {
       }
       queue.push(cls.superclass, ...cls.interfaces);
     }
+    // a compile-time constant of an SDK class the VM has no body for (Context.*_SERVICE, Build.VERSION_CODES.*, ...): the value the platform's class carries, as reflection reads it
+    if (isStatic) { for (const owner of [type, ...seen]) { const constant = constantField(owner, name); if (constant && constant.type === signature) return { owner, name, type: signature, key: `${owner}->${name}:${signature}`, static: true, constant: constant.value }; } }
+    // a non-constant field of an SDK class the VM hosts (Build.HOST, Build.MODEL, ...): read as bytecode reads it (the host's value, or an explicit unsupported-field stop)
+    for (const owner of [type, ...seen]) { const field = nonConstantField(owner, name); if (field && field.type === signature && !!(field.flags & 8) === isStatic) return { owner, name, type: signature, key: `${owner}->${name}:${signature}`, static: isStatic }; }
     return null;
   }
   #throwNew(type, message) {
@@ -446,6 +455,10 @@ export class JniBridge {
   }
 
   // ---- the JNI function table -------------------------------------------------------------------------------------------------------------
+  /** The JNI function bodies over another native process's memory (src/arm64/jni.js): `lib` gives memory, malloc/free and, for 64-bit code, pointerSize 8 with its own argument decoding. */
+  handlersFor(lib) { return this.#handlers(lib); }
+  /** A JNI function body with JNI's exception rule (a Java exception from a callback becomes the pending exception and the function returns 0): for bridges outside this file (src/arm64/jni.js). */
+  guardJni(name, body) { return this.#guard(name, body); }
   #handlers(lib) {
     const r = this.runtime, self = this;
     const view = () => new DataView(lib.memory.buffer), bytes = () => new Uint8Array(lib.memory.buffer);
@@ -491,25 +504,26 @@ export class JniBridge {
     h.PopLocalFrame = (_env, result) => { const value = result === 0 ? null : self.#value(result), frame = self.frames.pop() ?? []; for (const handle of frame) self.locals.delete(handle); return self.#local(value); };
     h.MonitorEnter = (_env, obj) => { const o = r.object(self.#value(obj)); o.jniMonitor = (o.jniMonitor ?? 0) + 1; return JNI_OK; };
     h.MonitorExit = (_env, obj) => { const o = r.object(self.#value(obj)); if (!o.jniMonitor) { self.#throwNew('Ljava/lang/IllegalMonitorStateException;', 'object not locked by thread before MonitorExit'); return JNI_ERR; } o.jniMonitor--; return JNI_OK; };
-    h.GetJavaVM = (_env, out) => { view().setUint32(out, lib.vmPtr, true); return JNI_OK; };
+    h.GetJavaVM = (_env, out) => { if (lib.writePtr) lib.writePtr(out, lib.vmPtr); else view().setUint32(out, lib.vmPtr, true); return JNI_OK; };
 
     // -- members
     const memberId = (isStatic) => (_env, cls, namePtr, sigPtr) => {
       const type = self.#classType(cls), name = cString(namePtr), signature = cString(sigPtr), info = self.#findMethod(type, name, signature);
-      if (!info || (name !== '<init>' && info.static !== isStatic && !info.host)) { self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return 0; }
+      if (!info || (name !== '<init>' && info.static !== isStatic && !info.host)) { r.record?.(`JNI Get${isStatic ? 'Static' : ''}MethodID ${type} ${name}${signature}: ${info ? 'static-ness differs' : 'no such method'} (NoSuchMethodError)`); self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return 0; }
       r.initialize?.(type);
       return self.#methodId({ ...info, static: isStatic });
     };
     h.GetMethodID = memberId(false); h.GetStaticMethodID = memberId(true);
     const fieldId = (isStatic) => (_env, cls, namePtr, sigPtr) => {
       const info = self.#findField(self.#classType(cls), cString(namePtr), cString(sigPtr), isStatic);
-      if (!info) { self.#throwNew('Ljava/lang/NoSuchFieldError;', cString(namePtr)); return 0; }
+      if (!info) { r.record?.(`JNI Get${isStatic ? 'Static' : ''}FieldID ${self.#classType(cls)} ${cString(namePtr)} ${cString(sigPtr)}: no such field (NoSuchFieldError)`); self.#throwNew('Ljava/lang/NoSuchFieldError;', cString(namePtr)); return 0; }
       return self.#fieldId(info);
     };
     h.GetFieldID = fieldId(false); h.GetStaticFieldID = fieldId(true);
 
     // -- calls: argument decoding for "...", va_list (same buffer layout on wasm32) and jvalue*
     const varargs = (parameters, ptr) => {
+      if (lib.vaArgs) return lib.vaArgs(parameters, ptr);   // AAPCS64: registers or a va_list structure
       const out = []; let cursor = ptr; const v = view();
       for (const type of parameters) {
         if (type === 'J' || type === 'D') { cursor = (cursor + 7) & ~7; out.push(type === 'J' ? v.getBigInt64(cursor, true) : v.getFloat64(cursor, true)); cursor += 8; }
@@ -540,7 +554,7 @@ export class JniBridge {
     const brief = (type, value) => briefValue(r, type, value);
     const callWith = (mode, kind, resultType) => (_env, objOrCls, ...rest) => {
       const nonvirtual = mode === 'nonvirtual', mid = rest[nonvirtual ? 1 : 0], argPtr = rest[nonvirtual ? 2 : 1];
-      const info = self.methodIds[mid]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' });
+      const info = self.methodIds[mid]; if (!info) throw new APKError(`Invalid jmethodID ${typeof mid === 'number' ? '0x' + mid.toString(16) : String(mid)} in Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${resultType ?? ''}Method${kind === 'A' ? 'A' : ''} (the bridge has handed out ${self.methodIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(mid) });
       const raw = kind === 'A' ? jvalues(info.parameters, argPtr) : varargs(info.parameters, argPtr);
       const values = info.parameters.map((type, i) => toVM(type, raw[i]));
       const words = r.argumentWords(info.parameters, values, mode === 'static' ? {} : { receiver: self.#value(objOrCls) });
@@ -569,12 +583,18 @@ export class JniBridge {
     };
     h.NewObject = newObject('V'); h.NewObjectV = newObject('V'); h.NewObjectA = newObject('A');
 
+    // -- reflection <-> IDs (FromReflectedMethod / FromReflectedField / ToReflectedMethod / ToReflectedField): the reflected object carries the member the lab resolved for it
+    h.FromReflectedMethod = (_env, obj) => { const member = r.object(self.#value(obj)).member; if (!member?.method) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Method or Constructor'); return 0; } return self.#methodId({ ...member.method, static: !!(member.flags & 8) }); };
+    h.FromReflectedField = (_env, obj) => { const member = r.object(self.#value(obj)).member; if (!member?.field) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Field'); return 0; } return self.#fieldId({ ...member.field, static: !!(member.flags & 8) }); };
+    h.ToReflectedMethod = (_env, _cls, id, isStatic) => { const info = self.methodIds[id]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject(info.name === '<init>' ? 'constructor' : 'method', { method: info, flags: 1 | (isStatic ? 8 : 0) })); };
+    h.ToReflectedField = (_env, _cls, id, isStatic) => { const f = self.fieldIds[id]; if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject('field', { field: f, flags: 1 | (isStatic ? 8 : 0) })); };
+
     // -- fields
-    const fieldRef = id => { const f = self.fieldIds[id]; if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return f; };
+    const fieldRef = id => { const f = self.fieldIds[id]; if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
     for (const [name, code] of callTypes.slice(0, 9)) {
       h[`Get${name}Field`] = (_env, obj, id) => { const f = fieldRef(id); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
       h[`Set${name}Field`] = (_env, obj, id, value) => { const f = fieldRef(id); r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
-      h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
+      h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id); if ('constant' in f) return toJNI(code, f.constant); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
       h[`SetStatic${name}Field`] = (_env, _cls, id, value) => { const f = fieldRef(id); r.writeStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key }, toVM(code, value)); };
     }
 
@@ -609,7 +629,7 @@ export class JniBridge {
       if (capacity < 0n || capacity > 0x7fffffffn) { self.#throwNew('Ljava/lang/IllegalArgumentException;', `negative or too large capacity: ${capacity}`); return 0; }
       r.resolveClass('java.nio.DirectByteBuffer', false);   // ART looks the class up the same way (boot class path)
       const object = r.allocate(DIRECT);
-      r.dispatch({ owner: DIRECT, name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [BigInt(address >>> 0), Number(capacity)], { receiver: object }), 'direct');
+      r.dispatch({ owner: DIRECT, name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [lib.directWindow !== undefined ? lib.directWindow + BigInt(address) : BigInt(address >>> 0), Number(capacity)], { receiver: object }), 'direct');
       return self.#local(object);
     };
     const directBuffer = handle => {   // the Buffer object when it is a direct java.nio.Buffer, else null
@@ -617,7 +637,7 @@ export class JniBridge {
       const object = r.object(v); if (!r.isSubtype(object.type, BUFFER)) return null;
       return r.dispatch({ owner: BUFFER, name: 'isDirect', parameters: [], result: 'Z', signature: '()Z' }, r.argumentWords([], [], { receiver: v }), 'virtual') ? object : null;
     };
-    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); return object ? Number(BigInt.asUintN(32, BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n))) : 0; };
+    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); if (!object) return 0; const address = BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n); if (lib.directWindow !== undefined) { const inside = address - lib.directWindow; return inside >= 0n && inside < 0x10000000000n ? Number(inside) : 0; } return Number(BigInt.asUintN(32, address)); };   // an ARM64 library sees only buffers over its own memory
     h.GetDirectBufferCapacity = (_env, buf) => { const object = directBuffer(buf); return object ? BigInt(object.fields.get('Ljava/nio/Buffer;->capacity:I') ?? 0) : -1n; };
     h.NewObjectArray = (_env, length, cls, init) => {
       if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; }
@@ -658,12 +678,13 @@ export class JniBridge {
 
     // -- natives
     h.RegisterNatives = (_env, cls, methods, count) => {
-      const type = self.#classType(cls), v = view();
+      const type = self.#classType(cls), v = view(), wide = lib.nativeMethods ? lib.nativeMethods(methods, count) : null;   // 64-bit code: JNINativeMethod is three 8-byte pointers
       for (let i = 0; i < count; i++) {
-        const name = cString(v.getUint32(methods + i * 12, true)), signature = cString(v.getUint32(methods + i * 12 + 4, true)).replace(/^[!]/, ''), index = v.getUint32(methods + i * 12 + 8, true);
+        const name = wide ? wide[i].name : cString(v.getUint32(methods + i * 12, true)), signature = (wide ? wide[i].signature : cString(v.getUint32(methods + i * 12 + 4, true))).replace(/^[!]/, ''), index = wide ? wide[i].address : v.getUint32(methods + i * 12 + 8, true);
         // ART's RegisterNatives finds the method in the class or, through FindVirtualMethod, in a superclass (reanimated registers NativeProxyCommon.installJSIBindings on NativeProxy); the binding belongs to the declaring class
         const info = self.#findMethod(type, name, signature), owner = info && !info.host ? info.owner : type, def = r.classes.get(owner)?.methods.get(name + signature);
         if (!def || !(def.flags & 0x100)) { self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return JNI_ERR; }
+        if (wide) { if (!index) { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; } self.registered.set(`${owner}->${name}${signature}`, { lib, address: index, symbol: `<RegisterNatives ${name}${signature} 0x${index.toString(16)}>` }); continue; }
         const fn = lib.table.get(index); if (typeof fn !== 'function') { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; }
         self.registered.set(`${owner}->${name}${signature}`, { lib, fn, symbol: `<RegisterNatives ${name}${signature}>` });
       }

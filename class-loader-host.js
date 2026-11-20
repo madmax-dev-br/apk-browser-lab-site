@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { APKArchive } from './apk-loader.js?v=448e4ced7d81';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=448e4ced7d81';
-import { createHostRegistry } from './host-contract.js?v=448e4ced7d81';
-import { normalizePath } from './virtual-fs.js?v=448e4ced7d81';
+import { unsignedBytes } from './java-arrays.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { APKArchive } from './apk-loader.js?v=1c341f498fc5';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=1c341f498fc5';
+import { createHostRegistry } from './host-contract.js?v=1c341f498fc5';
+import { normalizePath } from './virtual-fs.js?v=1c341f498fc5';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -199,7 +199,8 @@ export function createClassLoaderHost(platform) {
     runtime.storeField(runtime.object(list).fields, `${PATH_LIST}->dexElements:${ELEMENTS}`, array);
     runtime.storeField(runtime.object(list).fields, `${PATH_LIST}->definingContext:${LOADER}`, loader);
     // Native library search path (ART: app lib dir, then the system dirs from java.library.path). The VM has no loadable ELF for these directories.
-    const appLibs = [`${platform.javaIo.fs().codePath}/lib/wasm32`], systemLibs = (runtime.javaProperties.get('java.library.path') ?? '').split(':').filter(Boolean);
+    if (runtime.arm64) runtime.arm64.mount();
+    const appLibs = [...(runtime.arm64 ? [`${platform.javaIo.fs().codePath}/lib/arm64`] : []), `${platform.javaIo.fs().codePath}/lib/wasm32`], systemLibs = (runtime.javaProperties.get('java.library.path') ?? '').split(':').filter(Boolean);
     runtime.storeField(runtime.object(list).fields, `${PATH_LIST}->nativeLibraryDirectories:${LIST}`, fileList(runtime, appLibs));
     runtime.storeField(runtime.object(list).fields, `${PATH_LIST}->systemNativeLibraryDirectories:${LIST}`, fileList(runtime, systemLibs));
     const natives = [...appLibs, ...systemLibs].map(path => { const element = runtime.allocate(NATIVE_ELEMENT); runtime.storeField(runtime.object(element).fields, `${NATIVE_ELEMENT}->path:Ljava/io/File;`, platform.javaIo.makeFile(runtime, path)); return element; });
@@ -282,7 +283,8 @@ export function createClassLoaderHost(platform) {
   // BaseDexClassLoader.findLibrary: first file lib<name>.so in the app then system library directories of the virtual filesystem (null when absent).
   def(LOADER, 'findLibrary', `(${STRING})${STRING}`, (r, _m, [self, name]) => {
     if (name === null) r.throwJava('Ljava/lang/NullPointerException;', null);
-    const file = 'lib' + r.stringCharacters(name) + '.so', dirs = [`${platform.javaIo.fs().codePath}/lib/wasm32`, ...(r.javaProperties.get('java.library.path') ?? '').split(':').filter(Boolean)];
+    if (r.arm64) r.arm64.mount();
+    const file = 'lib' + r.stringCharacters(name) + '.so', dirs = [...(r.arm64 ? [`${platform.javaIo.fs().codePath}/lib/arm64`] : []), `${platform.javaIo.fs().codePath}/lib/wasm32`, ...(r.javaProperties.get('java.library.path') ?? '').split(':').filter(Boolean)];
     for (const dir of dirs) if (platform.javaIo.fs().stat(`${dir}/${file}`)?.type === 'file') { r.record(`CLASSLOADER findLibrary(${r.stringCharacters(name)}) -> ${dir}/${file}`); return `${dir}/${file}`; }
     r.record(`CLASSLOADER findLibrary(${r.stringCharacters(name)}) -> null: ${file} is not in ${dirs[0]} or the system library directories (no wasm32 build)`);
     return null;

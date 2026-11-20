@@ -1,20 +1,21 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=448e4ced7d81';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=448e4ced7d81';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=448e4ced7d81';
-import { inspectELF } from './native-inspector.js?v=448e4ced7d81';
-import { elfBuildId } from './elf-build-id.js?v=448e4ced7d81';
-import { inflateRaw } from './inflate.js?v=448e4ced7d81';
-import { crc32, inflateEntry } from './zip-entry.js?v=448e4ced7d81';
-import { resolveDevice } from './device-profile.js?v=448e4ced7d81';
-import { resourceProfileFor } from './device-configuration.js?v=448e4ced7d81';
-import { JniBridge } from './jni-host.js?v=448e4ced7d81';
-import { providerForApk } from './native-provider-variants.js?v=448e4ced7d81';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=448e4ced7d81';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=448e4ced7d81';
-import { AndroidResources } from './android-resources.js?v=448e4ced7d81';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=448e4ced7d81';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=448e4ced7d81';
-import { FrameworkProvider } from './framework-provider.js?v=448e4ced7d81';
+import { createArm64Native } from './arm64/glue.js?v=1c341f498fc5';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=1c341f498fc5';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=1c341f498fc5';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=1c341f498fc5';
+import { inspectELF } from './native-inspector.js?v=1c341f498fc5';
+import { elfBuildId } from './elf-build-id.js?v=1c341f498fc5';
+import { inflateRaw } from './inflate.js?v=1c341f498fc5';
+import { crc32, inflateEntry } from './zip-entry.js?v=1c341f498fc5';
+import { resolveDevice } from './device-profile.js?v=1c341f498fc5';
+import { resourceProfileFor } from './device-configuration.js?v=1c341f498fc5';
+import { JniBridge } from './jni-host.js?v=1c341f498fc5';
+import { providerForApk } from './native-provider-variants.js?v=1c341f498fc5';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=1c341f498fc5';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=1c341f498fc5';
+import { AndroidResources } from './android-resources.js?v=1c341f498fc5';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=1c341f498fc5';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=1c341f498fc5';
+import { FrameworkProvider } from './framework-provider.js?v=1c341f498fc5';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -248,7 +249,7 @@ export function parseManifest(data) {
         attrs[key] = raw !== 0xffffffff ? str(raw) : valueType === 3 ? str(value) : value; attrTypes[key] = valueType;
       }
       const node = { name };
-      if (name === 'manifest') { packageName = attrs.package; manifestAttrs = { versionCode: attrs.versionCode, versionName: attrs.versionName, installLocation: attrs.installLocation }; }
+      if (name === 'manifest') { packageName = attrs.package; manifestAttrs = { versionCode: attrs.versionCode, versionName: attrs.versionName, installLocation: attrs.installLocation, split: typeof attrs.split === 'string' ? attrs.split : null }; }
       if (name === 'application') { application = { ...attrs }; if (typeof attrs.name === 'string') { applicationName = resolveName(attrs.name); application.name = applicationName; } }
       if (name === 'uses-sdk') usesSdk = { ...attrs };
       if (name === 'uses-library' && typeof attrs.name === 'string') usesLibraries.push({ name: attrs.name, required: !(attrs.required === false || attrs.required === 0 || attrs.required === 'false') });   // android:required defaults to true
@@ -351,6 +352,8 @@ export async function prepareResources(archive, names, options, report, yieldCon
   await report('resources', 0, layoutFiles.length + 1, 'resources.arsc', arsc ? 'Reading Android resource table' : 'Using supplied framework resource table');
   try {
     if (arsc) { table = new AndroidResources(await archive.extract('resources.arsc', 64 * 1024 * 1024), callbacks); summary.tableParsed = true; summary.entries = table.entries.size; }
+    // the splits installed with the base (installSplits): each one's table adds its configurations to the package's resources
+    for (const split of archive.splits ?? []) if (split.archive.entries.has('resources.arsc')) { table.merge(new AndroidResources(await split.archive.extract('resources.arsc', 64 * 1024 * 1024), callbacks)); summary.entries = table.entries.size; summary.splitTables = (summary.splitTables ?? 0) + 1; }
     // Resource shrinkers/obfuscators may rename res/layout files to arbitrary ZIP
     // paths. The compiled resource type, not the filename, identifies layouts.
     const referenced = new Set(layoutFiles);
@@ -554,9 +557,55 @@ export function prepareCompanionPackage(input, { apiLevel = 33 } = {}) {
 let defaultFrameworkProvider = null;
 /** Node tests: a factory of the framework provider loadAPK uses when the caller names none (the browser Worker always passes its own). */
 export function setDefaultFrameworkProvider(factory) { defaultFrameworkProvider = factory; }
+/**
+ * A package installed with its splits (base + split APKs: configuration splits for densities, languages and ABIs, and feature splits), as PackageManager installs it: one
+ * code path per APK, read together. The splits' entries join the base archive's view (reads go to the split that holds them); a split's classes*.dex are added after the
+ * base's (the PathClassLoader of a non-isolated split app lists every split), renumbered classesN.dex; each split's resources.arsc is merged by prepareResources.
+ * A split must name the base's package. Manifest, signature and table entries of a split stay in the split.
+ */
+export function installSplits(archive, splitInputs, warnings = []) {
+  if (!splitInputs?.length) return archive;
+  const basePackage = parseManifest(archive.extractSync('AndroidManifest.xml', 8 * 1024 * 1024)).packageName, splits = [];
+  let nextDex = 2; while (archive.entries.has(`classes${nextDex}.dex`)) nextDex++;
+  for (const input of splitInputs) {
+    const split = new APKArchive(input instanceof Uint8Array ? input : new Uint8Array(input));
+    if (!split.entries.has('AndroidManifest.xml')) fail('A split APK has no AndroidManifest.xml');
+    const manifest = parseManifest(split.extractSync('AndroidManifest.xml', 8 * 1024 * 1024)), name = manifest.manifestAttrs?.split ?? null;
+    if (manifest.packageName !== basePackage) fail(`Split APK of package ${manifest.packageName} cannot be installed with ${basePackage}`);
+    if (!name) { warnings.push(`A second APK without a split name was given with ${basePackage}; it is not a split and was not installed`); continue; }
+    const record = { name, archive: split, entries: [] };
+    const dexes = [...split.entries.keys()].filter(n => /^classes\d*\.dex$/.test(n)).sort((a, b) => (Number(a.slice(7, -4)) || 1) - (Number(b.slice(7, -4)) || 1));
+    for (const [entryName, entry] of split.entries) {
+      if (entryName === 'AndroidManifest.xml' || entryName === 'resources.arsc' || entryName.startsWith('META-INF/') || entryName === 'stamp-cert-sha256') continue;
+      const viewName = dexes.includes(entryName) ? `classes${nextDex + dexes.indexOf(entryName)}.dex` : entryName;
+      if (archive.entries.has(viewName)) { warnings.push(`Split ${name}: ${entryName} is also in an earlier APK; the earlier one is used`); continue; }
+      archive.entries.set(viewName, { ...entry, owner: split, ownerName: entryName }); record.entries.push(viewName);
+    }
+    nextDex += dexes.length; splits.push(record);
+  }
+  const delegate = method => { const own = archive[method].bind(archive); archive[method] = (entryName, ...rest) => { const entry = archive.entries.get(entryName); return entry?.owner ? entry.owner[method](entry.ownerName, ...rest) : own(entryName, ...rest); }; };
+  for (const method of ['payload', 'entryRange', 'inspectSync', 'extractSync', 'readEntrySync', 'extract', 'extractPrefix']) delegate(method);
+  const prefetch = archive.prefetch.bind(archive);
+  archive.prefetch = (entryNames, limit, pool) => { prefetch(entryNames.filter(n => !archive.entries.get(n)?.owner), limit, pool); for (const split of splits) split.archive.prefetch(entryNames.filter(n => archive.entries.get(n)?.owner === split.archive).map(n => archive.entries.get(n).ownerName), limit, pool); };
+  archive.splits = splits;
+  return archive;
+}
+/** An APK set (.apks / .xapk / .apkm: a ZIP of a base APK and its split APKs) as { base, splits } of bytes, or null when the archive is not one. */
+export function apkSetParts(archive) {
+  const inner = [...archive.entries.keys()].filter(name => /\.apk$/i.test(name) && !name.includes('/') || /^splits\/[^/]+\.apk$/i.test(name));
+  if (!inner.length) return null;
+  const hasCode = name => { try { return new APKArchive(archive.extractSync(name, 1 << 30)).entries.has('classes.dex'); } catch { return false; } };
+  const named = inner.find(name => /(^|\/)base(-master)?\.apk$/i.test(name)), base = named && hasCode(named) ? named : inner.find(hasCode);
+  if (!base) return null;   // no installable base inside: loadAPK's error names the bundle
+  return { base: archive.extractSync(base, 1 << 30), splits: inner.filter(name => name !== base).map(name => archive.extractSync(name, 1 << 30)) };
+}
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
-  const archive = new APKArchive(arrayBuffer), names = [...archive.entries.keys()];
+  let archive = new APKArchive(arrayBuffer);
+  if (!archive.entries.has('classes.dex')) { const set = apkSetParts(archive); if (set) return loadAPK(set.base, { ...options, splits: [...set.splits, ...(options.splits ?? [])] }); }
+  const splitWarnings = [];
+  archive = installSplits(archive, options.splits, splitWarnings);
+  const names = [...archive.entries.keys()];
   if (!archive.entries.has('classes.dex')) {
     const inner = names.filter(name => /\.apk$/i.test(name)), kind = names.includes('BundleConfig.pb') || names.includes('base/manifest/AndroidManifest.xml') ? 'an Android App Bundle (.aab), which is not installable and has no classes.dex at its root'
       : inner.length ? `a bundle of APKs (XAPK/APKS: ${inner.slice(0, 4).join(', ')}${inner.length > 4 ? ', ...' : ''}); open its base APK` : names.some(name => /^classes\d*\.dex$/.test(name)) ? 'an APK whose dex files do not start at classes.dex'
@@ -596,7 +645,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const nativeSummary = { files: nativeLibraries.length, uniqueLibraries: new Set(nativeLibraryDetails.map(l => l.basename)).size,
     abiCount: Object.keys(nativeByABI).length, bytes: nativeLibraryDetails.reduce((sum, l) => sum + l.bytes, 0),
     executableInBrowser: false, executionRequired: 'determined-at-use' };
-  const unsupportedFeatures = [], warnings = [];
+  const unsupportedFeatures = [], warnings = [...splitWarnings];
   const embeddedFrameworks = [], bundles = [];
   let manifest = { packageName: null, applicationName: null, activities: [], services: [], providers: [], receivers: [], launcherActivity: null };
   await report('manifest', 0, 1, 'AndroidManifest.xml', 'Reading Android manifest');
@@ -909,6 +958,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     runtime.reactNativeVersion = detectReactNativeVersion(runtime); runtime.hermesBytecodeVersion = await detectHermesBytecodeVersion(archive);
   }
   runtime.nativeVersionMismatch = options.nativeVersionMismatch === true;   // opt-in: serve the lab's React Native libraries to an app of another release (jni-host.js #requireVersions), reported
+  if (options.arm64Native) runtime.arm64 = createArm64Native(runtime);   // the app's arm64-v8a libraries run in the ARM64 interpreter (docs/ARM64-NATIVE.md); off unless asked
   if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256, formatVersion(runtime.reactNativeVersion)), runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));

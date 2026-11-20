@@ -1,10 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { registerPackageValueFields } from './package-value-fields.js?v=448e4ced7d81';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=448e4ced7d81';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=448e4ced7d81';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=448e4ced7d81';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=448e4ced7d81';
+import { resolveIntentFields } from './intent-resolver.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { registerPackageValueFields } from './package-value-fields.js?v=1c341f498fc5';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=1c341f498fc5';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=1c341f498fc5';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1c341f498fc5';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=1c341f498fc5';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -1065,6 +1065,17 @@ export function createAppServicesHost(platform) {
   const assetPackage = (r, self) => (self && typeof self === 'object' ? r.object(self).packageEntry : null) ?? null;
   const entriesOf = (r, self) => assetPackage(r, self)?.entries ?? r.apkEntries;
   def('Landroid/content/res/Resources;', 'getAssets', `()${ASSETS}`, (r, _m, [self]) => { const own = assetPackage(r, self); return own && !own.main ? packageAssets(r, own) : assetManager(r); });   // a second package's Resources: the AssetManager over its own APK
+  // new Resources(AssetManager, DisplayMetrics, Configuration) (Resources.java, deprecated public constructor): Resources over that AssetManager's package, whose configuration is the
+  // given one (the device's when null), selected like a createConfigurationContext Resources (src/android-platform.js overrideResources).
+  def('Landroid/content/res/Resources;', '<init>', `(${ASSETS}Landroid/util/DisplayMetrics;Landroid/content/res/Configuration;)V`, (r, _m, [self, assets, _metrics, config]) => {
+    const CONFIG = 'Landroid/content/res/Configuration;', owner = assetPackage(r, assets), object = r.object(self);
+    if (owner && !owner.main) object.packageEntry = owner;
+    const device = platform.resourceConfiguration(r, null), merged = r.allocate(CONFIG);
+    r.dispatch({ owner: CONFIG, name: '<init>', parameters: [CONFIG], result: 'V', signature: `(${CONFIG})V` }, [merged, device], 'direct');
+    if (config) r.dispatch({ owner: CONFIG, name: 'updateFrom', parameters: [CONFIG], result: 'I', signature: `(${CONFIG})I` }, [merged, config], 'virtual');
+    object.contextConfiguration = merged;
+    object.resourceConfigurationDifference = r.dispatch({ owner: CONFIG, name: 'diff', parameters: [CONFIG], result: 'I', signature: `(${CONFIG})I` }, [device, merged], 'virtual');
+  });
   const assetEntry = (r, name) => { const n = text(r, name).replace(/^\/+/, ''); return { n, entry: 'assets/' + n }; };
   const openAsset = (r, _m, [self, name]) => {
     const { n, entry } = assetEntry(r, name), owner = assetPackage(r, self);
@@ -1375,6 +1386,31 @@ export function createAppServicesHost(platform) {
     }
   }
 
+  /**
+   * ActivityThread.installContentProviders(Context, List<ProviderInfo>) called by the app itself (a plugin or split loader installing providers the manifest does not list):
+   * each provider not installed yet is instantiated from its ProviderInfo.name, attachInfo()'d with the given Context and info (onCreate runs), and answers its authorities.
+   */
+  const installedByAuthority = new Map();
+  def('Landroid/app/ActivityThread;', 'installContentProviders', `(${CONTEXT}Ljava/util/List;)V`, (r, _m, [, context, list]) => {
+    if (list === null) return;
+    const size = r.dispatch({ owner: 'Ljava/util/List;', name: 'size', parameters: [], result: 'I', signature: '()I' }, [list], 'virtual');
+    for (let i = 0; i < size; i++) {
+      const info = r.dispatch({ owner: 'Ljava/util/List;', name: 'get', parameters: ['I'], result: OBJECT, signature: `(I)${OBJECT}` }, [list, i], 'virtual');
+      const fields = r.object(info).fields, read = (owner, name) => { const v = fields.get(`${owner}->${name}:${STRING}`); return v === null || v === undefined ? null : text(r, v); };
+      const name = read(ITEM_INFO, 'name'), authority = read(PROVIDER_INFO, 'authority');
+      if (!name) r.throwJava('Ljava/lang/NullPointerException;', 'ProviderInfo.name');
+      if (installedProviders.has(name)) continue;   // installProvider: an existing local provider is reused
+      const className = 'L' + name.replaceAll('.', '/') + ';';
+      r.resolveClass?.(name, false);
+      if (!r.classes.has(className) || !r.isSubtype(className, CP)) r.throwJava('Ljava/lang/RuntimeException;', `Unable to get provider ${name}: java.lang.ClassNotFoundException: ${name}`);
+      const instance = r.allocate(className); installedProviders.set(name, instance);
+      r.record(`PROVIDERS installContentProviders (called by the app) ${name}${authority ? ` authority ${authority}` : ''}`);
+      r.dispatch({ owner: className, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [instance], 'direct');
+      r.dispatch({ owner: CP, name: 'attachInfo', parameters: [CONTEXT, PROVIDER_INFO], result: 'V', signature: `(${CONTEXT}${PROVIDER_INFO})V` }, [instance, context, info], 'virtual');
+      for (const each of String(authority ?? '').split(';').filter(Boolean)) if (!installedByAuthority.has(each)) installedByAuthority.set(each, name);
+    }
+  });
+
   /** installContentProviders for a companion package's process (src/package-registry.js ensureProcess): the same order, its class loader, its Application as Context. */
   function installPackageProviders(runtime, entry) {
     const details = (entry.manifest.providerDetails ?? []).filter(p => !isFalse(p.enabled));
@@ -1396,5 +1432,5 @@ export function createAppServicesHost(platform) {
     runtime.dispatch({ owner: CP, name: 'attachInfo', parameters: [CONTEXT, PROVIDER_INFO], result: 'V', signature: `(${CONTEXT}${PROVIDER_INFO})V` }, [instance, pkgs().application(entry), makeProviderInfo(runtime, detail, true, entry)], 'virtual');
     return instance;
   }
-  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, installPackageProviders, installPackageProvider, holdsFor, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, providerByAuthority: authority => { const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(authority)); return detail ? installedProviders.get(detail.name) ?? null : null; }, preferenceInstances: instances, findPackage, packageAssets, packageNames: r => packages(r).map(entry => entry.name) };
+  return { ...registry, [GC_ROOTS](visit) { visit(currentContext); }, interfaces: registry.interfacesOf, getService, metaDataBundle, installPackageProviders, installPackageProvider, holdsFor, serviceNameForClass: classType => serviceByClass.get(classType) ?? null, installContentProviders, providerByAuthority: authority => { const detail = (platform.manifest?.providerDetails ?? []).find(p => !isFalse(p.enabled) && String(p.authorities ?? '').split(';').includes(authority)); if (detail) return installedProviders.get(detail.name) ?? null; const added = installedByAuthority.get(authority); return added ? installedProviders.get(added) ?? null : null; }, preferenceInstances: instances, findPackage, packageAssets, packageNames: r => packages(r).map(entry => entry.name) };
 }

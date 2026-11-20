@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=448e4ced7d81';
-import { DIGESTS } from './crypto-host.js?v=448e4ced7d81';
+import { createHostRegistry, floatBits } from './host-contract.js?v=1c341f498fc5';
+import { DIGESTS } from './crypto-host.js?v=1c341f498fc5';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
@@ -10,6 +10,10 @@ const RESOLVER = 'Landroid/content/ContentResolver;', STRING = 'Ljava/lang/Strin
 
 export function createSettingsHost(platform) {
   const registry = createHostRegistry(), { def, type } = registry;
+  // the tables' URIs (Settings.java: CONTENT_URI = content://settings/<table>; System.DEFAULT_*_URI are System.getUriFor of the ringtone, notification and alarm keys)
+  const parse = (r, text) => r.dispatch({ owner: 'Landroid/net/Uri;', name: 'parse', parameters: [STRING], result: 'Landroid/net/Uri;', signature: `(${STRING})Landroid/net/Uri;` }, [text], 'static');
+  for (const [owner, table] of [[SYSTEM, 'system'], [SECURE, 'secure'], [GLOBAL, 'global']]) registry.staticField(owner, 'CONTENT_URI', 'Landroid/net/Uri;', r => parse(r, `content://settings/${table}`));
+  for (const [name, key] of [['DEFAULT_RINGTONE_URI', 'ringtone'], ['DEFAULT_NOTIFICATION_URI', 'notification_sound'], ['DEFAULT_ALARM_ALERT_URI', 'alarm_alert']]) registry.staticField(SYSTEM, name, 'Landroid/net/Uri;', r => parse(r, `content://settings/system/${key}`));
   type(SETTINGS, 'Ljava/lang/Object;'); type('Landroid/provider/Settings$NameValueTable;', 'Ljava/lang/Object;'); for (const owner of [SECURE, SYSTEM]) type(owner, 'Landroid/provider/Settings$NameValueTable;');   // Settings.Global belongs to content-resolver-host (a writable VM store with observers)
   type('Landroid/util/AndroidException;', 'Ljava/lang/Exception;', [], { allocatable: true }); type(NOT_FOUND, 'Landroid/util/AndroidException;', [], { allocatable: true });
   const ANDROID_EXCEPTION = 'Landroid/util/AndroidException;';

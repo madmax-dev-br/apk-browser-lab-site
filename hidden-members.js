@@ -1,4 +1,5 @@
-import TABLES from './hidden-member-tables.js?v=448e4ced7d81';
+import TABLES from './hidden-member-tables.js?v=1c341f498fc5';
+import { constantField } from './framework-constants.js?v=1c341f498fc5';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with
@@ -59,6 +60,8 @@ export const ACCESSORS = new Map([
   [key('Landroid/content/ContextWrapper;', 'mBase', 'Landroid/content/Context;'), { get: (rt, o) => rt.object(o).baseContext ?? null, set: (rt, o, v) => { rt.object(o).baseContext = isNull(v) ? null : v; } }],
   [key('Landroid/app/Activity;', 'mApplication', 'Landroid/app/Application;'), { get: rt => rt.platform.application ?? null }],
   [key('Landroid/app/Activity;', 'mMainThread', THREAD), { get: rt => activityThread(rt) }],
+  // the process's Instrumentation; an app may install its own (recorded at the next activity launch: the lab drives activities without calling Instrumentation)
+  [key(THREAD, 'mInstrumentation', 'Landroid/app/Instrumentation;'), { get: rt => rt.instrumentation ??= (rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;')), set: (rt, _o, v) => { rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;'); rt.instrumentation = isNull(v) ? null : v; } }],
   [key('Landroid/app/Activity;', 'mDecor', 'Landroid/view/View;'), { get: (rt, o) => { const window = call(rt, o, 'Landroid/app/Activity;', 'getWindow', 'Landroid/view/Window;'); return isNull(window) ? null : call(rt, window, 'Landroid/view/Window;', 'peekDecorView', 'Landroid/view/View;'); } }],
   [key('Landroid/view/View;', 'mContext', 'Landroid/content/Context;'), { get: (rt, o) => call(rt, o, 'Landroid/view/View;', 'getContext', 'Landroid/content/Context;') }],
 ]);
@@ -78,5 +81,6 @@ export function hiddenStatic(rt, field) {
   if (row.length > 3 && row[3] !== null && row[3] !== undefined) {
     const value = row[3]; return { handled: true, value: field.type === 'J' ? BigInt(value) : field.type === 'Z' ? (value ? 1 : 0) : value };
   }
+  { const constant = constantField(field.owner, field.name); if (constant && constant.type === field.type) return { handled: true, value: constant.value }; }   // an SDK compile-time constant (Context.*_SERVICE): the value its class file carries
   return { handled: true, value: field.type === 'J' || field.type === 'D' ? 0n : field.type.startsWith('L') || field.type.startsWith('[') ? null : 0 };
 }

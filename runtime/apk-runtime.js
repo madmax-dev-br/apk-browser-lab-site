@@ -1,34 +1,34 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=448e4ced7d81';
-import { VMClock } from './vm-clock.js?v=448e4ced7d81';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=448e4ced7d81';
-import { OperationMonitor } from './operation-monitor.js?v=448e4ced7d81';
-import { ExecutionProfile } from './execution-profile.js?v=448e4ced7d81';
-import { SamplingProfiler } from './sampling-profiler.js?v=448e4ced7d81';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=448e4ced7d81';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=448e4ced7d81';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=448e4ced7d81';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=448e4ced7d81';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=448e4ced7d81';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=448e4ced7d81';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=448e4ced7d81';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=448e4ced7d81';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=448e4ced7d81';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=448e4ced7d81';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=448e4ced7d81';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=448e4ced7d81';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=448e4ced7d81';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=448e4ced7d81';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=448e4ced7d81';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=448e4ced7d81';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=448e4ced7d81';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=448e4ced7d81';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=448e4ced7d81';
+import STATIC_SHIMS from './shim-static-methods.js?v=1c341f498fc5';
+import { VMClock } from './vm-clock.js?v=1c341f498fc5';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=1c341f498fc5';
+import { OperationMonitor } from './operation-monitor.js?v=1c341f498fc5';
+import { ExecutionProfile } from './execution-profile.js?v=1c341f498fc5';
+import { SamplingProfiler } from './sampling-profiler.js?v=1c341f498fc5';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=1c341f498fc5';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=1c341f498fc5';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=1c341f498fc5';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=1c341f498fc5';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=1c341f498fc5';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=1c341f498fc5';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=1c341f498fc5';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=1c341f498fc5';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=1c341f498fc5';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=1c341f498fc5';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=1c341f498fc5';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=1c341f498fc5';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=1c341f498fc5';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=1c341f498fc5';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=1c341f498fc5';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=1c341f498fc5';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=1c341f498fc5';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=1c341f498fc5';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=1c341f498fc5';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=448e4ced7d81';
-import { bootClassLacksMember } from './boot-class-members.js?v=448e4ced7d81';
-export { APKError } from './apk-error.js?v=448e4ced7d81';
+import { Scheduler, Blocked } from './scheduler.js?v=1c341f498fc5';
+import { bootClassLacksMember } from './boot-class-members.js?v=1c341f498fc5';
+export { APKError } from './apk-error.js?v=1c341f498fc5';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -653,7 +653,7 @@ addBridge('java/lang/Class', ['newInstance()Ljava/lang/Object;', 'getDeclaredCon
   'getDeclaredFields()[Ljava/lang/reflect/Field;', 'getFields()[Ljava/lang/reflect/Field;']);
 EXTERNAL_PARENTS.set('Ljava/lang/reflect/Array;','Ljava/lang/Object;');
 { const existing = EXTERNAL_INTERFACES.get('Ljava/lang/Class;') ?? []; EXTERNAL_INTERFACES.set('Ljava/lang/Class;', [...new Set([...existing, 'Ljava/io/Serializable;', 'Ljava/lang/reflect/Type;', 'Ljava/lang/reflect/AnnotatedElement;', 'Ljava/lang/reflect/GenericDeclaration;'])]); } // java.lang.Class implements these
-addBridge('java/lang/reflect/Array',['newInstance(Ljava/lang/Class;I)Ljava/lang/Object;','newInstance(Ljava/lang/Class;[I)Ljava/lang/Object;','getLength(Ljava/lang/Object;)I','get(Ljava/lang/Object;I)Ljava/lang/Object;','set(Ljava/lang/Object;ILjava/lang/Object;)V']);
+addBridge('java/lang/reflect/Array',[...['Boolean:Z','Byte:B','Char:C','Short:S','Int:I','Long:J','Float:F','Double:D'].flatMap(p=>{const[n,t]=p.split(':');return[`get${n}(Ljava/lang/Object;I)${t}`,`set${n}(Ljava/lang/Object;I${t})V`];}),'newInstance(Ljava/lang/Class;I)Ljava/lang/Object;','newInstance(Ljava/lang/Class;[I)Ljava/lang/Object;','getLength(Ljava/lang/Object;)I','get(Ljava/lang/Object;I)Ljava/lang/Object;','set(Ljava/lang/Object;ILjava/lang/Object;)V']);
 EXTERNAL_PARENTS.set('Ljava/lang/ClassLoader;', 'Ljava/lang/Object;');
 addBridge('java/lang/ClassLoader', ['getSystemClassLoader()Ljava/lang/ClassLoader;', 'loadClass(Ljava/lang/String;)Ljava/lang/Class;', 'getParent()Ljava/lang/ClassLoader;']);
 EXTERNAL_PARENTS.set('Ljava/lang/reflect/AccessibleObject;', 'Ljava/lang/Object;');
@@ -1868,6 +1868,7 @@ export class APKRuntime {
     if(this.dex.bootClasses?.has('Lsun/misc/VM;'))this.dispatch({owner:'Lsun/misc/VM;',name:'booted',parameters:[],result:'V',signature:'()V'},[],'static');
     this.platform?.beforeLaunch?.(this);
     if (this.platform) this.platform.launchIntent = intent;
+    { const replaced = this.platform?.instrumentationReplaced?.(this); if (replaced && !this.instrumentationNoted) { this.instrumentationNoted = true; this.record(`INSTRUMENTATION ActivityThread.mInstrumentation is ${replaced}, set by the app; the lab creates and drives activities itself, so its Instrumentation callbacks (newActivity, callActivityOnCreate, execStartActivity) are NOT called`); } }
     this.activityType = type; this.activity = this.allocate(type);
     const launchedActivity = this.activity;
     this.dispatch({ owner: type, name: '<init>', signature: '()V', parameters: [], result: 'V' }, [launchedActivity], 'direct');
@@ -2405,6 +2406,7 @@ export class APKRuntime {
       if (definition) return definition.flags & 0x100 ? (this.nativeBindings.has(definition.method.key) ? 'framework-native' : null) : definition.flags & 0x400 ? 'interface' : 'framework-dex';
       const key = `${owner}->${method.name}${method.signature}`;
       if (SHIMS.has(key) || this.skiaHost?.supports?.(key) || this.platform?.supports?.(key)) return 'bridge';
+      if (this.platform?.declaresAbstract?.(key)) return 'interface';
       if (method.name === '<init>') break;
       owner = this.parent(owner);
     }
@@ -2777,6 +2779,8 @@ export class APKRuntime {
           // record static-ness, so the member carries a "static unless a receiver is supplied" marker (Java ignores the receiver of static methods).
           const found = this.bridgeReflection(owner, kind === 'constructor' ? '<init>' : name, parameters);
           if (found) return found;
+          // Class.getMethod also finds the public methods a host class inherits (Method.getParameterTypes is declared by Executable)
+          if (kind === 'method' && publicOnly) for (let up = this.parent(owner), depth = 0; up && up !== 'Ljava/lang/Object;' && depth < 32; up = this.parent(up), depth++) { const inherited = this.bridgeReflection(up, name, parameters); if (inherited) return inherited; }
         }
         if (kind === 'field') {   // compile-time constants of an SDK class (Manifest.permission, Context.*_SERVICE, Build.VERSION_CODES, framework R ...): what the class file declares
           const constant = constantField(owner, name);
@@ -3032,6 +3036,20 @@ export class APKRuntime {
       const component=array.type.slice(1);
       if(name==='get')return this.boxPrimitive(component,array.elements[index]);
       array.elements[index]=this.unboxReflection(args[2],component);return undefined;
+    }
+    if(method.owner==='Ljava/lang/reflect/Array;'&&/^(get|set)(Boolean|Byte|Char|Short|Int|Long|Float|Double)$/.test(name)){
+      // Array.getInt / setByte ...: the primitive widening conversions of JLS 5.1.2 between the call's type and the component type; anything else is "argument type mismatch"
+      if(isNull(args[0]))this.throwJava('Ljava/lang/NullPointerException;','array == null');
+      const array=this.object(args[0]);if(!array.elements||!array.type.startsWith('['))this.throwJava('Ljava/lang/IllegalArgumentException;','Argument is not an array');
+      const index=int(args[1]);if(index<0||index>=array.elements.length)this.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',`length=${array.elements.length}; index=${index}`);
+      const component=array.type.slice(1),type=name.startsWith('get')?method.result:method.parameters[2];
+      const WIDEN={B:'BSIJFD',S:'SIJFD',C:'CIJFD',I:'IJFD',J:'JFD',F:'FD',D:'D',Z:'Z'};
+      const from=name.startsWith('get')?component:type,to=name.startsWith('get')?type:component;
+      if(component.length!==1||!(WIDEN[from]??'').includes(to))this.throwJava('Ljava/lang/IllegalArgumentException;','argument type mismatch');
+      const value=(t,raw)=>t==='F'?floatNumber(int(raw)):t==='D'?doubleNumber(BigInt(raw)):t==='J'?BigInt(raw):Number(raw);
+      const raw=(t,v)=>t==='F'?floatBits(Math.fround(Number(v))):t==='D'?doubleBits(Number(v)):t==='J'?BigInt.asIntN(64,BigInt(v)):t==='Z'?(v?1:0):Number(v)|0;
+      if(name.startsWith('get'))return raw(type,value(component,array.elements[index]));
+      array.elements[index]=raw(component,value(type,args[2]));return undefined;
     }
     if(method.owner==='Ljava/lang/reflect/Array;'&&name==='newInstance'){
       const component=this.object(args[0]).classType;if(!component)fail('Array.newInstance requires a Class');if(component.replaceAll('[','')==='V')this.throwJava('Ljava/lang/IllegalArgumentException;','void array component');
@@ -3369,6 +3387,7 @@ export class APKRuntime {
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
       if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
+      if (this.arm64?.load(name, text)) return undefined;   // the APK's own arm64-v8a library, run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (this.stubNativeLibrary(text)) return undefined;
       this.nativeRequired(key, text);
     }

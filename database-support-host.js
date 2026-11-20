@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=448e4ced7d81';
-import { fieldOffset } from './unsafe-native.js?v=448e4ced7d81';
+import { createHostRegistry } from './host-contract.js?v=1c341f498fc5';
+import { fieldOffset } from './unsafe-native.js?v=1c341f498fc5';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -70,6 +70,11 @@ export function createDatabaseSupportHost(platform) {
   type(THREAD, OBJECT, [], { allocatable: true });
   // Code the lab runs on behalf of another process (the launcher loading the installed app's label and icon, src/launcher-info.js) is not in the app's process: there
   // ActivityThread.currentActivityThread() is null, and framework code takes its own no-app branch (AdaptiveIconDrawable falls back to Resources.getSystem()).
+  // android.app.Instrumentation: the process's instance is ActivityThread.mInstrumentation (src/hidden-members.js). The lab starts activities and calls their lifecycle itself, not
+  // through Instrumentation: an app that installs its own subclass there is recorded once at the next activity launch (src/apk-runtime.js launchActivity).
+  const INSTRUMENTATION = 'Landroid/app/Instrumentation;';
+  type(INSTRUMENTATION, OBJECT, [], { allocatable: true }); def(INSTRUMENTATION, '<init>', '()V', () => {});
+  platform.instrumentationReplaced = r => r.instrumentation && r.instrumentation.ref !== r.defaultInstrumentation?.ref ? r.typeOf(r.instrumentation) : null;
   def(THREAD, 'currentActivityThread', `()${THREAD}`, r => r.platform?.outsideAppProcess ? null : (r.activityThread ??= r.allocate(THREAD)), { static: true });
   // ActivityThread.H (the main Handler, ActivityThread.mH) and the MessageQueue object of a Looper: host types whose state lives in src/hidden-members.js
   type('Landroid/app/ActivityThread$H;', 'Landroid/os/Handler;', [], { allocatable: true }); type('Landroid/os/MessageQueue;', OBJECT, [], { allocatable: true });

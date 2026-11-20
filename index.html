@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=448e4ced7d81") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=448e4ced7d81">
-  <link rel="stylesheet" href="./lab-theme.css?v=448e4ced7d81">
-  <meta name="apk-browser-build" content="448e4ced7d81">
+  <style>@import url("./styles.css?v=1c341f498fc5") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=1c341f498fc5">
+  <link rel="stylesheet" href="./lab-theme.css?v=1c341f498fc5">
+  <meta name="apk-browser-build" content="1c341f498fc5">
 </head>
 <body>
   <header class="topbar">
@@ -24,9 +24,9 @@
         <section id="apk-panel" class="controls">
           <h2 class="rail-title">Open APK</h2>
           <label id="drop-zone" class="drop-zone" for="apk-file">
-            <strong>Drop an APK here</strong><span>or <u>choose a file</u></span><small>Accepts .apk and .aab files (an App Bundle runs as its base module). The file never leaves this browser.</small>
+            <strong>Drop an APK here</strong><span>or <u>choose a file</u></span><small>Accepts .apk and .aab files (an App Bundle runs as its base module), and APK sets (.apks / .xapk / .apkm: a base APK with its splits). The file never leaves this browser.</small>
           </label>
-          <input id="apk-file" type="file" accept=".apk,.aab,application/vnd.android.package-archive" class="visually-hidden">
+          <input id="apk-file" type="file" accept=".apk,.aab,.apks,.xapk,.apkm,application/vnd.android.package-archive" class="visually-hidden">
           <div class="demo-row"><span>No APK at hand?</span><button id="demo-button">Run demo</button></div>
           <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
           <div id="load-times" class="load-times" role="status" hidden></div>
@@ -76,12 +76,14 @@
                 <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.example.com/?url={url}" aria-describedby="dev-proxy-note">
                 <label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" aria-describedby="dev-relay-channel-note">
                 <label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note">
+                <label for="dev-arm64">Run ARM64 native code <em class="vm-memory-hint">experimental</em></label><input id="dev-arm64" type="checkbox" aria-describedby="dev-arm64-note">
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
               </div>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
               <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
               <p id="dev-client-cert-status" class="cp-note" role="status"></p>
               <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay over its token-protected channel, only for these hosts, and live there in memory only. Other hosts never see them.</p>
+              <p id="dev-arm64-note" class="cp-note">Run ARM64 native code: the app's own arm64-v8a libraries (from the APK and its splits) run in the lab's ARM64 interpreter, instruction by instruction, with the C library and JNI the lab provides; the device then reports arm64-v8a among its ABIs. Off: they cannot run, as before. An instruction, libc function or system call the interpreter does not have ends in an explicit error naming it. Read when the APK is opened.</p>
               <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
               <fieldset id="dev-microg-services" class="cp-microg-services">
                 <legend class="cp-subtitle">microG services</legend>
@@ -306,7 +308,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=448e4ced7d81"></script>
+  <script type="module" src="./app.js?v=1c341f498fc5"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

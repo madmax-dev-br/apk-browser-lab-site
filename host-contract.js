@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=448e4ced7d81';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that
@@ -18,7 +18,7 @@ export const bitsFloat = n => { bits.setInt32(0, n, true); return bits.getFloat3
 let definedMethods = 0;
 export const hostDefinitions = () => definedMethods;
 export function createHostRegistry() {
-  const defaultedParents = new Set(), reflectedFields = new Map(), instanceFields = new Map(), methods = new Map(), parents = new Map(), interfaces = new Map(), members = new Map(), fields = new Map(), allocatable = new Set();
+  const abstracts = new Set(), defaultedParents = new Set(), reflectedFields = new Map(), instanceFields = new Map(), methods = new Map(), parents = new Map(), interfaces = new Map(), members = new Map(), fields = new Map(), allocatable = new Set();
   const callWith = (runtime, method, args, fn) => {
     if (!fn) throw new APKError(`Unsupported contract-host method ${method.owner}->${method.name}${method.signature}`);
     // Bytecode passes a null reference as the register value 0; a host body tests references with `=== null`. Reference parameters are normalised here, once for every contract host.
@@ -39,6 +39,13 @@ export function createHostRegistry() {
       const byName = members.get(owner) ?? members.set(owner, new Map()).get(owner);
       (byName.get(name) ?? byName.set(name, []).get(name)).push({ ...parseSignature(signature), signature, static: isStatic });
     },
+    /** abstractMethod(owner, name, signature): a method a host interface declares without a body (JNI GetMethodID and reflection find it; a call dispatches on the receiver's class). */
+    abstractMethod(owner, name, signature, { abstract = true } = {}) {   // abstract: false for a concrete method whose body the instance's host type carries (a service manager)
+      abstracts.add(`${owner}->${name}${signature}`); definedMethods++;
+      const byName = members.get(owner) ?? members.set(owner, new Map()).get(owner);
+      (byName.get(name) ?? byName.set(name, []).get(name)).push({ ...parseSignature(signature), signature, static: false, abstract });
+    },
+    declares: key => abstracts.has(key),
     /** staticField(owner, name, type, (runtime) => value) -- lazily computed, cached per runtime. */
     staticField(owner, name, type, compute) { fields.set(`${owner}->${name}:${type}`, { compute, cache: new WeakMap() }); if (!parents.has(owner)) { parents.set(owner, 'Ljava/lang/Object;'); defaultedParents.add(owner); } },
     /** instanceField(owner, name, type): a protected/public instance field of a host class (subclasses in APK code access it through their own class reference). */
@@ -65,7 +72,7 @@ export function createHostRegistry() {
       }
       const memberName = kind === 'constructor' ? '<init>' : name, candidates = members.get(owner)?.get(memberName); if (!candidates) return null;
       const wanted = (parameters ?? []).join(''), found = candidates.find(c => c.parameters.join('') === wanted); if (!found) return null;
-      return { method: { owner, name: memberName, parameters: found.parameters, result: found.result, signature: found.signature, key: `${owner}->${memberName}${found.signature}` }, flags: 1 | (found.static ? 8 : 0) };
+      return { method: { owner, name: memberName, parameters: found.parameters, result: found.result, signature: found.signature, key: `${owner}->${memberName}${found.signature}` }, flags: 1 | (found.static ? 8 : 0) | (found.abstract ? 0x400 : 0) };
     },
     invoke(runtime, method, args) { return callWith(runtime, method, args, methods.get(`${method.owner}->${method.name}${method.signature}`)); },
     /** The body registered for a key, or undefined; a caller that invokes the same key repeatedly keeps it and calls callWith (the runtime does, per bridge resolution). */

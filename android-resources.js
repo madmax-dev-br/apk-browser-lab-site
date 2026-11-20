@@ -119,6 +119,20 @@ export class AndroidResources {
     this.options = callbacks; this.sourceCookie = callbacks.sourceCookie ?? 1; this.entries = new Map(); this.names = new Map(); this.packages = []; this.warnings = []; this.strings = []; this.libraries = new Map();
     if (arscBytes != null) this.parseTable(arscBytes);
   }
+  /**
+   * Adds the entries of a split APK's table (another resources.arsc of the same package: a configuration split's densities, languages or ABIs, or a feature split's own
+   * resources), as AssetManager does when it adds every split of an installed package: each variant joins the resource's list, and resolution chooses among all of them.
+   */
+  merge(other) {
+    for (const [id, variants] of other.entries) {
+      if (!this.entries.has(id)) { if (this.entries.size >= 250000) fail('Resource entry count exceeds limit'); this.entries.set(id, []); }
+      this.entries.get(id).push(...variants);
+    }
+    for (const [name, id] of other.names) if (!this.names.has(name)) this.names.set(name, id);
+    for (const pkg of other.packages) if (!this.packages.some(known => known.id === pkg.id)) this.packages.push(pkg);
+    this.warnings.push(...other.warnings.filter(w => !this.warnings.includes(w)));
+    return this;
+  }
   static fromJSON(data, callbacks = {}) {
     if (!data || data.schemaVersion !== 1 || !Array.isArray(data.entries) || data.entries.length > 100000 || !Array.isArray(data.packages)) fail('Invalid bounded resource JSON dataset');
     const table = new AndroidResources(null, callbacks); table.packages = data.packages.map(({ id, name }) => ({ id, name })); let count = 0;

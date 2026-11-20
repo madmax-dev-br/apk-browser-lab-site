@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=448e4ced7d81';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=448e4ced7d81';
+import { createHostRegistry } from './host-contract.js?v=1c341f498fc5';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=1c341f498fc5';
 
 // Shared plumbing of the system-service hosts (hardware-services-host.js, device-services-host.js, system-managers-host.js): a host contract registry plus the Context service
 // table -- each service has a Context.*_SERVICE name and a manager class; the manager object is a host object created once per runtime. Behaviour follows what an API 33 phone
@@ -15,7 +15,9 @@ export const DEVICE_FEATURES = Object.freeze(['android.hardware.wifi',
 export function createServiceKit(platform) {
   const registry = createHostRegistry(), { type } = registry, rawDef = registry.def, rawStaticField = registry.staticField, classOf = new Map();
   // Statics and constants belong to the manager class a service hands out, not to the host implementation type behind the instance.
-  const def = (owner, name, signature, fn, options) => rawDef(options?.static ? (classOf.get(owner) ?? owner) : owner, name, signature, fn, options);
+  // an instance method of a service's host type is a method of its public manager class too (WifiManagerImpl.getConnectionInfo is WifiManager.getConnectionInfo): declared there
+  // without a body, so JNI GetMethodID and reflection on the public class find it and a call dispatches on the instance (host-contract abstractMethod)
+  const def = (owner, name, signature, fn, options) => { const publicType = classOf.get(owner); if (publicType && !options?.static && name !== '<init>') registry.abstractMethod(publicType, name, signature, { abstract: false }); return rawDef(options?.static ? (publicType ?? owner) : owner, name, signature, fn, options); };
   const staticField = (owner, name, kind, compute) => rawStaticField(classOf.get(owner) ?? owner, name, kind, compute);
   registry.def = def; registry.staticField = staticField;
   const factories = new Map(), services = new Map(), byClass = new Map(), objects = new WeakMap(), roots = [];

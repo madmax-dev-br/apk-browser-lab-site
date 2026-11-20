@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { createHostRegistry } from './host-contract.js?v=448e4ced7d81';
-import { Blocked, VMThread } from './scheduler.js?v=448e4ced7d81';
-import { Invoke } from './interpreter.js?v=448e4ced7d81';
-import { GC_ROOTS } from './heap-gc.js?v=448e4ced7d81';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { createHostRegistry } from './host-contract.js?v=1c341f498fc5';
+import { Blocked, VMThread } from './scheduler.js?v=1c341f498fc5';
+import { Invoke } from './interpreter.js?v=1c341f498fc5';
+import { GC_ROOTS } from './heap-gc.js?v=1c341f498fc5';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -316,6 +316,8 @@ export function createConcurrencyHost(platform) {
   for (const name of ['ExecutionException', 'TimeoutException']) type(`Ljava/util/concurrent/${name};`, 'Ljava/lang/Exception;');
   type('Ljava/util/concurrent/CancellationException;', 'Ljava/lang/IllegalStateException;'); type('Ljava/util/concurrent/RejectedExecutionException;', 'Ljava/lang/RuntimeException;');
   type(FUTURE, OBJECT); registry.interfaces.set(FUTURE, []);
+  // Future's own methods (java.util.concurrent.Future): declared for JNI GetMethodID and reflection; every call dispatches on the receiver's class (FutureTask below, or the app's own)
+  for (const [name, signature] of [['cancel', '(Z)Z'], ['isCancelled', '()Z'], ['isDone', '()Z'], ['get', `()${OBJECT}`], ['get', `(JLjava/util/concurrent/TimeUnit;)${OBJECT}`]]) registry.abstractMethod(FUTURE, name, signature);
   type(FUTURE_TASK, OBJECT, ['Ljava/util/concurrent/RunnableFuture;', 'Ljava/util/concurrent/Future;', RUNNABLE], { allocatable: true });
   const ft = (r, ref) => r.object(ref).future ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'FutureTask used before construction');
   def(FUTURE_TASK, '<init>', `(${CALLABLE})V`, (r, _m, [self, c]) => { if (c === null) throwNew(r, 'Ljava/lang/NullPointerException;'); r.object(self).future = { callable: c, runnable: null, result: null, state: 'new' }; });

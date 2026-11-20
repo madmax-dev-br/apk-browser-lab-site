@@ -1,10 +1,10 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import KEY_DATA from './camera-metadata-keys-data.js?v=448e4ced7d81';
-import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=448e4ced7d81';
-import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=448e4ced7d81';
-import { installCaptureIntents } from './camera-capture-intent.js?v=448e4ced7d81';
-import { installMediaCodecs } from './media-codec-host.js?v=448e4ced7d81';
+import { createHostRegistry, floatBits } from './host-contract.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import KEY_DATA from './camera-metadata-keys-data.js?v=1c341f498fc5';
+import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=1c341f498fc5';
+import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=1c341f498fc5';
+import { installCaptureIntents } from './camera-capture-intent.js?v=1c341f498fc5';
+import { installMediaCodecs } from './media-codec-host.js?v=1c341f498fc5';
 
 // android.hardware.camera2 for the browser VM (android-13.0.0_r1: CameraManager.java, impl/CameraDeviceImpl.java, impl/CameraCaptureSessionImpl.java, CaptureRequest.java,
 // CaptureResult.java, params/StreamConfigurationMap.java, params/OutputConfiguration.java, params/SessionConfiguration.java) and the camera capture Intents
@@ -206,6 +206,17 @@ export function createCameraHost(platform) {
   def(AVAILABILITY, 'onCameraAccessPrioritiesChanged', '()V', () => {}); def(AVAILABILITY, 'onPhysicalCameraAvailable', `(${STRING}${STRING})V`, () => {}); def(AVAILABILITY, 'onPhysicalCameraUnavailable', `(${STRING}${STRING})V`, () => {});
   def(TORCH, 'onTorchModeUnavailable', `(${STRING})V`, () => {}); def(TORCH, 'onTorchModeChanged', `(${STRING}Z)V`, () => {}); def(TORCH, 'onTorchStrengthLevelChanged', `(${STRING}I)V`, () => {});
   const cameras = () => (S.backend ? CAMERAS : []);
+  // ---- android.hardware.Camera (the deprecated API): the same cameras as camera2 (none until the page attaches one). getNumberOfCameras / getCameraInfo describe them
+  // (legacy facing: CAMERA_FACING_BACK 0, CAMERA_FACING_FRONT 1); opening one through this API is not provided and fails by name.
+  const LEGACY = 'Landroid/hardware/Camera;', LEGACY_INFO = 'Landroid/hardware/Camera$CameraInfo;';
+  type(LEGACY, OBJECT); type(LEGACY_INFO, OBJECT, [], { allocatable: true }); def(LEGACY_INFO, '<init>', '()V', () => {});
+  def(LEGACY, 'getNumberOfCameras', '()I', () => cameras().length, { static: true });
+  def(LEGACY, 'getCameraInfo', `(I${LEGACY_INFO})V`, (r, _m, [index, info]) => {
+    const camera = cameras()[index]; if (!camera) r.throwJava('Ljava/lang/RuntimeException;', 'Fail to get camera info');
+    const fields = r.object(info).fields;
+    r.storeField(fields, `${LEGACY_INFO}->facing:I`, camera.facing === 1 ? 0 : 1); r.storeField(fields, `${LEGACY_INFO}->orientation:I`, camera.orientation); r.storeField(fields, `${LEGACY_INFO}->canDisableShutterSound:Z`, 1);
+  }, { static: true });
+  registry.instanceField(LEGACY_INFO, 'facing', 'I', { reflect: true }); registry.instanceField(LEGACY_INFO, 'orientation', 'I', { reflect: true }); registry.instanceField(LEGACY_INFO, 'canDisableShutterSound', 'Z', { reflect: true });
   const known = (r, id) => { if (nullish(id)) iae(r, 'cameraId was null'); const text = r.stringCharacters(id), camera = cameras().find(entry => entry.id === text); if (!camera) iae(r, `Unable to retrieve camera characteristics for unknown device ${text}`); return camera; };
   const tellAvailability = (r, cameraId, available, only = null) => { for (const entry of only ? [only] : [...S.availability]) post(r, entry.target, () => { if (S.availability.includes(entry)) call(r, entry.callback, AVAILABILITY, available ? 'onCameraAvailable' : 'onCameraUnavailable', [STRING], 'V', [cameraId]); }, [entry.callback]); };
   const manager = {

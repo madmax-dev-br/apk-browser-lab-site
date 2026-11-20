@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=448e4ced7d81';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=448e4ced7d81';
-import { parseReturnValue } from './method-overrides.js?v=448e4ced7d81';
-import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=448e4ced7d81';
-import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=448e4ced7d81';
-import { installDroidGuard, droidGuardNativeUnavailable } from './microg-droidguard.js?v=448e4ced7d81';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=1c341f498fc5';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=1c341f498fc5';
+import { parseReturnValue } from './method-overrides.js?v=1c341f498fc5';
+import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=1c341f498fc5';
+import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=1c341f498fc5';
+import { installDroidGuard, droidGuardNativeUnavailable } from './microg-droidguard.js?v=1c341f498fc5';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');

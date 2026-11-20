@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=448e4ced7d81';
-import { Invoke } from './interpreter.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=448e4ced7d81';
+import { gcRoot } from './heap-gc.js?v=1c341f498fc5';
+import { Invoke } from './interpreter.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=1c341f498fc5';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -23,9 +23,11 @@ export function createSystemServicesHost(platform) {
 
   // ---- android.os.Build (browser VM device identity; framework resources/classes are Android 13-based but SDK_INT stays the VM's declared api level (28; moving it to 33 changes AppCompat/Material code paths and breaks 20+ UI tests, see the task 21 report), whatever the app's targetSdkVersion) ----
   const BUILD = 'Landroid/os/Build;', stringArray = values => runtime => { const array = runtime.newArray('[Ljava/lang/String;', values.length); runtime.array(array).elements = values.slice(); return array; };
-  registry.staticField(BUILD, 'SUPPORTED_ABIS', '[Ljava/lang/String;', stringArray(['wasm32']));
+  // The ABIs whose code this device runs: wasm32 (the lab's own WebAssembly libraries) and, with the ARM64 interpreter option on (src/arm64/), arm64-v8a first, as on a 64-bit phone
+  const abis = runtime => runtime.arm64 ? ['arm64-v8a', 'wasm32'] : ['wasm32'];
+  registry.staticField(BUILD, 'SUPPORTED_ABIS', '[Ljava/lang/String;', runtime => stringArray(abis(runtime))(runtime));
   registry.staticField(BUILD, 'SUPPORTED_32_BIT_ABIS', '[Ljava/lang/String;', stringArray(['wasm32']));
-  registry.staticField(BUILD, 'SUPPORTED_64_BIT_ABIS', '[Ljava/lang/String;', stringArray([]));
+  registry.staticField(BUILD, 'SUPPORTED_64_BIT_ABIS', '[Ljava/lang/String;', runtime => stringArray(runtime.arm64 ? ['arm64-v8a'] : [])(runtime));
   for (const [name, value] of Object.entries({ BOARD: 'apkweb', BOOTLOADER: 'unknown', HOST: 'apkweb-host', USER: 'apkweb', RADIO: 'unknown', SERIAL: 'unknown' })) registry.staticField(BUILD, name, 'Ljava/lang/String;', () => value);
   registry.staticField(BUILD, 'TIME', 'J', () => 0n); registry.staticField(BUILD, 'IS_DEBUGGABLE', 'Z', () => 0);
   const BUILD_VERSION = 'Landroid/os/Build$VERSION;';
@@ -534,6 +536,7 @@ export function createSystemServicesHost(platform) {
     const path = r.stringCharacters(filename);
     try {
       if (r.jni?.loadPath(path, 'Runtime.nativeLoad')) return null;
+      if (r.arm64?.load('load', path)) return null;   // an arm64-v8a library run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (r.stubNativeLibrary(path)) return null;
       return `dlopen failed: library "${path}" is not a native library of this device (no wasm32 module is registered for it)`;
     } catch (error) {
@@ -552,7 +555,7 @@ export function createSystemServicesHost(platform) {
   // Process.myProcessName() (API 33): the app's process name, android:process on <application> (":x" is package-private) or the package name.
   def(PROCESS, 'myProcessName', '()Ljava/lang/String;', () => { const process = platform.manifest?.application?.process, pkg = platform.packageName; return process ? (process.startsWith(':') ? pkg + process : process) : pkg; }, { static: true });
   def(PROCESS, 'myUserHandle', '()Landroid/os/UserHandle;', r => r.dispatch({ owner: 'Landroid/os/UserHandle;', name: 'of', parameters: ['I'], result: 'Landroid/os/UserHandle;', signature: '(I)Landroid/os/UserHandle;' }, [0], 'static'), { static: true });   // the single user (0)
-  def(PROCESS, 'is64Bit', '()Z', () => 0, { static: true }); // the VM's native word is wasm32 (Build.SUPPORTED_ABIS = wasm32), so VMRuntime.is64Bit() is false
+  def(PROCESS, 'is64Bit', '()Z', r => r.arm64 ? 1 : 0, { static: true }); // the VM's native word is wasm32 (Build.SUPPORTED_ABIS = wasm32), so VMRuntime.is64Bit() is false
   const processStart = platform.clock.now(); // the virtual process starts when the VM is created; uptime/elapsed clocks both count from VM creation (SystemClock bridge uses platform.clock.now())
   for (const name of ['getStartUptimeMillis', 'getStartElapsedRealtime', 'getStartRequestedUptimeMillis', 'getStartRequestedElapsedRealtime']) def(PROCESS, name, '()J', () => BigInt(Math.floor(processStart)), { static: true });
   // ---- android.text.TextUtils: the framework DEX carries only the span/ellipsis half of TextUtils; the plain string helpers apps call are reimplemented here from the AOSP bodies

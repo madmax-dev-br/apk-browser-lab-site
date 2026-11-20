@@ -1,11 +1,11 @@
-import { coreMemorySetting } from './core-memory.js?v=448e4ced7d81';
-import { isMemoryStep } from './memory-budget.js?v=448e4ced7d81';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=448e4ced7d81';
-import { sanitizeHostMap } from './host-map.js?v=448e4ced7d81';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=448e4ced7d81';
-import { sanitizeLocation } from './runtime-permissions.js?v=448e4ced7d81';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=448e4ced7d81';
-import { sanitizeMicrogServices } from './microg-services.js?v=448e4ced7d81';
+import { coreMemorySetting } from './core-memory.js?v=1c341f498fc5';
+import { isMemoryStep } from './memory-budget.js?v=1c341f498fc5';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=1c341f498fc5';
+import { sanitizeHostMap } from './host-map.js?v=1c341f498fc5';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=1c341f498fc5';
+import { sanitizeLocation } from './runtime-permissions.js?v=1c341f498fc5';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=1c341f498fc5';
+import { sanitizeMicrogServices } from './microg-services.js?v=1c341f498fc5';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -60,6 +60,7 @@ export function sanitizeSettings(input = {}) {
   out.coreMemory = coreMemorySetting(input.coreMemory);   // "Wasm core memory" { mode, heapMiB, metaMiB, threads } (src/core-memory.js): the mode (dynamic by default, or fixed) and the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Show layout bounds"); the VM never sees it
   out.frameGraph = input.frameGraph === true;   // page-only developer option ("Show frame rate": the FPS line and the frame-time bars, src/frame-meter.js); off by default, applied live, the VM never sees it
+  out.arm64Native = input.arm64Native === true;   // "Run ARM64 native code" (src/arm64/, docs/ARM64-NATIVE.md): off by default; read by the next load, recorded in the trace
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   out.microgServices = sanitizeMicrogServices(input.microgServices);   // "microG services" (src/microg-services.js): each online service of microG off by default; read by the next load and sent live to a VM that runs microG (vm.setMicrogServices), never part of the device model
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
@@ -97,4 +98,4 @@ export { resolveDevice, checkCustomScreen };
 /** The part of the settings the running app's Configuration/device model reads (src/device-profile.js resolveDevice): a change of anything else (motion/still
  * resolution, renderer, time per event: side calls; memory, core memory, engine: next load) needs no exclusive 'device' VM operation. */
 export function vmDeviceModel(settings) { const { raster, eventSeconds, memoryMiB, coreMemory, engine, ...device } = deviceForVM(settings); return device; }
-export function deviceForVM(settings) { const { location, renderer, microg, microgServices, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model
+export function deviceForVM(settings) { const { location, renderer, microg, microgServices, arm64Native, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model

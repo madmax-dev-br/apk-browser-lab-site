@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=448e4ced7d81';
-import { APKError } from './apk-error.js?v=448e4ced7d81';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=448e4ced7d81';
-import { installCameraManager } from './camera-host.js?v=448e4ced7d81';
+import { bitsFloat, floatBits } from './host-contract.js?v=1c341f498fc5';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=1c341f498fc5';
+import { installCameraManager } from './camera-host.js?v=1c341f498fc5';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -208,6 +208,62 @@ export function createPeripheralServicesHost(platform) {
     r.throwJava('Ljava/lang/UnsupportedOperationException;', 'Service discovery needs multicast DNS, which the browser VM does not have');
   });
   def(NSD, 'stopServiceDiscovery', '(Landroid/net/nsd/NsdManager$DiscoveryListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) iae(r, 'listener cannot be null'); iae(r, 'listener not registered'); });
+
+  // ---- MediaRouter (android.media.MediaRouter, Context.MEDIA_ROUTER_SERVICE): a phone with no cast, Bluetooth or wired output: the system category ("System") holds the one
+  // default route ("Phone", ROUTE_TYPE_LIVE_AUDIO | ROUTE_TYPE_LIVE_VIDEO, local playback on STREAM_MUSIC), which is selected for every type it supports. Callbacks are kept; no
+  // route ever appears or changes, so none is called. Volume reads the music stream of AudioManager.
+  const ROUTER = service('media_router', 'Landroid/media/MediaRouter;'), ROUTE = 'Landroid/media/MediaRouter$RouteInfo;', CATEGORY = 'Landroid/media/MediaRouter$RouteCategory;', ROUTER_CALLBACK = 'Landroid/media/MediaRouter$Callback;', CHARSEQ = 'Ljava/lang/CharSequence;', CONTEXT = 'Landroid/content/Context;';
+  const LIVE_AUDIO = 1, LIVE_VIDEO = 2, SYSTEM_TYPES = LIVE_AUDIO | LIVE_VIDEO;
+  type(ROUTE, OBJECT); type(CATEGORY, OBJECT); type(ROUTER_CALLBACK, OBJECT, [], { allocatable: true }); def(ROUTER_CALLBACK, '<init>', '()V', () => {});
+  type('Landroid/media/MediaRouter$VolumeCallback;', OBJECT, [], { allocatable: true }); def('Landroid/media/MediaRouter$VolumeCallback;', '<init>', '()V', () => {});   // abstract callback base: the app's subclass
+  type('Landroid/media/MediaRouter$SimpleCallback;', ROUTER_CALLBACK, [], { allocatable: true }); def('Landroid/media/MediaRouter$SimpleCallback;', '<init>', '()V', () => {});   // its callbacks are empty
+  const routerState = r => (r.mediaRouter ??= (() => { const category = r.makeObject(CATEGORY), route = r.makeObject(ROUTE); r.object(route).mediaRoute = { category }; return { category, route, callbacks: [] }; })());
+  const music = r => { const audio = platform.application ? r.dispatch({ owner: CONTEXT, name: 'getSystemService', parameters: [STRING], result: OBJECT, signature: `(${STRING})${OBJECT}` }, [platform.application, 'audio'], 'virtual') : null; return audio ? [call(r, audio, 'Landroid/media/AudioManager;', 'getStreamVolume', ['I'], 'I', [3]), call(r, audio, 'Landroid/media/AudioManager;', 'getStreamMaxVolume', ['I'], 'I', [3])] : [0, 15]; };
+  def(ROUTER, 'getDefaultRoute', `()${ROUTE}`, r => routerState(r).route);
+  def(ROUTER, 'getSelectedRoute', `(I)${ROUTE}`, r => routerState(r).route);   // the default route stays selected for every type: there is no other route
+  def(ROUTER, 'getSelectedRoute', `()${ROUTE}`, r => routerState(r).route);
+  // routes and categories: the system ones, then the user routes the app added (createUserRoute / addUserRoute) and their categories
+  const allRoutes = r => [routerState(r).route, ...routerState(r).userRoutes ?? []];
+  const allCategories = r => { const out = [routerState(r).category]; for (const route of routerState(r).userRoutes ?? []) { const c = r.object(route).mediaRoute.category; if (!out.some(e => e.ref === c.ref)) out.push(c); } return out; };
+  const at = (r, list, i) => { if (i < 0 || i >= list.length) r.throwJava('Ljava/lang/IndexOutOfBoundsException;', `Index: ${i}, Size: ${list.length}`); return list[i]; };
+  def(ROUTER, 'getRouteCount', '()I', r => allRoutes(r).length); def(ROUTER, 'getCategoryCount', '()I', r => allCategories(r).length);
+  def(ROUTER, 'getRouteAt', `(I)${ROUTE}`, (r, _m, [, i]) => at(r, allRoutes(r), i));
+  def(ROUTER, 'getCategoryAt', `(I)${CATEGORY}`, (r, _m, [, i]) => at(r, allCategories(r), i));
+  const USER_ROUTE = 'Landroid/media/MediaRouter$UserRouteInfo;';
+  type(USER_ROUTE, ROUTE);
+  def(ROUTER, 'createRouteCategory', `(${CHARSEQ}Z)${CATEGORY}`, (r, _m, [, name, groupable]) => { const c = r.makeObject(CATEGORY); r.object(c).mediaCategory = { name, groupable: !!groupable, types: 0x800000 }; return c; });   // ROUTE_TYPE_USER
+  def(ROUTER, 'createRouteCategory', `(IZ)${CATEGORY}`, (r, _m, [, nameRes, groupable]) => { const c = r.makeObject(CATEGORY); r.object(c).mediaCategory = { nameRes, groupable: !!groupable, types: 0x800000 }; return c; });
+  def(ROUTER, 'createUserRoute', `(${CATEGORY})${USER_ROUTE}`, (r, _m, [, category]) => { if (nullish(category)) npe(r, 'category'); const route = r.makeObject(USER_ROUTE); r.object(route).mediaRoute = { category, user: true, name: null, status: null, playbackType: 1, playbackStream: 3, volume: 0, volumeMax: 0, volumeHandling: 0 }; return route; });   // PLAYBACK_TYPE_REMOTE by default
+  def(ROUTER, 'addUserRoute', `(${USER_ROUTE})V`, (r, _m, [, route]) => { const state = routerState(r); state.userRoutes ??= []; if (!state.userRoutes.some(e => e.ref === route.ref)) state.userRoutes.push(route); });
+  def(ROUTER, 'removeUserRoute', `(${USER_ROUTE})V`, (r, _m, [, route]) => { const state = routerState(r); state.userRoutes = (state.userRoutes ?? []).filter(e => e.ref !== route?.ref); });
+  def(ROUTER, 'clearUserRoutes', '()V', r => { routerState(r).userRoutes = []; });
+  const userField = (name, signature, key) => def(USER_ROUTE, name, signature, (r, _m, [self, value]) => { r.object(self).mediaRoute[key] = value; });
+  userField('setName', `(${CHARSEQ})V`, 'name'); userField('setStatus', `(${CHARSEQ})V`, 'status'); userField('setDescription', `(${CHARSEQ})V`, 'description');
+  userField('setPlaybackType', '(I)V', 'playbackType'); userField('setPlaybackStream', '(I)V', 'playbackStream'); userField('setVolume', '(I)V', 'volume'); userField('setVolumeMax', '(I)V', 'volumeMax'); userField('setVolumeHandling', '(I)V', 'volumeHandling');
+  userField('setVolumeCallback', '(Landroid/media/MediaRouter$VolumeCallback;)V', 'volumeCallback'); userField('setIconDrawable', '(Landroid/graphics/drawable/Drawable;)V', 'icon'); userField('setIconResource', '(I)V', 'iconRes');
+  userField('setRemoteControlClient', '(Landroid/media/RemoteControlClient;)V', 'remoteControlClient'); userField('setName', '(I)V', 'nameRes');
+  def(USER_ROUTE, 'getRemoteControlClient', '()Landroid/media/RemoteControlClient;', (r, _m, [self]) => r.object(self).mediaRoute.remoteControlClient ?? null);
+  def(ROUTER, 'getFallbackRoute', `()${ROUTE}`, r => routerState(r).route);
+  const addCallback = (r, _m, [, types, callback]) => { if (nullish(callback)) npe(r, 'callback'); const list = routerState(r).callbacks; if (!list.some(e => e.ref === callback.ref)) list.push(callback); };
+  def(ROUTER, 'addCallback', `(I${ROUTER_CALLBACK})V`, addCallback); def(ROUTER, 'addCallback', `(I${ROUTER_CALLBACK}I)V`, addCallback);
+  def(ROUTER, 'removeCallback', `(${ROUTER_CALLBACK})V`, (r, _m, [, callback]) => { const state = routerState(r); state.callbacks = state.callbacks.filter(e => e.ref !== callback?.ref); });
+  def(ROUTER, 'selectRoute', `(I${ROUTE})V`, (r, _m, [, , route]) => { if (nullish(route)) iae(r, 'Route cannot be null.'); });   // the only route is already selected
+  def(ROUTER, 'isRouteAvailable', `(II)Z`, (r, _m, [, types]) => ((types & SYSTEM_TYPES) !== 0 ? 1 : 0));
+  const routeOf = (r, self) => r.object(self).mediaRoute; const routeName = (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).name ?? null : 'Phone';
+  def(ROUTE, 'getName', `()${CHARSEQ}`, routeName); def(ROUTE, 'getName', `(${CONTEXT})${CHARSEQ}`, routeName);
+  def(ROUTE, 'getDescription', `()${CHARSEQ}`, (r, _m, [self]) => routeOf(r, self).description ?? null); def(ROUTE, 'getStatus', `()${CHARSEQ}`, (r, _m, [self]) => routeOf(r, self).status ?? null);
+  const routeTypes = (r, self) => routeOf(r, self).user ? 0x800000 : SYSTEM_TYPES;
+  def(ROUTE, 'getSupportedTypes', '()I', (r, _m, [self]) => routeTypes(r, self)); def(ROUTE, 'matchesTypes', '(I)Z', (r, _m, [self, types]) => ((types & routeTypes(r, self)) !== 0 ? 1 : 0));
+  def(ROUTE, 'getCategory', `()${CATEGORY}`, (r, _m, [self]) => r.object(self).mediaRoute.category);
+  def(ROUTE, 'getPlaybackType', '()I', (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).playbackType : 0); def(ROUTE, 'getPlaybackStream', '()I', (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).playbackStream : 3); def(ROUTE, 'getVolumeHandling', '()I', (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).volumeHandling : 1);   // PLAYBACK_TYPE_LOCAL, STREAM_MUSIC, PLAYBACK_VOLUME_VARIABLE
+  def(ROUTE, 'getVolume', '()I', (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).volume : music(r)[0]); def(ROUTE, 'getVolumeMax', '()I', (r, _m, [self]) => routeOf(r, self).user ? routeOf(r, self).volumeMax : music(r)[1]);
+  def(ROUTE, 'isEnabled', '()Z', () => 1); def(ROUTE, 'isConnecting', '()Z', () => 0); def(ROUTE, 'isDefault', '()Z', (r, _m, [self]) => (routeOf(r, self).user ? 0 : 1)); def(ROUTE, 'isBluetooth', '()Z', () => 0);
+  def(ROUTE, 'getDeviceType', '()I', () => 0); def(ROUTE, 'getPresentationDisplay', '()Landroid/view/Display;', () => null); def(ROUTE, 'getIconDrawable', '()Landroid/graphics/drawable/Drawable;', () => null);
+  def(ROUTE, 'getTag', `()${OBJECT}`, (r, _m, [self]) => r.object(self).mediaRoute.tag ?? null); def(ROUTE, 'setTag', `(${OBJECT})V`, (r, _m, [self, tag]) => { r.object(self).mediaRoute.tag = tag; });
+  def(ROUTE, 'getGroup', '()Landroid/media/MediaRouter$RouteGroup;', () => null);
+  const categoryName = (r, _m, [self]) => { const c = r.object(self).mediaCategory; return c ? c.name ?? null : 'System'; };
+  def(CATEGORY, 'getName', `()${CHARSEQ}`, categoryName); def(CATEGORY, 'getName', `(${CONTEXT})${CHARSEQ}`, categoryName);
+  def(CATEGORY, 'getSupportedTypes', '()I', (r, _m, [self]) => r.object(self).mediaCategory?.types ?? SYSTEM_TYPES); def(CATEGORY, 'isGroupable', '()Z', (r, _m, [self]) => (r.object(self).mediaCategory?.groupable ? 1 : 0)); def(CATEGORY, 'isSystem', '()Z', (r, _m, [self]) => (r.object(self).mediaCategory ? 0 : 1));
 
   const base = kit.finish({ nullServices: NULL_SERVICES });
   return {

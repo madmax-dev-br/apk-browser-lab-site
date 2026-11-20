@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=448e4ced7d81';
+import { APKError } from './apk-error.js?v=1c341f498fc5';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -16,6 +16,8 @@ const ELEMENT_SIZE = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const REFERENCE_BASE = 12, REFERENCE_SIZE = 4;
 const WASM_LIMIT = 0x100000000n;   // addresses below 4 GiB are wasm32 pointers; pinned arrays start at 4 GiB, the arena at 16 GiB
 const ARENA_BASE = 0x400000000n, ARENA_LIMIT = 0x7ffffff00n, PAGE = 4096;
+// the ARM64 process's memory (src/arm64/), seen from Java at ARM64_WINDOW + its own address: its pointers overlap the wasm32 ones, so Java-visible addresses get their own range
+export const ARM64_WINDOW = 0x10000000000n, ARM64_WINDOW_LIMIT = 0x20000000000n;
 const fieldView = new DataView(new ArrayBuffer(8));
 const fail = (message, kind = 'unsafe-boundary') => { throw new APKError(message, { kind }); };
 
@@ -104,7 +106,20 @@ function locate(runtime, address, count) {
     if (at + count > memory.arena.length) fail(`Native access beyond the arena: ${address} (+${count})`, 'native-memory-fault');
     return { arena: memory, at };
   }
+  const arm64 = runtime.nativeMemory?.arm64;
+  if (arm64 && address >= ARM64_WINDOW && address < ARM64_WINDOW_LIMIT) {   // the ARM64 process's memory (a direct ByteBuffer its JNI created): a live view, it grows as the process maps more
+    const at = Number(address - ARM64_WINDOW);
+    if (at + count > arm64.buffer.byteLength) fail(`Native access beyond the ARM64 process memory: 0x${(address - ARM64_WINDOW).toString(16)} (+${count})`, 'native-memory-fault');
+    return { wasm: arm64, at };
+  }
   const wasm = runtime.nativeMemory?.wasm;
+  // a raw pointer an ARM64 library handed to Java (a long field, a return value): ARM64 data starts at 16 MiB (src/arm64/process.js), so an address the wasm32 memory does not
+  // reach is the ARM64 process's; one that both memories cover cannot be attributed and stops by name
+  if (arm64 && address >= 0x1000000n && address < WASM_LIMIT) {
+    const at = Number(address), inWasm = wasm && at + count <= wasm.buffer.byteLength, inArm64 = at + count <= arm64.buffer.byteLength;
+    if (inArm64 && !inWasm) return { wasm: arm64, at };
+    if (inArm64 && inWasm) fail(`Native address 0x${address.toString(16)} is inside both the wasm32 libraries' memory and the ARM64 process memory: the lab cannot tell which library's pointer it is`, 'native-memory-ambiguous');
+  }
   if (wasm && address > 0n && address < WASM_LIMIT) {   // the process's wasm linear memory (NewDirectByteBuffer): live view of whatever the memory is now, so memory.grow never leaves a stale buffer
     const at = Number(address);
     if (at + count > wasm.buffer.byteLength) fail(`Native access beyond the wasm memory: 0x${address.toString(16)} (+${count})`, 'native-memory-fault');
@@ -129,6 +144,7 @@ function writeNative(runtime, address, bytes) {
 // ---- object fields --------------------------------------------------------------------------------------------------------------------------------
 /** Registers the process's wasm linear memory as native memory: addresses below 4 GiB then read and write it directly (direct ByteBuffers made by JNI NewDirectByteBuffer). */
 export function registerWasmMemory(runtime, memory) { state(runtime).wasm = memory; }
+export function registerArm64Memory(runtime, memory) { state(runtime).arm64 = memory; }
 /** Reads `count` bytes at a native address (arena or pinned array); used by natives that take a raw address, e.g. CRC32.updateByteBuffer. */
 export function readNativeBytes(runtime, address, count) { return readNative(runtime, BigInt(address), count); }
 /** Writes bytes at a native address (arena or pinned array); the counterpart of readNativeBytes for natives that fill a direct buffer. */

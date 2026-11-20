@@ -1,5 +1,5 @@
-import { openExchange, serialiseError } from './network-transport.js?v=448e4ced7d81';
-import { RelayMux, unavailableChannel } from './relay-mux.js?v=448e4ced7d81';
+import { openExchange, serialiseError } from './network-transport.js?v=1c341f498fc5';
+import { RelayMux, unavailableChannel } from './relay-mux.js?v=1c341f498fc5';
 
 // The network worker: runs one fetch per exchange for the web device (see network-worker-executor.js for the protocol). Works as a Node worker_thread and as a browser Worker.
 const HEAD_CAPACITY = 64 * 1024;
