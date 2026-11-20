@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=8a2b0d58d249';
+import { createHostRegistry } from './host-contract.js?v=f90be5f5e9be';
 
 // The rest of android.telephony for an offline phone with the emulator's SIM that device-state-host.js already declares (SIM ready, 310260, "Android", no radio cells):
 //   PhoneStateListener / TelephonyManager.listen              (TelephonyManager.listen -> TelephonyRegistry.listenWithEventList, android-13.0.0_r1)

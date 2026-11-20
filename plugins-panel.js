@@ -2,10 +2,10 @@
 // Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=8a2b0d58d249';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=8a2b0d58d249';
-import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=8a2b0d58d249';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=8a2b0d58d249';
+import { RENDER_MS } from './plugin-host.js?v=f90be5f5e9be';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=f90be5f5e9be';
+import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=f90be5f5e9be';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=f90be5f5e9be';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };
