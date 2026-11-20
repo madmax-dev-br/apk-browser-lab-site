@@ -34068,5 +34068,135 @@
     "sha256": "d78bb922870ccb04e7800478d06e41e4bb472ef21f179e7f54b753163810a522",
     "bytes": 694,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/android/telephony/SmsMessage.java",
+    "localPath": "framework-aosp/upstream/android/telephony/SmsMessage.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/android/telephony/SmsMessage.java?format=TEXT",
+    "sha256": "0276a1bfad02b360d73fed3b975d9e234968dad4291b8b2ffa7d180427e42580",
+    "bytes": 47912,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/android/telephony/PhoneNumberUtils.java",
+    "localPath": "framework-aosp/upstream/android/telephony/PhoneNumberUtils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/android/telephony/PhoneNumberUtils.java?format=TEXT",
+    "sha256": "a51fc2eb0766675b45cdbe53393c073033774bd2a65186d5ad0ea63016f6c889",
+    "bytes": 125064,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/gsm/SmsMessage.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/gsm/SmsMessage.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/gsm/SmsMessage.java?format=TEXT",
+    "sha256": "f053a641c53e25770b8224670ef9b464d847451b1c9b542d5e8be8a7bbb778a8",
+    "bytes": 63278,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/gsm/GsmSmsAddress.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/gsm/GsmSmsAddress.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/gsm/GsmSmsAddress.java?format=TEXT",
+    "sha256": "1d12d6fe1bb1bf82bbdc30b5e91d6a77c52fe654df3a23b9caeab3c10d43b3d3",
+    "bytes": 5255,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/SmsMessageBase.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/SmsMessageBase.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/SmsMessageBase.java?format=TEXT",
+    "sha256": "a8fcf766c2cbeba3802c6720b9af30b514b6e6332d95c56119e3bfa327d4d20a",
+    "bytes": 17497,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/SmsHeader.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/SmsHeader.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/SmsHeader.java?format=TEXT",
+    "sha256": "66b6a171e8e1343afca09b10592893a53173cbf23c16c950e79c12d8010efd3c",
+    "bytes": 17007,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/SmsAddress.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/SmsAddress.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/SmsAddress.java?format=TEXT",
+    "sha256": "afd5a9d583b98d527b607169cbcdca82998e3c122904c2377e800b40204f59ed",
+    "bytes": 2158,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/common/com/android/internal/telephony/SmsConstants.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/SmsConstants.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/common/com/android/internal/telephony/SmsConstants.java?format=TEXT",
+    "sha256": "19182c4baac9383411bb7d1bbe54f2c3d180a376f3e61e2819fe4e1e857e97cd",
+    "bytes": 2840,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/common/com/android/internal/telephony/EncodeException.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/EncodeException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/common/com/android/internal/telephony/EncodeException.java?format=TEXT",
+    "sha256": "deb61ee31879362c6a3167aa4fc041bb63a961fd6e57ca189562605904f4afc9",
+    "bytes": 1354,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/internal/telephony/uicc/IccUtils.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/telephony/uicc/IccUtils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/internal/telephony/uicc/IccUtils.java?format=TEXT",
+    "sha256": "399e87ca3d03adc85b9dc8c77cfb182bdf1d890601dc027e9d4d5072a10fdcbf",
+    "bytes": 33942,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telephony/java/com/android/telephony/Rlog.java",
+    "localPath": "framework-aosp/upstream/com/android/telephony/Rlog.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telephony/java/com/android/telephony/Rlog.java?format=TEXT",
+    "sha256": "89cac70fcd61493a0cdc2702398f446af5fb1ba4c64080e15b29c3373fadcae6",
+    "bytes": 5092,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/provider/Telephony.java",
+    "localPath": "framework-aosp/upstream/android/provider/Telephony.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/Telephony.java?format=TEXT",
+    "sha256": "d680744fed0f293409c346ade6c1a1b855f0a09253116d147f327df834ca8cc6",
+    "bytes": 178032,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/telephony/Rlog.java",
+    "localPath": "framework-aosp/upstream/android/telephony/Rlog.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/telephony/Rlog.java?format=TEXT",
+    "sha256": "a0029bd9744daeefced32145af80a243022836c6369660301c840cd72037d840",
+    "bytes": 5668,
+    "license": "Apache-2.0"
   }
 ]

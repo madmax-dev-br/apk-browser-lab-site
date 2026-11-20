@@ -1,8 +1,8 @@
-import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=8e11a37fba6a';
-import {APKError} from './apk-error.js?v=8e11a37fba6a';
-import {getVectorGraphics} from './vector-native.js?v=8e11a37fba6a';
-import {getSolidPaintByHandle} from './paint-host.js?v=8e11a37fba6a';
-import {createMatrixNativeBindings} from './matrix-native.js?v=8e11a37fba6a';
+import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=ad32040fbef9';
+import {APKError} from './apk-error.js?v=ad32040fbef9';
+import {getVectorGraphics} from './vector-native.js?v=ad32040fbef9';
+import {getSolidPaintByHandle} from './paint-host.js?v=ad32040fbef9';
+import {createMatrixNativeBindings} from './matrix-native.js?v=ad32040fbef9';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -19,6 +19,8 @@ const stateFor=r=>{if(!states.has(r))states.set(r,{next:0x600000000n,nodes:new M
 const node=(r,h,retained=false)=>{const value=stateFor(r).nodes.get(h);if(!value||value.javaReleased&&!retained)fail('Invalid or released RenderNode VM token');return value;};
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite RenderNode geometry');return values;};
 const identity=()=>[1,0,0,0,1,0,0,0,1];
+// hwui StretchEffect::isEmpty (effects/StretchEffect.h, android-13.0.0_r1): both direction components within NON_ZERO_EPSILON (0.00004f) of zero.
+const STRETCH_EPSILON=Math.fround(0.00004),stretchEmpty=(x,y)=>Math.abs(x)<=STRETCH_EPSILON&&Math.abs(y)<=STRETCH_EPSILON;
 function newNode(r,name){const s=stateFor(r);if(s.nodes.size>=4096)fail('RenderNode handle limit4096 exceeded');const h=s.next++;s.nodes.set(h,{name,displayList:null,left:0,top:0,right:0,bottom:0,alpha:1,translationX:0,translationY:0,translationZ:0,elevation:0,rotation:0,rotationX:0,rotationY:0,scaleX:1,scaleY:1,pivotX:0,pivotY:0,pivotExplicit:false,clipToBounds:true,clipBounds:null,clipToOutline:false,outline:null,overlap:false,layerType:0,layerPaint:null,staticMatrix:null,animationMatrix:null,spotShadowColor:0xff000000|0,ambientShadowColor:0xff000000|0,cameraDistance:8,stretch:null});return h;}
 // A recorded clip is immutable (Canvas.clip* pushes a new one), so the copy of one clip is made once and shared by every command recorded under it, as the recording shares the
 // clip itself: the replay then applies one clip path per clip (src/skia-canvas-host.js clipShape), not one per command.
@@ -174,8 +176,15 @@ export function createRenderNodeNativeBindings(){const map=new Map();
  n3('nGetWidth',['J'],'I',(r,[h])=>{const x=node(r,h);return x.right-x.left;});n3('nGetHeight',['J'],'I',(r,[h])=>{const x=node(r,h);return x.bottom-x.top;});
  n3('nGetLayerType',['J'],'I',(r,[h])=>node(r,h).layerType);
  n3('nGetClipToBounds',['J'],'Z',(r,[h])=>node(r,h).clipToBounds?1:0);
- // RenderNode.stretch: hwui records a StretchEffect on the node (RenderProperties::mStretchEffect); the node's layer is drawn through it. Returns true when the value changed.
- n3('nStretch',['J','F','F','F','F'],'Z',(r,[h,...v])=>{const x=node(r,h);finite(v);const [vecX,vecY,maxX,maxY]=v,old=x.stretch,empty=vecX===0&&vecY===0,same=old?old.vecX===vecX&&old.vecY===vecY&&old.maxX===maxX&&old.maxY===maxY:empty;if(same)return 0;x.stretch=empty?null:{vecX,vecY,maxX,maxY};return 1;});
+ // RenderNode.stretch / clearStretch: hwui keeps one StretchEffect per node (LayerProperties::mStretchEffect) and MERGES every stretch() into it (android-13.0.0_r1
+ // libs/hwui/jni/android_graphics_RenderNode.cpp, effects/StretchEffect.h mergeWith): the direction vectors add up (float), the max amounts keep the larger, and an effect whose
+ // direction is within NON_ZERO_EPSILON of zero on both axes is empty (merging an empty one changes nothing; a sum that comes out empty clears the effect). stretch() always
+ // returns true; clearStretch() returns false when there was nothing to clear. View.updateDisplayListIfDirty clears the effect before every recording; Compose's
+ // StretchOverscrollNode, which cannot call the hidden clearStretch, cancels the previous frame's stretch with a negated EdgeEffect drawn before the current one -- which is
+ // why this must add, not replace: replacing left the last negation alone on the node after the spring-back ended (-0.0001 to -0.0007 seen: 0.2-1 px at the far edge).
+ n3('nStretch',['J','F','F','F','F'],'Z',(r,[h,...v])=>{const x=node(r,h);finite(v);const [vecX,vecY,maxX,maxY]=v;if(stretchEmpty(vecX,vecY))return 1;const old=x.stretch;
+  if(!old){x.stretch={vecX,vecY,maxX,maxY};return 1;}
+  const sx=Math.fround(old.vecX+vecX),sy=Math.fround(old.vecY+vecY);x.stretch=stretchEmpty(sx,sy)?null:{vecX:sx,vecY:sy,maxX:Math.max(old.maxX,maxX),maxY:Math.max(old.maxY,maxY)};return 1;});
  n3('nClearStretch',['J'],'Z',(r,[h])=>{const x=node(r,h),changed=x.stretch!==null&&x.stretch!==undefined;x.stretch=null;return changed?1:0;});
  n3('nSetRenderEffect',['J','J'],'Z',(r,[h,effect])=>{node(r,h);if(effect)fail('RenderNode RenderEffect (blur / shader effects) requires a Skia image-filter backend');return 0;});
  n3('nSetUsageHint',['J','I'],'V',(r,[h,v])=>{node(r,h).usageHint=v;});

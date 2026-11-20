@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { cleartextPermitted } from './network-native.js?v=8e11a37fba6a';
-import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=8e11a37fba6a';
-import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=8e11a37fba6a';
-import { rotateRGBA } from './camera-frames.js?v=8e11a37fba6a';
-import { Blocked } from './scheduler.js?v=8e11a37fba6a';
-import { IntCells } from './java-arrays.js?v=8e11a37fba6a';
-import { state as ioState } from './libcore-io-native.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { cleartextPermitted } from './network-native.js?v=ad32040fbef9';
+import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=ad32040fbef9';
+import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=ad32040fbef9';
+import { rotateRGBA } from './camera-frames.js?v=ad32040fbef9';
+import { Blocked } from './scheduler.js?v=ad32040fbef9';
+import { IntCells } from './java-arrays.js?v=ad32040fbef9';
+import { state as ioState } from './libcore-io-native.js?v=ad32040fbef9';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
@@ -48,6 +48,28 @@ export function createMiscPlatformHost(platform) {
   def(WS, 'hashCode', '()I', (r, _m, [self]) => { let h = 0; for (const e of entries(r, self)) h = (Math.imul(31, h) + (e.uid | 0) + [...(e.name ?? '')].reduce((x, c) => (Math.imul(31, x) + c.charCodeAt(0)) | 0, 0)) | 0; return h; });
   def(WS, 'toString', `()${STRING}`, (r, _m, [self]) => `WorkSource{${entries(r, self).map(e => e.name == null ? `${e.uid}` : `${e.uid} ${e.name}`).join(', ')}}`);
   def(WS, 'describeContents', '()I', () => 0);
+  // Parcel form (WorkSource.writeToParcel / WorkSource(Parcel), android-13.0.0_r1): mNum, the uids, the names (null when none has one), then the WorkChain count (-1: none). The virtual
+  // device keeps no WorkChains (WorkSource.createWorkChain is not offered), so a written one is always -1 and a read one with chains is refused explicitly.
+  const PARCEL = 'Landroid/os/Parcel;', CREATOR = 'Landroid/os/Parcelable$Creator;', WS_CREATOR = 'Landroid/os/WorkSource$1;';
+  const parcelCall = (r, name, parameters, result, args) => r.dispatch({ owner: PARCEL, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, 'virtual');
+  def(WS, 'writeToParcel', `(${PARCEL}I)V`, (r, _m, [self, out]) => {
+    const list = entries(r, self), uids = r.newArray('[I', list.length), named = list.some(e => e.name != null);
+    for (let i = 0; i < list.length; i++) r.array(uids).elements[i] = list[i].uid | 0;
+    parcelCall(r, 'writeInt', ['I'], 'V', [out, list.length]); parcelCall(r, 'writeIntArray', ['[I'], 'V', [out, uids]);
+    let names = null; if (named) { names = r.newArray(`[${STRING}`, list.length); r.array(names).elements = list.map(e => e.name == null ? null : r.javaString(e.name)); }
+    parcelCall(r, 'writeStringArray', [`[${STRING}`], 'V', [out, names]); parcelCall(r, 'writeInt', ['I'], 'V', [out, -1]);
+  });
+  const readWorkSource = (r, input) => {
+    const count = parcelCall(r, 'readInt', [], 'I', [input]), uids = parcelCall(r, 'createIntArray', [], '[I', [input]), names = parcelCall(r, 'createStringArray', [], `[${STRING}`, [input]), chains = parcelCall(r, 'readInt', [], 'I', [input]);
+    if (chains > 0) unsupported('WorkSource from a Parcel with WorkChains: the virtual device keeps no WorkChains', 'worksource-chains-unsupported');
+    const ws = r.allocate(WS), uidCells = nullish(uids) ? [] : r.array(uids).elements, nameCells = nullish(names) ? null : r.array(names).elements;
+    r.object(ws).work = Array.from({ length: Math.max(0, count) }, (_, i) => ({ uid: uidCells[i] | 0, name: nameCells && !nullish(nameCells[i]) ? text(r, nameCells[i]) : null }));
+    return ws;
+  };
+  type(WS_CREATOR, OBJECT, [CREATOR], { allocatable: true });
+  def(WS_CREATOR, 'createFromParcel', `(${PARCEL})${OBJECT}`, (r, _m, [, input]) => readWorkSource(r, input));
+  def(WS_CREATOR, 'newArray', `(I)[${OBJECT}`, (r, _m, [, size]) => r.newArray(`[${WS}`, size));
+  staticField(WS, 'CREATOR', CREATOR, r => r.allocate(WS_CREATOR));
 
   // ---- MediaMetadataRetriever: container metadata of ISO BMFF sources (MP4 / MOV / 3GP, src/media-container.js); no frames, no other container ---------------------------------------------------
   const noExtractor = what => unsupported(`${what}: the lab has no media extractor for this (it reads the duration, size, rotation and track kinds of MP4 / MOV / 3GP files; no codecs, no other container)`, 'media-extractor-unsupported');

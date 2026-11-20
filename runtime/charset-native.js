@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { CHARSET_DATA } from './charset-data.js?v=8e11a37fba6a';
-import { closeConverterHandle } from './icu-converter-native.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { CHARSET_DATA } from './charset-data.js?v=ad32040fbef9';
+import { closeConverterHandle } from './icu-converter-native.js?v=ad32040fbef9';
 
 const CONVERTER = 'Lcom/android/icu/charset/NativeConverter;';
 const CHARSET = 'Ljava/nio/charset/Charset;';
@@ -33,8 +33,8 @@ export function createCharsetNativeBindings() {
     }],
     [`${CONVERTER}->contains(Ljava/lang/String;Ljava/lang/String;)Z`, (runtime, [left, right]) => {
       const a = lookup(runtime.stringCharacters(left)), b = lookup(runtime.stringCharacters(right));
-      if (!a || !b) throw new APKError('Charset repertoire outside the curated six-charset ICU profile', { kind: 'unsupported-charset-profile' });
       const rank = { ascii: 0, latin1: 1, unicode: 2 };
+      if (!a || !b || !(a.repertoire in rank) || !(b.repertoire in rank)) throw new APKError('Charset repertoire outside the curated six-charset ICU profile (the CJK charsets are named only: their converter tables are not in the vendored ICU data)', { kind: 'unsupported-charset-profile' });
       return rank[a.repertoire] >= rank[b.repertoire] ? 1 : 0;
     }],
   ]);

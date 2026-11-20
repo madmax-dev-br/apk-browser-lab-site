@@ -1,9 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { registerPackageValueFields } from './package-value-fields.js?v=8e11a37fba6a';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=8e11a37fba6a';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
+import { resolveIntentFields } from './intent-resolver.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { registerPackageValueFields } from './package-value-fields.js?v=ad32040fbef9';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ad32040fbef9';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ad32040fbef9';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=ad32040fbef9';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -1104,14 +1105,17 @@ export function createAppServicesHost(platform) {
   def(APP_INFO_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
   // ---- the packages of the virtual device ------------------------------------------------------------------------------------------------------------
   // A stock Android 13 image without Google services: this app plus a small, generic set of system packages (framework resources, System UI, the AOSP launcher). Nothing else is installed (no store,
-  // no root or hooking framework). System packages carry what the image would: FLAG_SYSTEM, a /system* code path, the platform version, no installer. Their signing certificates, components and
-  // permission lists are not modeled (signatures / signingInfo / activities stay null). Package visibility (API 30+) applies: an app targeting 30 or later without QUERY_ALL_PACKAGES sees itself and the
+  // no root or hooking framework). System packages carry what the image would: FLAG_SYSTEM, a /system* code path, the platform version, no installer, and the signer of a test-keys build (the
+  // device's Build.FINGERPRINT says test-keys): the AOSP test platform certificate (framework-aosp/security, src/platform-certificate-data.js). Their components and permission lists are
+  // not modeled (activities / services / requestedPermissions stay null). Package visibility (API 30+) applies: an app targeting 30 or later without QUERY_ALL_PACKAGES sees itself and the
   // always-visible "android" package; <queries> declarations are not parsed, so packages they would add are not listed.
   const SYSTEM_PACKAGES = [
     { name: 'android', uid: () => 1000, label: 'Android System', sourceDir: '/system/framework/framework-res.apk', dataDir: '/data/system', process: 'system', flags: 1 | 4 | 8 | (1 << 23), always: true },
     { name: 'com.android.systemui', uid: app => app === 10037 ? 10039 : 10037, label: 'System UI', sourceDir: '/system_ext/priv-app/SystemUI/SystemUI.apk', process: 'com.android.systemui', flags: 1 | 4 | 8 | (1 << 23) },
     { name: 'com.android.launcher3', uid: app => app === 10038 ? 10040 : 10038, label: 'Quickstep', sourceDir: '/system_ext/priv-app/Launcher3QuickStep/Launcher3QuickStep.apk', process: 'com.android.launcher3', flags: 1 | 4 | 0x40 | (1 << 23) },
   ];
+  let platformDer = null;
+  const platformCertificate = () => platformDer ??= Uint8Array.from(atob(PLATFORM_CERTIFICATE_BASE64), c => c.charCodeAt(0));
   const systemInfos = new WeakMap();
   const systemApplicationInfo = (r, entry) => {
     const cache = systemInfos.get(r) ?? systemInfos.set(r, gcRoot(new Map())).get(r);   // a collector root: the cached ApplicationInfo objects are handed out again (a WeakMap's values are invisible to the collector)
@@ -1151,6 +1155,11 @@ export function createAppServicesHost(platform) {
     put('packageName', STRING, entry.name); put('versionName', STRING, system ? '13' : typeof attrs.versionName === 'string' ? attrs.versionName : null); put('versionCode', 'I', code); put('longVersionCode', 'J', BigInt(code));
     put('installLocation', 'I', Number.isInteger(attrs.installLocation) && !system ? attrs.installLocation : -1);   // android:installLocation, else INSTALL_LOCATION_UNSPECIFIED
     put('firstInstallTime', 'J', BigInt(installTime)); put('lastUpdateTime', 'J', BigInt(installTime)); put('applicationInfo', APPLICATION_INFO, applicationInfoOf(r, entry, (flags & 128) !== 0));
+    if (system) {   // GET_SIGNATURES / GET_SIGNING_CERTIFICATES of a system package: the platform certificate of the build
+      const certificates = [platformCertificate()];
+      if (flags & 0x40) put('signatures', SIGNATURES, signatureArray(r, certificates));
+      if (flags & 0x08000000) { const signing = r.allocate(SIGNING_INFO); r.object(signing).signers = signatureArray(r, certificates); put('signingInfo', SIGNING_INFO, signing); }
+    }
     if (!system) {
       // GET_SIGNATURES (0x40) / GET_SIGNING_CERTIFICATES (0x08000000): the APK's real signer certificates (v3, v2 or v1 block).
       const certificates = other ? pkgs().signingCertificatesOf(r, other) : null;
@@ -1159,7 +1168,14 @@ export function createAppServicesHost(platform) {
       if (other) {   // GET_SERVICES (4) / GET_PROVIDERS (8) / GET_PERMISSIONS (0x1000) of a companion package
         if (flags & 4) { const details = pkgs().detailsOf(other, 'service'), array = r.newArray(`[${SERVICE_INFO}`, details.length); r.array(array).elements = details.map(d => makeInfo(r, d, 'service', (flags & 128) !== 0, other)); put('services', `[${SERVICE_INFO}`, array); }
         if (flags & 8) { const details = (other.manifest.providerDetails ?? []), array = r.newArray(`[${PROVIDER_INFO}`, details.length); r.array(array).elements = details.map(d => makeProviderInfo(r, d, (flags & 128) !== 0, other)); put('providers', `[${PROVIDER_INFO}`, array); }
-        if (flags & 0x1000) { const names = (other.manifest.usesPermissions ?? []).map(p => p.name), array = r.newArray('[Ljava/lang/String;', names.length); r.array(array).elements = names; put('requestedPermissions', '[Ljava/lang/String;', array); }
+      }
+      // GET_PERMISSIONS (0x1000): the <uses-permission> names in manifest order, and requestedPermissionsFlags with REQUESTED_PERMISSION_GRANTED (2) for those the package holds
+      if (flags & 0x1000) {
+        const names = [...new Set(((other ? other.manifest : platform.manifest)?.usesPermissions ?? []).map(p => p.name))];
+        if (names.length) {
+          const array = r.newArray('[Ljava/lang/String;', names.length); r.array(array).elements = names; put('requestedPermissions', '[Ljava/lang/String;', array);
+          const granted = r.newArray('[I', names.length); r.array(granted).elements = names.map(name => (other ? pkgs().holds(r, other, name) : holdsPermission(r, name)) ? 2 : 0); put('requestedPermissionsFlags', '[I', granted);
+        }
       }
     }
     return info;

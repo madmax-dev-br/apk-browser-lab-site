@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=8e11a37fba6a';
+import { floatBits } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=ad32040fbef9';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -41,23 +41,43 @@ export function createSystemManagersHost(platform) {
     'android:get_usage_stats': ['android.permission.PACKAGE_USAGE_STATS', 'special'], 'android:system_alert_window': ['android.permission.SYSTEM_ALERT_WINDOW', 'special'], 'android:write_settings': ['android.permission.WRITE_SETTINGS', 'special'],
     'android:request_install_packages': ['android.permission.REQUEST_INSTALL_PACKAGES', 'special'], 'android:manage_external_storage': ['android.permission.MANAGE_EXTERNAL_STORAGE', 'special'], 'android:schedule_exact_alarm': ['android.permission.SCHEDULE_EXACT_ALARM', 'special'],
     'android:turn_screen_on': [null, 'special'], 'android:run_in_background': [null, 'always'], 'android:run_any_in_background': [null, 'always'], 'android:access_notifications': [null, 'special'],
+    // location monitoring ops: no permission of their own, MODE_ALLOWED by default (AppOpsManager sOpDefaultMode); location providers start them for their clients
+    'android:monitor_location': [null, 'always'], 'android:monitor_location_high_power': [null, 'always'],
   }));
   for (const [opString] of OPS) registry.staticField(APPOPS, `OPSTR_${opString.slice(8).toUpperCase()}`, STRING, () => opString);
   const opOf = (r, op) => { const name = requireText(r, op, 'op'); if (!OPS.has(name)) iae(r, `Unknown operation string: ${name}`); return name; };
+  // With a companion package installed (src/package-registry.js) the ops are AppOpsService's for every installed package: the uid/package pair must match one package, the mode follows
+  // THAT package's grants, and noting or starting an op for another uid (verifyIncomingUid) needs UPDATE_APP_OPS_STATS, which an installed app never holds: a service working for a
+  // client (a location provider) uses the proxy variants, whose mode is the proxied package's and the proxy's. Without a companion, the app's own uid/package is the only valid pair.
+  const P = () => platform.packages?.multi ? platform.packages : null;
+  const callerOf = r => P()?.callerEntry(r) ?? null;
+  const holdsFor = (r, entry, permission) => !entry || entry.main ? holds(r, permission) : P().holds(r, entry, permission);
   const checkPackage = (r, uidValue, packageName) => {
     const name = requireText(r, packageName, 'packageName');
-    if (uidValue !== uid() || name !== pkg()) denied(r, `Package ${name} does not belong to ${uidValue}`);
+    if (!P()) { if (uidValue !== uid() || name !== pkg()) denied(r, `Package ${name} does not belong to ${uidValue}`); return null; }
+    const entry = P().byName(name); if (!entry || entry.uid !== uidValue) denied(r, `Package ${name} does not belong to ${uidValue}`);
+    return entry;
   };
-  const modeOf = (r, opString) => { const [permission, kind] = OPS.get(opString); return kind === 'always' ? ALLOWED : kind === 'special' ? DEFAULT : (permission && holds(r, permission)) ? ALLOWED : IGNORED; };
-  const mustBeAllowed = (r, mode, opString) => { if (mode === ERRORED) denied(r, `uid ${uid()} does not have ${opString}.`); return mode; };
-  for (const name of ['unsafeCheckOp', 'unsafeCheckOpRaw', 'unsafeCheckOpNoThrow', 'unsafeCheckOpRawNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return modeOf(r, o); });
-  for (const name of ['checkOp', 'checkOpNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return name === 'checkOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
+  const verifyIncomingUid = (r, uidValue) => { const caller = callerOf(r); if (!caller || caller.uid === uidValue) return; if (!holdsFor(r, caller, 'android.permission.UPDATE_APP_OPS_STATS')) denied(r, `uid ${caller.uid} does not have android.permission.UPDATE_APP_OPS_STATS.`); };
+  const modeOf = (r, opString, entry = null) => { const [permission, kind] = OPS.get(opString); return kind === 'always' ? ALLOWED : kind === 'special' ? DEFAULT : (permission && holdsFor(r, entry, permission)) ? ALLOWED : IGNORED; };
+  const mustBeAllowed = (r, mode, opString, uidValue = uid()) => { if (mode === ERRORED) denied(r, `uid ${uidValue} does not have ${opString}.`); return mode; };
+  /** The mode of a proxy op: the proxied package's, unless the proxy itself (the calling package) is not allowed either. */
+  const proxyMode = (r, opString, proxied) => { const mode = modeOf(r, opString, proxied), proxy = callerOf(r); return mode === ALLOWED && proxy && proxy !== proxied ? modeOf(r, opString, proxy) : mode; };
+  for (const name of ['unsafeCheckOp', 'unsafeCheckOpRaw', 'unsafeCheckOpNoThrow', 'unsafeCheckOpRawNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); return modeOf(r, o, checkPackage(r, id, packageName)); });
+  for (const name of ['checkOp', 'checkOpNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op), mode = modeOf(r, o, checkPackage(r, id, packageName)); return name === 'checkOp' ? mustBeAllowed(r, mode, o, id) : mode; });
+  const note = (r, name, op, id, packageName) => { const o = opOf(r, op); verifyIncomingUid(r, id); const mode = modeOf(r, o, checkPackage(r, id, packageName)); return name === 'noteOp' ? mustBeAllowed(r, mode, o, id) : mode; };
   for (const name of ['noteOp', 'noteOpNoThrow']) {
-    def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return name === 'noteOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
-    def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); return name === 'noteOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
+    def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => note(r, name, op, id, packageName));
+    def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => note(r, name, op, id, packageName));
   }
-  for (const name of ['noteProxyOp', 'noteProxyOpNoThrow']) def(APPOPS, name, `(${STRING}${STRING}I${STRING}${STRING})I`, (r, _m, [, op, proxiedPackage, proxiedUid]) => { const o = opOf(r, op); checkPackage(r, proxiedUid, proxiedPackage); return name === 'noteProxyOp' ? mustBeAllowed(r, modeOf(r, o), o) : modeOf(r, o); });
-  // Active operations (startOp ... finishOp, counted per op) and the watchers of their changes: AppOpsService notifies a watcher of its own uid through the watcher's executor.
+  const noteProxy = (r, name, op, proxiedPackage, proxiedUid) => { const o = opOf(r, op), mode = proxyMode(r, o, checkPackage(r, proxiedUid, proxiedPackage)); return name === 'noteProxyOp' ? mustBeAllowed(r, mode, o, proxiedUid) : mode; };
+  for (const name of ['noteProxyOp', 'noteProxyOpNoThrow']) {
+    def(APPOPS, name, `(${STRING}${STRING}I${STRING}${STRING})I`, (r, _m, [, op, proxiedPackage, proxiedUid]) => noteProxy(r, name, op, proxiedPackage, proxiedUid));
+    def(APPOPS, name, `(${STRING}${STRING}I)I`, (r, _m, [, op, proxiedPackage, proxiedUid]) => noteProxy(r, name, op, proxiedPackage, proxiedUid));   // API 29
+    // API 23: the proxied app is the caller of the Binder transaction being served (Binder.getCallingUid)
+    def(APPOPS, name, `(${STRING}${STRING})I`, (r, _m, [, op, proxiedPackage]) => noteProxy(r, name, op, proxiedPackage, P() ? P().callingIdentity(r).uid : uid()));
+  }
+  // Active operations (startOp ... finishOp, counted per uid and op) and the watchers of their changes: AppOpsService notifies a watcher of its own uid (the app's) through the watcher's executor.
   const activeCounts = new Map(), activeWatchers = gcRoot([]);
   const ACTIVE_LISTENER = 'Landroid/app/AppOpsManager$OnOpActiveChangedListener;', DELIVERY = 'Landroid/app/AppOpsManager$ActiveChangedDelivery;';
   type(DELIVERY, OBJECT, ['Ljava/lang/Runnable;'], { allocatable: true });
@@ -65,9 +85,10 @@ export function createSystemManagersHost(platform) {
     const f = r.object(self).fields, get = name => f.get(`${DELIVERY}->${name}`);
     call(r, get('listener'), ACTIVE_LISTENER, 'onOpActiveChanged', [STRING, 'I', STRING, 'Z'], 'V', [get('op'), uid(), pkg(), get('active')]);
   });
-  const setActive = (r, opString, active) => {
-    const before = activeCounts.get(opString) ?? 0, after = Math.max(0, before + (active ? 1 : -1)); activeCounts.set(opString, after);
-    if ((before > 0) === (after > 0)) return;   // only the transitions inactive <-> active are reported
+  const activeKey = (uidValue, opString) => `${uidValue}:${opString}`;
+  const setActive = (r, opString, active, uidValue = uid()) => {
+    const key = activeKey(uidValue, opString), before = activeCounts.get(key) ?? 0, after = Math.max(0, before + (active ? 1 : -1)); activeCounts.set(key, after);
+    if ((before > 0) === (after > 0) || uidValue !== uid()) return;   // only the transitions inactive <-> active of the app's own uid reach its watchers
     for (const watcher of [...activeWatchers]) {
       if (!watcher.ops.includes(opString)) continue;
       const delivery = r.allocate(DELIVERY), fields = r.object(delivery).fields;
@@ -75,11 +96,24 @@ export function createSystemManagersHost(platform) {
       call(r, watcher.executor, 'Ljava/util/concurrent/Executor;', 'execute', ['Ljava/lang/Runnable;'], 'V', [delivery]);
     }
   };
-  def(APPOPS, 'startOp', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); const mode = mustBeAllowed(r, modeOf(r, o), o); if (mode === ALLOWED) setActive(r, o, true); return mode; });
-  def(APPOPS, 'startOpNoThrow', `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); checkPackage(r, id, packageName); const mode = modeOf(r, o); if (mode === ALLOWED) setActive(r, o, true); return mode; });
-  const finish = (r, op, id, packageName) => { const o = opOf(r, op); checkPackage(r, id, packageName); if ((activeCounts.get(o) ?? 0) > 0) setActive(r, o, false); };
-  def(APPOPS, 'finishOp', `(${STRING}I${STRING}${STRING})V`, (r, _m, [, op, id, packageName]) => finish(r, op, id, packageName));
-  def(APPOPS, 'finishOp', `(${STRING}I${STRING})V`, (r, _m, [, op, id, packageName]) => finish(r, op, id, packageName));
+  const start = (r, name, op, id, packageName) => {
+    const o = opOf(r, op); verifyIncomingUid(r, id);
+    const entry = checkPackage(r, id, packageName), mode = name === 'startOp' ? mustBeAllowed(r, modeOf(r, o, entry), o, id) : modeOf(r, o, entry);
+    if (mode === ALLOWED) setActive(r, o, true, id); return mode;
+  };
+  for (const name of ['startOp', 'startOpNoThrow']) {
+    def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => start(r, name, op, id, packageName));
+    def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => start(r, name, op, id, packageName));
+  }
+  // API 31 proxy ops: started and finished for the proxied package by the calling package (a service working for its client)
+  for (const name of ['startProxyOp', 'startProxyOpNoThrow']) def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, proxiedUid, proxiedPackage]) => {
+    const o = opOf(r, op), mode = proxyMode(r, o, checkPackage(r, proxiedUid, proxiedPackage)); if (name === 'startProxyOp') mustBeAllowed(r, mode, o, proxiedUid);
+    if (mode === ALLOWED) setActive(r, o, true, proxiedUid); return mode;
+  });
+  const finish = (r, op, id, packageName) => { const o = opOf(r, op); checkPackage(r, id, packageName); if ((activeCounts.get(activeKey(id, o)) ?? 0) > 0) setActive(r, o, false, id); };
+  def(APPOPS, 'finishOp', `(${STRING}I${STRING}${STRING})V`, (r, _m, [, op, id, packageName]) => { verifyIncomingUid(r, id); finish(r, op, id, packageName); });
+  def(APPOPS, 'finishOp', `(${STRING}I${STRING})V`, (r, _m, [, op, id, packageName]) => { verifyIncomingUid(r, id); finish(r, op, id, packageName); });
+  def(APPOPS, 'finishProxyOp', `(${STRING}I${STRING}${STRING})V`, (r, _m, [, op, proxiedUid, proxiedPackage]) => finish(r, op, proxiedUid, proxiedPackage));
   // startWatchingActive(String[] ops, Executor, OnOpActiveChangedListener) (API 29): an app without WATCH_APPOPS watches its own uid only; null arguments and unknown ops fail as AppOpsManager does.
   def(APPOPS, 'startWatchingActive', `([${STRING}Ljava/util/concurrent/Executor;${ACTIVE_LISTENER})V`, (r, _m, [, ops, executor, listener]) => {
     if (nullish(ops)) npe(r); if (nullish(executor)) npe(r); if (nullish(listener)) npe(r);
@@ -88,10 +122,10 @@ export function createSystemManagersHost(platform) {
     activeWatchers.push({ ops: names, executor, listener });
   });
   def(APPOPS, 'stopWatchingActive', `(${ACTIVE_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); const at = activeWatchers.findIndex(w => r.object(w.listener).id === r.object(listener).id); if (at >= 0) activeWatchers.splice(at, 1); });
-  def(APPOPS, 'checkPackage', `(I${STRING})V`, (r, _m, [, id, packageName]) => checkPackage(r, id, packageName));
+  def(APPOPS, 'checkPackage', `(I${STRING})V`, (r, _m, [, id, packageName]) => { checkPackage(r, id, packageName); });
   def(APPOPS, 'permissionToOp', `(${STRING})${STRING}`, (r, _m, [permission]) => { const name = requireText(r, permission, 'permission'); for (const [op, [p]] of OPS) if (p === name) return op; return null; }, { static: true });
-  def(APPOPS, 'isOpActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => (activeCounts.get(opOf(r, op)) ?? 0) > 0 ? 1 : 0);
-  def(APPOPS, 'isOperationActive', `(${STRING}I${STRING})Z`, (r, _m, [, op]) => (activeCounts.get(opOf(r, op)) ?? 0) > 0 ? 1 : 0);
+  def(APPOPS, 'isOpActive', `(${STRING}I${STRING})Z`, (r, _m, [, op, id]) => (activeCounts.get(activeKey(id, opOf(r, op))) ?? 0) > 0 ? 1 : 0);
+  def(APPOPS, 'isOperationActive', `(${STRING}I${STRING})Z`, (r, _m, [, op, id]) => (activeCounts.get(activeKey(id, opOf(r, op))) ?? 0) > 0 ? 1 : 0);
   def(APPOPS, 'startWatchingMode', `(${STRING}${STRING}Landroid/app/AppOpsManager$OnOpChangedListener;)V`, (r, _m, [, op, packageName, listener]) => { opOf(r, op); if (nullish(listener)) npe(r, 'callback'); void packageName; });
   def(APPOPS, 'startWatchingMode', `(${STRING}${STRING}ILandroid/app/AppOpsManager$OnOpChangedListener;)V`, (r, _m, [, op, packageName, , listener]) => { opOf(r, op); if (nullish(listener)) npe(r, 'callback'); void packageName; });
   def(APPOPS, 'stopWatchingMode', '(Landroid/app/AppOpsManager$OnOpChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r, 'callback'); });

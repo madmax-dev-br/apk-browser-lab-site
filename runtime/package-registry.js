@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=8e11a37fba6a';
-import { AndroidResources } from './android-resources.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ad32040fbef9';
+import { AndroidResources } from './android-resources.js?v=ad32040fbef9';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -117,6 +117,8 @@ export function createPackageRegistry(platform) {
     if (!entry.loader) { entry.loader = platform.classLoaders.createPackageLoader(runtime, entry); refs.set(`${entry.name}:loader`, entry.loader); platform.onPackageCodeDefined?.(runtime, entry); }   // a device option that hooks the package's methods (src/microg-device.js) resolves their loader-alias keys now
     return entry.loader;
   };
+  /** The class loader of the package whose code is running now (what reading code passes as Bundle/Intent extras loader when it unparcels Parcelables of its own classes). */
+  const readingLoader = runtime => loaderOf(runtime, callerEntry(runtime));
   /** The VM class-table type of class `className` (dotted) as package `entry` sees it, or null when that package has no such class. */
   const typeIn = (runtime, entry, className) => {
     const plain = descriptorOf(className);
@@ -310,7 +312,12 @@ export function createPackageRegistry(platform) {
         return runtime.dispatch({ owner: 'Landroid/content/res/Resources;', name: method.name, parameters, result, signature: `(${parameters.join('')})${result}` }, [packageResources(runtime, entry), ...args.slice(1)], 'virtual');
       }
       case 'createConfigurationContext': return unsupported(entry, 'Context.createConfigurationContext');
-      case 'startActivity': case 'startActivityForResult': throw new APKError(`Context.startActivity from companion package ${entry.name}: Activities of a second package are not supported`, { kind: 'package-activity-unsupported' });
+      case 'startActivity': case 'startActivityForResult': {
+        const intent = args[1] && typeof args[1] === 'object' ? runtime.object(args[1]) : null, component = intent?.component ? runtime.object(intent.component) : null;
+        const className = component ? String(typeof component.className === 'string' ? component.className : runtime.stringCharacters(component.className)) : intent?.target ? intent.target.slice(1, -1).replaceAll('/', '.').replace(/\$\$ldr\d+$/, '') : null;
+        platform.onPackageActivityRefused?.(runtime, entry.name, className);   // a device option names what its package's Activity was for (src/microg-device.js)
+        throw new APKError(`Context.startActivity from companion package ${entry.name}: Activities of a second package are not supported`, { kind: 'package-activity-unsupported' });
+      }
       case 'registerActivityLifecycleCallbacks': entry.activityCallbacks.push(args[1]); refs.set(`${entry.name}:activityCallbacks`, entry.activityCallbacks); return undefined;   // the companion's process has no Activities
       case 'unregisterActivityLifecycleCallbacks': { const at = entry.activityCallbacks.findIndex(ref => ref?.ref === args[1]?.ref); if (at >= 0) entry.activityCallbacks.splice(at, 1); return undefined; }
       default: return NOT_HANDLED;
@@ -323,7 +330,7 @@ export function createPackageRegistry(platform) {
     get multi() { return companions.size > 0; },
     main, entries, companions: () => [...companions.values()], byName, byUid, install, refs,
     callerEntry, contextEntry, entryOfClass, withCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
-    loaderOf, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
+    loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
     detailsOf, exported, providerFor, providerInstance, providerOwner, providerOwners,
     holds, levelFor, declaredPermission, sameSigners, securityException, visible, grant, targetSdk,
     contextInvoke,

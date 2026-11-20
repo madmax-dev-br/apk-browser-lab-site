@@ -407,7 +407,9 @@ main>footer a{color:var(--accent-ink);text-decoration:underline;text-underline-o
 .netlog-timing,.netlog-block-title{color:var(--muted)}
 .netlog-body{padding:8px;border-radius:6px;background-color:var(--code-bg);color:var(--code-ink);font:400 12px/1.5 var(--mono)}
 .netlog-allow{margin:4px 0;font:500 12px/16px var(--sans);padding:5px 10px;color:var(--ink)}
-.netlog-mock,.netlog-redirected,.netlog-proxied{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans)}
+.netlog-mock,.netlog-redirected,.netlog-proxied,.netlog-channel{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans)}
+.netlog-channel{background-color:var(--accent-soft);color:var(--accent-ink)}
+.netlog-channel.is-fallback{background-color:var(--amber-soft);color:var(--amber-ink)}
 .netlog-mock{background-color:var(--amber-soft);color:var(--amber-ink)}
 .netlog-redirected{background-color:var(--accent-soft);color:var(--accent-ink)}
 .netlog-proxied{background-color:color-mix(in srgb,var(--run) 18%,transparent);color:var(--ink)}

@@ -179,5 +179,98 @@ export const CHARSET_DATA = [
       "IBM367"
     ],
     "repertoire": "ascii"
+  },
+  {
+    "canonical": "Shift_JIS",
+    "icu": "ibm-943_P15A-2003",
+    "aliases": [
+      "Shift_JIS",
+      "MS_Kanji",
+      "csShiftJIS",
+      "windows-31j",
+      "csWindows31J",
+      "x-sjis",
+      "x-ms-cp932",
+      "cp932",
+      "windows-932",
+      "cp943c",
+      "x-MS932_0213",
+      "x-JISAutoDetect"
+    ],
+    "lookupAliases": [
+      "ibm-943_P15A-2003",
+      "ibm-943",
+      "Shift_JIS",
+      "MS_Kanji",
+      "csShiftJIS",
+      "windows-31j",
+      "csWindows31J",
+      "x-sjis",
+      "x-ms-cp932",
+      "cp932",
+      "windows-932",
+      "cp943c",
+      "IBM-943C",
+      "ms932",
+      "pck",
+      "sjis",
+      "ibm-943_VSUB_VPUA",
+      "x-MS932_0213",
+      "x-JISAutoDetect"
+    ],
+    "repertoire": "cjk"
+  },
+  {
+    "canonical": "EUC-JP",
+    "icu": "euc-jp-2007",
+    "aliases": [
+      "EUC-JP",
+      "Extended_UNIX_Code_Packed_Format_for_Japanese",
+      "csEUCPkdFmtJapanese",
+      "X-EUC-JP",
+      "eucjis"
+    ],
+    "lookupAliases": [
+      "euc-jp-2007",
+      "EUC-JP",
+      "Extended_UNIX_Code_Packed_Format_for_Japanese",
+      "csEUCPkdFmtJapanese",
+      "X-EUC-JP",
+      "eucjis",
+      "ujis"
+    ],
+    "repertoire": "cjk"
+  },
+  {
+    "canonical": "GBK",
+    "icu": "windows-936-2000",
+    "aliases": [
+      "GBK",
+      "CP936",
+      "MS936",
+      "windows-936",
+      "chinese",
+      "iso-ir-58",
+      "GB2312",
+      "csGB2312",
+      "GB_2312-80",
+      "csISO58GB231280"
+    ],
+    "lookupAliases": [
+      "windows-936-2000",
+      "GBK",
+      "CP936",
+      "MS936",
+      "windows-936",
+      "chinese",
+      "iso-ir-58",
+      "gb2312-1980",
+      "GB2312",
+      "EUC-CN",
+      "csGB2312",
+      "GB_2312-80",
+      "csISO58GB231280"
+    ],
+    "repertoire": "cjk"
   }
 ];

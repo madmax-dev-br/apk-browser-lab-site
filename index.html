@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=8e11a37fba6a") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=8e11a37fba6a">
-  <link rel="stylesheet" href="./lab-theme.css?v=8e11a37fba6a">
-  <meta name="apk-browser-build" content="8e11a37fba6a">
+  <style>@import url("./styles.css?v=ad32040fbef9") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=ad32040fbef9">
+  <link rel="stylesheet" href="./lab-theme.css?v=ad32040fbef9">
+  <meta name="apk-browser-build" content="ad32040fbef9">
 </head>
 <body>
   <header class="topbar">
@@ -52,6 +52,7 @@
                 <label for="dev-dark">Dark theme</label><input id="dev-dark" type="checkbox">
                 <label for="look-app-colors" title="The page around the device takes the colours of the open app (read from its launcher icon), with a reveal from the device. The app itself is not changed">Page in the app's colors</label><input id="look-app-colors" type="checkbox" checked>
                 <label for="dev-layout-bounds" title="Android developer option (debug.layout), drawn as Android draws it: each View's bounds in red with blue corner marks and its margins in magenta; each Compose LayoutNode in red and each layout modifier in blue">Show layout bounds</label><input id="dev-layout-bounds" type="checkbox">
+                <label for="dev-frame-graph" title="Developer option modeled on Android's Profile HWUI rendering (on screen as bars): one stacked bar per frame (VM events, raster, snapshot, transfer, page, put) with the 16.7 ms line, and the frames per second over the last 20 s with current, average and minimum FPS and the janky frames. An idle screen is shown as idle, not as 0 FPS. Drawn by the page over the screen; the app and the screenshots do not see it">Show frame rate</label><input id="dev-frame-graph" type="checkbox">
                 <label for="dev-font">Font scale <output id="dev-font-out">1.00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
                 <label for="dev-locale">Language</label><select id="dev-locale"></select>
                 <label for="dev-region">Region</label><select id="dev-region" title="The country of the device locale (Locale.getDefault, Configuration.locale): dates, numbers, currency and -rBR resources. The emulator SIM (TelephonyManager) stays the US one, as in the Android emulator"></select>
@@ -73,13 +74,16 @@
                 <label for="dev-hosts-all">Allow all hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
                 <label for="dev-hosts">Allowed network hosts</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, *.cdn.example.com" aria-describedby="dev-hosts-note">
                 <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.example.com/?url={url}" aria-describedby="dev-proxy-note">
+                <label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" aria-describedby="dev-relay-channel-note">
                 <label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note">
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
               </div>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
+              <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
               <p id="dev-client-cert-status" class="cp-note" role="status"></p>
               <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay over its token-protected channel, only for these hosts, and live there in memory only. Other hosts never see them.</p>
-              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers (availability, App Set ID, advertising ID, location). Still unavailable, with an explicit error: device registration, Google account sign-in, push (FCM), SafetyNet, Play Integrity and DroidGuard. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs a Google server, native code or a microG screen, ends in an explicit error. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+              <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
               <div id="dev-microg-entries" class="cp-microg-entries" hidden>
                 <p class="cp-note">Entry points of the functions the lab does not run (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). Without a mock, each call logs a "not implemented" failure and microG's locked body runs. To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
                 <ul id="dev-microg-entry-list" class="cp-list"></ul>
@@ -98,7 +102,14 @@
                 <label for="loc-lon">Longitude</label><input id="loc-lon" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-46.6333">
                 <label for="loc-acc">Accuracy (m)</label><input id="loc-acc" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="10">
               </div>
-              <p id="loc-note" class="cp-note" role="status" aria-live="polite">With the permission granted and location on, LocationManager delivers this position (getLastKnownLocation and requestLocationUpdates). The Google Play services location client does not exist on this virtual device and keeps failing explicitly.</p>
+              <p id="loc-note" class="cp-note" role="status" aria-live="polite">With the permission granted and location on, LocationManager delivers this position (getLastKnownLocation and requestLocationUpdates). The Google Play services location client fails explicitly on a device without Play services; with the "With microG" option (Device section), microG's fused location delivers this position too.</p>
+              <span class="cp-subtitle perms-loc-title">Incoming SMS</span>
+              <div class="cp-grid">
+                <label for="sms-from">From</label><input id="sms-from" type="text" inputmode="tel" spellcheck="false" autocomplete="off" placeholder="+15550100" value="+15550100">
+                <label for="sms-body">Message</label><textarea id="sms-body" rows="2" spellcheck="false" placeholder="Your code is 123456"></textarea>
+              </div>
+              <button id="sms-send" class="cp-button" type="button" disabled>Receive this SMS</button>
+              <p id="sms-note" class="cp-note" role="status" aria-live="polite">The device's radio receives the message and broadcasts SMS_RECEIVED to the apps that hold RECEIVE_SMS (with microG on, its SMS Retriever and SMS User Consent read it and pass it to the app that asked). The device has no default SMS app: nothing is stored in the SMS inbox.</p>
               <button id="perms-reset" class="cp-button" type="button" disabled>Reset this app's permissions</button>
             </div></details>
             <details class="cp-group" id="cp-sec-files" data-section="files">
@@ -195,6 +206,9 @@
               <summary><h3 id="cp-plugins-title">Plugins</h3><span id="pl-summary" class="cp-badge">0 running</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <p class="cp-note">Your own JavaScript snippets that observe the current screen, the Compose tree, the ViewModels, Logcat and the network, and show the result in the <b>Plugins</b> panel below the device. Each enabled plugin runs in its own Web Worker and only reads: nothing writes to the app or calls its code. With no plugin enabled, nothing runs. API in docs/PLUGINS.md.</p>
               <p class="cp-note ov-warning">A plugin's code runs with this page's origin (it can use fetch like any script of the page). Use only code you wrote or reviewed.</p>
+              <div class="pl-power"><label for="pl-power">Plugin power</label><select id="pl-power" aria-describedby="pl-power-note"><option value="normal">Normal</option><option value="high">High</option><option value="max">Max</option></select></div>
+              <p id="pl-power-note" class="cp-note">Normal: about 4 % of the VM thread for plugin reads, one query at a time. Raise it for plugins that scan the heap, read many objects or watch a lot: reads get more time and shorter pauses; a tap still waits for at most one query.</p>
+              <p id="pl-power-stats" class="cp-note" aria-live="off"></p>
               <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, in panel order"></ul>
               <p id="pl-status" class="cp-note" role="status" aria-live="polite">No plugins.</p>
               <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Add</button><button id="pl-export" class="cp-button" type="button" disabled>Export</button><button id="pl-import" class="cp-button" type="button">Import</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
@@ -225,6 +239,7 @@
               <div id="android-content" class="android-content"></div>
               <div id="android-window-layer" class="android-window-layer"></div>
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
+              <canvas id="frame-graph-canvas" class="frame-graph-canvas" aria-hidden="true" hidden></canvas>
               <div id="lab-highlight-layer" class="lab-highlight-layer" aria-hidden="true"></div>
               <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Only this time</button><button id="perm-deny" type="button" class="perm-button">Don't allow</button></div></div></div>
               <div id="system-picker" class="sp-scrim" hidden></div>
@@ -274,7 +289,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=8e11a37fba6a"></script>
+  <script type="module" src="./app.js?v=ad32040fbef9"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

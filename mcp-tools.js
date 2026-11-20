@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=8e11a37fba6a';
+import { blockValue, outputsOf } from './plugin-host.js?v=ad32040fbef9';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -52,9 +52,9 @@ export function readyReport(result) {
  * query(method, args): the plugin host's page-level query (screen, layoutBounds, screenshot, composeTree, viewModels, inspect, field, statics, staticField, classes,
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * pluginStore: { list() -> stored plugins with code, save(spec) -> { plugin, created } } (src/plugins-panel.js), for get_plugin / save_plugin.
- * status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
+ * frameStats(): the summary of "Show frame rate" (current / average / minimum FPS, janky frames, idle) while that option is on, else null; lab_status adds it as `frameRate`. status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
  */
-export function createMcpTools({ controls = null, query, plugins = () => [], pluginStore = null, clickButton = null, logcat = () => [], network = () => [], status = () => ({}), actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ controls = null, query, plugins = () => [], pluginStore = null, clickButton = null, logcat = () => [], network = () => [], status = () => ({}), frameStats = () => null, actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   const waitReady = (timeoutMs = 15000, networkMs = NETWORK_WAIT_MS) => waitScreenReady({ screen: () => query('screen', {}), requests: network, sleep, now }, bounded(timeoutMs, 15000, 100, 120000), bounded(networkMs, NETWORK_WAIT_MS, 0, 120000));
   /** instances / referrers: the runtime's short pages, walked until `limit` items or the end (as lab.instances does). */
   async function paged(method, args, limit) {
@@ -96,7 +96,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
   const tools = {
     async lab_status() {
       const screen = await query('screen', {});
-      return [text({ apk: status(), screen, plugins: plugins().map(plugin => ({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, errors: plugin.errorCount || undefined })) })];
+      const frameRate = frameStats(); return [text({ apk: status(), screen, ...(frameRate ? { frameRate } : {}), plugins: plugins().map(plugin => ({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, errors: plugin.errorCount || undefined })) })];
     },
     async screenshot(args) {
       let ready = null; if (args.wait_ready) ready = await waitReady(args.timeout_ms);

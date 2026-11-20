@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -139,8 +139,9 @@ export function createPackageManagerApiHost(platform) {
   def(PM, 'getSyntheticAppDetailsActivityEnabled', `(${STRING})Z`, (r, _m, [, name]) => { known(r, name); return 0; });
   def(PM, 'canonicalToCurrentPackageNames', `(${STRINGS})${STRINGS}`, (r, _m, [, names]) => names); def(PM, 'currentToCanonicalPackageNames', `(${STRINGS})${STRINGS}`, (r, _m, [, names]) => names);
   const certificate = r => (r.apkSigningCertificates?.() ?? [])[0] ?? null;
-  // Two installed packages match when their signer certificates are the same (src/package-registry.js: the app and its companion packages); a system package matches only itself.
-  const sameSigner = (r, a, b) => { if (a === b) return SIGNATURE_MATCH; const P = platform.packages, x = P?.byName(a), y = P?.byName(b); return x && y && P.sameSigners(r, x, y) ? SIGNATURE_MATCH : SIGNATURE_NO_MATCH; };
+  // Two installed packages match when their signer certificates are the same (src/package-registry.js: the app and its companion packages); the system packages share the platform key.
+  const SYSTEM = new Set(['android', 'com.android.systemui', 'com.android.launcher3']);
+  const sameSigner = (r, a, b) => { if (a === b) return SIGNATURE_MATCH; if (SYSTEM.has(a) && SYSTEM.has(b)) return SIGNATURE_MATCH; const P = platform.packages, x = P?.byName(a), y = P?.byName(b); return x && y && P.sameSigners(r, x, y) ? SIGNATURE_MATCH : SIGNATURE_NO_MATCH; };
   def(PM, 'checkSignatures', `(${STRING}${STRING})I`, (r, _m, [, a, b]) => { if (nullish(a) || nullish(b)) npe(r); const names = platform.appServices.packageNames(r), x = text(r, a), y = text(r, b); return !names.includes(x) || !names.includes(y) ? SIGNATURE_UNKNOWN_PACKAGE : sameSigner(r, x, y); });
   def(PM, 'checkSignatures', '(II)I', (r, _m, [, a, b]) => a === b ? SIGNATURE_MATCH : SIGNATURE_NO_MATCH);
   const sha256 = async () => null; void sha256;

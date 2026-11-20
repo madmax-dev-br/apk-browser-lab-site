@@ -1,10 +1,11 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=8e11a37fba6a';
-import { installNetworkCallbacks } from './network-callbacks.js?v=8e11a37fba6a';
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { resolveDevice } from './device-profile.js?v=8e11a37fba6a';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=ad32040fbef9';
+import { installNetworkCallbacks } from './network-callbacks.js?v=ad32040fbef9';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { resolveDevice } from './device-profile.js?v=ad32040fbef9';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { installBroadcastQueue } from './broadcast-queue.js?v=ad32040fbef9';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.
@@ -27,17 +28,14 @@ export function createDeviceStateHost(platform) {
   // ---- Broadcasts (Context.registerReceiver / sendBroadcast), sticky battery state, BatteryManager, ConnectivityManager/NetworkCallback ----------------
   const INTENT = 'Landroid/content/Intent;', RECEIVER = 'Landroid/content/BroadcastReceiver;', FILTER = 'Landroid/content/IntentFilter;', CONTEXT = 'Landroid/content/Context;', CONTEXT_WRAPPER = 'Landroid/content/ContextWrapper;', STRING = 'Ljava/lang/String;', HANDLER = 'Landroid/os/Handler;';
   const BATTERY = 'Landroid/os/BatteryManager;', CONNECTIVITY = 'Landroid/net/ConnectivityManager;', NETWORK = 'Landroid/net/Network;', CAPABILITIES = 'Landroid/net/NetworkCapabilities;', NET_INFO = 'Landroid/net/NetworkInfo;', CALLBACK = 'Landroid/net/ConnectivityManager$NetworkCallback;', REQUEST = 'Landroid/net/NetworkRequest;', REQUEST_BUILDER = 'Landroid/net/NetworkRequest$Builder;';
-  type(RECEIVER, 'Ljava/lang/Object;', [], { allocatable: true }); type(FILTER, 'Ljava/lang/Object;', [], { allocatable: true }); type(CALLBACK, 'Ljava/lang/Object;', [], { allocatable: true });
+  type(FILTER, 'Ljava/lang/Object;', [], { allocatable: true }); type(CALLBACK, 'Ljava/lang/Object;', [], { allocatable: true });
   type(BATTERY, 'Ljava/lang/Object;'); type(CONNECTIVITY, 'Ljava/lang/Object;'); type(NETWORK, 'Ljava/lang/Object;', [], { allocatable: true }); type(CAPABILITIES, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
-  const registrations = gcRoot([]), callbacks = gcRoot([]), sent = { broadcasts: 0 };
+  const callbacks = gcRoot([]), sent = { broadcasts: 0 };
   const filterOf = (r, ref) => { const o = r.object(ref); return o.intentFilter ??= { actions: [] }; };
-  // BroadcastReceiver.onReceive is abstract: a call that names the base class dispatches on the receiver's own class, and only a receiver without the method ends here (as ART answers)
-  def(RECEIVER, 'onReceive', `(${CONTEXT}${INTENT})V`, r => r.throwJava('Ljava/lang/AbstractMethodError;', 'abstract method "void android.content.BroadcastReceiver.onReceive(android.content.Context, android.content.Intent)"'));
-  def(RECEIVER, '<init>', '()V', () => {}); def(RECEIVER, 'isOrderedBroadcast', '()Z', () => 0); def(RECEIVER, 'isInitialStickyBroadcast', '()Z', (r, _m, [self]) => r.object(self).initialSticky ? 1 : 0);
-  def(RECEIVER, 'getResultCode', '()I', () => -1 | 0); def(RECEIVER, 'setResultCode', '(I)V', () => {}); def(RECEIVER, 'abortBroadcast', '()V', () => {});
   def(FILTER, '<init>', '()V', () => {}); def(FILTER, '<init>', `(${STRING})V`, (r, _m, [self, action]) => { filterOf(r, self).actions.push(action); });
   def(FILTER, '<init>', `(${STRING}${STRING})V`, (r, _m, [self, action]) => { filterOf(r, self).actions.push(action); });
-  def(FILTER, '<init>', `(${FILTER})V`, (r, _m, [self, other]) => { filterOf(r, self).actions.push(...filterOf(r, other).actions); });
+  // IntentFilter(IntentFilter o): every part of the filter is copied (actions, categories, data schemes / authorities / paths / types, priority)
+  def(FILTER, '<init>', `(${FILTER})V`, (r, _m, [self, other]) => { const source = filterOf(r, other), copy = value => Array.isArray(value) ? value.map(item => item && typeof item === 'object' && !item.ref ? { ...item } : item) : value; r.object(self).intentFilter = Object.fromEntries(Object.entries(source).map(([key, value]) => [key, copy(value)])); });
   def(FILTER, 'addAction', `(${STRING})V`, (r, _m, [self, action]) => { const f = filterOf(r, self); if (!f.actions.includes(action)) f.actions.push(action); });
   def(FILTER, 'countActions', '()I', (r, _m, [self]) => filterOf(r, self).actions.length); def(FILTER, 'getAction', '(I)' + STRING, (r, _m, [self, i]) => filterOf(r, self).actions[i] ?? null);
   def(FILTER, 'hasAction', `(${STRING})Z`, (r, _m, [self, action]) => filterOf(r, self).actions.includes(action) ? 1 : 0);
@@ -48,25 +46,31 @@ export function createDeviceStateHost(platform) {
   };
   const batteryIntent = r => { const { level, charging } = platform.device.battery; return makeIntent(r, 'android.intent.action.BATTERY_CHANGED', { level: ['I', level], scale: ['I', 100], status: ['I', level >= 100 && charging ? 5 : charging ? 2 : 3], plugged: ['I', charging ? 2 : 0], present: ['Z', 1], health: ['I', 2], temperature: ['I', 280], voltage: ['I', 3900 + level], technology: [STRING, 'Li-ion'], battery_low: ['Z', level <= 15 && !charging ? 1 : 0], icon_small: ['I', 0] }); };
   const sticky = (r, action) => action === 'android.intent.action.BATTERY_CHANGED' ? batteryIntent(r) : platform.stickyBroadcasts?.get(action) ?? null;
+  // The broadcast queue (src/broadcast-queue.js): registered and manifest receivers of every installed package, permissions, ordered delivery, goAsync. The system broadcasts below
+  // (configuration, locale, battery, connectivity) go to the registered receivers whose filter names the action, each with an Intent of its own, as before.
+  const queue = platform.broadcasts = installBroadcastQueue({ platform, def, type, filterOf });
+  const registrations = queue.registrations;
   const deliver = (r, action, makeExtras) => {
-    for (const entry of [...registrations]) if (entry.actions.includes(action)) platform.queueTask(() => { if (!registrations.includes(entry)) return; try { call(r, entry.receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [entry.context, makeIntent(r, action, makeExtras?.() ?? {})]); } catch (error) { if (!(error instanceof APKError)) throw error; throw error; } }, 0, [entry.receiver, entry.context]);
+    for (const entry of [...registrations]) if (entry.actions.includes(action)) platform.queueTask(() => { if (!registrations.includes(entry)) return; call(r, entry.receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [entry.context, makeIntent(r, action, makeExtras?.() ?? {})]); }, 0, [entry.receiver, entry.context]);
     sent.broadcasts++;
   };
-  const register = (r, _m, args) => {
-    const [, receiver, filter] = args, actions = filterOf(r, filter).actions.slice(), context = args[0];
-    let result = null; for (const action of actions) { const s = sticky(r, action); if (s) result ??= s; }
-    if (receiver) registrations.push({ receiver, actions, context: r.object(context).baseContext && r.isSubtype(r.object(context).type, 'Landroid/app/Activity;') ? context : context });
+  // registerReceiver(receiver, filter[, flags]) / (receiver, filter, broadcastPermission, scheduler[, flags]): the sticky Intent of the first matching action is returned (and delivered first)
+  const register = (r, m, args) => {
+    const [context, receiver, filter] = args, withPermission = m.parameters[2] === STRING;
+    const permission = withPermission ? args[3] : null, flags = withPermission ? (m.parameters.length > 4 ? args[5] : 0) : (m.parameters.length > 2 ? args[3] : 0);
+    let result = null; for (const action of filterOf(r, filter).actions) { const s = sticky(r, action); if (s) result ??= s; }
+    if (receiver) queue.register(r, context, receiver, filter, { permission, flags: flags | 0 });
     if (receiver && result) { const initial = result; platform.queueTask(() => { r.object(receiver).initialSticky = true; try { call(r, receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [context, initial]); } finally { r.object(receiver).initialSticky = false; } }, 0, [receiver, context, initial]); }
-    return receiver ? result : result;
+    return result;
   };
   for (const owner of [CONTEXT, CONTEXT_WRAPPER]) {
     def(owner, 'registerReceiver', `(${RECEIVER}${FILTER})${INTENT}`, register); def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}I)${INTENT}`, register);
     def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}${STRING}${HANDLER})${INTENT}`, register); def(owner, 'registerReceiver', `(${RECEIVER}${FILTER}${STRING}${HANDLER}I)${INTENT}`, register);
     // Hidden Context.registerReceiverAsUser (the framework's own widgets register this way): the virtual device has one user, so it is registerReceiver.
-    def(owner, 'registerReceiverAsUser', `(${RECEIVER}Landroid/os/UserHandle;${FILTER}${STRING}${HANDLER})${INTENT}`, (r, m, [context, receiver, , filter]) => register(r, m, [context, receiver, filter]));
-    def(owner, 'unregisterReceiver', `(${RECEIVER})V`, (r, _m, [, receiver]) => { const at = registrations.findIndex(entry => entry.receiver.ref === receiver?.ref); if (at < 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Receiver not registered: ' + r.typeOf(receiver)); registrations.splice(at, 1); });
-    def(owner, 'sendBroadcast', `(${INTENT})V`, (r, _m, [, intent]) => { const action = r.object(intent).action; if (action) for (const entry of [...registrations]) if (entry.actions.includes(action)) platform.queueTask(() => { if (registrations.includes(entry)) call(r, entry.receiver, RECEIVER, 'onReceive', [CONTEXT, INTENT], 'V', [entry.context, intent]); }, 0, [entry.receiver, entry.context, intent]); });
-    def(owner, 'sendBroadcast', `(${INTENT}${STRING})V`, (r, m, args) => r.dispatch({ owner: CONTEXT, name: 'sendBroadcast', signature: `(${INTENT})V`, parameters: [INTENT], result: 'V' }, [args[0], args[1]], 'virtual'));
+    def(owner, 'registerReceiverAsUser', `(${RECEIVER}Landroid/os/UserHandle;${FILTER}${STRING}${HANDLER})${INTENT}`, (r, _m, [context, receiver, , filter, permission, handler]) => register(r, { parameters: [RECEIVER, FILTER, STRING, HANDLER] }, [context, receiver, filter, permission, handler]));
+    def(owner, 'unregisterReceiver', `(${RECEIVER})V`, (r, _m, [, receiver]) => queue.unregister(r, receiver));
+    def(owner, 'sendBroadcast', `(${INTENT})V`, (r, _m, [self, intent]) => queue.send(r, self, intent));
+    def(owner, 'sendBroadcast', `(${INTENT}${STRING})V`, (r, _m, [self, intent, permission]) => queue.send(r, self, intent, { receiverPermissions: [permission] }));
   }
   // BatteryManager: capacity/charging from the device profile.
   def(BATTERY, 'isCharging', '()Z', () => platform.device.battery.charging ? 1 : 0);

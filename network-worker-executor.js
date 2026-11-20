@@ -1,5 +1,5 @@
-import { captureBody } from './network-capture.js?v=8e11a37fba6a';
-import { describeFailure } from './network-transport.js?v=8e11a37fba6a';
+import { captureBody } from './network-capture.js?v=ad32040fbef9';
+import { describeFailure } from './network-transport.js?v=ad32040fbef9';
 
 // Main-side half of the synchronous network bridge. The exchange runs in a dedicated worker (network-worker.js): it fetches, then hands the response to this side through
 // SharedArrayBuffers (head as JSON, body through a ring buffer, state words) and wakes it with Atomics.notify, so a VM frame that cannot yield to the event loop can wait for
@@ -24,7 +24,10 @@ export class WorkerExecutor {
     else { this.worker = new Worker(url, { type: 'module' }); this.worker.onmessage = event => this.onMessage(event.data); this.worker.onerror = event => this.onCrash(event.error ?? new Error(event.message)); }
     return this.worker;
   }
-  onMessage(message) { if (message?.type === 'activity') this.bridge.signal(); }
+  onMessage(message) {
+    if (message?.type === 'activity') this.bridge.signal();
+    else if (message?.type === 'relay-channel') this.bridge.noteRelayChannel?.(message.kind, message.detail, message.endpoint);   // the worker's own channel (src/relay-mux.js) changed state
+  }
   onCrash(error) { for (const op of this.exchanges.values()) if (op.error === null && !op.ended) op.error = { type: 'Ljava/io/IOException;', message: `network worker failed: ${error?.message ?? error}` }; this.worker = null; this.bridge.signal(); }
   post(message) { this.ensure().postMessage(message); }
 
@@ -44,10 +47,11 @@ export class WorkerExecutor {
     if (state === STATE_HEAD && !shared.headParsed) {
       const head = JSON.parse(new TextDecoder().decode(data.slice(0, Atomics.load(control, HEAD_LENGTH)))); shared.headParsed = true;
       if (head.clientIdentityRenewed) { delete head.clientIdentityRenewed; this.bridge.noteClientIdentityRenewed?.(this.bridge.clientIdentityFor?.(op.request.url)?.dest ?? new URL(op.request.url).host); }   // the relay restarted and was given the identity again (openExchange)
-      op.head = head; this.bridge.stats.redirectsObserved += head.status >= 300 && head.status < 400 ? 1 : 0; changed = true;
+      if (head.relayChannel) { this.bridge.noteChannelOf?.(op, head); delete head.relayChannel; delete head.relayChannelNote; }   // which path it took: the relay's channel or the per-request fallback
+      op.head = head; op.trace?.arrived('head'); this.bridge.stats.redirectsObserved += head.status >= 300 && head.status < 400 ? 1 : 0; changed = true;
     } else if (state === STATE_ERROR && op.error === null) {
       const failure = JSON.parse(new TextDecoder().decode(data.slice(0, Atomics.load(control, ERROR_LENGTH))));
-      op.error = describeFailure(failure, op.request, op.request.timedOut); this.bridge.stats.failures++; changed = true;
+      this.bridge.noteChannelOf?.(op, failure); op.error = describeFailure(failure, op.request, op.request.timedOut); this.bridge.stats.failures++; changed = true;
     }
     // body bytes: from the ring into the operation's queue, as long as it is not over its high-water mark
     let write = Atomics.load(control, WRITE_POS) >>> 0, read = Atomics.load(control, READ_POS) >>> 0, moved = 0;
@@ -55,8 +59,8 @@ export class WorkerExecutor {
       const available = (write - read) >>> 0, offset = HEAD_CAPACITY + (read % RING_CAPACITY), n = Math.min(available, RING_CAPACITY - (read % RING_CAPACITY), 64 * 1024);
       const piece = data.slice(offset, offset + n); captureBody(op, piece); op.queue.push(piece); op.queued += n; read = (read + n) >>> 0; moved += n;
     }
-    if (moved) { Atomics.store(control, READ_POS, read | 0); this.bridge.stats.bytesIn += moved; op.received += moved; this.post({ type: 'drain', id: op.handle }); changed = true; }
-    if (!op.ended && Atomics.load(control, ENDED) === 1 && ((Atomics.load(control, WRITE_POS) >>> 0) === read)) { op.ended = true; this.exchanges.delete(op.handle); changed = true; }
+    if (moved) { op.trace?.arrived('piece', moved); Atomics.store(control, READ_POS, read | 0); this.bridge.stats.bytesIn += moved; op.received += moved; this.post({ type: 'drain', id: op.handle }); changed = true; }
+    if (!op.ended && Atomics.load(control, ENDED) === 1 && ((Atomics.load(control, WRITE_POS) >>> 0) === read)) { op.ended = true; op.trace?.arrived('end'); this.exchanges.delete(op.handle); changed = true; }
     return changed;
   }
 

@@ -1,0 +1,21 @@
+Original Android 13 telephony profile (decoding a received SMS)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-telephony-profile.sh
+    node --test --import ./tests/setup-javacrypto.mjs tests/telephony-sms.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/telephony-sources.txt, compiled unchanged (no source
+transform): android.telephony.SmsMessage, android.telephony.PhoneNumberUtils, com.android.internal.telephony.gsm.SmsMessage and
+GsmSmsAddress, SmsMessageBase, SmsHeader, SmsAddress, SmsConstants, EncodeException, uicc.IccUtils, com.android.telephony.Rlog,
+and android.provider.Telephony (its nested Sms.Intents.getMessagesFromIntent turns the "pdus" of SMS_RECEIVED into SmsMessages).
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt); these
+classes do not fit in it. The loader (src/apk-loader.js) adds this DEX when the APK's DEX references android.telephony.SmsMessage or
+android.provider.Telephony, when a companion package is installed that may (the "With microG" option: microG's SMS Retriever reads
+SMS_RECEIVED), or when the loader option enableTelephonyProfile is true.
+
+Behaviour: the virtual device's radio delivers an incoming SMS (src/telephony-sms.js: Device panel, Node API) as Android's
+InboundSmsHandler does: SMS_RECEIVED_ACTION to the receivers that hold RECEIVE_SMS, with "pdus" (3GPP SMS-DELIVER PDUs, the body
+in UCS-2) and "format" = "3gpp". The original classes decode them. Not in the profile, so failing with NoClassDefFoundError naming the
+class when reached: the 3GPP2 (CDMA) SmsMessage and GsmAlphabet (GSM 7-bit bodies, alphanumeric senders: its static initialiser reads
+framework config arrays the lab's resource table does not carry). The device never produces either.

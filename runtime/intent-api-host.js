@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
 
 // android.content.Intent public API (API 33) the platform Intent model did not carry, ported from android-13.0.0_r1 Intent.java: filter identity (filterEquals / filterHashCode / cloneFilter),
 // fillIn, selectors, clip data, source bounds, identifier, the list extras, createChooser, the make*Activity factories, the Intent URI syntax (toUri / parseUri / getIntent) and mime type
@@ -51,8 +51,71 @@ export function createIntentApiHost(platform) {
   });
   def(INTENT, 'describeContents', '()I', (r, _m, [self]) => call(r, self, INTENT, 'hasFileDescriptors', [], 'Z') ? 1 : 0);
   def(INTENT, 'hasFileDescriptors', '()Z', (r, _m, [self]) => { for (const entry of (state(r, self).extras ?? new Map()).values()) if (typeof entry.type === 'string' && entry.type.includes('ParcelFileDescriptor')) return 1; return 0; });
-  def(INTENT, 'writeToParcel', '(Landroid/os/Parcel;I)V', () => unsupported('Intent.writeToParcel needs the Parcel wire format for the Intent and its Bundle, which the virtual device only keeps in memory', 'intent-parcel-unsupported'));
-  def(INTENT, 'readFromParcel', '(Landroid/os/Parcel;)V', () => unsupported('Intent.readFromParcel needs the Parcel wire format for the Intent and its Bundle, which the virtual device only keeps in memory', 'intent-parcel-unsupported'));
+  // ---- Parcel form (Intent.writeToParcel / readFromParcel, android-13.0.0_r1): action, data, type, identifier, flags, package, component, source bounds, categories, selector,
+  // clip data, content user hint, the extras Bundle, the original intent. An Intent crosses a process boundary this way (an Intent extra, an AIDL argument, a broadcast to another
+  // package, src/broadcast-queue.js): the extras are read with the class loader of the package that reads them, so its own Parcelable classes are created (Android reads them lazily
+  // with the loader the receiving code sets; the virtual device's Bundles are read at once, with the reading package's loader).
+  const PARCEL = 'Landroid/os/Parcel;', BUNDLE = 'Landroid/os/Bundle;', LOADER = 'Ljava/lang/ClassLoader;', CREATOR = 'Landroid/os/Parcelable$Creator;', INTENT_CREATOR = 'Landroid/content/Intent$1;';
+  const parcel = (r, p, name, parameters = [], result = 'V', args = []) => r.dispatch({ owner: PARCEL, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [p, ...args], 'virtual');
+  const staticCreate = (r, owner, p) => { const creator = r.readStatic({ owner, name: 'CREATOR', type: CREATOR }); return r.dispatch({ owner: CREATOR, name: 'createFromParcel', parameters: [PARCEL], result: OBJECT, signature: `(${PARCEL})${OBJECT}` }, [creator, p], 'virtual'); };
+  const writeIntent = (r, self, out, flags) => {
+    const a = state(r, self), str = value => nullish(value) ? null : value;
+    parcel(r, out, 'writeString8', [STRING], 'V', [str(a.action)]);
+    callStatic(r, URI, 'writeToParcel', [PARCEL, URI], 'V', [out, a.data ?? null]);
+    parcel(r, out, 'writeString8', [STRING], 'V', [str(a.mimeType)]); parcel(r, out, 'writeString8', [STRING], 'V', [str(a.identifier)]);
+    parcel(r, out, 'writeInt', ['I'], 'V', [a.flags | 0]); parcel(r, out, 'writeString8', [STRING], 'V', [str(a.package)]);
+    callStatic(r, COMPONENT, 'writeToParcel', [COMPONENT, PARCEL], 'V', [call(r, self, INTENT, 'getComponent', [], COMPONENT), out]);
+    if (!nullish(a.sourceBounds)) { parcel(r, out, 'writeInt', ['I'], 'V', [1]); call(r, a.sourceBounds, RECT, 'writeToParcel', [PARCEL, 'I'], 'V', [out, flags]); } else parcel(r, out, 'writeInt', ['I'], 'V', [0]);
+    const categories = a.categories ?? []; parcel(r, out, 'writeInt', ['I'], 'V', [categories.length]); for (const category of categories) parcel(r, out, 'writeString8', [STRING], 'V', [category]);
+    if (!nullish(a.selector)) { parcel(r, out, 'writeInt', ['I'], 'V', [1]); writeIntent(r, a.selector, out, flags); } else parcel(r, out, 'writeInt', ['I'], 'V', [0]);
+    if (!nullish(a.clipData)) { parcel(r, out, 'writeInt', ['I'], 'V', [1]); call(r, a.clipData, CLIP, 'writeToParcel', [PARCEL, 'I'], 'V', [out, flags]); } else parcel(r, out, 'writeInt', ['I'], 'V', [0]);
+    parcel(r, out, 'writeInt', ['I'], 'V', [a.contentUserHint ?? -2]);   // UserHandle.USER_CURRENT
+    const extras = call(r, self, INTENT, 'getExtras', [], BUNDLE);
+    if (nullish(extras)) parcel(r, out, 'writeInt', ['I'], 'V', [-1]); else call(r, extras, BUNDLE, 'writeToParcel', [PARCEL, 'I'], 'V', [out, 0]);
+    parcel(r, out, 'writeInt', ['I'], 'V', [0]);   // mOriginalIntent: not kept by the virtual device
+  };
+  /** Intent.readFromParcel into `self` (a constructed Intent); `loader` reads the extras (null: the loader of the package whose code reads the Intent). */
+  const readIntent = (r, self, input, loader = null) => {
+    const a = state(r, self), str = value => nullish(value) ? null : r.stringCharacters(value);
+    a.action = str(parcel(r, input, 'readString8', [], STRING)); a.data = staticCreate(r, URI, input);
+    a.mimeType = str(parcel(r, input, 'readString8', [], STRING)); a.identifier = str(parcel(r, input, 'readString8', [], STRING));
+    a.flags = parcel(r, input, 'readInt', [], 'I'); a.package = str(parcel(r, input, 'readString8', [], STRING));
+    a.component = callStatic(r, COMPONENT, 'readFromParcel', [PARCEL], COMPONENT, [input]); a.target = null; a.componentPackage = null;
+    if (!nullish(a.component)) {   // the target class of a component of the app itself (an Activity it starts); a component of another package keeps only its ComponentName
+      const c = r.object(a.component), className = text(r, c.className), descriptor = className ? `L${className.replaceAll('.', '/')};` : null;
+      if (descriptor && text(r, c.packageName) === platform.packageName && r.classes.has(descriptor) && !r.classOwners?.has(descriptor)) a.target = descriptor;
+    }
+    a.sourceBounds = parcel(r, input, 'readInt', [], 'I') !== 0 ? staticCreate(r, RECT, input) : null;
+    const count = parcel(r, input, 'readInt', [], 'I'); a.categories = count > 0 ? Array.from({ length: count }, () => str(parcel(r, input, 'readString8', [], STRING))) : undefined;
+    a.selector = parcel(r, input, 'readInt', [], 'I') !== 0 ? (() => { const selector = newIntent(r); readIntent(r, selector, input, loader); return selector; })() : null;
+    a.clipData = parcel(r, input, 'readInt', [], 'I') !== 0 ? staticCreate(r, CLIP, input) : null;
+    a.contentUserHint = parcel(r, input, 'readInt', [], 'I');
+    const length = parcel(r, input, 'readInt', [], 'I');
+    a.extras = new Map(); a.extrasPresent = false; a.extrasClassLoader = null;
+    if (length >= 0) {
+      const reading = loader ?? platform.packages?.readingLoader?.(r) ?? null;
+      const bundle = r.makeObject(BUNDLE); r.object(bundle).classLoader = reading;
+      r.dispatch({ owner: BUNDLE, name: '<init>', parameters: [PARCEL, 'I'], result: 'V', signature: `(${PARCEL}I)V` }, [bundle, input, length], 'direct');
+      a.extras = new Map(r.object(bundle).extras ?? []); a.extrasPresent = true; a.extrasClassLoader = reading;
+    }
+    if (parcel(r, input, 'readInt', [], 'I') !== 0) { const original = newIntent(r); readIntent(r, original, input, loader); }   // mOriginalIntent: read and dropped
+  };
+  def(INTENT, 'writeToParcel', '(Landroid/os/Parcel;I)V', (r, _m, [self, out, flags]) => writeIntent(r, self, out, flags | 0));
+  def(INTENT, 'readFromParcel', '(Landroid/os/Parcel;)V', (r, _m, [self, input]) => readIntent(r, self, input));
+  registry.type(INTENT_CREATOR, OBJECT, [CREATOR], { allocatable: true });
+  def(INTENT_CREATOR, 'createFromParcel', `(${PARCEL})${OBJECT}`, (r, _m, [, input]) => { const intent = newIntent(r); readIntent(r, intent, input); return intent; });
+  def(INTENT_CREATOR, 'newArray', `(I)[${OBJECT}`, (r, _m, [, size]) => r.newArray(`[${INTENT}`, size));
+  registry.staticField(INTENT, 'CREATOR', CREATOR, r => r.allocate(INTENT_CREATOR));
+  /**
+   * The Intent `intent` as package `to` receives it from another process: written to a Parcel and read back with `to`'s class loader (its own Parcelable classes in the extras).
+   * Used by the broadcast queue and by anything that hands an Intent to another package's component.
+   */
+  const crossCopy = (r, intent, loader) => {
+    const p = callStatic(r, PARCEL, 'obtain', [], PARCEL, []);
+    try { writeIntent(r, intent, p, 0); parcel(r, p, 'setDataPosition', ['I'], 'V', [0]); const copy = newIntent(r); readIntent(r, copy, p, loader); return copy; }
+    finally { parcel(r, p, 'recycle'); }
+  };
+  platform.intentCrossCopy = crossCopy;
 
   // ---- fillIn ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
   def(INTENT, 'fillIn', `(${INTENT}I)I`, (r, _m, [self, other, flags]) => {

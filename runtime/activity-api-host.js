@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -723,7 +723,9 @@ export function createActivityApiHost(platform) {
   defContext('moveDatabaseFrom', `(${CONTEXT}${STRING})Z`, (r, _m, [, source]) => { if (nullish(source)) npe(r); return 1; });
 
   // ---- Broadcast variants -----------------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const broadcast = (r, self, intent) => call(r, self, CONTEXT, 'sendBroadcast', [INTENT], 'V', [intent]);
+  // Every variant goes to the broadcast queue (src/broadcast-queue.js) with its receiver permissions; the device has one user, so the *AsUser forms are the plain ones.
+  const broadcast = (r, self, intent, options = {}) => platform.broadcasts.send(r, self, intent, options);
+  const permissions = (r, array) => nullish(array) ? [] : r.array(array).elements;
   const needSticky = r => { if (!platform.holdsPermission(r, 'android.permission.BROADCAST_STICKY')) r.throwJava('Ljava/lang/SecurityException;', `Neither user ${platform.virtualProcess.uid} nor current process has android.permission.BROADCAST_STICKY.`); };
   const sticky = platform.stickyBroadcasts ??= gcRoot(new Map());
   const stick = (r, intent) => {
@@ -731,29 +733,23 @@ export function createActivityApiHost(platform) {
     sticky.set(text(r, action), construct(r, INTENT, [INTENT], [intent]));
   };
   defContext('sendBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;)V`, (r, _m, [self, intent]) => broadcast(r, self, intent));
-  defContext('sendBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;${STRING})V`, (r, _m, [self, intent]) => broadcast(r, self, intent));
-  defContext('sendBroadcastWithMultiplePermissions', `(${INTENT}[Ljava/lang/String;)V`, (r, _m, [self, intent]) => broadcast(r, self, intent));
+  defContext('sendBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;${STRING})V`, (r, _m, [self, intent, , permission]) => broadcast(r, self, intent, { receiverPermissions: [permission] }));
+  defContext('sendBroadcastWithMultiplePermissions', `(${INTENT}[Ljava/lang/String;)V`, (r, _m, [self, intent, list]) => broadcast(r, self, intent, { receiverPermissions: permissions(r, list) }));
   defContext('sendStickyBroadcast', `(${INTENT})V`, (r, _m, [self, intent]) => { stick(r, intent); broadcast(r, self, intent); });
   defContext('sendStickyBroadcast', `(${INTENT}${BUNDLE})V`, (r, _m, [self, intent]) => { stick(r, intent); broadcast(r, self, intent); });
   defContext('sendStickyBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;)V`, (r, _m, [self, intent]) => { stick(r, intent); broadcast(r, self, intent); });
   const unstick = (r, intent) => { needSticky(r); const action = call(r, intent, INTENT, 'getAction', [], STRING); if (!nullish(action)) sticky.delete(text(r, action)); };
   defContext('removeStickyBroadcast', `(${INTENT})V`, (r, _m, [, intent]) => unstick(r, intent));
   defContext('removeStickyBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;)V`, (r, _m, [, intent]) => unstick(r, intent));
-  // Ordered broadcasts: delivered to the registered receivers, then the final receiver runs with the initial result (receiver-side result editing is not modelled: no receiver can change it).
-  const ordered = (r, self, intent, resultReceiver, scheduler, initialCode, initialData, initialExtras) => {
-    broadcast(r, self, intent);
-    if (nullish(resultReceiver)) return;
-    platform.queueTask(() => {
-      call(r, resultReceiver, 'Landroid/content/BroadcastReceiver;', 'setResultCode', ['I'], 'V', [initialCode]);
-      call(r, resultReceiver, 'Landroid/content/BroadcastReceiver;', 'onReceive', [CONTEXT, INTENT], 'V', [self, intent]);
-    }, 0, [resultReceiver, intent, self, initialData, initialExtras]);
-  };
-  defContext('sendOrderedBroadcast', `(${INTENT}${STRING})V`, (r, _m, [self, intent]) => ordered(r, self, intent, null, null, -1, null, null));
-  defContext('sendOrderedBroadcast', `(${INTENT}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , receiver, handler, code, data, extras]) => ordered(r, self, intent, receiver, handler, code, data, extras));
-  defContext('sendOrderedBroadcast', `(${INTENT}${STRING}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , , receiver, handler, code, data, extras]) => ordered(r, self, intent, receiver, handler, code, data, extras));
-  defContext('sendOrderedBroadcast', `(${INTENT}I${STRING}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;${STRING}${BUNDLE}${BUNDLE})V`, (r, _m, [self, intent, , , , receiver, handler, data, extras]) => ordered(r, self, intent, receiver, handler, -1, data, extras));
-  defContext('sendOrderedBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , , receiver, handler, code, data, extras]) => ordered(r, self, intent, receiver, handler, code, data, extras));
-  defContext('sendStickyOrderedBroadcast', `(${INTENT}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, receiver, handler, code, data, extras]) => { stick(r, intent); ordered(r, self, intent, receiver, handler, code, data, extras); });
+  // Ordered broadcasts: one receiver after the other by priority, each sees (and may change or abort) the result of the previous one; the result receiver runs last with the final result.
+  const ordered = (r, self, intent, permission, resultReceiver, scheduler, initialCode, initialData, initialExtras) =>
+    broadcast(r, self, intent, { ordered: true, receiverPermissions: [permission], resultReceiver, initialCode, initialData, initialExtras });
+  defContext('sendOrderedBroadcast', `(${INTENT}${STRING})V`, (r, _m, [self, intent, permission]) => ordered(r, self, intent, permission, null, null, -1, null, null));
+  defContext('sendOrderedBroadcast', `(${INTENT}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, permission, receiver, handler, code, data, extras]) => ordered(r, self, intent, permission, receiver, handler, code, data, extras));
+  defContext('sendOrderedBroadcast', `(${INTENT}${STRING}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, permission, , receiver, handler, code, data, extras]) => ordered(r, self, intent, permission, receiver, handler, code, data, extras));
+  defContext('sendOrderedBroadcast', `(${INTENT}I${STRING}${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;${STRING}${BUNDLE}${BUNDLE})V`, (r, _m, [self, intent, code, permission, , receiver, handler, data, extras]) => ordered(r, self, intent, permission, receiver, handler, code, data, extras));
+  defContext('sendOrderedBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;${STRING}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , permission, receiver, handler, code, data, extras]) => ordered(r, self, intent, permission, receiver, handler, code, data, extras));
+  defContext('sendStickyOrderedBroadcast', `(${INTENT}Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, receiver, handler, code, data, extras]) => { stick(r, intent); ordered(r, self, intent, null, receiver, handler, code, data, extras); });
   defContext('sendStickyOrderedBroadcastAsUser', `(${INTENT}Landroid/os/UserHandle;Landroid/content/BroadcastReceiver;Landroid/os/Handler;I${STRING}${BUNDLE})V`, (r, _m, [self, intent, , receiver, handler, code, data, extras]) => { stick(r, intent); ordered(r, self, intent, receiver, handler, code, data, extras); });
   // Starting / stopping services and activities through the Context.
   defContext('startActivity', `(${INTENT}${BUNDLE})V`, (r, _m, [self, intent]) => call(r, self, CONTEXT, 'startActivity', [INTENT], 'V', [intent]));

@@ -7,11 +7,12 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=8e11a37fba6a';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=8e11a37fba6a';
-import { encodeVariantImages } from './render-variant-image.js?v=8e11a37fba6a';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=8e11a37fba6a';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=8e11a37fba6a';
+import { pluginWorkerSource } from './plugin-runtime.js?v=ad32040fbef9';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=ad32040fbef9';
+import { encodeVariantImages } from './render-variant-image.js?v=ad32040fbef9';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=ad32040fbef9';
+import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=ad32040fbef9';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=ad32040fbef9';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -21,7 +22,7 @@ for (const method of ['frame', 'invoke', 'adb']) ACTION_METHODS.add(method);   /
 /** The events a plugin can listen to ('frame': the device moved or resized; 'modal' / 'tab' / 'overlay' / 'track': the runtime's own, for the handles of lab.modal, lab.tab, lab.overlay, lab.track). */
 export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track']);
 const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
-const VM_METHODS = new Set(['methods', 'scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
+const VM_METHODS = new Set(['batch', 'methods', 'scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
 /** The screen as the 'screen' event and lab.screen() give it, from the snapshot the page drew. */
 export function screenFromSnapshot(snapshot, { packageName = null, frame = 0 } = {}) {
@@ -122,12 +123,14 @@ function defaultCreateWorker(name) {
  */
 const FRESHEN_MIN_MS = 150;   // a reader of the screen's components forces a fresh semantics walk at most this often (a plugin polling every frame must not undo the pacing)
 export function createPluginHost({ vm = null, createWorker = defaultCreateWorker, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id),
-  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null, freshen = null } = {}) {
+  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null, freshen = null, power = 'normal' } = {}) {
+  let powerLevel = sanitizePower(power), P = powerParams(powerLevel);   // "Plugin power" (src/plugin-power.js): the page's pacing numbers (vmGapMs, composeTreeMs, watchMinMs)
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
   let lastFreshenAt = -Infinity, lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
   let logBuffer = [], logDropped = 0, netPending = new Map(), eventTimer = null;
   const cache = new Map(); let cacheFrame = -1;   // VM answers of the current frame: key -> Promise
   const vmQueue = []; let vmBusy = false, vmLastAt = -Infinity, vmTimer = null;
+  let workerStats = null;
   const stats = { vmQueries: 0, cacheHits: 0, vmMs: 0, events: 0, workersStarted: 0 };
   const running = () => [...plugins.values()].filter(plugin => plugin.worker);
   const subscribed = name => running().filter(plugin => plugin.subs.has(name));
@@ -149,7 +152,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   // ---- VM queries ---------------------------------------------------------------------------------------------------------------------------------------------------
   function pumpVm() {
     if (vmBusy || vmTimer !== null || !vmQueue.length) return;
-    const wait = vmLastAt + VM_QUERY_GAP_MS - now(); if (wait > 0) { vmTimer = setTimer(() => { vmTimer = null; pumpVm(); }, wait); return; }
+    const wait = vmLastAt + P.vmGapMs - now(); if (wait > 0) { vmTimer = setTimer(() => { vmTimer = null; pumpVm(); }, wait); return; }
     const job = vmQueue.shift(); vmBusy = true; vmLastAt = now(); stats.vmQueries++;
     const started = now();
     Promise.resolve().then(() => { if (!vm?.worker || typeof vm.pluginQuery !== 'function') throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); return vm.pluginQuery(job.method, job.args); })
@@ -277,6 +280,11 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       const shot = await captureImage({ snapshot: lastSnapshot, element: region ? null : element, region, padding: named ? args?.padding : 0, maxWidth: args?.maxWidth, type: args?.type });
       return named ? { ...shot, element: named.element, matches: named.matches } : shot;
     }
+    if (method === 'batch') {   // lab.batch: several read-only queries in one Worker task (src/plugin-power.js BATCH_QUERIES); every item is checked here and again in the Worker
+      const queries = Array.isArray(args?.queries) ? args.queries : null;
+      if (!queries || !queries.length || queries.length > BATCH_MAX) throw Object.assign(new Error(`lab.batch takes 1 to ${BATCH_MAX} queries.`), { code: 'bad-args' });
+      for (const item of queries) if (!BATCH_QUERIES.includes(item?.query)) throw Object.assign(new Error(`Not allowed in lab.batch: ${String(item?.query).slice(0, 40)}`), { code: 'bad-query' });
+    }
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Unknown method: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }
     catch (error) { if (error?.code === 'no-apk' && EMPTY[method]) return EMPTY[method](); throw error; }
@@ -288,7 +296,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     if (method === 'composeTree') {
       const key = `composeTree:${safeArgs.maxNodes ?? ''}:${(safeArgs.locals ?? []).join(',')}`;
       if (cacheFrame === frame && cache.has(key)) { stats.cacheHits++; return cache.get(key); }
-      const wait = plugin.lastComposeAt + COMPOSE_TREE_MS - now();
+      const wait = plugin.lastComposeAt + P.composeTreeMs - now();
       if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
       if (!plugin.worker) throw Object.assign(new Error('Plugin stopped.'), { code: 'stopped' });
       plugin.lastComposeAt = now();
@@ -304,7 +312,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     const t = now(); if (t - plugin.rate.at >= 1000) { plugin.rate.at = t; plugin.rate.count = 0; }
     if (++plugin.rate.count > MAX_MESSAGES_PER_SECOND) { plugin.stats.droppedMessages++; return; }
     switch (data.t) {
-      case 'ready': plugin.release?.(); plugin.release = null; send(plugin, { t: 'start', id: plugin.id, name: plugin.name, code: plugin.code, info: { packageName: getPackage() ?? null } }); return;
+      case 'ready': plugin.release?.(); plugin.release = null; send(plugin, { t: 'power', watchMinMs: P.watchMinMs }); send(plugin, { t: 'start', id: plugin.id, name: plugin.name, code: plugin.code, info: { packageName: getPackage() ?? null } }); return;
       case 'started': plugin.status = 'rodando'; changed(plugin); return;
       case 'done': if (!data.ok) { plugin.status = 'erro'; if (data.phase === 'compile') stopWorker(plugin, 'erro'); } plugin.finished = true; changed(plugin); return;
       case 'error': record(plugin, plugin.errors, { phase: clipText(data.phase, 40), message: clipText(data.message, 2000), stack: clipText(data.stack, 4000), at: Date.now() }, MAX_ERRORS); plugin.errorCount++; if (data.phase === 'compile' || data.phase === 'run') plugin.status = 'erro'; changed(plugin); return;
@@ -458,7 +466,19 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     /** A plugin's output as JSON ({ [block id]: value }, outputsOf), by id or name; null when there is no such plugin. */
     outputs(idOrName) { const key = String(idOrName ?? ''), plugin = plugins.get(key) ?? [...plugins.values()].find(item => item.name === key); return plugin ? outputsOf(plugin.output) : null; },
     get runningCount() { return running().length; },
-    get stats() { return { ...stats, queued: vmQueue.length, running: running().length }; },
+    get stats() { return { ...stats, queued: vmQueue.length, running: running().length, power: powerLevel, worker: workerStats }; },
+    /** "Plugin power": the page's pacing changes now (queued queries use it at once; each running plugin is told its shortest watch interval). The Worker's side is the client's `setPluginPower`. */
+    get power() { return powerLevel; },
+    /** The VM Worker's serving numbers ({ level, stats } from pluginPowerStatus), kept for `stats.worker` and the diagnostics. */
+    setWorkerStats(status) { workerStats = status ?? null; },
+    get workerStats() { return workerStats; },
+    setPower(level) {
+      const next = sanitizePower(level); if (next === powerLevel) return powerLevel;
+      powerLevel = next; P = powerParams(next);
+      for (const plugin of running()) send(plugin, { t: 'power', watchMinMs: P.watchMinMs });
+      if (vmTimer !== null) { clearTimer(vmTimer); vmTimer = null; pumpVm(); }   // a pause chosen under the old gap is not waited out
+      return powerLevel;
+    },
     dispose() { for (const plugin of plugins.values()) stopWorker(plugin); plugins.clear(); if (eventTimer !== null) clearTimer(eventTimer); eventTimer = null; if (vmTimer !== null) clearTimer(vmTimer); vmTimer = null; },
   };
 }

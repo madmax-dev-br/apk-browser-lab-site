@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=8e11a37fba6a';
-import { APKError } from './apk-runtime.js?v=8e11a37fba6a';
-import { ephemeronMap } from './heap-gc.js?v=8e11a37fba6a';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=8e11a37fba6a';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=8e11a37fba6a';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=ad32040fbef9';
+import { APKError } from './apk-runtime.js?v=ad32040fbef9';
+import { ephemeronMap } from './heap-gc.js?v=ad32040fbef9';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=ad32040fbef9';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=ad32040fbef9';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -361,7 +361,7 @@ export class AndroidStyleBackend {
         const type='Landroid/graphics/drawable/DrawableInflater;',object=runtime.object(receiver);
         if(!object.sourceDrawableInflater){
           if(!runtime.classes.has(type))fail('Original AOSP DrawableInflater source DEX is unavailable');
-          const inflater=runtime.allocate(type),loader=runtime.dispatch({owner:'Ljava/lang/ClassLoader;',name:'getSystemClassLoader',parameters:[],result:'Ljava/lang/ClassLoader;',signature:'()Ljava/lang/ClassLoader;'},[],'static');
+          const inflater=runtime.allocate(type),loader=runtime.applicationClassLoader??=this.platform.classLoaders.createApplicationLoader(runtime);   // Resources.getDrawableInflater: the Resources' class loader, the app's (a <drawable class=...> names an app class)
           runtime.dispatch({owner:type,name:'<init>',parameters:[RESOURCES,'Ljava/lang/ClassLoader;'],result:'V',signature:`(${RESOURCES}Ljava/lang/ClassLoader;)V`},[inflater,receiver,loader],'direct');
           object.sourceDrawableInflater=inflater;
         }

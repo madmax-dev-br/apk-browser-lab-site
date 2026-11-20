@@ -1,33 +1,33 @@
-import { VMClock } from './vm-clock.js?v=8e11a37fba6a';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=8e11a37fba6a';
-import { OperationMonitor } from './operation-monitor.js?v=8e11a37fba6a';
-import { ExecutionProfile } from './execution-profile.js?v=8e11a37fba6a';
-import { SamplingProfiler } from './sampling-profiler.js?v=8e11a37fba6a';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8e11a37fba6a';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8e11a37fba6a';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8e11a37fba6a';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8e11a37fba6a';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8e11a37fba6a';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=8e11a37fba6a';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8e11a37fba6a';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8e11a37fba6a';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8e11a37fba6a';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8e11a37fba6a';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=8e11a37fba6a';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=8e11a37fba6a';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=8e11a37fba6a';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=8e11a37fba6a';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8e11a37fba6a';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=8e11a37fba6a';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=8e11a37fba6a';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=8e11a37fba6a';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=8e11a37fba6a';
+import { VMClock } from './vm-clock.js?v=ad32040fbef9';
+import { overrideHit, RUN_BODY } from './method-overrides.js?v=ad32040fbef9';
+import { OperationMonitor } from './operation-monitor.js?v=ad32040fbef9';
+import { ExecutionProfile } from './execution-profile.js?v=ad32040fbef9';
+import { SamplingProfiler } from './sampling-profiler.js?v=ad32040fbef9';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ad32040fbef9';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ad32040fbef9';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ad32040fbef9';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ad32040fbef9';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ad32040fbef9';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=ad32040fbef9';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ad32040fbef9';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ad32040fbef9';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ad32040fbef9';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ad32040fbef9';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=ad32040fbef9';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ad32040fbef9';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ad32040fbef9';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=ad32040fbef9';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ad32040fbef9';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ad32040fbef9';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ad32040fbef9';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ad32040fbef9';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=ad32040fbef9';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=8e11a37fba6a';
-import { bootClassLacksMember } from './boot-class-members.js?v=8e11a37fba6a';
-export { APKError } from './apk-error.js?v=8e11a37fba6a';
+import { Scheduler, Blocked } from './scheduler.js?v=ad32040fbef9';
+import { bootClassLacksMember } from './boot-class-members.js?v=ad32040fbef9';
+export { APKError } from './apk-error.js?v=ad32040fbef9';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -415,7 +415,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const name of dex.classes.keys()) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|telephony|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, dex);
       }
@@ -3334,7 +3334,7 @@ export class APKRuntime {
       if (!TIME_UNITS.includes(args[0])) this.throwJava('Ljava/lang/IllegalArgumentException;', `No TimeUnit.${args[0]}`);
       return constant(args[0]);
     }
-    if (method.owner === 'Ljava/lang/ClassLoader;' && name === 'getSystemClassLoader') return this.applicationClassLoader ??= this.platform?.classLoaders?.createApplicationLoader(this) ?? this.makeObject(method.owner);
+    if (method.owner === 'Ljava/lang/ClassLoader;' && name === 'getSystemClassLoader') return this.platform?.classLoaders?.systemLoader?.(this) ?? this.makeObject(method.owner);   // the boot-only system loader (class-loader-host.js)
     if (method.owner === 'Ljava/lang/ClassLoader;') {
       this.object(args[0]);
       if (name === 'loadClass') return this.resolveClass(args[1], false, args[0]);
@@ -3665,7 +3665,11 @@ export class APKRuntime {
           if(from<0||count<0||from>source.elements.length-count)this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;','Invalid String byte array range');
           text=decodeBytes(unsignedBytes(source.cells,from,from+count),this.stringCodec(selector,true));
         }
-        const units=(this.constructedStringUnits??0)+text.length;if(text.length>4000000||units>16*1024*1024)fail('Constructed String UTF-16 storage limit exceeded');this.constructedStringUnits=units;object.stringValue=text;return;
+        // The text of one constructed String is bounded; the total is not a lifetime count any more. It counted every String ever built from bytes or chars and never went down,
+        // so a session that kept decoding network answers (OkHttp's ResponseBody.string(), new String(bytes, UTF_8)) failed after about 16M UTF-16 units in all, some fifty
+        // answers of 300 KB, whatever had been collected. The WebAssembly core keeps the text in a String of its own heap, which its collector and its OutOfMemoryError bound as
+        // on Android: no count there. The JavaScript VM keeps it on the heap object: what was built since the last collection is counted (src/heap-gc.js resets it).
+        const units=(this.constructedStringUnits??0)+text.length;if(text.length>4000000||(!this.wasm&&units>16*1024*1024))fail('Constructed String UTF-16 storage limit exceeded');this.constructedStringUnits=units;object.stringValue=text;return;
       }
       if(name==='copyValueOf'){const source=this.array(args[0]);if(source.type!=='[C')this.throwJava('Ljava/lang/ClassCastException;','copyValueOf requires char[]');return utf16String(source.cells);}
       const value = this.stringCharacters(args[0]);

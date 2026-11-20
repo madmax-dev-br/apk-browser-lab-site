@@ -1,9 +1,9 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=8e11a37fba6a';
-import { createReadingHold } from './reading-hold.js?v=8e11a37fba6a';
-import { sanitizeHosts } from './device-settings.js?v=8e11a37fba6a';
+import { MAX_ENTRIES } from './netlog.js?v=ad32040fbef9';
+import { createReadingHold } from './reading-hold.js?v=ad32040fbef9';
+import { sanitizeHosts } from './device-settings.js?v=ad32040fbef9';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -26,7 +26,7 @@ export function matchesFilter(entry, { text = '', category = 'all' } = {}) {
   else if (category === 'proxied') { if (!entry.proxiedVia) return false; }   // "Via proxy": went through Device › Proxy
   else if (category !== 'all' && categoryOf(entry) !== category) return false;
   const needle = String(text).trim().toLowerCase(); if (!needle) return true;
-  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
+  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}${entry.relayChannel === 'mux' ? ' channel' : entry.relayChannel === 'fallback' ? ' fallback' : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
 }
 
 const pad = (value, width = 2) => String(value).padStart(width, '0');
@@ -68,7 +68,11 @@ export function describeOutcome(entry) {
 }
 
 /** One table row's text, `HH:MM:SS.mmm METHOD host/path -> status  size  duration`. */
-export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.mockId ? ' [MOCK]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.mockId ? ' [MOCK]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}${entry.relayChannel === 'mux' ? ' [CHANNEL]' : entry.relayChannel === 'fallback' ? ' [CHANNEL FALLBACK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+/** The note of an entry sent while the relay's parallel channel is on (Device › Parallel relay channel): carried by it, or sent as a separate request and why. */
+export const channelNote = entry => entry.relayChannel === 'mux' ? 'Carried by the relay\'s parallel channel (Device › Parallel relay channel): one WebSocket to the relay holds every exchange at once, with no preflight and no per-origin connection limit.'
+  : entry.relayChannel === 'fallback' ? `Parallel relay channel on, but not used for this exchange: ${entry.relayChannelNote ?? 'the channel was not open'}. It went as a separate request, as without the setting.`
+  : 'Parallel relay channel on: waiting for the exchange to start.';
 /** The note of an entry a "Redirecionar hosts" rule sent elsewhere. */
 export const redirectNote = entry => `Redirected by the lab (Redirect hosts, Controls): the app asked for ${entry.url}; the request went to ${entry.mappedUrl} by the rule "${entry.mappedRule}". The app sees the original URL.`;
 const FAILED = new Set(['error', 'unknown-host', 'timeout', 'unsupported']);
@@ -186,6 +190,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     }
     if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
     if (entry.proxiedVia) box.append(el('div', 'netlog-note', `Via proxy ${entry.proxiedVia} (Controls › Device › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`));
+    if (entry.relayChannel) box.append(el('div', 'netlog-note', channelNote(entry)));
     if (entry.finalUrl) box.append(el('div', 'netlog-note', `The server redirected (3xx) and the transport followed to ${entry.finalUrl}`));
     if (note) box.append(el('div', `netlog-note netlog-note-${categoryOf(entry)}`, note));
     if (entry.outcome === 'refused-by-allowlist' && entry.refusedHost) {
@@ -205,6 +210,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
   const row = entry => {
     const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId ? ' is-mocked' : ''}${entry.mappedUrl ? ' is-redirected' : ''}${entry.proxiedVia ? ' is-proxied' : ''}`), line = el('div', 'netlog-line');
     const target = el('span', 'netlog-target', `${entry.host}${entry.path}`); if (entry.mockId) target.prepend(el('b', 'netlog-mock', 'MOCK'));
+    if (entry.relayChannel === 'mux' || entry.relayChannel === 'fallback') { const badge = el('b', `netlog-channel${entry.relayChannel === 'fallback' ? ' is-fallback' : ''}`, entry.relayChannel === 'mux' ? 'CHANNEL' : 'NO CHANNEL'); badge.title = channelNote(entry); target.prepend(badge); }
     if (entry.proxiedVia) { const badge = el('b', 'netlog-proxied', 'PROXY'); badge.title = `Via proxy ${entry.proxiedVia}`; target.prepend(badge); }
     if (entry.mappedUrl) { const badge = el('b', 'netlog-redirected', 'REDIRECTED'); badge.title = `Sent to ${entry.mappedUrl}`; target.prepend(badge); }
     line.append(el('span', 'netlog-time', formatTime(entry.wall)), el('span', 'netlog-method', entry.method), target, el('span', 'netlog-status', statusLabel(entry)), el('span', 'netlog-size', formatSize(entry.responseBytes)), el('span', 'netlog-duration', formatDuration(entry.durationMs)));

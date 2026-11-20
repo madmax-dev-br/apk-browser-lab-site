@@ -2,9 +2,10 @@
 // Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=8e11a37fba6a';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=8e11a37fba6a';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=8e11a37fba6a';
+import { RENDER_MS } from './plugin-host.js?v=ad32040fbef9';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=ad32040fbef9';
+import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=ad32040fbef9';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=ad32040fbef9';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };
@@ -49,7 +50,15 @@ const imageURLs = new Map();
 function imageURL(blob) { let url = imageURLs.get(blob); if (!url) { url = URL.createObjectURL(blob); imageURLs.set(blob, url); } return url; }
 export function releaseImages(liveBlobs) { for (const [blob, url] of imageURLs) if (!liveBlobs.has(blob)) { URL.revokeObjectURL(url); imageURLs.delete(blob); } }
 
-export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), toolbarRoot = null, setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null }) {
+const POWER_HELP = 'Plugins read at low priority: never during an operation or a VM event, never right after a tap.';
+/** "Plugin power High: 120 served, 3.1 s of VM time, 40 deferred, 0 rejected, longest 22 ms" (no Worker numbers yet: just the level). */
+export function powerStatsText(status) {
+  if (!status) return '';
+  const stats = status.stats ?? {}, name = POWER[sanitizePower(status.level)].label, round = value => Math.round((Number(value) || 0) * 10) / 10;
+  if (!stats.served && !stats.deferred && !stats.rejected) return `Plugin power ${name}: no plugin query yet.`;
+  return `Plugin power ${name}: ${stats.served} served${stats.batches ? ` (${stats.batches} batches of ${stats.batched} queries)` : ''}, ${round((stats.ms ?? 0) / 1000)} s of VM time, ${stats.deferred} deferred, ${stats.rejected} rejected, longest ${round(stats.maxMs)} ms${stats.queued ? `, ${stats.queued} waiting` : ''}.`;
+}
+export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), toolbarRoot = null, setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null, onPower = () => {} }) {
   const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set() };
   const doc = outputRoot?.ownerDocument ?? globalThis.document;
   const el = (tag, className, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
@@ -293,8 +302,19 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   // a console <details> opening shows its lines (they are not rendered while closed)
   outputRoot?.addEventListener('click', event => { const box = event.target?.closest?.('.po-console'); if (box) setTimer(() => { for (const [id, entry] of S.cards) if (entry.consoleBox === box) { entry.consoleCount = -1; schedule(id); } }, 0); });
 
+  // "Plugin power" (src/plugin-power.js): the level is stored, given to the host (the page's pacing) and to `onPower` (the VM Worker's budget); applied live, no reload.
+  const powerNode = $('pl-power');
+  const showPower = level => { const note = $('pl-power-note'); if (note) note.textContent = POWER_NOTES[level] + ' ' + POWER_HELP; };
+  if (powerNode) {
+    const level = loadPower(); powerNode.value = level; host.setPower?.(level); showPower(level); try { onPower(level); } catch { /* the VM may not exist yet: its client keeps the level for the next query */ }
+    powerNode.addEventListener('change', () => { const next = sanitizePower(powerNode.value); powerNode.value = next; savePower(next); host.setPower?.(next); showPower(next); try { onPower(next); } catch { /* idem */ } });
+  }
   host.setPlugins(S.plugins); renderList();
   return {
+    /** The Worker's serving numbers for the Controls line and the diagnostics ({ level, stats } from APKWorkerClient.pluginPowerStatus, or null). */
+    showPowerStats(status) { const node = $('pl-power-stats'); if (node) node.textContent = powerStatsText(status); },
+    /** The level the panel shows. */
+    get power() { return sanitizePower(powerNode?.value); },
     /** The host reports a change of one plugin (status, output, console): rendered at most every RENDER_MS. */
     changed: id => schedule(id),
     /** The open package changed: the host re-evaluates the package filters. */

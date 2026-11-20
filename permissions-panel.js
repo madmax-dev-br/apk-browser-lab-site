@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=8e11a37fba6a';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=8e11a37fba6a';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=ad32040fbef9';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=ad32040fbef9';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 export const PERMISSION_ICONS = {
@@ -43,7 +43,7 @@ export function createPermissionsPanel({ $, vm, location }) {
     else if (!S.list.length) empty.textContent = 'This app\'s manifest requests no runtime (dangerous) permissions. Normal permissions are granted at install time.';
     const granted = S.pkg ? computeGranted(S.config, S.manifest) : new Set();
     $('perms-summary').textContent = !S.pkg ? 'no app' : S.list.length ? `${S.list.filter(item => granted.has(item.name)).length} of ${S.list.length} granted` : 'none requested';
-    $('perms-reset').disabled = !S.pkg;
+    $('perms-reset').disabled = !S.pkg; if ($('sms-send')) $('sms-send').disabled = !S.pkg;
     let currentLabel = null, group = null;
     for (const entry of S.list) {
       if (entry.label !== currentLabel) {
@@ -132,6 +132,18 @@ export function createPermissionsPanel({ $, vm, location }) {
     location.set(block); push({ location: block });
   }
   for (const id of ['loc-enabled', 'loc-lat', 'loc-lon', 'loc-acc']) $(id).addEventListener('input', onLocationInput);
+  // Incoming SMS: the device's radio receives it (src/telephony-sms.js, apk-worker 'incoming-sms'); the VM delivers SMS_RECEIVED on its next event
+  const smsButton = $('sms-send');
+  const sendSms = async () => {
+    if (!vm.worker || !S.pkg) return;
+    const from = $('sms-from').value.trim(), body = $('sms-body').value;
+    if (!body.trim()) { $('sms-note').textContent = 'Write the message text first.'; return; }
+    smsButton.disabled = true;
+    try { await vm.receiveSms(from, body); $('sms-note').textContent = `SMS from ${from} received by the device (${body.length} characters): SMS_RECEIVED goes to the apps that hold RECEIVE_SMS.`; }
+    catch (error) { $('sms-note').textContent = `Not delivered: ${error?.message ?? error}`; }
+    finally { smsButton.disabled = !S.pkg; }
+  };
+  smsButton?.addEventListener('click', sendSms);
   $('perms-reset').addEventListener('click', () => { if (!S.pkg) return; clearConfig(S.pkg); S.config = emptyConfig(); $('perms-note').textContent = 'This app\'s permissions restored to "Ask".'; render(); push({ config: S.config }); });
 
   return {

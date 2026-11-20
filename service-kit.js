@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ad32040fbef9';
 
 // Shared plumbing of the system-service hosts (hardware-services-host.js, device-services-host.js, system-managers-host.js): a host contract registry plus the Context service
 // table -- each service has a Context.*_SERVICE name and a manager class; the manager object is a host object created once per runtime. Behaviour follows what an API 33 phone
@@ -7,7 +7,10 @@ import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
 export const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', LIST = 'Ljava/util/List;', CONTEXT = 'Landroid/content/Context;';
 
 /** The features the virtual device advertises. Hardware that is absent from this set is absent from every service that models it. */
-export const DEVICE_FEATURES = Object.freeze(['android.hardware.wifi']);
+export const DEVICE_FEATURES = Object.freeze(['android.hardware.wifi',
+  // LocationManager has gps and network providers that report the device's simulated position (hardware-services-host.js), so the device advertises them as the emulator does
+  // (a location provider such as a fused-location service checks these features before it answers LocationSettings requests).
+  'android.hardware.location', 'android.hardware.location.gps', 'android.hardware.location.network']);
 
 export function createServiceKit(platform) {
   const registry = createHostRegistry(), { type } = registry, rawDef = registry.def, rawStaticField = registry.staticField, classOf = new Map();

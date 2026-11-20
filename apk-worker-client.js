@@ -1,14 +1,15 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=8e11a37fba6a';
-import { createRasterReceiver } from './raster-cache.js?v=8e11a37fba6a';
+import { createWebAudioPlayer } from './web-audio-player.js?v=ad32040fbef9';
+import { createRasterReceiver } from './raster-cache.js?v=ad32040fbef9';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=ad32040fbef9';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8e11a37fba6a', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=ad32040fbef9', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
       return new Worker(url, { type: 'module', name: 'apk-dex-vm' });
     });
     this.loadTimeoutMs = loadTimeoutMs; this.eventTimeoutMs = eventTimeoutMs;
-    this.worker = null; this.pending = null; this.sequence = 0; this.rasters = createRasterReceiver();
+    this.worker = null; this.pending = null; this.sequence = 0; this.rasters = createRasterReceiver(); this.pluginPower = DEFAULT_POWER;
   }
   /** Starts the Worker ahead of the first load and has it fetch, verify and compile the lab's assets (framework, Skia, ICU, the core...) while the user picks an APK: the next
    *  load() uses this Worker instead of starting another. Does nothing when a Worker already exists. Errors are left to the load, which reports them. */
@@ -143,6 +144,8 @@ export class APKWorkerClient {
     });
   }
   /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
+  /** The device's radio receives an SMS from `from` with text `body` (src/telephony-sms.js): SMS_RECEIVED goes to the holders of RECEIVE_SMS. */
+  async receiveSms(from, body) { return this.sideCall('incoming-sms', { from, body }); }
   async setMethodOverrides(overrides) { return (await this.sideCall('method-overrides', { overrides })).statuses; }
   /** "Resolução no movimento" (1 = always full density, or 0.75 / 0.5 / 0.35 / 0.25) and "Tela nova em baixa resolução", applied live. */
   /** "Renderização" (src/gpu-raster.js): 'cpu' (default) or 'gpu' (experimental), applied live; resolves the renderer status (requested, active, fallback reason). */
@@ -156,6 +159,14 @@ export class APKWorkerClient {
     this.layoutBoundsWorker = wanted ? worker : null;
     return this.sideCall('layout-bounds', { on: wanted }).then(reply => !!reply.layoutBounds, () => { if (this.layoutBoundsWorker === worker) this.layoutBoundsWorker = null; return false; });
   }
+  /** "Show frame rate": with `on`, the Worker adds what it measured for each frame to its snapshots (src/frame-meter.js); sent only when it changes for the current Worker (a new Worker starts
+   * with it off); resolves false when there is no Worker or the call fails. */
+  syncFrameTiming(on) {
+    const worker = this.worker, wanted = !!on; if (!worker) return Promise.resolve(false);
+    if ((this.frameTimingWorker === worker) === wanted) return Promise.resolve(wanted);
+    this.frameTimingWorker = wanted ? worker : null;
+    return this.sideCall('frame-timing', { on: wanted }).then(reply => !!reply.frameTiming, () => { if (this.frameTimingWorker === worker) this.frameTimingWorker = null; return false; });
+  }
   async setTimeLimits(seconds) { return (await this.sideCall('time-limits', { seconds })).limits; }
   /** The Logcat panel opened (the Worker posts its recent lines, then streams) or closed (only a counter, src/logcat.js). Without a Worker there is nothing to stream. */
   async setLogcatStreaming(open) { if (!this.worker) return { streaming: false, total: 0 }; return this.sideCall('logcat-stream', { open: !!open }); }
@@ -163,7 +174,11 @@ export class APKWorkerClient {
 
   async inspectCompose({ maxNodes = 2000 } = {}) { if (!this.worker) return null; return (await this.sideCall('compose-inspect', { maxNodes }, 15000)).inspection ?? null; }
   /** A page plugin's read-only query (src/plugin-queries.js; queued and served at low priority by the Worker). Rejects with `code` 'no-apk' when no APK is loaded. */
-  async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args }, 10000); return { value: reply.value, ms: reply.ms }; }
+  async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args, power: this.pluginPower }, 10000); return { value: reply.value, ms: reply.ms }; }
+  /** "Plugin power" (src/plugin-power.js): the level every later plugin query carries, and, with a Worker, the level applied at once. Resolves with { level, stats } (the Worker's serving stats), or null without a Worker. */
+  async setPluginPower(level) { this.pluginPower = sanitizePower(level); if (!this.worker) return null; const reply = await this.sideCall('plugin-power', { level: this.pluginPower }, 4000); return { level: reply.level, stats: reply.stats }; }
+  /** The Worker's plugin serving stats { served, ms, deferred, rejected, maxMs, batches, batched, queued } and its level; null without a Worker. */
+  async pluginPowerStatus() { if (!this.worker) return null; const reply = await this.sideCall('plugin-power', {}, 2000); return { level: reply.level, stats: reply.stats }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
   /** The "com microG" entry points (src/microg-entry-points.js): sets the page's constant-value mocks ([{ id, value }]; an id left out is unmocked) and resolves the entry-point rows. */
   async setMicrogMocks(mocks) { return (await this.sideCall('microg-mocks', { mocks })).entryPoints ?? []; }

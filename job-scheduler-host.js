@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ad32040fbef9';
 
 // android.app.job: JobScheduler, JobInfo (+ Builder), JobParameters and the JobService base class, with the scheduling rules of Android 13's JobSchedulerService for the
 // constraints a virtual device can answer. AOSP references: frameworks/base/apex/jobscheduler (JobSchedulerService.validateJob, JobStatus.isReady / wouldBeReadyWithConstraint,
@@ -59,7 +59,14 @@ export function createJobSchedulerHost(platform) {
   const clock = () => platform.clock.now();
   const dispatch = (r, owner, name, parameters, result, args, mode = 'virtual') => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, mode);
   const className = (r, component) => r.stringCharacters(dispatch(r, COMPONENT, 'getClassName', [], STRING, [component]));
-  const describe = spec => `(job:${spec.id}/${spec.className})`;
+  const describe = spec => `(job:${spec.id}/${spec.owner ? spec.owner.name + '/' : ''}${spec.className})`;
+  // Jobs belong to the package that schedules them (JobSchedulerService keys them by uid): with a companion package installed (src/package-registry.js), each package schedules,
+  // lists and cancels its own jobs, and its JobService runs in its own process with its own Context. Without one, the owner is always the app (null) and the key is the job id.
+  const packages = () => platform.packages?.multi ? platform.packages : null;
+  const ownerOf = r => { const entry = packages()?.callerEntry(r) ?? null; return entry && !entry.main ? entry : null; };
+  const keyOf = (owner, id) => owner ? `${owner.name}:${id}` : id;
+  const ownerName = owner => owner ? owner.name : platform.packageName;
+  const serviceKey = spec => spec.owner ? `${spec.owner.name}/${spec.className}` : spec.className;
 
   // ---- constraints ---------------------------------------------------------------------------------------------------------------------------
   const device = () => platform.device, connectivity = () => device().connectivity ?? 'online', battery = () => device().battery ?? { level: 80, charging: false };
@@ -109,13 +116,15 @@ export function createJobSchedulerHost(platform) {
   }
   /** Creates (or reuses) the service of a job: { ref, descriptor, callee: { ref, descriptor } receiving onStartJob/onStopJob, engine, intent }. */
   function serviceFor(r, job) {
-    const key = job.spec.className;
+    const key = serviceKey(job.spec), owner = job.spec.owner;
     let instance = services.get(key);
     if (!instance) {
-      const descriptor = `L${key.replaceAll('.', '/')};`;
-      if (!r.classes.has(descriptor) || !r.isSubtype(descriptor, SERVICE)) throw new APKError(`Service ${key} is not a Service of this APK`, { kind: 'job-service-missing' });
+      if (owner) packages().ensureProcess(r, owner);   // a companion's JobService runs in its package's process
+      const descriptor = owner ? packages().typeIn(r, owner, job.spec.className) : `L${job.spec.className.replaceAll('.', '/')};`;
+      if (!descriptor || !r.classes.has(descriptor) || !r.isSubtype(descriptor, SERVICE)) throw new APKError(`Service ${job.spec.className} is not a Service of ${owner ? `package ${owner.name}` : 'this APK'}`, { kind: 'job-service-missing' });
       const ref = r.allocate(descriptor); dispatch(r, descriptor, '<init>', [], 'V', [ref], 'direct');
-      r.object(ref).baseContext = platform.application; r.object(ref).jobServiceType = descriptor;
+      r.object(ref).baseContext = owner ? packages().newContext(r, owner) : platform.application; r.object(ref).jobServiceType = descriptor;
+      if (owner) r.object(ref).serviceApplication = packages().application(owner);
       dispatch(r, descriptor, 'onCreate', [], 'V', [ref]);
       instance = { ref, descriptor, callee: { ref, descriptor }, engine: null, intent: null };
       if (!r.isSubtype(descriptor, JOB_SERVICE)) {
@@ -138,7 +147,7 @@ export function createJobSchedulerHost(platform) {
     if (!service?.engine || service.released) return;
     service.released = true;
     platform.queueTask(() => {
-      if (services.get(job.spec.className) === service) services.delete(job.spec.className);
+      if (services.get(serviceKey(job.spec)) === service) services.delete(serviceKey(job.spec));
       dispatch(r, service.descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
       dispatch(r, service.descriptor, 'onDestroy', [], 'V', [service.ref]);
       r.record(`JOB unbind+destroy ${describe(job.spec)}`);
@@ -166,11 +175,11 @@ export function createJobSchedulerHost(platform) {
     if (!job.running) return;
     job.running = false; job.params = null; stats.finished++; releaseWork(job); releaseService(r, job);
     r.record(`JOB finished ${describe(job.spec)} reschedule=${reschedule} (${why})`);
-    if (!jobs.has(job.spec.id) || jobs.get(job.spec.id) !== job) return;           // cancelled or replaced meanwhile
+    if (!jobs.has(job.spec.key) || jobs.get(job.spec.key) !== job) return;           // cancelled or replaced meanwhile
     if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); job.deadline = null; stats.rescheduled++; }
     else if (job.spec.periodic) { job.backoffAttempts = 0; nextPeriod(job); }
     else if (job.pending?.length) { job.backoffAttempts = 0; r.record(`JOB work left ${describe(job.spec)} items=${job.pending.length}`); }   // JobSchedulerService keeps a job that still has work and runs it again
-    else jobs.delete(job.spec.id);
+    else jobs.delete(job.spec.key);
     kick(r);
   }
   /** A run ended: items handed out by dequeueWork but never completed return to the front of the pending queue, delivery count already bumped (JobStatus.stopTrackingJobLocked / JobServiceContext cleanup). */
@@ -192,10 +201,10 @@ export function createJobSchedulerHost(platform) {
     r.record(`JOB stopped ${describe(job.spec)} reason=${reason} reschedule=${!!reschedule}`);
     job.running = false; job.params = null; releaseWork(job); releaseService(r, job);
     if (constraint === false) return;                                                // cancelled: removed by the caller
-    if (jobs.get(job.spec.id) !== job) return;
+    if (jobs.get(job.spec.key) !== job) return;
     if (reschedule || job.spec.periodic) { if (reschedule) { job.backoffAttempts++; job.earliest = clock() + backoffDelay(job); } else nextPeriod(job); stats.rescheduled++; }
     else if (job.pending?.length) { job.earliest = clock(); stats.rescheduled++; }
-    else jobs.delete(job.spec.id);
+    else jobs.delete(job.spec.key);
     kick(r);
   }
 
@@ -369,10 +378,11 @@ export function createJobSchedulerHost(platform) {
   // ---- JobScheduler ---------------------------------------------------------------------------------------------------------------------------------
   /** JobSchedulerService.validateJob: the service must be declared in the manifest and require android.permission.BIND_JOB_SERVICE. */
   function validate(r, spec) {
-    const details = (platform.manifest?.componentDetails ?? []).find(entry => entry.kind === 'service' && entry.name === spec.className);
-    if (!details) r.throwJava('Ljava/lang/IllegalArgumentException;', `No such service ComponentInfo{${platform.packageName}/${spec.className}}`);
+    const manifest = spec.owner ? spec.owner.manifest : platform.manifest, componentPackage = r.stringCharacters(dispatch(r, COMPONENT, 'getPackageName', [], STRING, [spec.component]));
+    const details = componentPackage === ownerName(spec.owner) ? (manifest?.componentDetails ?? []).find(entry => entry.kind === 'service' && entry.name === spec.className) : null;
+    if (!details) r.throwJava('Ljava/lang/IllegalArgumentException;', `No such service ComponentInfo{${componentPackage}/${spec.className}}`);
     if (details.permission !== 'android.permission.BIND_JOB_SERVICE') r.throwJava('Ljava/lang/IllegalArgumentException;', `Scheduled service ServiceInfo{${spec.className}} does not require android.permission.BIND_JOB_SERVICE permission`);
-    if (spec.persisted && !platform.holdsPermission?.(r, 'android.permission.RECEIVE_BOOT_COMPLETED')) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Error: requested job be persisted without holding RECEIVE_BOOT_COMPLETED permission.');
+    if (spec.persisted && !(spec.owner ? packages().holds(r, spec.owner, 'android.permission.RECEIVE_BOOT_COMPLETED') : platform.holdsPermission?.(r, 'android.permission.RECEIVE_BOOT_COMPLETED'))) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Error: requested job be persisted without holding RECEIVE_BOOT_COMPLETED permission.');
   }
   const SCHEDULER_STUB = SCHEDULER;
   // JobScheduler.scheduleAsPackage(job, packageName, userId, tag): the hidden system-API overload (Firebase/Play Services measurement uses it with its own package). JobSchedulerService
@@ -380,38 +390,39 @@ export function createJobSchedulerHost(platform) {
   def(SCHEDULER_STUB, 'scheduleAsPackage', `(${INFO}${STRING}I${STRING})I`, (r, m, [self, info, packageName, userId, tag]) => {
     if (packageName === null || packageName === 0) r.throwJava('Ljava/lang/NullPointerException;', 'packageName');
     const wanted = r.stringCharacters(packageName);
-    if (wanted !== platform.packageName || userId !== 0) r.throwJava('Ljava/lang/SecurityException;', `Caller uid ${platform.virtualProcess.uid} cannot schedule jobs for package ${wanted} (user ${userId})`);
+    const owner = ownerOf(r);
+    if (wanted !== ownerName(owner) || userId !== 0) r.throwJava('Ljava/lang/SecurityException;', `Caller uid ${owner ? owner.uid : platform.virtualProcess.uid} cannot schedule jobs for package ${wanted} (user ${userId})`);
     return schedule(r, info);
   });
   def(SCHEDULER_STUB, 'schedule', `(${INFO})I`, (r, _m, [, info]) => schedule(r, info));
-  function schedule(r, info) {
+  function schedule(r, info, owner = ownerOf(r)) {
     if (info === null || info === 0) r.throwJava('Ljava/lang/NullPointerException;', 'job');
-    const spec = specOf(r, info); validate(r, spec);
-    const now = clock(), previous = jobs.get(spec.id);
+    const spec = { ...specOf(r, info), owner, key: keyOf(owner, specOf(r, info).id) }; validate(r, spec);
+    const now = clock(), previous = jobs.get(spec.key);
     if (previous?.running) stop(r, previous, STOP_CANCELLED, false);
     const job = { spec, info, submitted: now, periodStart: now, earliest: spec.periodic ? now + spec.interval - spec.flex : now + (spec.hasLatency ? spec.minLatency : 0), deadline: spec.periodic ? now + spec.interval : spec.hasDeadline ? now + spec.maxDelay : null, running: false, backoffAttempts: 0, params: null };
-    jobs.set(spec.id, job); stats.scheduled++; r.record(`JOB schedule ${describe(spec)} network=${spec.networkType} charging=${spec.requiresCharging} periodic=${spec.periodic}`);
+    jobs.set(spec.key, job); stats.scheduled++; r.record(`JOB schedule ${describe(spec)} network=${spec.networkType} charging=${spec.requiresCharging} periodic=${spec.periodic}`);
     kick(r); return RESULT_SUCCESS;
   }
-  def(SCHEDULER_STUB, 'cancel', '(I)V', (r, _m, [, id]) => { const job = jobs.get(id); if (!job) return; if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(id); stats.cancelled++; });
-  def(SCHEDULER_STUB, 'cancelAll', '()V', r => { for (const job of [...jobs.values()]) { if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(job.spec.id); stats.cancelled++; } });
+  def(SCHEDULER_STUB, 'cancel', '(I)V', (r, _m, [, id]) => { const key = keyOf(ownerOf(r), id), job = jobs.get(key); if (!job) return; if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(key); stats.cancelled++; });
+  def(SCHEDULER_STUB, 'cancelAll', '()V', r => { const owner = ownerOf(r); for (const job of [...jobs.values()]) { if (job.spec.owner !== owner) continue; if (job.running) stop(r, job, STOP_CANCELLED, false); jobs.delete(job.spec.key); stats.cancelled++; } });
   def(SCHEDULER_STUB, 'getAllPendingJobs', `()${LIST}`, r => {
     const list = r.allocate('Ljava/util/ArrayList;'); dispatch(r, 'Ljava/util/ArrayList;', '<init>', [], 'V', [list], 'direct');
-    for (const job of jobs.values()) dispatch(r, 'Ljava/util/ArrayList;', 'add', ['Ljava/lang/Object;'], 'Z', [list, job.info]);
+    const owner = ownerOf(r); for (const job of jobs.values()) if (job.spec.owner === owner) dispatch(r, 'Ljava/util/ArrayList;', 'add', ['Ljava/lang/Object;'], 'Z', [list, job.info]);
     return list;
   });
-  def(SCHEDULER_STUB, 'getPendingJob', `(I)${INFO}`, (r, _m, [, id]) => jobs.get(id)?.info ?? null);
+  def(SCHEDULER_STUB, 'getPendingJob', `(I)${INFO}`, (r, _m, [, id]) => jobs.get(keyOf(ownerOf(r), id))?.info ?? null);
   // JobSchedulerService.enqueue: the same JobInfo as the pending job appends to it (even while it runs); another JobInfo replaces the job (the old one is stopped, its work dropped).
   def(SCHEDULER_STUB, 'enqueue', `(${INFO}${WORK})I`, (r, _m, [, info, item]) => {
     if (info === null || info === 0) r.throwJava('Ljava/lang/NullPointerException;', 'job');
     if (item === null || item === 0) r.throwJava('Ljava/lang/NullPointerException;', 'work');
-    const spec = specOf(r, info); validate(r, spec);
+    const owner = ownerOf(r), spec = { ...specOf(r, info), owner, key: keyOf(owner, specOf(r, info).id) }; validate(r, spec);
     const w = r.object(item);
     if (w.workId !== 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Already enqueued');
     if (spec.persisted && w.intent !== null && (dispatch(r, INTENT, 'getFlags', [], 'I', [w.intent]) & 3) !== 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Work items with URI grants cannot be enqueued on a persisted job');
-    const previous = jobs.get(spec.id);
+    const previous = jobs.get(spec.key);
     if (previous && dispatch(r, INFO, 'equals', ['Ljava/lang/Object;'], 'Z', [previous.info, info])) { addWork(r, previous, item); r.record(`JOB enqueue ${describe(spec)} work=${w.workId}`); kick(r); return RESULT_SUCCESS; }
-    const result = schedule(r, info); addWork(r, jobs.get(spec.id), item); r.record(`JOB enqueue ${describe(spec)} work=${w.workId}`); return result;
+    const result = schedule(r, info, owner); addWork(r, jobs.get(spec.key), item); r.record(`JOB enqueue ${describe(spec)} work=${w.workId}`); return result;
   });
   /** JobStatus.enqueueWorkLocked: work ids count from 1 per job. */
   function addWork(r, job, item) { job.nextWorkId ??= 1; r.object(item).workId = job.nextWorkId++; (job.pending ??= []).push(item); job.executing ??= []; }
@@ -423,6 +434,6 @@ export function createJobSchedulerHost(platform) {
     getService(r, name) { if (name !== 'jobscheduler') return null; scheduler ??= r.makeObject(SCHEDULER); return scheduler; },
     /** Device settings changed (connectivity, charging, battery): constraints are re-evaluated like JobSchedulerService's StateControllers do. */
     constraintsChanged(r) { if (jobs.size) kick(r); },
-    pendingJobs: () => [...jobs.values()].map(job => ({ id: job.spec.id, service: job.spec.className, running: job.running, networkType: job.spec.networkType, periodic: job.spec.periodic })),
+    pendingJobs: () => [...jobs.values()].map(job => ({ id: job.spec.id, ...(job.spec.owner ? { package: job.spec.owner.name } : {}), service: job.spec.className, running: job.running, networkType: job.spec.networkType, periodic: job.spec.periodic })),
   };
 }

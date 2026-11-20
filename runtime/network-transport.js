@@ -1,7 +1,7 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=8e11a37fba6a';
-import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=8e11a37fba6a';
+import { mapUrl } from './host-map.js?v=ad32040fbef9';
+import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=ad32040fbef9';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -16,9 +16,13 @@ export const inBrowser = () => typeof window !== 'undefined' || (typeof WorkerGl
  * `clientIdentity` { dest, key, identity }: the client certificate (mTLS) the relay already holds for the request's destination (network-native.js useClientIdentity). The request names
  * it (client-identity-key); a relay that no longer holds it (restarted: it keeps identities in memory only) refuses before reaching the server, and the identity is handed to it
  * again and the request repeated once (head.clientIdentityRenewed). Only for that destination, through a relay.
+ * `mux`: the relay's parallel channel (src/relay-mux.js; Device > "Parallel relay channel"), or null. With a relay proxy the exchange goes over it when it is open, built exactly as for
+ * the per-request path (the same relay query and headers; the relay decides it with the same code), and the response is read by the code below as a fetch response is. When the
+ * channel is not there the exchange takes the per-request path, as without the setting. head.relayChannel then says which it took ('mux' | 'fallback', with
+ * head.relayChannelNote the reason), and so does error.relayChannel of a failure; neither is set without a channel.
  */
 export async function openExchange(request, options = {}) {
-  const { fetch: fetchFunction = globalThis.fetch, proxyUrl = '', redirect = 'auto', browser = inBrowser(), signal, dropped = null, hostMap = null, clientIdentity = null, identityRenewed = false } = options;
+  const { fetch: fetchFunction = globalThis.fetch, proxyUrl = '', redirect = 'auto', browser = inBrowser(), signal, dropped = null, hostMap = null, clientIdentity = null, identityRenewed = false, mux = null } = options;
   const headers = [];
   for (const [name, value] of request.headers) {
     const lower = name.toLowerCase();
@@ -33,14 +37,22 @@ export async function openExchange(request, options = {}) {
   const manual = redirect === 'manual' || (redirect !== 'follow' && !browser) || request.redirect === 0;
   const init = { method: request.method, headers, redirect: manual ? 'manual' : 'follow', signal, credentials: 'omit', cache: 'no-store' };
   if (request.body && request.method !== 'GET' && request.method !== 'HEAD') init.body = request.body;
-  let response;
-  try { response = await fetchFunction(target, init); }
-  catch (error) {
+  let response = null, channel = null;
+  try {
+    if (mux && proxyUrl) {
+      const pending = (await mux.ready()) ? mux.fetch(target, init) : null;   // null: no open channel (an older relay, a channel being retried later): the per-request path
+      channel = pending ? 'mux' : 'fallback';
+      if (pending) response = await pending;
+    }
+    response ??= await fetchFunction(target, init);
+  } catch (error) {
+    if (channel && error && typeof error === 'object') { try { error.relayChannel = channel; } catch { /* a frozen error: the log shows no channel */ } }
     // A redirected request that the browser failed ("Failed to fetch" hides the cause): say where it really went, and find out whether the target answered at all, with a HEAD of
     // its origin that needs no CORS (an opaque answer means the server is up and the failure was CORS; a rejection means nothing answered there). Only for "Redirecionar hosts" targets.
     if (mapped && browser && !proxyUrl && error?.name === 'TypeError') error.redirect = { from: request.url, target: mapped.url, rule: mapped.rule, reachable: await originAnswers(mapped.url, fetchFunction, signal) };
     throw error;
   }
+  const channelInfo = channel ? { relayChannel: channel, relayChannelNote: channel === 'fallback' ? String(mux.reason ?? 'the channel is not open') : null } : null;
   if (response.type === 'opaqueredirect') { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error('The browser does not expose redirect responses; enable redirect following for this connection'), { code: 'APKWEB_OPAQUE_REDIRECT' }); }
   // A relay that could not reach the target answers 502 with the Node error code (scripts/cors-relay.mjs): it is the same failure as a direct connect, so it becomes the same exception.
   const relayCode = proxyUrl ? response.headers.get('x-apkweb-relay-error-code') : null;
@@ -50,7 +62,7 @@ export async function openExchange(request, options = {}) {
       await registerClientIdentity({ proxyUrl, fetch: fetchFunction, dest: identity.dest, identity: identity.identity });
       const again = await openExchange(request, { ...options, identityRenewed: true }); again.head.clientIdentityRenewed = true; return again;
     }
-    throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true });
+    throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true, ...(channelInfo ? { relayChannel: channel } : {}) });
   }
   const out = []; let encoded = false;
   response.headers.forEach((value, name) => {
@@ -63,7 +75,7 @@ export async function openExchange(request, options = {}) {
   const kept = encoded ? out.filter(([name]) => name.toLowerCase() !== 'content-length') : out;   // the transport already decoded the body (OkHttp's transparent gzip drops both too)
   let url = !proxyUrl && response.redirected && response.url ? response.url : request.url;         // only a followed redirect changes the URL
   if (mapped && url !== request.url) url = unmapOrigin(url, mapped.url, request.url);              // a redirect the target followed on its own origin stays on the app's origin
-  return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept }, reader: response.body ? response.body.getReader() : null };
+  return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept, ...channelInfo }, reader: response.body ? response.body.getReader() : null };
 }
 
 /** `url` on the origin of `mappedUrl` -> the same path on the origin of `originalUrl` (any other URL is returned as is). */
@@ -116,4 +128,4 @@ export function describeFailure(error, request, timedOut = false) {
 }
 
 /** What crosses a thread boundary of a failure: plain data only. */
-export const serialiseError = error => ({ name: error?.name ?? 'Error', message: String(error?.message ?? error), code: error?.code ?? null, redirect: error?.redirect ? { ...error.redirect } : null, cause: error?.cause ? { code: error.cause.code ?? null, message: String(error.cause.message ?? error.cause) } : null });
+export const serialiseError = error => ({ name: error?.name ?? 'Error', message: String(error?.message ?? error), code: error?.code ?? null, redirect: error?.redirect ? { ...error.redirect } : null, cause: error?.cause ? { code: error.cause.code ?? null, message: String(error.cause.message ?? error.cause) } : null, relayChannel: error?.relayChannel ?? null });

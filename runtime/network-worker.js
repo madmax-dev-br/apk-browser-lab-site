@@ -1,4 +1,5 @@
-import { openExchange, serialiseError } from './network-transport.js?v=8e11a37fba6a';
+import { openExchange, serialiseError } from './network-transport.js?v=ad32040fbef9';
+import { RelayMux, unavailableChannel } from './relay-mux.js?v=ad32040fbef9';
 
 // The network worker: runs one fetch per exchange for the web device (see network-worker-executor.js for the protocol). Works as a Node worker_thread and as a browser Worker.
 const HEAD_CAPACITY = 64 * 1024;
@@ -8,6 +9,20 @@ const channel = nodeThreads?.parentPort
   ? { listen: handler => nodeThreads.parentPort.on('message', handler), post: message => nodeThreads.parentPort.postMessage(message) }
   : { listen: handler => { globalThis.onmessage = event => handler(event.data); }, post: message => globalThis.postMessage(message) };
 const exchanges = new Map(), encoder = new TextEncoder();
+// The relay's parallel channel (Device > "Parallel relay channel"): the exchanges of this worker share one WebSocket of this worker's own realm, per relay endpoint; its state
+// changes go to the VM side (network-worker-executor.js), which writes them in the trace. options.relayChannel: { endpoint, headers } | { unavailable: reason } | null.
+const channels = new Map();
+function channelFor(spec) {
+  if (!spec) return null;
+  if (spec.unavailable) return unavailableChannel(spec.unavailable);
+  let mux = channels.get(spec.endpoint);
+  if (!mux) {
+    const create = url => spec.headers ? new globalThis.WebSocket(url, { headers: spec.headers }) : new globalThis.WebSocket(url);   // headers: Node only (tests add the page's Origin)
+    mux = new RelayMux({ endpoint: spec.endpoint, create: typeof globalThis.WebSocket === 'function' ? create : null, onEvent: (kind, detail) => channel.post({ type: 'relay-channel', kind, detail, endpoint: spec.endpoint }) });
+    channels.set(spec.endpoint, mux);
+  }
+  return mux;
+}
 
 async function run({ id, request, control: controlBuffer, data: dataBuffer, signal: signalBuffer, options }) {
   const control = new Int32Array(controlBuffer), data = new Uint8Array(dataBuffer), signal = new Int32Array(signalBuffer), ring = data.length - HEAD_CAPACITY;
@@ -20,7 +35,7 @@ async function run({ id, request, control: controlBuffer, data: dataBuffer, sign
     data.set(bytes, 0); Atomics.store(control, lengthWord, bytes.length); Atomics.store(control, STATE, state); wake();
   };
   try {
-    const { head, reader } = await openExchange(request, { ...options, signal: controller.signal });
+    const { head, reader } = await openExchange(request, { ...options, relayChannel: undefined, mux: channelFor(options?.relayChannel), signal: controller.signal });
     if (exchange.aborted) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     writeJSON(head, HEAD_LENGTH, 1);
     if (!reader) { Atomics.store(control, ENDED, 1); wake(); return; }

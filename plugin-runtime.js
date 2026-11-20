@@ -58,8 +58,10 @@
  *   'dynamic' (a MutableState: its current value) or 'computed' (not evaluated). Only the Locals provided on the way to that node are listed (the others have their default).
  * @property {(match: string|string[], options?: { limit?: number, budgetMs?: number, depth?: number }) => Promise<{ matches: [{ name, declaredIn, kind, valueType, value, nodes, node }], scannedNodes, done }>} findCompositionLocal
  *   Where a Local is provided on the screen, without choosing a node: each distinct provided value, how many components see it and the handle of one of them.
+ * @property {(queries: Array<[name: string, ...args]>) => Promise<Array<{ ok: true, value } | { ok: false, error: { code, message } }>>} batch
+ *   Several read-only queries (activity, viewModels, fragments, inspect, field, statics, staticField, classes, compositionLocals, methods) in one round trip and one VM task; results in order.
  * @property {(handle: string|{ static: string }, path: string|string[], fn: (value: any, previous: any) => void, options?: { intervalMs?: number, depth?: number, onError?: Function }) => () => void} watch
- *   Polls `field(handle, path)` every intervalMs (>= 250) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
+ *   Polls `field(handle, path)` every intervalMs (>= 250; 100 at High power, 50 at Max) and calls fn only when the value changed; returns the stop function. A collected object stops the watch.
  * @property {{ text(s: string, o?: {id?: string}): void, kv(obj: object, o?: {id?: string}): void, table(rows: object[], columns?: string[], o?: {id?: string}): void,
  *   json(value: any, o?: {id?: string}): void, image(blobOrScreenshot: Blob|{blob: Blob}, o?: {id?: string, caption?: string}): void, clear(): void, badge(s: string): void }} ui   Output of the plugin's panel. Each call adds a block; a block with the same `id`
  *   is replaced in place. Rendered as text only (no HTML), at most ~10 times a second.
@@ -123,6 +125,7 @@ export function pluginWorkerMain(scope) {
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Query failed.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {});
+  let watchMinMs = 250;   // the shortest lab.watch interval: the page sends the "Plugin power" level's value ({ t: 'power' }) before the plugin starts and when the level changes
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const tabs = new Map(); let tabSubscribed = false;
   const overlays = new Map(); let overlaySubscribed = false;   // lab.overlay: id -> { message: Set, close: Set, state }
@@ -355,9 +358,39 @@ export function pluginWorkerMain(scope) {
     referrers: (handle, options = {}) => pages('referrers', { handle: String(handle ?? '') }, options),
     compositionLocals: (handle, options = {}) => call('compositionLocals', { handle: String(handle ?? ''), only: Array.isArray(options?.only) ? options.only.map(String) : options?.only ? [String(options.only)] : null, options: viewOptions(options) }),
     findCompositionLocal: (match, options = {}) => call('findCompositionLocal', { match: Array.isArray(match) ? match.map(String) : String(match ?? ''), limit: options?.limit, budgetMs: options?.budgetMs, options: viewOptions(options) }),
+    /**
+     * Several read-only queries in one round trip and one VM task: lab.batch([['inspect', handle, options], ['field', handle, path, options], ['activity'], ...]) -> [{ ok: true, value } | { ok: false, error: { code, message } }]
+     * in the same order (a failed item does not stop the others). Names: activity, viewModels, fragments, inspect, field, statics, staticField, classes, compositionLocals, methods; the same arguments
+     * as the lab call of that name. Up to 50 items; heap scans (instances, referrers) are paged and stay separate. What the VM's time budget left over is sent again by the runtime, so every item answers.
+     */
+    async batch(items) {
+      if (!Array.isArray(items) || !items.length) throw new TypeError('lab.batch([[name, ...arguments], ...])');
+      const specs = items.slice(0, 50).map(item => {
+        const [name, a, b, c] = Array.isArray(item) ? item : [item];
+        switch (name) {
+          case 'activity': case 'viewModels': case 'fragments': return { query: name, args: {} };
+          case 'inspect': return { query: name, args: { handle: String(a ?? ''), options: { depth: b?.depth, maxFields: b?.maxFields, maxItems: b?.maxItems, maxString: b?.maxString } } };
+          case 'field': return { query: name, args: { handle: String(a ?? ''), path: pathArg(b ?? ''), options: viewOptions(c ?? {}) } };
+          case 'statics': return { query: name, args: { className: String(a ?? ''), options: viewOptions(b ?? {}) } };
+          case 'staticField': return { query: name, args: { className: String(a ?? ''), path: pathArg(b ?? ''), options: viewOptions(c ?? {}) } };
+          case 'classes': return { query: name, args: { match: String(a ?? ''), limit: b?.limit, initialized: !!b?.initialized } };
+          case 'compositionLocals': return { query: name, args: { handle: String(a ?? ''), only: Array.isArray(b?.only) ? b.only.map(String) : b?.only ? [String(b.only)] : null, options: viewOptions(b ?? {}) } };
+          case 'methods': return { query: name, args: { ...(typeof a === 'string' && !/^h\d+\./.test(a) ? { className: a } : a && typeof a === 'object' && a.static ? { className: String(a.static) } : { handle: String(a?.handle ?? a ?? '') }), match: b?.match === undefined ? undefined : String(b.match), limit: b?.limit } };
+          default: throw new TypeError(`lab.batch: "${String(name).slice(0, 40)}" is not a batchable query (activity, viewModels, fragments, inspect, field, statics, staticField, classes, compositionLocals, methods)`);
+        }
+      });
+      const out = new Array(specs.length); let todo = specs.map((_, index) => index);
+      for (let round = 0; todo.length && round < 50; round++) {
+        const reply = await call('batch', { queries: todo.map(index => specs[index]) }), next = [];
+        todo.forEach((index, i) => { const result = reply?.results?.[i]; if (!result || result.skipped) next.push(index); else out[index] = result.ok ? { ok: true, value: result.value } : { ok: false, error: { code: result.error?.code ?? 'failed', message: String(result.error?.message ?? 'Query failed.') } }; });
+        todo = next;
+      }
+      for (const index of todo) out[index] = { ok: false, error: { code: 'busy', message: 'The VM did not get to this query.' } };
+      return out;
+    },
     watch(handle, path, fn, options = {}) {   // handle: a handle, or { static: 'pacote.Classe' } to follow a static field
       if (typeof fn !== 'function') throw new TypeError('lab.watch(handle, path, function)');
-      const interval = Math.max(250, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false;
+      const requested = Math.max(1, Number(options?.intervalMs) || 500); let last, first = true, busy = false, stopped = false, timer = null;   // the pause is read again after every tick: a change of the power level applies to watches already running
       const tick = async () => {
         if (busy || stopped) return; busy = true;
         try {
@@ -371,8 +404,9 @@ export function pluginWorkerMain(scope) {
           else if (error?.code !== 'busy' && error?.code !== 'no-apk') reportError(error, 'watch');
         } finally { busy = false; }
       };
-      const timer = setInterval(tick, interval); const stop = () => { if (stopped) return; stopped = true; clearInterval(timer); watches.delete(stop); };
-      watches.add(stop); tick(); return stop;
+      const next = () => { if (!stopped) timer = setTimeout(async () => { await tick(); next(); }, Math.max(watchMinMs, requested)); };
+      const stop = () => { if (stopped) return; stopped = true; clearTimeout(timer); watches.delete(stop); };
+      watches.add(stop); tick(); next(); return stop;
     },
     /** A button of the plugin rendered by the lab: lab.button({ label, icon, title, id, variant, disabled, placement }, onClick) -> { id, state, update, remove, onClick }. */
     async button(options = {}, onClick) {
@@ -395,6 +429,7 @@ export function pluginWorkerMain(scope) {
     if (!data || typeof data !== 'object') return;
     if (data.t === 'reply') { const waiter = pending.get(data.id); if (!waiter) return; pending.delete(data.id); if (data.ok) waiter.resolve(data.value); else waiter.reject(wrapError(data.error)); return; }
     if (data.t === 'click') { runClick(data); return; }
+    if (data.t === 'power') { const ms = Number(data.watchMinMs); if (Number.isFinite(ms)) watchMinMs = Math.max(10, Math.min(1000, ms)); return; }
     if (data.t === 'event') {
       const set = handlers.get(data.name); if (!set) return;
       for (const fn of [...set]) { try { const result = fn(data.data); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, `on('${data.name}')`)); } catch (error) { reportError(error, `on('${data.name}')`); } }

@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=8e11a37fba6a';
-import { installCameraManager } from './camera-host.js?v=8e11a37fba6a';
+import { bitsFloat, floatBits } from './host-contract.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=ad32040fbef9';
+import { installCameraManager } from './camera-host.js?v=ad32040fbef9';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -147,6 +147,9 @@ export function createPeripheralServicesHost(platform) {
   def(USB, 'getAccessoryList', '()[Landroid/hardware/usb/UsbAccessory;', () => null);
   def(USB, 'hasPermission', '(Landroid/hardware/usb/UsbDevice;)Z', (r, _m, [, usbDevice]) => { if (nullish(usbDevice)) return 0; return 0; });
 
+  // ---- WifiScanner (@SystemApi, Context.WIFI_SCANNING_SERVICE "wifiscanner"): registered on every device with Wi-Fi (WifiFrameworkInitializer), so getSystemService hands it out; every
+  // scan call of IWifiScanner needs LOCATION_HARDWARE / NETWORK_STACK, which an installed app does not hold, so no method is offered here (a call names itself as unsupported).
+  service('wifiscanner', 'Landroid/net/wifi/WifiScanner;');
   // ---- ConsumerIrManager: no IR emitter
   const IR = service('consumer_ir', 'Landroid/hardware/ConsumerIrManager;');
   def(IR, 'hasIrEmitter', '()Z', () => 0);

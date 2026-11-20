@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=8e11a37fba6a">
-  <link rel="stylesheet" href="./lab-tokens.css?v=8e11a37fba6a">
+  <link rel="stylesheet" href="./site-pages.css?v=ad32040fbef9">
+  <link rel="stylesheet" href="./lab-tokens.css?v=ad32040fbef9">
 </head>
 <body>
   <header class="topbar">
@@ -229,6 +229,7 @@
               <li><a href="#api-classes"><code>classes</code></a></li>
               <li><a href="#api-instances"><code>instances</code></a></li>
               <li><a href="#api-referrers"><code>referrers</code></a></li>
+              <li><a href="#api-batch"><code>batch</code></a></li>
             </ul>
           </div>
           <div>
@@ -558,6 +559,15 @@
           <p>Who holds an object. For discovering the path to an object found with <code>instances</code>.</p>
           <dl class="facts">
             <div><dt>Returns</dt><dd>Static fields: <code class="shape">{ kind: 'static', className, field }</code> and objects whose field, array cell or internal slot points to it: <code class="shape">{ kind: 'object', handle, className, via }</code></dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-batch">
+          <h4 class="api-sig"><code>await lab.batch([['inspect', handle, options], ['field', handle, path], ['activity'], ...])</code></h4>
+          <p>Several read-only queries in one round trip and one VM task. Names: <code>activity</code>, <code>viewModels</code>, <code>fragments</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>staticField</code>, <code>classes</code>, <code>compositionLocals</code>, <code>methods</code>, with the arguments of the <code>lab</code> call of that name; up to 50 items.</p>
+          <dl class="facts">
+            <div><dt>Returns</dt><dd><code class="shape">[{ ok: true, value } | { ok: false, error: { code, message } }]</code> in the same order; a failed item does not stop the others.</dd></div>
+            <div><dt>Cost</dt><dd>Cuts the round trips of a plugin that reads many objects. How much time the VM gives plugins is the <b>Plugin power</b> option in Controls &gt; Plugins (Normal, High, Max).</dd></div>
           </dl>
         </div>
 
@@ -1005,7 +1015,7 @@ url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
 
         <div class="api" id="mcp-lab-status">
           <h4 class="api-sig names"><code>lab_status</code><code>wait_ready</code></h4>
-          <p>The current screen and “Screen ready”; waits for the screen to settle.</p>
+          <p>The current screen and “Screen ready”; waits for the screen to settle. While “Show frame rate” is on, <code>lab_status</code> also returns <code>frameRate</code> (current, average and minimum FPS, janky frames over 16.7 and 33 ms, and <code>idle</code>).</p>
           <dl class="facts">
             <div><dt>Slow network</dt><dd>The screen only becomes ready with no network request in flight, but a slow or hanging endpoint (a long poll, a server that does not respond) does not hold the wait to the end: with the screen already drawn and still and only the network pending, <code>wait_ready</code> waits <code>network_ms</code> more (default 5000) and returns <code>ready: false</code> with <code>networkPending</code>, the list of open requests (method, URL and for how many seconds). The same applies to the wait in <code>tap</code>, <code>type</code> and <code>scroll</code>. If the content depends on the response, call <code>wait_ready</code> again with a larger <code>network_ms</code>.</dd></div>
           </dl>
@@ -1568,6 +1578,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=8e11a37fba6a"></script>
+  <script type="module" src="./site-pages.js?v=ad32040fbef9"></script>
 </body>
 </html>

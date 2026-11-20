@@ -1,17 +1,17 @@
-import {APKError} from './apk-runtime.js?v=8e11a37fba6a';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=8e11a37fba6a';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=8e11a37fba6a';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=8e11a37fba6a';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=8e11a37fba6a';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=8e11a37fba6a';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=8e11a37fba6a';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=8e11a37fba6a';
-import {createBitmapHost} from './bitmap-host.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
-import {sha256Hex} from './sha256-sync.js?v=8e11a37fba6a';
-import {colorLongToArgb} from './color-long.js?v=8e11a37fba6a';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=8e11a37fba6a';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=8e11a37fba6a';
+import {APKError} from './apk-runtime.js?v=ad32040fbef9';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=ad32040fbef9';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=ad32040fbef9';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=ad32040fbef9';
+import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=ad32040fbef9';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=ad32040fbef9';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=ad32040fbef9';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=ad32040fbef9';
+import {createBitmapHost} from './bitmap-host.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import {sha256Hex} from './sha256-sync.js?v=ad32040fbef9';
+import {colorLongToArgb} from './color-long.js?v=ad32040fbef9';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=ad32040fbef9';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=ad32040fbef9';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -194,7 +194,9 @@ function keyDigest(text){
  const fin=h=>{h^=h>>>16;h=Math.imul(h,0x85ebca6b);h^=h>>>13;h=Math.imul(h,0xc2b2ae35);h^=h>>>16;return (h>>>0).toString(36);};
  return `${fin(a)}.${fin(b^a)}.${fin(c^b)}.${fin(d^c)}.${text.length.toString(36)}`;
 }
-function rasterKeyBody(runtime,graphics,state,width){
+function rasterKeyBody(runtime,graphics,state,width){return commandsKeyBody(runtime,graphics,state.draws,width);}
+/** The key body of a list of recorded commands: a frame's draws, or the display list of one RenderNode (the stretch layer below), with every RenderNode it reaches. */
+function commandsKeyBody(runtime,graphics,commands,width){
  let depth=0,nodes=false,dynamic=false;
  const resolve=value=>Object.fromEntries(Object.entries(value).map(([name,handle])=>[name,graphics.get(handle)]));
  const replacer=function(name,value){
@@ -221,7 +223,7 @@ function rasterKeyBody(runtime,graphics,state,width){
   try{const text=JSON.stringify(command,replacer);if(dynamic)return text;const id=commandId(text);COMMAND_IDS.set(command,id);return '#'+id;}finally{dynamic=outer||dynamic;}
  };
  try{
-  const key=state.draws.map(commandKey).join(',');
+  const key=commands.map(commandKey).join(',');
   if(key.length>4*1024*1024)return null;
   // Shadows are lit by the window theme's light: part of the input whenever a RenderNode is replayed.
   if(!nodes)return keyDigest(key);
@@ -254,6 +256,19 @@ function decodeRasterImage(CK,raster){
  * Per CanvasKit instance.
  */
 const REPLAYED_LISTS=new WeakSet();
+// Stretch layers (rasterizeSkiaCanvasUncached drawStretchLayer): per runtime and backend (the CanvasKit instance for CPU replays, the GPU engine for GPU ones), RenderNode
+// handle -> { key, seen, image, bytes }, least recently used first; bounded by count and bytes, an evicted image is deleted at once (a replay never holds one across the
+// eviction). The layers of a GPU engine that is no longer the session's (a renderer switch, a fallback) are dropped at the next stretched replay; all of them with the Skia host.
+const STRETCH_LAYERS_MAX=16,STRETCH_LAYER_BYTES=48*1024*1024,STRETCH_LAYERS=new WeakMap();   // runtime -> Map(owner -> layers), outside the runtime so the heap walk never visits CanvasKit objects
+function stretchLayers(runtime,owner,CK){
+ let all=STRETCH_LAYERS.get(runtime);if(!all)STRETCH_LAYERS.set(runtime,all=new Map());let layers=all.get(owner);
+ if(!layers){for(const [other,old] of all)if(other!==CK){for(const entry of old.values())dropStretchLayer(old,entry);all.delete(other);}all.set(owner,layers=new Map());}
+ return layers;
+}
+function dropStretchLayer(layers,entry){if(!entry.image)return;try{entry.image.delete();}catch{/* a lost GPU context */}entry.image=null;entry.key=null;layers.bytes=Math.max(0,(layers.bytes??0)-entry.bytes);entry.bytes=0;}
+function trimStretchLayers(layers,keep){for(const [handle,entry] of layers){if(layers.size<=STRETCH_LAYERS_MAX&&(layers.bytes??0)<=STRETCH_LAYER_BYTES)break;if(handle===keep)continue;dropStretchLayer(layers,entry);layers.delete(handle);}}
+/** Drops every stretch layer a runtime keeps (its Skia host is being disposed). */
+function disposeStretchLayers(runtime){const all=STRETCH_LAYERS.get(runtime);if(!all)return;for(const layers of all.values())for(const entry of layers.values())dropStretchLayer(layers,entry);STRETCH_LAYERS.delete(runtime);}
 const DECODED_IMAGE_BYTES=96*1024*1024,decodedImages=new WeakMap();
 export function recordedImage(CK,command){
  const pixels=command.pixelData,data=pixels?pixels.base64:command.raster?.dataURL;
@@ -370,14 +385,56 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  const scale=options?.scale??1;if(!(Number.isFinite(scale)&&scale>0&&scale<=1))fail('Skia raster scale must be in (0, 1]');if(scale!==1&&(options?.pixels||options?.surfaceType))fail('Skia raster scale applies to display rasters only');
  const pw=scale===1?width:Math.max(1,Math.round(width*scale)),ph=scale===1?height:Math.max(1,Math.round(height*scale));
  const gpuTransport=options?.transport==='gpu'||options?.transport==='gpu-png',gpu=gpuTransport?runtime.gpuRaster?.engine:null;if(gpuTransport&&(!gpu||options.pixels||options.surfaceType))fail('Skia GPU raster needs an active GPU engine and a display raster');
- const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?gpu.begin(pw,ph,options.transport==='gpu-png'):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}const canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
+ const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?gpu.begin(pw,ph,options.transport==='gpu-png'):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}let canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
  const activeNodes=new Set();let replayCount=0;   // a reduced replay (scale < 1) also scales the shadow light geometry, which Skia takes in device pixels (drawNodeShadow)
+ let lightDx=0,lightDy=0;   // inside a stretch layer the device origin is the layer's: the light (device pixels of the whole surface) is moved by it
  const drawNodeShadow=node=>{
    const z=renderNodeShadowCaster(node);if(!z)return;const outline=node.outline,casterAlpha=node.alpha*outline.alpha;let path;
    if(outline.commands){path=CK.Path.MakeFromCmds(outline.commands);path.setFillType({value:outline.fillType});}else{const builder=new CK.PathBuilder();builder.addRRect(CK.RRectXY(outline.rect,outline.radius,outline.radius));path=builder.snapshot();builder.delete();}
    const light=renderLightInfo(runtime,width),color=(value,alpha)=>{const c=value>>>0;return CK.Color4f(((c>>>16)&255)/255,((c>>>8)&255)/255,(c&255)/255,Math.max(0,Math.min(1,(c>>>24)/255*alpha)));};
    canvas.save();canvas.translate(node.left,node.top);if(node.staticMatrix)canvas.concat(node.staticMatrix);if(node.animationMatrix)canvas.concat(node.animationMatrix);canvas.concat(node.matrix);
-   try{canvas.drawShadow(path,[0,0,z*scale],[light.x*scale,light.y*scale,light.z*scale],light.radius*scale,color(node.ambientShadowColor,light.ambientShadowAlpha*casterAlpha),color(node.spotShadowColor,light.spotShadowAlpha*casterAlpha),casterAlpha<1?1:0);}finally{canvas.restore();path.delete();}
+   try{canvas.drawShadow(path,[0,0,z*scale],[light.x*scale-lightDx,light.y*scale-lightDy,light.z*scale],light.radius*scale,color(node.ambientShadowColor,light.ambientShadowAlpha*casterAlpha),color(node.spotShadowColor,light.spotShadowAlpha*casterAlpha),casterAlpha<1?1:0);}finally{canvas.restore();path.delete();}
+ };
+ // A stretched RenderNode drawn from a layer, as hwui draws it (RenderProperties::promotedToLayer: a non-empty StretchEffect requires a layer; RenderNodeDrawable draws
+ // the layer's image through the stretch, sampled linearly). OFF by default (runtime.stretchLayer: 'gpu' = GPU replays, true = every replay): measured, it does not pay
+ // (docs/INTERACTION-PERFORMANCE.md section 26). The node's content is rendered once, without its stretch, into an offscreen surface of the part of the screen it can show;
+ // every frame that only changes the stretch (a pull at the edge, the spring-back, a fling absorbed by the edge: the content stands still, the EdgeEffect animates the
+ // RenderNode property) draws that image through the stretch matrix instead of replaying the subtree under a new scale. The image is kept per node and per backend (the CPU
+ // CanvasKit, or the GPU engine whose context holds the texture) under the key of the node's display list (commandsKeyBody: every command and every RenderNode it reaches,
+ // its own stretch excluded) and the device geometry; a node is promoted when its content key repeats from one replay to the next, so content that changes every frame (a
+ // list scrolling while stretched) is drawn directly and pays no layer. On the GPU the saved CanvasKit time (~0.3 ms a frame on the heavy feed) is what the subtree's key
+ // costs, since Compose re-records the stretched node every frame; on the CPU the resampled image (the raster pipeline in WebAssembly, pixel by pixel) costs more than
+ // replaying light content (6-7 ms against 3.6 ms for a 411x722 list of cards and text in Node). Returns false when the node must be drawn directly.
+ const drawStretchLayer=(handle,node,stretch)=>{
+   if(!runtime.stretchLayer||runtime.stretchLayer==='gpu'&&!gpu||typed||options?.pixels||!Array.isArray(node.displayList)||typeof surface.makeSurface!=='function')return false;
+   const m=canvas.getTotalMatrix(),stats=runtime.rasterStats;
+   if(m.length<9||m[1]!==0||m[3]!==0||m[6]!==0||m[7]!==0||m[8]!==1||!(m[0]>0)||!(m[4]>0))return false;   // an axis-aligned scale and translation only (no rotation, skew, mirror or perspective)
+   const w=node.right-node.left,h=node.bottom-node.top,nl=m[2],nt=m[5],nr=m[0]*w+m[2],nb=m[4]*h+m[5],s=node.stretch,clip=canvas.getDeviceClipBounds();
+   // The source pixels the stretched draw can show: the visible clip, extended on a stretched axis to the edge the stretch is anchored at (the stretch moves content away
+   // from that edge, so what shows at the clip comes from between the clip and the anchor), within the node's bounds (a layer is the node's size, as in hwui).
+   let l=clip[0],t=clip[1],r=clip[2],b=clip[3];
+   if(stretch[0]!==1){if(s.vecX>0)l=Math.min(l,Math.floor(nl));else r=Math.max(r,Math.ceil(nr));}
+   if(stretch[4]!==1){if(s.vecY>0)t=Math.min(t,Math.floor(nt));else b=Math.max(b,Math.ceil(nb));}
+   l=Math.max(l,Math.floor(nl));t=Math.max(t,Math.floor(nt));r=Math.min(r,Math.ceil(nr));b=Math.min(b,Math.ceil(nb));
+   if(!(r>l&&b>t))return true;   // nothing of the node can show
+   if((r-l)*(b-t)>4*1024*1024)return false;
+   const k0=performance.now();const body=commandsKeyBody(runtime,graphics,node.displayList,width);if(stats)stats.stretchLayerKeyMs=(stats.stretchLayerKeyMs??0)+performance.now()-k0;if(body===null)return false;
+   const key=`${body}|${l},${t},${r},${b}|${m[0]},${m[2]},${m[4]},${m[5]}|${scale}`,layers=stretchLayers(runtime,gpu??CK,CK);
+   let entry=layers.get(handle);if(entry)layers.delete(handle);else entry={key:null,seen:null,image:null,bytes:0};layers.set(handle,entry);   // most recently used last
+   if(!(entry.image&&entry.key===key)){
+    if(entry.seen!==key){entry.seen=key;dropStretchLayer(layers,entry);return false;}   // first replay of this content: drawn directly; promoted if the next one repeats it
+    dropStretchLayer(layers,entry);
+    const layer=surface.makeSurface({width:r-l,height:b-t,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Premul,colorSpace:CK.ColorSpace.SRGB});if(!layer)return false;
+    const outer=canvas,odx=lightDx,ody=lightDy;
+    try{canvas=layer.getCanvas();canvas.clear(CK.TRANSPARENT);canvas.concat([m[0],0,m[2]-l,0,m[4],m[5]-t,0,0,1]);lightDx=odx+l;lightDy=ody+t;replay(node.displayList);layer.flush();entry.image=layer.makeImageSnapshot();}
+    finally{canvas=outer;lightDx=odx;lightDy=ody;layer.delete();}
+    if(!entry.image)return false;
+    entry.key=key;entry.bytes=(r-l)*(b-t)*4;layers.bytes=(layers.bytes??0)+entry.bytes;trimStretchLayers(layers,handle);
+    if(stats)stats.stretchLayerMisses=(stats.stretchLayerMisses??0)+1;
+   }else if(stats)stats.stretchLayerHits=(stats.stretchLayerHits??0)+1;
+   // device = M * S * M^-1: the layer's pixels (rendered at M) go through the node's stretch; drawn at the layer's device origin, sampled linearly as hwui samples its layer
+   const d0=performance.now();canvas.save();try{canvas.concat(stretch);canvas.concat([1/m[0],0,-m[2]/m[0],0,1/m[4],-m[5]/m[4],0,0,1]);canvas.drawImageOptions(entry.image,l,t,CK.FilterMode.Linear,CK.MipmapMode.None,null);}finally{canvas.restore();}if(stats)stats.stretchLayerDrawMs=(stats.stretchLayerDrawMs??0)+performance.now()-d0;
+   return true;
  };
  const run=(command,shadow=false)=>{
    if(command.op==='layerBegin'){
@@ -398,9 +455,11 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
      if(node.clipToOutline&&node.outline){if(node.outline.commands){const path=CK.Path.MakeFromCmds(node.outline.commands);path.setFillType({value:node.outline.fillType});canvas.clipPath(path,CK.ClipOp.Intersect,true);path.delete();}else if(node.outline.empty)canvas.clipRect(CK.LTRBRect(0,0,0,0),CK.ClipOp.Intersect,false);else canvas.clipRRect(CK.RRectXY(node.outline.rect,node.outline.radius,node.outline.radius),CK.ClipOp.Intersect,true);}
      const isolate=!!node.layerPaint||node.layerType!==0||node.alpha<1;   // hwui only renders a node into an offscreen layer when it has alpha / a layer paint / a layer type
      if(isolate){const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();}
-     const stretch=renderNodeStretchMatrix(node);if(stretch)canvas.concat(stretch);   // hwui StretchEffect (approximation documented at renderNodeStretchMatrix); after the clips so the bounds stay fixed
+     const stretch=renderNodeStretchMatrix(node);   // hwui StretchEffect (approximation documented at renderNodeStretchMatrix); after the clips so the bounds stay fixed
      {const stats=runtime.rasterStats,list=node.displayList;if(stats&&Array.isArray(list)){stats.nodeReplays=(stats.nodeReplays??0)+1;stats.nodeCommands=(stats.nodeCommands??0)+list.length;if(REPLAYED_LISTS.has(list)){stats.nodeReplaysSame=(stats.nodeReplaysSame??0)+1;stats.nodeCommandsSame=(stats.nodeCommandsSame??0)+list.length;}else REPLAYED_LISTS.add(list);}}   // how often a node replays the display list it replayed before (what retained layers could reuse)
-     replay(node.displayList);if(isolate)canvas.restore();activeNodes.delete(command.node);
+     if(!stretch)replay(node.displayList);
+     else{const stats=runtime.rasterStats;if(stats)stats.stretchReplays=(stats.stretchReplays??0)+1;if(!drawStretchLayer(command.node,node,stretch)){if(stats)stats.stretchDirect=(stats.stretchDirect??0)+1;canvas.concat(stretch);replay(node.displayList);}}
+     if(isolate)canvas.restore();activeNodes.delete(command.node);
     }
    }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);sourceVector(CK,canvas,graphics,tree,command.colorFilter);
    }else if(command.argb!==undefined&&command.kind!=='skia'){const paint=makePaint(CK,command.paint??{argb:command.argb,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0});canvas.drawRect(CK.XYWHRect(command.x,command.y,command.width,command.height),paint);paint.delete();
@@ -622,7 +681,7 @@ export function createSkiaCanvasHost(runtime,backend){
    return !!backend.fallback?.covers(text,{weight:face.weight,italic:face.italic});},
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,...faceState(face)});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF','SERIF','MONOSPACE'].includes(field.name))return{handled:true,value:makeTypeface(field.name==='SERIF'?'serif':field.name==='MONOSPACE'?'monospace':'sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
-  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeDecodedImages(CK);disposeShapedRuns(CK);disposeClipShapes(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
+  dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeStretchLayers(runtime);disposeDecodedImages(CK);disposeShapedRuns(CK);disposeClipShapes(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
   invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){

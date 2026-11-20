@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=8e11a37fba6a';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=8e11a37fba6a';
-import { parseReturnValue } from './method-overrides.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=ad32040fbef9';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=ad32040fbef9';
+import { parseReturnValue } from './method-overrides.js?v=ad32040fbef9';
+import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=ad32040fbef9';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');
@@ -55,11 +56,21 @@ export function microgSettingsXml(settings = MICROG_LOCKED_SETTINGS) {
   return `<?xml version='1.0' encoding='utf-8' standalone='yes' ?>\n<map>\n${rows.join('\n')}\n</map>\n`;
 }
 
+/** What a refused microG Activity was for (the trace and deviceOptions.microg.failures name it). */
+const MICROG_ACTIVITIES = [
+  [/\.auth\.phone\.UserConsentPromptActivity$/, 'SMS User Consent prompt'], [/\.auth\.phone\.AskPermissionActivity$/, 'SMS Retriever permission prompt'],
+  [/\.location\.manager\.AskPermissionActivity$/, 'location permission prompt'], [/\.location\.settings\./, 'location settings resolution'],
+  [/\.ui\.SettingsActivity$|\.ui\.MainSettingsActivity$/, 'microG settings (never opened, by design)'], [/LoginActivity$|\.auth\.login\./, 'Google account login (never opened, by design)'],
+];
 /** Permissions no package of the device ever holds while the option is on (signature|privileged ones that let a caller flip microG's locked settings). */
 export const MICROG_REFUSED_PERMISSIONS = Object.freeze(['org.microg.gms.PROVISION']);
 
-/** Dangerous permissions the device grants to com.google.android.gms by default (only those it requests). */
-export const MICROG_DEFAULT_GRANTS = Object.freeze(['android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION', 'android.permission.ACCESS_BACKGROUND_LOCATION']);
+/**
+ * Dangerous permissions the device grants to com.google.android.gms by default (only those it requests), as a ROM that preinstalls microG grants them (default-permissions): location
+ * for its fused provider, and RECEIVE_SMS / READ_CONTACTS, the two permissions microG's SMS Retriever asks for through its own permission Activity (AskPermissionActivity,
+ * ALLOWED_PERMISSIONS), which the virtual device does not start (Activities of a second package are refused). microG still answers each app only within that app's own grants.
+ */
+export const MICROG_DEFAULT_GRANTS = Object.freeze(['android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION', 'android.permission.ACCESS_BACKGROUND_LOCATION', 'android.permission.RECEIVE_SMS', 'android.permission.READ_CONTACTS']);
 /** The hex DER certificate of a package's `fake-signature` meta-data (a resource reference resolved in the package's own resources.arsc), or an explicit error. */
 export function declaredFakeSignature(registry, entry) {
   const item = (entry.manifest?.application?.metaData ?? []).find(m => m.name === 'fake-signature');
@@ -105,6 +116,15 @@ export function enableMicrog(runtime, { version }) {
     if (!platform.microg.failures.some(item => item.api === failure.api)) platform.microg.failures.push(failure);
     r.record(`DEVICE microG FAILURE ProviderInstaller: the security provider was NOT installed (lib${library}.so cannot run on this device; microG swallows the UnsatisfiedLinkError, so installIfNeeded returns normally)`);
   };
+  // microG's Activities (its settings and Google login screens by design, and the prompts some local APIs open: SMS User Consent, permission requests, location settings
+  // resolution) never start: a second package's Activities are refused by the device. The refusal is an explicit lab error; the device also records which API it ends.
+  platform.onPackageActivityRefused = (r, packageName, className) => {
+    if (!MICROG_PACKAGES.includes(packageName)) return;
+    const api = MICROG_ACTIVITIES.find(([pattern]) => pattern.test(className ?? ''))?.[1] ?? 'a microG screen';
+    const failure = { kind: 'microg-activity', api, package: packageName, activity: className, reason: 'microG opens one of its own Activities here; the virtual device does not start the Activities of a second package' };
+    if (!platform.microg.failures.some(item => item.kind === failure.kind && item.activity === failure.activity)) platform.microg.failures.push(failure);
+    r.record(`DEVICE microG FAILURE ${api}: ${packageName}/${className} is an Activity of microG, which the device does not start (Activities of a second package are not supported)`);
+  };
   // DroidGuard, by construction: its VM is code Google's server sends (stored as <dataDir>/app_cache_dg/<vmKey>/the.apk, Context.getDir("cache_dg"), then loaded with a
   // DexClassLoader, play-services-droidguard HandleProxyFactory). The settings above keep microG from asking for it, the device has no real network, and even so the device
   // refuses to load any code from that directory: the attempt is an explicit lab error naming DroidGuard.
@@ -113,9 +133,9 @@ export function enableMicrog(runtime, { version }) {
     r.record(`DEVICE microG REFUSED DroidGuard code load: ${path}`);
     throw new APKError(`DroidGuard: the virtual device never loads DroidGuard's downloaded code (${path}); DroidGuard, SafetyNet and Play Integrity attestation are not available with the microG option`, { kind: 'microg-droidguard-refused' });
   };
-  const microg = platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings: { ...MICROG_LOCKED_SETTINGS }, mocks: new Map(), entries: new Map() };
+  const microg = platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings: { ...MICROG_LOCKED_SETTINGS }, mocks: new Map(), entries: new Map(), stubs: new Map() };
   installMicrogEntryPoints(runtime, microg, registry);
-  runtime.record(`DEVICE microG ${version}: ${names.join(', ')} preinstalled (option "With microG"); signatures from their fake-signature meta-data; locked off: check-in, GCM, SafetyNet/Play Integrity, DroidGuard, licensing, billing (${MICROG_SETTINGS_PATH}); refused permission: ${MICROG_REFUSED_PERMISSIONS.join(', ')}; default grants to ${MICROG_GMS}: location`);
+  runtime.record(`DEVICE microG ${version}: ${names.join(', ')} preinstalled (option "With microG"); signatures from their fake-signature meta-data; locked off: check-in, GCM, SafetyNet/Play Integrity, DroidGuard, licensing, billing (${MICROG_SETTINGS_PATH}); refused permission: ${MICROG_REFUSED_PERMISSIONS.join(', ')}; default grants to ${MICROG_GMS}: location, RECEIVE_SMS, READ_CONTACTS`);
   return platform.microg;
 }
 
@@ -126,6 +146,7 @@ export function enableMicrog(runtime, { version }) {
 // reaches a microG package pays nothing.
 function installMicrogEntryPoints(runtime, microg, registry) {
   for (const def of MICROG_ENTRY_POINTS) microg.entries.set(def.id, { def, key: null, hits: 0, mockHits: 0, resolved: false });
+  for (const def of MICROG_STUBS) microg.stubs.set(def.id, { def, key: null, hits: 0, resolved: false, stub: true });
   // API the page/Node use to supply a mock (loadAPK option mocks are applied by the caller through this).
   microg.mock = (id, handler) => {
     if (!microg.entries.has(id)) throw new APKError(`microG: no entry point "${id}" (known: ${[...microg.entries.keys()].join(', ')})`, { kind: 'microg-entry-point' });
@@ -135,21 +156,36 @@ function installMicrogEntryPoints(runtime, microg, registry) {
   microg.unmock = id => microg.mocks.delete(id);
   // Resolves and installs the interceptor for every entry point of the package whose code was just defined.
   const installFor = (rt, entry) => {
-    for (const state of microg.entries.values()) {
+    for (const state of [...microg.entries.values(), ...microg.stubs.values()]) {
       if (state.resolved || state.def.pkg !== entry.name) continue;
       const aliasOwner = entry.descriptors?.get(state.def.method.owner); if (!aliasOwner) continue;
       const cls = rt.classes.get(aliasOwner); if (!cls) continue;
       let nameSig = null;
       for (const candidate of cls.methods.keys()) if (candidate.startsWith(state.def.method.name + '(') && dealias(candidate) === state.def.method.name + state.def.method.signature) { nameSig = candidate; break; }
-      if (!nameSig) throw new APKError(`microG entry point ${state.def.id}: ${microgEntryMethodSmali(state.def)} is not a method of the installed ${entry.name}`, { kind: 'microg-entry-point' });
+      const smali = state.stub ? microgStubMethodSmali(state.def) : microgEntryMethodSmali(state.def);
+      if (!nameSig) throw new APKError(`microG ${state.stub ? 'unimplemented method' : 'entry point'} ${state.def.id}: ${smali} is not a method of the installed ${entry.name}`, { kind: 'microg-entry-point' });
       state.key = `${aliasOwner}->${nameSig}`; state.result = nameSig.slice(nameSig.indexOf(')') + 1); state.resolved = true;
-      setMethodInterceptor(rt, state.key, (r, definition, args) => intercept(r, microg, state, definition, args));
+      setMethodInterceptor(rt, state.key, (r, definition, args) => state.stub ? reportStub(r, microg, state) : intercept(r, microg, state, definition, args));
     }
   };
   // Install for packages whose loader already exists, and hook later creations.
   for (const entry of registry.companions().filter(e => e.deviceOption === 'microg')) if (entry.loader) installFor(runtime, entry);
   const previous = runtime.platform.onPackageCodeDefined;
   runtime.platform.onPackageCodeDefined = (rt, entry) => { previous?.(rt, entry); if (entry.deviceOption === 'microg') installFor(rt, entry); };
+}
+
+/**
+ * One call of a local API microG does not implement (src/microg-stubs.js): the device records it as an explicit failure, naming the API and what microG does with it (never answers, or
+ * answers without doing it), and microG's own body runs, so the app sees what it would see on a phone with this microG.
+ */
+function reportStub(runtime, microg, state) {
+  const def = state.def; state.hits++;
+  let failure = microg.failures.find(item => item.kind === 'microg-unimplemented' && item.stub === def.id);
+  if (!failure) { failure = { kind: 'microg-unimplemented', stub: def.id, api: def.api, answer: def.answer, reason: `microG ${microg.version} does not implement this (its source logs "Not yet implemented"): ${MICROG_STUB_ANSWERS[def.answer]}`, method: microgStubMethodSmali(def), source: def.source, hits: 0 }; microg.failures.push(failure); }
+  failure.hits = state.hits;
+  if (state.hits === 1 || state.hits % 100 === 0) runtime.record(`LOG W APKWebLab: microG ${def.id} (${def.api}): not implemented by microG; ${MICROG_STUB_ANSWERS[def.answer]} (${state.hits} calls)`);
+  if (state.hits === 1) runtime.record(`DEVICE microG UNIMPLEMENTED ${def.id}: ${def.api}; ${MICROG_STUB_ANSWERS[def.answer]} (${def.source})`);
+  return RUN_BODY;
 }
 
 /** One intercepted call of an entry point's method: the mock's value, or a reported "not implemented" failure followed by microG's own body (RUN_BODY). */
@@ -207,6 +243,12 @@ export function applyMicrogMocks(runtime, specs) {
     microg.mock(def.id, ({ runtime: r }) => typeof parsed.value === 'string' ? r.javaString(parsed.value) : parsed.value);
   }
   return describeMicrogEntryPoints(microg).map(row => errors.has(row.id) ? { ...row, error: errors.get(row.id) } : row);
+}
+
+/** For the snapshot: one row per local API microG leaves unimplemented (src/microg-stubs.js), whether its method was found in the installed DEX and how often it was called. */
+export function describeMicrogStubs(microg) {
+  if (!microg?.stubs) return [];
+  return MICROG_STUBS.map(def => { const state = microg.stubs.get(def.id); return { id: def.id, api: def.api, answer: def.answer, method: microgStubMethodSmali(def), resolved: state?.resolved === true, hits: state?.hits ?? 0 }; });
 }
 
 /** For the snapshot and the page: one row per entry point (src/microg-entry-points.js), with its resolved key, whether it is mocked and its hit counts. */

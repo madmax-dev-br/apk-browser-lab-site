@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { encodeUri } from './content-resolver-host.js?v=8e11a37fba6a';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { encodeUri } from './content-resolver-host.js?v=ad32040fbef9';
 
 // android.net.Uri members the StringUri model of content-resolver-host.js did not carry (android-13.0.0_r1 Uri.java): EMPTY, fromFile, fromParts, withAppendedPath, normalizeScheme,
 // compareTo. Uris are built by composing the string the AOSP HierarchicalUri / OpaqueUri would print and parsing it, so every accessor answers like the original.
@@ -34,7 +34,24 @@ export function createUriApiHost() {
   def(URI, 'compareTo', `(${URI})I`, (r, _m, [self, other]) => { if (nullish(other)) r.throwJava('Ljava/lang/NullPointerException;', null); return compare(r, self, other); });
   def(URI, 'compareTo', `(${OBJECT})I`, (r, _m, [self, other]) => { if (nullish(other)) r.throwJava('Ljava/lang/NullPointerException;', null); return compare(r, self, other); });
   def(URI, 'describeContents', '()I', () => 0);
-  def(URI, 'writeToParcel', '(Landroid/os/Parcel;I)V', () => { throw new APKError('Uri.writeToParcel needs the Parcel wire format, which the virtual device only keeps in memory', { kind: 'uri-parcel-unsupported' }); });
-  def(URI, 'writeToParcel', `(Landroid/os/Parcel;${URI})V`, () => { throw new APKError('Uri.writeToParcel needs the Parcel wire format, which the virtual device only keeps in memory', { kind: 'uri-parcel-unsupported' }); }, { static: true });
+  // Parcel form (Uri.java): a type id, then the Uri. Every Uri of the virtual device is written as a StringUri (TYPE_ID 1 + its string, the form StringUri.writeToParcel uses), which
+  // Uri.CREATOR reads back with Uri.parse: the same Uri on the other side. The hierarchical / opaque part-by-part forms (ids 2 and 3) are never written here and refused when read.
+  const PARCEL = 'Landroid/os/Parcel;', CREATOR = 'Landroid/os/Parcelable$Creator;', URI_CREATOR = 'Landroid/net/Uri$1;';
+  const parcel = (r, out, name, parameters, result, args = []) => r.dispatch({ owner: PARCEL, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [out, ...args], 'virtual');
+  const write = (r, uri, out) => {
+    if (nullish(uri)) { parcel(r, out, 'writeInt', ['I'], 'V', [0]); return; }
+    parcel(r, out, 'writeInt', ['I'], 'V', [1]); parcel(r, out, 'writeString8', [STRING], 'V', [call(r, uri, OBJECT, 'toString', [], STRING)]);
+  };
+  def(URI, 'writeToParcel', '(Landroid/os/Parcel;I)V', (r, _m, [self, out]) => write(r, self, out));
+  def(URI, 'writeToParcel', `(Landroid/os/Parcel;${URI})V`, (r, _m, [out, uri]) => write(r, uri, out), { static: true });
+  registry.type(URI_CREATOR, OBJECT, [CREATOR], { allocatable: true });
+  def(URI_CREATOR, 'createFromParcel', `(${PARCEL})${OBJECT}`, (r, _m, [, input]) => {
+    const typeId = parcel(r, input, 'readInt', [], 'I');
+    if (typeId === 0) return null;
+    if (typeId === 1) return parse(r, parcel(r, input, 'readString8', [], STRING));
+    throw new APKError(`Uri from a Parcel with type id ${typeId}: only the string form (1) is written by the virtual device`, { kind: 'uri-parcel-unsupported' });
+  });
+  def(URI_CREATOR, 'newArray', `(I)[${OBJECT}`, (r, _m, [, size]) => r.newArray(`[${URI}`, size));
+  registry.staticField(URI, 'CREATOR', CREATOR, r => r.allocate(URI_CREATOR));
   return registry;
 }

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { Blocked, VMThread } from './scheduler.js?v=8e11a37fba6a';
-import { Invoke } from './interpreter.js?v=8e11a37fba6a';
-import { GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { Blocked, VMThread } from './scheduler.js?v=ad32040fbef9';
+import { Invoke } from './interpreter.js?v=ad32040fbef9';
+import { GC_ROOTS } from './heap-gc.js?v=ad32040fbef9';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -221,7 +221,7 @@ export function createConcurrencyHost(platform) {
   const CLASS_LOADER = 'Ljava/lang/ClassLoader;';
   // A thread whose context loader was never set: the app's class loader (LoadedApk.makeApplication -> initializeJavaContextClassLoader sets it on the main thread before Application.onCreate,
   // and every thread created afterwards inherits its creator's, see init above). `undefined` is "not set" (VMThread starts with it); a loader set to null stays null, as on Android.
-  const appContextLoader = r => r.dispatch({ owner: CLASS_LOADER, name: 'getSystemClassLoader', parameters: [], result: CLASS_LOADER, signature: `()${CLASS_LOADER}` }, [], 'static');
+  const appContextLoader = r => r.applicationClassLoader ??= platform.classLoaders.createApplicationLoader(r);   // the app's PathClassLoader (not ClassLoader.getSystemClassLoader, which sees the boot layer only)
   const contextLoaderOf = (r, thread) => { if (!thread) return appContextLoader(r); if (thread.contextLoader === undefined) thread.contextLoader = appContextLoader(r); return thread.contextLoader; };
   def(THREAD, 'getContextClassLoader', `()${CLASS_LOADER}`, (r, _m, [self]) => contextLoaderOf(r, state(r, self) ?? r.scheduler.mainThread()));
   def(THREAD, 'setContextClassLoader', `(${CLASS_LOADER})V`, (r, _m, [self, loader]) => { state(r, self).contextLoader = loader; });
@@ -535,7 +535,16 @@ export function createConcurrencyHost(platform) {
   function startWorker(r, self, worker) {
     const p = pool(r, self), st = state(r, worker.thread); st.javaObject = worker.thread; st.keepAlive = true;
     r.uncaughtHook ??= (thread, error) => { if (!error?.value) throw error; return uncaughtInvoke(r, thread.javaObject, error.value); };
+    // A ThreadFactory may hand back a Thread that does more than run the worker (its Runnable wraps the worker, or a Thread subclass overrides run()): the JDK worker thread runs that
+    // run(), which reaches Worker.run. That code runs here first, on the worker's thread (what it sets up, a ThreadLocal for instance, belongs to that thread); its call to
+    // Worker.run returns at once and the green thread then drives the worker loop. Code the wrapper runs after Worker.run therefore runs before the first task, not at thread exit.
+    const override = r.resolveInvoke(THREAD_RUN, [worker.thread], 'virtual', null);
+    worker.entering = (override.kind === 'definition' && !!override.definition.code) || !(st.target && typeof st.target === 'object' && st.target.ref === worker.runnable.ref);
     r.scheduler.start(st, (rt, thread) => {
+      if (worker.entering) {
+        worker.entering = false; worker.inEntry = true;
+        return new Invoke(THREAD_RUN, [worker.thread], 'virtual', () => { worker.inEntry = false; return undefined; }, error => { worker.inEntry = false; throw error; });
+      }
       if (thread.lastOutcome?.error) throw thread.lastOutcome.error;     // the previous task's exception already ran afterExecute; the worker dies and the handler sees it
       if (worker.expired) { retire(r, self, worker); return undefined; }
       let task = worker.first; worker.first = null;
@@ -558,7 +567,11 @@ export function createConcurrencyHost(platform) {
     });
   }
   type(WORKER, OBJECT, [RUNNABLE], { allocatable: true });
-  def(WORKER, 'run', '()V', (r, _m, [self]) => { const o = r.object(self); if (o.periodic) o.periodic(); else throw new APKError('A ThreadPoolExecutor worker is driven by its green thread, not run directly', { kind: 'worker-run' }); });
+  def(WORKER, 'run', '()V', (r, _m, [self]) => {
+    const o = r.object(self); if (o.periodic) { o.periodic(); return; }
+    if (o.worker?.worker.inEntry) return;   // reached from the factory's Thread.run on the worker's own thread (startWorker): the green thread drives the loop next
+    throw new APKError('A ThreadPoolExecutor worker is driven by its green thread, not run directly', { kind: 'worker-run' });
+  });
   function retire(r, self, worker) {
     const p = pool(r, self), i = p.workers.indexOf(worker); if (i >= 0) p.workers.splice(i, 1);
     state(r, worker.thread).keepAlive = false; state(r, worker.thread).finished = true;

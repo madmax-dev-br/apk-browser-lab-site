@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
 
 // Green-thread scheduler for the VM.
 //
@@ -10,9 +10,11 @@ import { APKError } from './apk-error.js?v=8e11a37fba6a';
 //
 // Time is the VM clock (vm-clock.js): when every thread waits, the clock jumps to the earliest deadline instead of sleeping in real time.
 
-/** What a blocking native returns (`roots`: the Java values its closures keep alive while the thread is parked, so a collector can see them): park the calling thread until ready() or the deadline; finish(timedOut) then produces the call's result (or throws, or blocks again). */
+/** What a blocking native returns (`roots`: the Java values its closures keep alive while the thread is parked, so a collector can see them): park the calling thread until ready() or the deadline; finish(timedOut) then produces the call's result (or throws, or blocks again).
+ *  `io`: the wait is for the network (a socket read, an HTTP exchange's head or body), whose wake-up may give the thread an I/O boost (Scheduler.ioBoostMs); a function gives
+ *  the size in bytes of the answer the thread wakes up to (the boost serves the smallest first). */
 export class Blocked {
-  constructor({ ready, deadline = Infinity, finish = () => undefined, reason = 'blocked', retry = false, interruptible = false, roots = [], blocker = null }) { this.roots = roots; this.blocker = blocker; this.ready = ready; this.deadline = deadline; this.finish = finish; this.reason = reason; this.retry = retry; this.interruptible = interruptible; }
+  constructor({ ready, deadline = Infinity, finish = () => undefined, reason = 'blocked', retry = false, interruptible = false, roots = [], blocker = null, io = false }) { this.roots = roots; this.blocker = blocker; this.ready = ready; this.deadline = deadline; this.finish = finish; this.reason = reason; this.retry = retry; this.interruptible = interruptible; this.io = io; }
 }
 
 let nextThreadId = 2;
@@ -23,15 +25,27 @@ export class VMThread {
     this.coreQuantum = 0; this.coreQuantumSize = 0; this.coreQuantumAt = 0;   // the core's quantum for this thread in a slice (vmcore/js/core-threads.js quantumFor / sizeQuantum)
     this.interrupted = false; this.permit = false; this.waitingOn = null; this.finished = false; this.started = false; this.handler = null; this.target = null;
     this.contextLoader = undefined; this.idleParks = 0; this.blocker = null; this.uncaught = null;
+    this.boostAt = 0; this.boostUsed = 0; this.boostSize = 0;   // the I/O boost (Scheduler.ioBoostMs): declared here so a thread keeps one shape when it is on
   }
 }
 
 export const QUANTUM = 20000;   // instructions a thread runs before another runnable thread gets the processor
 
+// I/O boost (off unless ioBoostMs > 0; docs/INTERACTION-PERFORMANCE.md section 25): on a phone the threads that just got a network answer decode it in parallel, each on a core of
+// its own; here they share one Worker, and round robin between them made every one of them finish as late as the last (five 150 ms decodes: each result after ~750 ms). A thread
+// whose network wait ended (a Blocked with io) is served before the threads that stayed runnable, until it parks again or has run ioBoostMs of background slices since that
+// wake-up; then it is an ordinary thread again. Among boosted threads the one whose answer is the smallest goes first (it will be done soonest: small answers that arrive
+// while a large one is decoded are not held behind it), and of equal answers the one woken first (each decode runs to its end in turn instead of all of them ending last).
+// Main-thread events keep their priority (they run between slices whatever the order of the background threads), a thread that never waits for the network never gets a
+// boost, and nothing is reordered within a thread. The boost orders only the event pump's background slices (a slice with a deadline and no owner): a run some thread waits
+// for on the JavaScript stack (the main thread in a nested wait, host code that called Java) keeps the plain round robin, so the thread that would wake it is never held
+// behind a boosted decode. One slice in IO_BOOST_SHARE goes to the round robin while a boost is on, so a thread the boosted one spins on (a CAS loop, onSpinWait) moves on.
+const IO_BOOST_WALL_FACTOR = 8;   // a boost also ends this many times ioBoostMs of wall time after its wake-up
+const IO_BOOST_SHARE = 4;
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; }
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -76,12 +90,43 @@ export class Scheduler {
       if (thread.state !== 'blocked') continue;
       const blocked = thread.blocked;
       const monitor = this.rt.monitor, stats = this.stats;
-      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 0); continue; }
-      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 1); }
-      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 2); }
+      if (thread.interrupted && blocked.interruptible) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 0); this.noteWake(thread, false); continue; }
+      if (blocked.ready()) { thread.timedOut = false; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 1); this.noteWake(thread, blocked.io); }
+      else if (blocked.deadline <= now) { thread.timedOut = true; thread.state = 'runnable'; stats.wakeups++; monitor?.noteWake(thread, blocked, 2); this.noteWake(thread, false); }
       else if (blocked.deadline < earliest) earliest = blocked.deadline;
     }
     return earliest;
+  }
+  /** A parked thread became runnable: a network wait that ended (`io`: true, or the size of its answer) gives it an I/O boost (ioBoostMs), any other wake-up ends the one it had. */
+  noteWake(thread, io) {
+    if (this.ioBoostMs <= 0) { if (thread.boostAt) thread.boostAt = 0; return; }
+    if (!io) { if (thread.boostAt) { thread.boostAt = 0; this.boosted = this.boosted.filter(other => other !== thread); } return; }
+    if (!thread.boostAt) this.boosted.push(thread);   // a boosted thread woken again keeps its place, with a fresh budget
+    let size = 0; if (typeof io === 'function') { try { size = Number(io()) || 0; } catch { size = 0; } }
+    thread.boostAt = performance.now(); thread.boostUsed = 0; thread.boostSize = size; this.stats.boosts++;
+  }
+  /** `ms` of a background slice ran `thread` (drainEvents): charged to its boost. */
+  charge(thread, ms) { if (thread?.boostAt && ms > 0) thread.boostUsed = (thread.boostUsed ?? 0) + ms; }
+  /** The boosted thread to run now (of those that may run under `owner`, the one with the smallest answer, then the earliest woken), or null; boosts that are over are dropped. */
+  boostHead(owner) {
+    if (!this.boosted.length) return null;
+    const now = performance.now(), budget = this.ioBoostMs; let head = null;
+    for (let i = 0; i < this.boosted.length; i++) {
+      const thread = this.boosted[i];
+      const over = !thread.boostAt || thread.state === 'terminated' || thread.state === 'blocked' || (thread.boostUsed ?? 0) >= budget || now - thread.boostAt > budget * IO_BOOST_WALL_FACTOR || !this.threads.includes(thread);
+      if (over) { thread.boostAt = 0; this.boosted.splice(i--, 1); continue; }
+      if (thread.state === 'runnable' && (head === null || (thread.boostSize ?? 0) < (head.boostSize ?? 0)) && this.eligible(thread, owner)) head = thread;
+    }
+    return head;
+  }
+  /** A background slice of the event pump (drainEvents: no owner, a deadline): the only runs the I/O boost orders. */
+  pumpSlice(owner) { return owner === null && this.rt.sliceDeadline > 0; }
+  /** May `thread` run in a run owned by `owner` (pick's rules)? */
+  eligible(thread, owner) {
+    if (thread !== owner && thread.nestedDepth > 0) return false;
+    if (thread !== owner && this.waitingNested.has(thread)) return false;
+    if (thread === this.main && thread !== owner && thread.frames.length === 0) return false;
+    return true;
   }
   /** True when `thread` (blocked inside a nested host wait) can continue. */
   nestedReady() { for (const thread of this.waitingNested) if (thread.state === 'runnable') return true; return false; }
@@ -96,6 +141,10 @@ export class Scheduler {
     // head of the list every time let the first runnable threads monopolize the processor while a thread created later (a HandlerThread whose getLooper() the main thread waits for) never
     // ran. The cursor remembers where the last pick left off, so consecutive slices go around the whole list.
     const from = current !== null && current !== undefined ? this.threads.indexOf(current) : this.cursor;
+    if (this.boosted.length && this.pumpSlice(owner)) {   // a thread that just got its network answer goes first (ioBoostMs), but for one slice in IO_BOOST_SHARE
+      const boosted = this.boostHead(owner);
+      if (boosted !== null && ++this.boostTurn % IO_BOOST_SHARE !== 0) { this.lastPicked = boosted; return { thread: boosted, earliest }; }
+    }
     for (let i = 1; i <= n; i++) {
       const at = (from + i + n) % n, thread = this.threads[at];
       if (!thread || thread.state !== 'runnable') continue;
@@ -129,6 +178,7 @@ export class Scheduler {
     // below it. When its wait is over (woken by its deadline, notify or unpark) the slice must end so that it can continue, however many other threads are runnable -- or whether `current` is the only one.
     if (owner === null && this.waitingNested.size && this.innermostNestedReady()) return true;
     if (this.hostEventsStarved(owner)) return true;
+    if (this.boosted.length && this.pumpSlice(owner)) { const head = this.boostHead(owner); if (head !== null) return head !== current; }   // boosted threads first, the smallest answer (then the earliest woken) until its boost is over
     for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return true;
     return false;
   }

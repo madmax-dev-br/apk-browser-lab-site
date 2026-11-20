@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=8e11a37fba6a';
+import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=ad32040fbef9';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -503,6 +503,23 @@ export function createSystemServicesHost(platform) {
     if (cross) P().withCaller(r, cross.caller, post); else post();
   });
   def(MESSENGER_IMPL, 'getInterfaceDescriptor', '()Ljava/lang/String;', () => IMESSENGER);
+  // Parcel form (Messenger.writeToParcel / CREATOR): the strong binder of its IMessenger, which a reader wraps again (Messenger(IBinder)); the binder of the VM's own Messenger is the
+  // same object on the other side, so a Messenger handed to another package (an Intent extra, an AIDL argument) still reaches its Handler.
+  const PARCEL_TYPE = 'Landroid/os/Parcel;', MESSENGER_CREATOR = 'Landroid/os/Messenger$1;', CREATOR_TYPE = 'Landroid/os/Parcelable$Creator;';
+  const writeMessenger = (r, messenger, out) => r.dispatch({ owner: PARCEL_TYPE, name: 'writeStrongBinder', parameters: [IBINDER], result: 'V', signature: `(${IBINDER})V` }, [out, messenger === null || messenger === 0 ? null : impl(r, messengerTarget(r, messenger))], 'virtual');
+  const readMessenger = (r, input) => {
+    const binder = r.dispatch({ owner: PARCEL_TYPE, name: 'readStrongBinder', parameters: [], result: IBINDER, signature: `()${IBINDER}` }, [input], 'virtual');
+    if (binder === null || binder === 0) return null;
+    const messenger = r.allocate(MESSENGER); r.dispatch({ owner: MESSENGER, name: '<init>', parameters: [IBINDER], result: 'V', signature: `(${IBINDER})V` }, [messenger, binder], 'direct'); return messenger;
+  };
+  def(MESSENGER, 'writeToParcel', `(${PARCEL_TYPE}I)V`, (r, _m, [self, out]) => writeMessenger(r, self, out));
+  def(MESSENGER, 'describeContents', '()I', () => 0);
+  def(MESSENGER, 'writeMessengerOrNullToParcel', `(${MESSENGER}${PARCEL_TYPE})V`, (r, _m, [messenger, out]) => writeMessenger(r, messenger, out), { static: true });
+  def(MESSENGER, 'readMessengerOrNullFromParcel', `(${PARCEL_TYPE})${MESSENGER}`, (r, _m, [input]) => readMessenger(r, input), { static: true });
+  registry.type(MESSENGER_CREATOR, 'Ljava/lang/Object;', [CREATOR_TYPE], { allocatable: true });
+  def(MESSENGER_CREATOR, 'createFromParcel', `(${PARCEL_TYPE})Ljava/lang/Object;`, (r, _m, [, input]) => readMessenger(r, input));
+  def(MESSENGER_CREATOR, 'newArray', '(I)[Ljava/lang/Object;', (r, _m, [, size]) => r.newArray(`[${MESSENGER}`, size));
+  registry.staticField(MESSENGER, 'CREATOR', CREATOR_TYPE, r => r.allocate(MESSENGER_CREATOR));
   def(MESSENGER, 'getBinder', `()${IBINDER}`, (r, _m, [self]) => impl(r, messengerTarget(r, self)));
   def(MESSENGER, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other !== null && typeof other === 'object' && r.typeOf(other) === MESSENGER && messengerTarget(r, self) === messengerTarget(r, other) ? 1 : 0);
   def(MESSENGER, 'hashCode', '()I', (r, _m, [self]) => r.object(impl(r, messengerTarget(r, self))).id | 0);

@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { APKArchive } from './apk-loader.js?v=8e11a37fba6a';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=8e11a37fba6a';
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { normalizePath } from './virtual-fs.js?v=8e11a37fba6a';
+import { unsignedBytes } from './java-arrays.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { APKArchive } from './apk-loader.js?v=ad32040fbef9';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=ad32040fbef9';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { normalizePath } from './virtual-fs.js?v=ad32040fbef9';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -34,6 +34,16 @@ export function createClassLoaderHost(platform) {
   /** Loader chain nearest-first: [loader, parent, ...] as {ref, st}; stops at a host ClassLoader that has no state (the boot loader). */
   const chainOf = (runtime, loader) => { const out = []; for (let x = loader, depth = 0; x && depth < 64; depth++) { const st = stateOf(runtime, x); if (!st) break; out.push({ ref: x, st }); x = st.parent; } return out; };
   const ALIAS_SUFFIX = (id) => `$$ldr${id};`;
+  const HOST_LOADERS = new Set([LOADER, BASE, IN_MEMORY, DEX_CLASS_LOADER, PATH]);
+  /** Whether loader `ref` is of a ClassLoader subclass (code of a package) that overrides loadClass, so its delegation is its own code's. */
+  const overridesLoadClass = (runtime, ref) => {
+    for (let type = runtime.object(ref)?.type, depth = 0; type && !HOST_LOADERS.has(type) && depth < 32; depth++) {
+      const cls = runtime.classes.get(type); if (!cls) return false;
+      if (cls.methods.has(`loadClass(${STRING}Z)${CLASS}`) || cls.methods.has(`loadClass(${STRING})${CLASS}`)) return true;
+      type = cls.superclass;
+    }
+    return false;
+  };
   // A type reference is renamed with its array dimensions kept ([Lfoo/Bar; follows Lfoo/Bar;).
   const renamer = rename => t => { const at = t.lastIndexOf('[') + 1; if (at === 0) return rename.get(t) ?? t; const mapped = rename.get(t.slice(at)); return mapped === undefined ? t : t.slice(0, at) + mapped; };
   /**
@@ -42,7 +52,7 @@ export function createClassLoaderHost(platform) {
    * defines, is renamed to that alias too. The package's code therefore binds to its own copies whatever the app ships, a reference to a class only the app has fails as
    * NoClassDefFoundError (as in a separate process), and the app's code never sees a class of the companion.
    */
-  const defineDex = (runtime, owner, bytes, label, { isolated = false, packageClasses = null, parsed = null } = {}) => {
+  const defineDex = (runtime, owner, bytes, label, { isolated = false, packageClasses = null, parsed = null, decision = null } = {}) => {
     const st = stateOf(runtime, owner), parse = rename => {
       try { return new DexFile(bytes, { filename: label, maxBytes: MAX_DEX, ...(rename ? { typeRename: renamer(rename) } : {}) }); }
       catch (error) { throw new APKError(`Invalid DEX payload (${label}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); }
@@ -65,28 +75,55 @@ export function createClassLoaderHost(platform) {
       runtime.record(`DEXLOADER ${label}: ${added.length} classes of package ${st.packageEntry?.name ?? '?'} defined by loader #${st.id} (${shadowed} shadowed by the boot layer, ${hidden} references to classes only another package defines are not visible)`);
       return { label, classes: names };
     }
-    const chain = chainOf(runtime, owner), ancestors = chain.slice(1).reverse(); // root-first
-    const app = runtime.applicationClassLoader ??= createApplicationLoader(runtime), hasApp = chain.some(c => c.ref.ref === app.ref);
-    const rename = new Map(), skip = new Set(), aliased = [], shadowed = [];
+    const own = decision ?? decide(runtime, owner, names), rename = own.rename, skip = new Set();
     for (const name of names) {
-      let visible = null;
-      if (runtime.deviceProvidesClass(name)) visible = name;   // the boot layer's classes and the platform classes the hosts implement: parent-first
-      else { for (const ancestor of ancestors) if (ancestor.st.own.has(name)) { visible = ancestor.st.own.get(name); break; } }
-      if (visible === null && st.own.has(name)) visible = st.own.get(name);
-      if (visible === null && hasApp && runtime.classes.has(name) && !runtime.classOwners.has(name)) visible = name;
-      if (visible !== null) { skip.add(visible); if (visible !== name) rename.set(name, visible); shadowed.push(name); }
-      else if (runtime.classes.has(name)) { const alias = name.slice(0, -1) + ALIAS_SUFFIX(st.id); rename.set(name, alias); aliased.push(name); }
+      if (own.visible.has(name)) skip.add(own.visible.get(name));
+      else if (st.own.has(name)) skip.add(rename.get(name) ?? name);   // an earlier DEX file of this loader defined it: the first one wins
     }
     if (rename.size) dex = parse(rename);
     dex.definingLoader = owner;
     const added = runtime.dex.addDynamicFile(dex, label, { skip });
     for (const key of added) { const plain = key.replace(LOADER_ALIAS, ';'); st.own.set(plain, key); runtime.classOwners.set(key, owner); if (!runtime.dynamicPlain.has(plain)) runtime.dynamicPlain.set(plain, key); }
-    runtime.record(`DEXLOADER ${label}: ${added.length} classes defined by loader #${st.id} (${aliased.length} redefined under alias, ${shadowed.length} shadowed by a parent)`);
+    const aliased = names.filter(n => own.aliased.has(n)).length, shadowed = names.filter(n => own.visible.has(n)).length;
+    runtime.record(`DEXLOADER ${label}: ${added.length} classes defined by loader #${st.id} (${aliased} redefined under alias, ${shadowed} shadowed by a parent)`);
     return { label, classes: names };
+  };
+  /**
+   * What loader `owner` does with each class name of the DEX files it is given (all of them, so a reference from one DEX file to a class another DEX file of the same loader
+   * defines is renamed like that class): a name visible through the parent chain binds to the parent's class (parent-first), a name defined elsewhere but not visible is defined
+   * again under the loader's alias, anything else is defined as it is.
+   */
+  const decide = (runtime, owner, names) => {
+    const st = stateOf(runtime, owner), chain = chainOf(runtime, owner), ancestors = chain.slice(1).reverse(); // root-first
+    const app = runtime.applicationClassLoader ??= createApplicationLoader(runtime), hasApp = chain.some(c => c.ref.ref === app.ref);
+    // A parent that is a ClassLoader subclass with its own loadClass (a filtering loader of a package's code) decides itself what it delegates: a class its parents define is
+    // visible to this loader only if that loadClass returns it (libcore ClassLoader.loadClass asks the parent first). Asked only for the names a parent defines, once, here.
+    const customAt = chain.slice(1).findIndex(c => overridesLoadClass(runtime, c.ref)), custom = customAt < 0 ? null : chain[customAt + 1];
+    const throughCustom = (name, found) => {
+      if (!custom) return found;
+      try { const cls = runtime.dispatch({ owner: LOADER, name: 'loadClass', parameters: [STRING, 'Z'], result: CLASS, signature: `(${STRING}Z)${CLASS}` }, [custom.ref, name.slice(1, -1).replaceAll('/', '.'), 0], 'virtual'); return cls ? runtime.object(cls).classType ?? found : null; }
+      catch (error) { if (error?.value && runtime.isSubtype(runtime.typeOf(error.value), 'Ljava/lang/ClassNotFoundException;')) return null; throw error; }
+    };
+    const rename = new Map(), visible = new Map(), aliased = new Set();
+    for (const name of names) {
+      if (visible.has(name) || aliased.has(name)) continue;
+      let found = null;
+      if (runtime.deviceProvidesClass(name)) found = name;   // the boot layer's classes and the platform classes the hosts implement: parent-first
+      else { for (const ancestor of ancestors) if (ancestor.st.own.has(name)) { found = custom && chain.indexOf(ancestor) > customAt ? throughCustom(name, ancestor.st.own.get(name)) : ancestor.st.own.get(name); break; } }
+      if (found === null && st.own.has(name)) found = st.own.get(name);
+      if (found === null && hasApp && runtime.classes.has(name) && !runtime.classOwners.has(name)) found = throughCustom(name, name);
+      if (found !== null) { visible.set(name, found); if (found !== name) rename.set(name, found); }
+      else if (runtime.classes.has(name)) { rename.set(name, name.slice(0, -1) + ALIAS_SUFFIX(st.id)); aliased.add(name); }
+    }
+    return { rename, visible, aliased };
   };
   /** Class lookup for a requesting loader: returns the VM table type, the unchanged name (base class / unknown), or false when the class is not visible. */
   const isolatedRoot = (runtime, loader) => { const chain = chainOf(runtime, loader); return chain.find(c => c.st.packageEntry)?.st ?? null; };
   const mapType = (runtime, loader, plain) => {
+    if (loader && loader !== 'boot' && typeof loader === 'object') {   // the system class loader (and a loader under it): the boot layer only
+      const root = chainOf(runtime, loader).at(-1)?.st;
+      if (root?.bootOnly) { for (const { st } of chainOf(runtime, loader).reverse()) if (st.own.has(plain)) return st.own.get(plain); return runtime.deviceProvidesClass(plain) ? plain : false; }
+    }
     if (loader && loader !== 'boot' && runtime.platform?.packages?.multi) {   // a companion package's loader chain: its own classes and the boot layer, nothing of another package
       const root = isolatedRoot(runtime, loader);
       if (root) { for (const { st } of chainOf(runtime, loader).reverse()) if (st.own.has(plain)) return st.own.get(plain); return runtime.dex.bootClasses?.has(plain) || !runtime.dex.classes.has(plain) && !runtime.classOwners.has(plain) ? plain : false; }
@@ -113,7 +150,10 @@ export function createClassLoaderHost(platform) {
     if (bytes[0] === 0x50 && bytes[1] === 0x4b) {
       const archive = new APKArchive(bytes), names = [...archive.entries.keys()].filter(n => /^classes\d*\.dex$/.test(n)).sort();
       if (!names.length) runtime.throwJava('Ljava/lang/ClassNotFoundException;', `No classes.dex in ${normalized}`);
-      for (const name of names) unit.push(defineDex(runtime, owner, archive.extractSync(name, MAX_DEX), `${normalized}!${name}`));
+      // every DEX file of the archive first, so the loader decides over all their classes at once (multidex references cross files)
+      const files = names.map(name => { const data = archive.extractSync(name, MAX_DEX), label = `${normalized}!${name}`; try { return { data, label, parsed: new DexFile(data, { filename: label, maxBytes: MAX_DEX }) }; } catch (error) { throw new APKError(`Invalid DEX payload (${label}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); } });
+      const decision = decide(runtime, owner, files.flatMap(f => [...f.parsed.classes.keys()]));
+      for (const file of files) unit.push(defineDex(runtime, owner, file.data, file.label, { parsed: file.parsed, decision }));
     } else unit.push(defineDex(runtime, owner, bytes, normalized));
     return { label: normalized, classes: unit.flatMap(u => u.classes) };
   };
@@ -238,7 +278,7 @@ export function createClassLoaderHost(platform) {
   });
   def(LOADER, 'findClass', `(${STRING})${CLASS}`, (r, _m, [_self, name]) => r.throwJava('Ljava/lang/ClassNotFoundException;', r.stringCharacters(name)));
   def(LOADER, 'findLoadedClass', `(${STRING})${CLASS}`, (r, _m, [self, name]) => { const plain = 'L' + r.stringCharacters(name).replaceAll('.', '/') + ';', own = stateOf(r, self)?.own.get(plain); return own ? r.classObject(own) : null; });
-  def(LOADER, 'getSystemClassLoader', `()${LOADER}`, (r) => r.applicationClassLoader ??= createApplicationLoader(r), { static: true });
+  def(LOADER, 'getSystemClassLoader', `()${LOADER}`, (r) => systemLoader(r), { static: true });
   def(BASE, 'getParent', `()${LOADER}`, (r, _m, [self]) => state(r, self).parent);
   def(BASE, 'toString', `()${STRING}`, (r, _m, [self]) => `dalvik.system.${r.object(self).type.slice(r.object(self).type.lastIndexOf('/') + 1, -1)}[DexPathList[[${state(r, self).label}]]]`);
   // ClassLoader.loadClass on a dex loader: its own classes first, then the parent chain (the shared table makes parent lookups global).
@@ -297,7 +337,18 @@ export function createClassLoaderHost(platform) {
     makePathList(runtime, ref, { units });
     return ref;
   }
-  /** The app's PathClassLoader (ART creates it from the installed base.apk): Class.getClassLoader() and ClassLoader.getSystemClassLoader() return it. */
+  /**
+   * ClassLoader.getSystemClassLoader() (libcore ClassLoader.createSystemClassLoader): a PathClassLoader over java.class.path (".", nothing) whose parent is the boot class loader, so
+   * it finds the boot layer's classes only, never an installed package's (an app's own classes are found through its PathClassLoader, Class.getClassLoader()).
+   */
+  function systemLoader(runtime) {
+    if (runtime.systemClassLoader) return runtime.systemClassLoader;
+    const app = runtime.applicationClassLoader ??= createApplicationLoader(runtime), ref = runtime.allocate(PATH);
+    runtime.systemClassLoader = ref; newState(runtime, ref, stateOf(runtime, app).parent, '.'); stateOf(runtime, ref).bootOnly = true;
+    makePathList(runtime, ref, { units: [] });
+    return ref;
+  }
+  /** The app's PathClassLoader (ART creates it from the installed base.apk): Class.getClassLoader() of the app's classes returns it. */
   function createApplicationLoader(runtime) {
     const ref = runtime.allocate(PATH), base = `${platform.javaIo.fs().codePath}/base.apk`;
     runtime.applicationClassLoader = ref; // state first: loaders created while building the path list may name it as their parent
@@ -305,5 +356,5 @@ export function createClassLoaderHost(platform) {
     makePathList(runtime, ref, { units: [{ label: base, classes: [] }] });
     return ref;
   }
-  return { ...registry, interfaces: registry.interfacesOf, createApplicationLoader, createPackageLoader, mapType };
+  return { ...registry, interfaces: registry.interfacesOf, createApplicationLoader, createPackageLoader, systemLoader, mapType };
 }

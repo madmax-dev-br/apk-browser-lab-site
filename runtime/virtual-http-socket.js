@@ -14,7 +14,7 @@
 // This module is VM-free: the network bridge (`net`) is passed in and the failures are plain JavaScript errors the natives (src/libcore-io-native.js) turn into Java exceptions.
 
 export const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024, MAX_HEAD = 64 * 1024, MAX_BODY = 128 * 1024 * 1024;
-import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=8e11a37fba6a';
+import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=ad32040fbef9';
 const TUNNEL_PREFIX = 64 * 1024;   // the bytes kept until the first request is recognised: a conversation that is not HTTP/1.1 starts the tunnel with them
 const encoder = new TextEncoder();
 const latin1 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); return text; };
@@ -207,6 +207,7 @@ export class VirtualHttpSocket {
     this.https = false; this.sni = null; this.alpn = 'http/1.1';
     this.requests = []; this.exchange = null; this.out = []; this.outBytes = 0;
     this.eof = false; this.error = null; this.errorDelivered = false; this.closed = false; this.readShut = false; this.writeShut = false; this.served = 0; this.closing = false; this.prefix = new Uint8Array(0); this.raw = null; this.ws = null;
+    this.appended = 0; this.taken = 0; this.traces = [];   // bytes queued for the app and read by it, and the timelines (src/net-trace.js) of the exchanges whose bytes are not all read yet
   }
   get label() { return `${this.peer.host}:${this.peer.port}`; }
   /** The browser does the TLS: the socket's requests are https from now on. `host` is the SNI name. */
@@ -240,12 +241,17 @@ export class VirtualHttpSocket {
   }
   dispose() {
     if (this.closed) return; this.closed = true; this.ws?.session.dispose(); this.raw?.dispose();
+    for (const trace of this.traces) this.net.trace?.finish(trace); this.traces = [];
     if (this.exchange) { this.net.discard(this.exchange.op); this.exchange = null; }
     this.requests = []; this.out = []; this.outBytes = 0;
   }
 
   // ---- the read side
-  append(bytes) { if (bytes.length && !this.readShut) { this.out.push(bytes); this.outBytes += bytes.length; } }
+  append(bytes) { if (bytes.length && !this.readShut) { this.out.push(bytes); this.outBytes += bytes.length; this.appended += bytes.length; } }
+  /** The size in bytes of the answer the app is reading: its declared Content-Length, else what has arrived (the scheduler's I/O boost serves the smallest first). */
+  answerSize() { const ex = this.exchange; return Math.max(ex?.declared ?? 0, ex?.op?.received ?? 0, this.reading?.bytes ?? 0, this.outBytes); }
+  /** The timeline of the exchange the app is reading (the oldest whose bytes are not all read), or null. */
+  get reading() { return this.traces[0] ?? null; }
   get available() { return this.outBytes; }
   /** A read would not wait: bytes, the end of the conversation, a failure or a closed socket. */
   readable() { this.pump(); return this.outBytes > 0 || this.eof || this.closed || this.readShut || (this.error !== null && !this.errorDelivered); }
@@ -257,8 +263,15 @@ export class VirtualHttpSocket {
       out.set(n === piece.length ? piece : piece.subarray(0, n), copied); copied += n; this.outBytes -= n;
       if (n === piece.length) this.out.shift(); else this.out[0] = piece.subarray(n);
     }
+    this.taken += copied; this.noteTaken();
     this.pump();
     return out;
+  }
+  /** The exchanges whose head or last byte the app has now read (their timelines: headTaken, bodyTaken). */
+  noteTaken() {
+    const at = performance.now();
+    for (const trace of this.traces) if (!trace.headTaken && trace.headEnd !== undefined && this.taken >= trace.headEnd) trace.headTaken = at;
+    while (this.traces.length && this.traces[0].bodyEnd !== undefined && this.taken >= this.traces[0].bodyEnd) { const trace = this.traces.shift(); trace.bodyTaken = at; this.net.trace?.finish(trace); }
   }
   /** The failure to throw once the bytes before it were read, or null. */
   takeError() {
@@ -289,31 +302,34 @@ export class VirtualHttpSocket {
       if (!ex.headSent && op.head) {
         const closing = !ex.request.keepAlive; ex.closing = closing;
         const serialized = serializeResponseHead(ex.request, op.head, { closing }); ex.framing = serialized.framing; ex.declared = serialized.length; ex.noBody = serialized.noBody; ex.headSent = true;
-        this.append(serialized.bytes);
+        this.append(serialized.bytes); if (op.trace) op.trace.headEnd = this.appended;
       }
       if (ex.headSent) {
         while (this.outBytes < HIGH_WATER) {
           const pieces = net.drain(op, CHUNK); if (!pieces.length) break;
           for (const piece of pieces) { ex.delivered += piece.length; if (!ex.noBody) this.append(ex.framing === 'chunked' ? chunkFrame(piece) : piece); }
         }
+        if (op.trace && op.trace.bodyEnd === undefined && (ex.noBody || (ex.framing === 'length' && ex.delivered === ex.declared))) { op.trace.bodyEnd = this.appended; this.noteTaken(); }   // the whole declared body is queued: the client stops reading there
       }
       net.observe(op);
       if (op.error !== null) {
-        const failure = op.error; net.discard(op); this.exchange = null; this.error = failure; this.eof = true;   // bytes already queued are read first, then the failure
+        const failure = op.error; this.closeTrace(op); net.discard(op); this.exchange = null; this.error = failure; this.eof = true;   // bytes already queued are read first, then the failure
         if (ex.headSent && ex.framing === 'chunked') { /* the chunked body stays unterminated: the app sees the failure, not a clean end */ }
         return;
       }
       if (op.ended && op.queue.length === 0 && ex.headSent) {
         if (ex.framing === 'chunked') this.append(LAST_CHUNK);
-        else if (ex.framing === 'length' && ex.delivered !== ex.declared) { this.error = { type: 'Ljava/net/SocketException;', message: 'Connection reset' }; this.eof = true; net.discard(op); this.exchange = null; return; }
-        net.discard(op); this.exchange = null; this.served++;
+        else if (ex.framing === 'length' && ex.delivered !== ex.declared) { this.error = { type: 'Ljava/net/SocketException;', message: 'Connection reset' }; this.eof = true; this.closeTrace(op); net.discard(op); this.exchange = null; return; }
+        this.closeTrace(op); net.discard(op); this.exchange = null; this.served++;
         if (ex.closing) { this.eof = true; this.requests = []; return; }
         continue;                                                // the next pipelined request, if any
       }
-      if (op.ended && !ex.headSent) { this.error = { type: 'Ljava/io/IOException;', message: 'unexpected end of stream' }; this.eof = true; net.discard(op); this.exchange = null; return; }
+      if (op.ended && !ex.headSent) { this.error = { type: 'Ljava/io/IOException;', message: 'unexpected end of stream' }; this.eof = true; this.closeTrace(op); net.discard(op); this.exchange = null; return; }
       return;
     }
   }
+  /** The exchange's bytes are all queued for the app: its timeline ends when the app has read them (noteTaken). */
+  closeTrace(op) { const trace = op.trace; if (!trace) return; trace.bodyEnd ??= this.appended; this.noteTaken(); }
   // ---- a TCP tunnel through the relay (src/tcp-tunnel.js)
   pumpRaw() {
     const session = this.raw;
@@ -367,6 +383,7 @@ export class VirtualHttpSocket {
     net.noteHost(host);
     // redirect: 1 -- a Socket client applies its own redirect rules; where the transport can show 3xx responses (outside a browser) it does, and a browser follows them (it hides them).
     const op = net.start({ method: request.method, url: url.href, headers, body: request.body.length || !['GET', 'HEAD'].includes(request.method) ? request.body : null, redirect: 1, connectTimeout: 0, readTimeout: 0, api: 'Socket', mock });
+    if (op.trace) { op.trace.socket = true; this.traces.push(op.trace); }   // its timeline ends when the app has read its bytes, not when the exchange is discarded
     this.exchange = { op, request, headSent: false, framing: 'none', declared: null, delivered: 0, noBody: false, closing: false };
   }
 }

@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { throwNew } from './java-throw.js?v=8e11a37fba6a';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=8e11a37fba6a';
-import { networkOf, isIpLiteral } from './network-native.js?v=8e11a37fba6a';
-import { Blocked } from './scheduler.js?v=8e11a37fba6a';
-import { installUdp } from './udp-native.js?v=8e11a37fba6a';
-import { createLoopback } from './loopback-socket.js?v=8e11a37fba6a';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=8e11a37fba6a';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { throwNew } from './java-throw.js?v=ad32040fbef9';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=ad32040fbef9';
+import { networkOf, isIpLiteral } from './network-native.js?v=ad32040fbef9';
+import { Blocked } from './scheduler.js?v=ad32040fbef9';
+import { installUdp } from './udp-native.js?v=ad32040fbef9';
+import { createLoopback } from './loopback-socket.js?v=ad32040fbef9';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=ad32040fbef9';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=ad32040fbef9';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -148,11 +148,12 @@ export function readSocket(runtime, desc, length, timeoutMs, deliver, roots = []
     if (http.eof || http.readShut) return -1;
     return null;
   };
+  http.reading?.read();   // the exchange's timeline (src/net-trace.js): a measurement aid
   const now = attempt(); if (now !== null) return now;
-  const clock = runtime.platform.clock;
+  const clock = runtime.platform.clock, trace = http.reading; trace?.park();
   return new Blocked({
-    ready: () => http.readable(), deadline: timeoutMs > 0 ? clock.now() + timeoutMs : Infinity, reason: `socket read: ${http.label}`, interruptible: false, roots,
-    finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'Read timed out'); throw new APKError('socket read woke without data', { kind: 'network-boundary' }); },
+    ready: () => { const ready = http.readable(); if (ready) trace?.ready(); return ready; }, deadline: timeoutMs > 0 ? clock.now() + timeoutMs : Infinity, reason: `socket read: ${http.label}`, interruptible: false, roots, io: () => http.answerSize(),
+    finish: timedOut => { trace?.resume(); const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'Read timed out'); throw new APKError('socket read woke without data', { kind: 'network-boundary' }); },
   });
 }
 export function writeSocket(runtime, desc, bytes, options = {}) {

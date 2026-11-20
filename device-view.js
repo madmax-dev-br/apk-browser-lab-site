@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=8e11a37fba6a';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=8e11a37fba6a';
-import { isTrustedRasterURL } from './raster-cache.js?v=8e11a37fba6a';
+import { updateWebViewSlot } from './webview-slot.js?v=ad32040fbef9';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=ad32040fbef9';
+import { isTrustedRasterURL } from './raster-cache.js?v=ad32040fbef9';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -49,7 +49,7 @@ export function paintRgbaContentLayer(element, drawing, counters) {
   let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
   if (layer._image !== drawing.image) {
     if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
-    const putStarted = Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); counters.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+    const putStarted = globalThis.performance?.now?.() ?? Date.now(); layer.getContext('2d').putImageData(drawing.image, 0, 0); counters.putMs += (globalThis.performance?.now?.() ?? Date.now()) - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
     if (drawing.scale !== undefined && drawing.scale < 1) { layer.dataset.rasterScale = String(drawing.scale); counters.reducedDrawn++; } else delete layer.dataset.rasterScale;
     layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
   }
@@ -61,7 +61,7 @@ export function paintBitmapContentLayer(element, drawing, counters) {
   let layer = element._contentLayer; if (!layer || layer.tagName !== 'CANVAS') { layer = element._contentLayer = document.createElement('canvas'); layer._image = null; }
   if (layer._image !== drawing.image) {
     if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
-    const putStarted = Date.now(), context = layer.getContext('2d'); context.clearRect(0, 0, drawing.width, drawing.height); context.drawImage(drawing.image, 0, 0); counters.putMs += Date.now() - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
+    const putStarted = globalThis.performance?.now?.() ?? Date.now(), context = layer.getContext('2d'); context.clearRect(0, 0, drawing.width, drawing.height); context.drawImage(drawing.image, 0, 0); counters.putMs += (globalThis.performance?.now?.() ?? Date.now()) - putStarted; layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId;
     counters.bitmapsDrawn = (counters.bitmapsDrawn ?? 0) + 1;
     if (drawing.scale !== undefined && drawing.scale < 1) { layer.dataset.rasterScale = String(drawing.scale); counters.reducedDrawn++; } else delete layer.dataset.rasterScale;
     layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
@@ -105,10 +105,11 @@ function flushRuntimeSnapshot(vm) {
 }
 /** Route the Worker client's asynchronous snapshots/errors (timers, animations) into this view. */
 function bindVM(vm) {
-  vm.onRuntimeBusy = busy => { runtimeFrames.vmBusy = busy; };   // a scheduled VM event is being processed (frame, timer): the screen is not settled yet
+  vm.onRuntimeBusy = busy => { runtimeFrames.vmBusy = busy; ctx.frameMeter?.busyChanged(busy); };   // frameMeter: "Show frame rate" (src/frame-meter.js), which ignores everything while the option is off   // a scheduled VM event is being processed (frame, timer): the screen is not settled yet
   vm.onRuntimeSnapshot = (snapshot, seq) => {
     runtimeFrames.vmBusy = false;
     if (state.runtime !== vm) return;
+    ctx.frameMeter?.received(snapshot);
     if (runtimeFrames.log.length < 50000) runtimeFrames.log.push([Date.now(), snapshot?.vmHealth?.framesProduced ?? null]);
     if (runtimeFrames.pending) runtimeFrames.coalesced++;
     if (Number.isSafeInteger(seq)) runtimeFrames.seq = seq;
@@ -911,6 +912,7 @@ function renderActionModes(modes = []) {
   reconcileChildren(layer, toolbars);
 }
 function renderSnapshot(snapshot) {
+  const meter = ctx.frameMeter?.enabled ? ctx.frameMeter : null, meterAt = meter ? nowMs() : 0, putBefore = runtimeFrames.putMs;   // "Show frame rate": the page's own draw time of this frame
   state.lastSnapshotAt = nowMs();   // the input wait indicator (watchInputWait) counts from the VM's last answer
   if (runtimeFrames.pending && state.runtime?.ackFrame) state.runtime.ackFrame(runtimeFrames.seq);   // an RPC reply replaces a queued scheduled-event snapshot: it counts as drawn
   runtimeFrames.pending = null; runtimeFrames.rendered++; if (runtimeFrames.drawn.length < 50000) runtimeFrames.drawn.push(Date.now());
@@ -948,6 +950,7 @@ function renderSnapshot(snapshot) {
   // after the VM trace replaced the log: a key the Worker could not send through an InputConnection (its own trace has the WEB InputMethod line too)
   if (snapshot.imeFallback) { const f = snapshot.imeFallback; state.imeFallbacks = (state.imeFallbacks ?? 0) + 1; appendTrace(`Keyboard: ${f.keys} key(s) without an InputConnection (${f.reason}); ${f.via === 'SetText' ? 'used the SetText action with the field text' : 'key discarded'}.`); }
   notifyParent('apk-lab-snapshot', { activityName: snapshot.activityName, texts: snapshot.texts, counters: snapshot.counters });
+  if (meter) meter.frame(snapshot, { at: meterAt, drawMs: nowMs() - meterAt, putMs: runtimeFrames.putMs - putBefore });
 }
 return { resetWebViews: () => webviews?.reset(), renderSnapshot, createView, queueComposeAction, flushPendingInputs, bindVM, runtimeFrames, renderSystemBars, updateSystemBarIcons, fitDevice, startClock };
 }

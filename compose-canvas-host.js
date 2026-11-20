@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=8e11a37fba6a';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=8e11a37fba6a';
-import {getVectorGraphics} from './vector-native.js?v=8e11a37fba6a';
-import {deferRaster} from './deferred-raster.js?v=8e11a37fba6a';
+import {APKError} from './apk-runtime.js?v=ad32040fbef9';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=ad32040fbef9';
+import {getVectorGraphics} from './vector-native.js?v=ad32040fbef9';
+import {deferRaster} from './deferred-raster.js?v=ad32040fbef9';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -43,6 +43,8 @@ export function createComposeCanvasHost(platform){
      call(r,node,NODE,'setElevation',['F'],'Z',[raw(elevation)]);call(r,node,NODE,'setTranslationZ',['F'],'Z',[raw(translationZ)]);
      const outline=elevation+translationZ>0||view.clipToOutline?platform.viewOutlineHost.outlineObject(r,receiver):null;
      call(r,node,NODE,'setOutline',['Landroid/graphics/Outline;'],'Z',[outline??null]);call(r,node,NODE,'setClipToOutline',['Z'],'Z',[view.clipToOutline?1:0]);}
+    // View.updateDisplayListIfDirty (android-13.0.0_r1): "Reset any stretch effects as those are applied during the draw pass" -- hwui merges every RenderNode.stretch of a recording.
+    call(r,node,NODE,'clearStretch',[],'Z',[]);
     const target=call(r,node,NODE,'beginRecording',['I','I'],DISPLAY,[width,height]);view.updatingDisplayList=true;view.displayListDirty=false;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);
     try{const sx=view.fields.get(`${VIEW}->mScrollX:I`)??0,sy=view.fields.get(`${VIEW}->mScrollY:I`)??0;if(sx||sy)canvas(r,target,'translate',['F','F'],'V',[raw(-sx),raw(-sy)]);call(r,receiver,VIEW,'draw',[CANVAS],'V',[target]);}
     catch(error){view.displayListDirty=true;r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,1);throw error;}

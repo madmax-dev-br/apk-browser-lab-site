@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { createHostRegistry } from './host-contract.js?v=8e11a37fba6a';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { createHostRegistry } from './host-contract.js?v=ad32040fbef9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ad32040fbef9';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.
@@ -22,14 +22,20 @@ export function createPendingIntentHost(platform) {
     const o = r.object(intent), data = o.data ? text(r, call(r, 'Landroid/net/Uri;', 'toString', [], STRING, [o.data])) : '', component = o.component ? text(r, call(r, 'Landroid/content/ComponentName;', 'flattenToString', [], STRING, [o.component])) : '';
     return JSON.stringify([text(r, o.action), data, text(r, o.mimeType), o.package ? text(r, o.package) : '', component, o.target ?? '', [...(o.categories ?? [])].map(c => text(r, c)).sort()]);
   };
-  const targetSdk = () => Number(platform.manifest?.usesSdk?.targetSdkVersion ?? platform.manifest?.usesSdk?.minSdkVersion ?? 1);
+  // The package that creates a PendingIntent owns it (ActivityManagerService.getIntentSenderLocked records the caller's package and uid): its targetSdk decides the mutability rule,
+  // it is part of the token's identity, and send() delivers as that package (from its Context), whoever holds the token. Without a companion package (src/package-registry.js) the
+  // creator is always the app and the token key is the single-package one.
+  const packages = () => platform.packages?.multi ? platform.packages : null;
+  const creatorOf = (r, context) => packages() && !(context === null || context === 0) ? packages().contextEntry(r, context) : null;
+  const targetSdk = (creator = null) => creator && !creator.main ? packages().targetSdk(creator) : Number(platform.manifest?.usesSdk?.targetSdkVersion ?? platform.manifest?.usesSdk?.minSdkVersion ?? 1);
   function get(kind) {
     return (r, _m, [context, requestCode, intent, flags]) => {
       if (intent === null || intent === 0) r.throwJava('Ljava/lang/NullPointerException;', 'intent');
       flags |= 0;
-      if (targetSdk() >= 31 && !(flags & (FLAG.IMMUTABLE | FLAG.MUTABLE))) r.throwJava('Ljava/lang/IllegalArgumentException;', `${platform.packageName}: Targeting S+ (version 31 and above) requires that one of FLAG_IMMUTABLE or FLAG_MUTABLE be specified when creating a PendingIntent.\nStrongly consider using FLAG_IMMUTABLE, only use FLAG_MUTABLE if some functionality depends on the PendingIntent being mutable, e.g. if it needs to be used with inline replies or bubbles.`);
+      const creator = creatorOf(r, context), creatorName = creator ? creator.name : platform.packageName;
+      if (targetSdk(creator) >= 31 && !(flags & (FLAG.IMMUTABLE | FLAG.MUTABLE))) r.throwJava('Ljava/lang/IllegalArgumentException;', `${creatorName}: Targeting S+ (version 31 and above) requires that one of FLAG_IMMUTABLE or FLAG_MUTABLE be specified when creating a PendingIntent.\nStrongly consider using FLAG_IMMUTABLE, only use FLAG_MUTABLE if some functionality depends on the PendingIntent being mutable, e.g. if it needs to be used with inline replies or bubbles.`);
       if ((flags & FLAG.IMMUTABLE) && (flags & FLAG.MUTABLE)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Cannot set both FLAG_IMMUTABLE and FLAG_MUTABLE for PendingIntent');
-      const key = `${kind}|${requestCode}|${filterKey(r, intent)}`, existing = tokens.get(key);
+      const key = `${creator && !creator.main ? creator.name + '#' : ''}${kind}|${requestCode}|${filterKey(r, intent)}`, existing = tokens.get(key);
       if (existing && !existing.canceled) {
         if (flags & FLAG.CANCEL_CURRENT) { existing.canceled = true; tokens.delete(key); }
         else {
@@ -39,7 +45,7 @@ export function createPendingIntentHost(platform) {
       }
       if (flags & FLAG.NO_CREATE) return null;
       const object = r.makeObject(PENDING); r.object(object).tokenKey = key;
-      tokens.set(key, { object, intent, flags, canceled: false, kind });
+      tokens.set(key, { object, intent, flags, canceled: false, kind, creator: creator && !creator.main ? creator : null });
       return object;
     };
   }
@@ -75,17 +81,28 @@ export function createPendingIntentHost(platform) {
   const send = (r, self, code = 0, extra = null) => {
     const token = tokenOf(r, self); if (!token || token.canceled) r.throwJava('Landroid/app/PendingIntent$CanceledException;', null);
     if (token.flags & FLAG.ONE_SHOT) { token.canceled = true; tokens.delete(r.object(self).tokenKey); }
-    r.record(`PENDINGINTENT send kind=${token.kind}`);
-    const context = platform.application;
+    r.record(`PENDINGINTENT send kind=${token.kind}${token.creator ? ` creator=${token.creator.name}` : ''}`);
+    // The Context it is sent from is the creator's (PendingIntentRecord.sendInner runs as the creating uid); the intent sent is the stored one, filled in with the sender's intent
+    // (Intent.fillIn with the flags given at creation: none here) unless the token is immutable.
+    let context = platform.application;
+    if (token.creator) { packages().ensureProcess(r, token.creator); context = packages().application(token.creator); }
+    // The sender's fill-in Intent leaves its process (IIntentSender.send parcels it): a package other than the creator hands over a copy read with the creator's class loader
+    if (packages() && !(extra === null || extra === 0) && packages().callerEntry(r) !== (token.creator ?? packages().main)) extra = platform.intentCrossCopy(r, extra, packages().loaderOf(r, token.creator ?? packages().main));
+    const intentToSend = () => {
+      if (extra === null || extra === 0 || (token.flags & FLAG.IMMUTABLE) || token.kind === KIND.result || token.intent === null) return token.intent;
+      const copy = r.allocate(INTENT); r.dispatch({ owner: INTENT, name: '<init>', parameters: [INTENT], result: 'V', signature: `(${INTENT})V` }, [copy, token.intent], 'direct');
+      call(r, INTENT, 'fillIn', [INTENT, 'I'], 'I', [copy, extra, 0]); return copy;
+    };
+    if (token.kind === KIND.service || token.kind === KIND.foregroundService) { call(r, CONTEXT, token.kind === KIND.service ? 'startService' : 'startForegroundService', [INTENT], 'Landroid/content/ComponentName;', [context, intentToSend()]); return; }
     if (token.kind === KIND.result) {
       // Activity.createPendingResult: send(code, intent) delivers onActivityResult(requestCode, code, data) to the Activity, once it is resumed (the result queue of its Activity record)
       const frame = platform.allFrames().find(entry => entry.activity.ref === token.activity.ref); if (!frame) throw new APKError('PendingIntent.send(): the Activity that created this result is gone', { kind: 'pending-result-gone' });
       (frame.pendingActivityResults ||= []).push({ requestCode: token.requestCode, resultCode: code | 0, data: extra ?? token.intent ?? null });
       platform.queueTask(() => { if (platform.allFrames().includes(frame)) platform.deliverActivityResults(r, frame); }, 0, [token.activity, token.intent, extra]);
-    } else if (token.kind === KIND.broadcast) call(r, CONTEXT, 'sendBroadcast', [INTENT], 'V', [context, token.intent]);
+    } else if (token.kind === KIND.broadcast) call(r, CONTEXT, 'sendBroadcast', [INTENT], 'V', [context, intentToSend()]);
     else if (token.kind === KIND.activity && token.intents) { const array = r.newArray(`[${INTENT}`, token.intents.length); r.array(array).elements = [...token.intents]; platform.asSystemLaunch(() => call(r, CONTEXT, 'startActivities', [`[${INTENT}`], 'V', [context, array])); }
-    else if (token.kind === KIND.activity) platform.asSystemLaunch(() => call(r, CONTEXT, 'startActivity', [INTENT], 'V', [context, token.intent]));
-    else throw new APKError('PendingIntent.send() for a Service: starting services from a PendingIntent is not modelled by the virtual device', { kind: 'pending-intent-service-unsupported' });
+    else if (token.kind === KIND.activity) platform.asSystemLaunch(() => call(r, CONTEXT, 'startActivity', [INTENT], 'V', [context, intentToSend()]));
+    else throw new APKError(`PendingIntent.send() of kind ${token.kind}: not a kind the virtual device creates`, { kind: 'pending-intent-kind' });
   };
   def(PENDING, 'send', '()V', (r, _m, [self]) => send(r, self));
   def(PENDING, 'send', `(${CONTEXT}I${INTENT})V`, (r, _m, [self, , code, intent]) => send(r, self, code, intent));
@@ -107,11 +124,13 @@ export function createPendingIntentHost(platform) {
   def(PENDING, 'getIntentSender', `()${SENDER}`, (r, _m, [self]) => { const sender = r.allocate(SENDER); r.object(sender).pending = self; return sender; });
   const pendingOf = (r, sender) => r.object(sender).pending;
   def(SENDER, 'sendIntent', `(${CONTEXT}I${INTENT}Landroid/content/IntentSender$OnFinished;${HANDLER})V`, (r, _m, [self, , code, intent]) => { const pending = pendingOf(r, self), token = tokenOf(r, pending); if (!token || token.canceled) r.throwJava('Landroid/content/IntentSender$SendIntentException;', null); send(r, pending, code, intent); });
-  def(SENDER, 'getCreatorPackage', `()${STRING}`, () => platform.packageName); def(SENDER, 'getTargetPackage', `()${STRING}`, () => platform.packageName); def(SENDER, 'getCreatorUid', '()I', () => platform.virtualProcess.uid);
+  const creatorEntry = (r, pending) => tokenOf(r, pending)?.creator ?? null;
+  def(SENDER, 'getCreatorPackage', `()${STRING}`, (r, _m, [self]) => creatorEntry(r, pendingOf(r, self))?.name ?? platform.packageName); def(SENDER, 'getTargetPackage', `()${STRING}`, (r, _m, [self]) => creatorEntry(r, pendingOf(r, self))?.name ?? platform.packageName); def(SENDER, 'getCreatorUid', '()I', (r, _m, [self]) => creatorEntry(r, pendingOf(r, self))?.uid ?? platform.virtualProcess.uid);
   def(SENDER, 'hashCode', '()I', (r, _m, [self]) => [...r.object(pendingOf(r, self)).tokenKey].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
   def(SENDER, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other && r.typeOf(other) === SENDER && r.object(pendingOf(r, other)).tokenKey === r.object(pendingOf(r, self)).tokenKey ? 1 : 0);
   def(SENDER, 'describeContents', '()I', () => 0);
-  def(PENDING, 'getCreatorPackage', `()${STRING}`, () => platform.packageName); def(PENDING, 'getCreatorUid', '()I', () => platform.virtualProcess.uid);
+  def(PENDING, 'getCreatorPackage', `()${STRING}`, (r, _m, [self]) => creatorEntry(r, self)?.name ?? platform.packageName); def(PENDING, 'getCreatorUid', '()I', (r, _m, [self]) => creatorEntry(r, self)?.uid ?? platform.virtualProcess.uid);
+  def(PENDING, 'getTargetPackage', `()${STRING}`, (r, _m, [self]) => creatorEntry(r, self)?.name ?? platform.packageName);
   def(PENDING, 'isImmutable', '()Z', (r, _m, [self]) => (tokenOf(r, self)?.flags ?? 0) & FLAG.IMMUTABLE ? 1 : 0);
   def(PENDING, 'hashCode', '()I', (r, _m, [self]) => [...r.object(self).tokenKey].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
   def(PENDING, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other && r.typeOf(other) === PENDING && r.object(other).tokenKey === r.object(self).tokenKey ? 1 : 0);

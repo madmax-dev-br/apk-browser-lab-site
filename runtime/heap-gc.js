@@ -63,9 +63,9 @@
 //  - Audit: a minor collection in audit mode is cross-checked against a full conservative mark (anything it reaches must survive); audit and stress collections alternate three minor collections
 //    and a major one. What remains unchecked by construction: host code that keeps the record of an old object without host state in a JavaScript closure (a rooted host structure is traced) and
 //    later writes a young reference into its cells or slots directly, without object(), FieldMap or storeField; the tombstone diagnosis names a minor collection for such a case.
-import { BUCKET } from './time-breakdown.js?v=8e11a37fba6a';
-import { cellBytes } from './java-arrays.js?v=8e11a37fba6a';
-import { storedFieldCount } from './object-shapes.js?v=8e11a37fba6a';
+import { BUCKET } from './time-breakdown.js?v=ad32040fbef9';
+import { cellBytes } from './java-arrays.js?v=ad32040fbef9';
+import { storedFieldCount } from './object-shapes.js?v=ad32040fbef9';
 export const GC_ROOTS = Symbol.for('apkweb.gc.roots');
 
 // Containers created inside host factories (closure state the collector cannot reach through object properties) register themselves here.
@@ -516,6 +516,7 @@ function collectGarbageNow(runtime, { audit = globalThis.process?.env?.APKWEB_GC
   runtime.gcOldSize = heap.size;
   runtime.gcMinorMs ??= (performance.now() - started) / 2;   // before any minor collection, its pause is guessed at half this one's (minorDue's motion rule): a small heap whose minor collection would cost close to a major one does not run it in motion
   runtime.allocationSamples = null; runtime.gcPressure = false; runtime.gcCellPressure = false; runtime.gcLastNextId = runtime.nextId; runtime.fieldSlots = fieldSlots; runtime.arrayCells = arrayCells; runtime.arrayBytes = arrayBytes; runtime.collectionCells = collectionCells;
+  runtime.constructedStringUnits = 0;   // the constructed-String guard counts what was built since the last collection (src/apk-runtime.js String constructors)
   runtime.gcStats = { collections: (runtime.gcStats?.collections ?? 0) + 1, majors: (runtime.gcStats?.majors ?? 0) + 1, minors: runtime.gcMinorStats?.collections ?? 0, freed: (runtime.gcStats?.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(runtime.gcStats?.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, softCleared: (runtime.gcStats?.softCleared ?? 0) + softCleared, softCollections: (runtime.gcStats?.softCollections ?? 0) + (softMode ? 1 : 0), weakCleared: (runtime.gcStats?.weakCleared ?? 0) + weakCleared, phantomCleared: (runtime.gcStats?.phantomCleared ?? 0) + phantomCleared, totalMs: (runtime.gcStats?.totalMs ?? 0) + (performance.now() - started), deferrals: runtime.gcDeferralStats ?? null, recent: [...(runtime.gcStats?.recent ?? []).slice(-15), { kind: 'major', at: Math.round(started), ms: Math.round(performance.now() - started), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion, ...(deferral ? { deferral } : {}), ...(softMode ? { soft: policy, softCleared } : {}) }] };
   return { collected: true, reason, before, after: heap.size, freed, ms: Math.round(performance.now() - started), markMs: Math.round(markMs), softPolicy: policy, softCleared };
 }
@@ -572,6 +573,7 @@ function collectMinor(runtime, { audit, extraRoots, reason, safepoint, started, 
   stats.recent.push(entry); if (stats.recent.length > 16) stats.recent.shift();
   // gcStats counts every collection, minor ones included (`majors` the major ones); its recent list marks them kind 'minor'.
   const g = runtime.gcStats ?? {};
+  runtime.constructedStringUnits = 0;   // as after a major collection
   runtime.gcStats = { ...g, collections: (g.collections ?? 0) + 1, majors: g.majors ?? 0, minors: stats.collections, freed: (g.freed ?? 0) + freed, lastLive: heap.size, peakLiveAfterGc: Math.max(g.peakLiveAfterGc ?? 0, heap.size), lastReason: reason, weakCleared: (g.weakCleared ?? 0) + weakCleared, phantomCleared: (g.phantomCleared ?? 0) + phantomCleared, totalMs: (g.totalMs ?? 0) + ms, deferrals: runtime.gcDeferralStats ?? null, recent: [...(g.recent ?? []).slice(-15), { kind: 'minor', at: entry.at, ms: Math.round(ms), markMs: Math.round(markMs), before, after: heap.size, nextId: runtime.nextId, reason, motion }] };
   return { collected: true, minor: true, reason, before, after: heap.size, freed, survivors, ms: Math.round(ms), markMs: Math.round(markMs) };
 }

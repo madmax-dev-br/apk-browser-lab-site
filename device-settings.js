@@ -1,10 +1,10 @@
-import { coreMemorySetting } from './core-memory.js?v=8e11a37fba6a';
-import { isMemoryStep } from './memory-budget.js?v=8e11a37fba6a';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=8e11a37fba6a';
-import { sanitizeHostMap } from './host-map.js?v=8e11a37fba6a';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=8e11a37fba6a';
-import { sanitizeLocation } from './runtime-permissions.js?v=8e11a37fba6a';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=8e11a37fba6a';
+import { coreMemorySetting } from './core-memory.js?v=ad32040fbef9';
+import { isMemoryStep } from './memory-budget.js?v=ad32040fbef9';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ad32040fbef9';
+import { sanitizeHostMap } from './host-map.js?v=ad32040fbef9';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=ad32040fbef9';
+import { sanitizeLocation } from './runtime-permissions.js?v=ad32040fbef9';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=ad32040fbef9';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -29,12 +29,20 @@ export function proxyState(raw) {
   if (kept && host) return { state: 'on', text: `Proxy on: the app's requests go through ${host}${kept.includes('{url}') ? '' : ' (the target URL is appended at the end)'}. In Network they show the PROXY badge.` };
   return { state: 'refused', text: 'Proxy refused and turned off: use https://… (or http:// only on localhost / 127.0.0.1), for example https://relay.example.com/?url={url}.' };
 }
+/** What the line under "Parallel relay channel" says (pure): { state: 'off' | 'on' | 'warn', text }. The channel exists only through the APK Lab Relay (its /<token>/ address). */
+export function relayChannelState(on, proxyRaw) {
+  if (!on) return { state: 'off', text: 'Parallel relay channel off: every exchange through the relay is a separate browser request (a preflight for most, about 6 at a time).' };
+  const kept = sanitizeProxyUrl(String(proxyRaw ?? '').trim()); let relay = false; try { relay = kept.includes('{url}') && /^\/[A-Za-z0-9_-]{8,128}\/?$/.test(new URL(kept.replace('{url}', 'x')).pathname); } catch { relay = false; }
+  if (!kept) return { state: 'warn', text: 'Parallel relay channel on, but no Proxy is set: it applies to exchanges through the APK Lab Relay only.' };
+  if (!relay) return { state: 'warn', text: 'Parallel relay channel on, but the Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/<token>/?url={url}): exchanges go as separate requests.' };
+  return { state: 'on', text: 'Parallel relay channel on: the app\'s exchanges share one WebSocket to the relay, all at once. A relay without it (older than 0.4.0) gets separate requests, as before; Network shows CHANNEL or NO CHANNEL on each entry.' };
+}
 // The engine a load uses when nothing names one: the WebAssembly core. `?engine=js` (the page) and `engine: 'js'` (the player) select the JavaScript VM;
 // scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
 export const DEFAULT_ENGINE = 'wasm';
 export function sanitizeSettings(input = {}) {
-  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [] }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
-  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host
+  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [], relayChannel: false }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
+  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); out.network.relayChannel = input.network.relayChannel === true; }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host. relayChannel: "Parallel relay channel" (src/relay-mux.js), off by default
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   { const custom = checkCustomScreen(input.customScreen); out.customScreen = custom.value ?? DEFAULT_CUSTOM_SCREEN; if (out.screen === 'custom' && !custom.value) out.screen = DEFAULT_DEVICE.screen; }   // "Personalizado" { width, height, unit: 'dp' | 'px' } (device-profile.js checkCustomScreen); kept while a preset is selected so switching back restores it
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
@@ -50,6 +58,7 @@ export function sanitizeSettings(input = {}) {
   out.engine = input.engine === 'wasm' || input.engine === 'js' ? input.engine : DEFAULT_ENGINE;   // the VM engine: 'wasm' (default: the WebAssembly core, docs/WASM-CORE-PLANO.md) or 'js' (the JavaScript VM); applies at the next load, never part of the device model the app sees
   out.coreMemory = coreMemorySetting(input.coreMemory);   // "Wasm core memory" { mode, heapMiB, metaMiB, threads } (src/core-memory.js): the mode (dynamic by default, or fixed) and the sizes of the WebAssembly core's memory; applies at the next load, only with engine 'wasm', never part of the device model the app sees
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Show layout bounds"); the VM never sees it
+  out.frameGraph = input.frameGraph === true;   // page-only developer option ("Show frame rate": the FPS line and the frame-time bars, src/frame-meter.js); off by default, applied live, the VM never sees it
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
@@ -86,4 +95,4 @@ export { resolveDevice, checkCustomScreen };
 /** The part of the settings the running app's Configuration/device model reads (src/device-profile.js resolveDevice): a change of anything else (motion/still
  * resolution, renderer, time per event: side calls; memory, core memory, engine: next load) needs no exclusive 'device' VM operation. */
 export function vmDeviceModel(settings) { const { raster, eventSeconds, memoryMiB, coreMemory, engine, ...device } = deviceForVM(settings); return device; }
-export function deviceForVM(settings) { const { location, renderer, microg, ...device } = settings; return device; }   // microg: a load option (the installed packages), not part of the device model
+export function deviceForVM(settings) { const { location, renderer, microg, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model

@@ -1,5 +1,5 @@
-import { mixerOf } from './audio-native.js?v=8e11a37fba6a';
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
+import { mixerOf } from './audio-native.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
 
 // android.media.AudioManager on the virtual device (android-13.0.0_r1 AudioService / MediaFocusControl contracts), installed on the host type `AudioManagerImpl`:
 //   * stream volumes with Android's default maxima and indexes, adjust*() with mute/unmute/toggle, and the ringer mode with the Do Not Disturb rule: toggling silent mode changes the
@@ -181,6 +181,23 @@ export function installAudioManager({ platform, def, service, call, holds, empty
     return 1;
   });
   def(AUDIO, 'clearCommunicationDevice', '()V', () => { state.communication = null; });
+  // AudioManager.getAudioDevicesForAttributes (public since API 33): the output devices the audio policy routes these attributes to, as the AudioDeviceInfo of getDevices(OUTPUTS)
+  // in an unmodifiable list. android-13.0.0_r1 wraps Objects.requireNonNull and the service call in one try: null attributes (or a failed call) log "No audio devices available for
+  // specified attributes." and answer Collections.emptyList(). Routing of the default policy engine on a device with only the built-in speaker and earpiece: voice communication
+  // (USAGE_VOICE_COMMUNICATION) follows the communication route (the chosen communication device, else the speaker with speakerphone on, else the earpiece), and so does call
+  // signalling (USAGE_VOICE_COMMUNICATION_SIGNALLING, the DTMF strategy) while the mode is a call; every other usage plays on the speaker.
+  const ATTRIBUTES = 'Landroid/media/AudioAttributes;', LIST = 'Ljava/util/List;', COLLECTIONS = 'Ljava/util/Collections;';
+  const communicationRoute = r => state.communication ?? communicationDevices(r)[state.speaker ? 0 : 1];
+  def(AUDIO, 'getAudioDevicesForAttributes', `(${ATTRIBUTES})${LIST}`, (r, _m, [, attributes]) => {
+    if (isNull(attributes)) {
+      r.dispatch({ owner: 'Landroid/util/Log;', name: 'i', parameters: [STRING, STRING], result: 'I', signature: `(${STRING}${STRING})I` }, [r.javaString('AudioManager'), r.javaString('No audio devices available for specified attributes.')], 'static');
+      return r.dispatch({ owner: COLLECTIONS, name: 'emptyList', parameters: [], result: LIST, signature: `()${LIST}` }, [], 'static');
+    }
+    const usage = call(r, attributes, ATTRIBUTES, 'getUsage', [], 'I'), inCall = state.mode === 2 || state.mode === 3;
+    const route = usage === 2 || (usage === 3 && inCall) ? communicationRoute(r) : sink(r)[0];
+    const list = emptyList(r); call(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [route]);
+    return r.dispatch({ owner: COLLECTIONS, name: 'unmodifiableList', parameters: [LIST], result: LIST, signature: `(${LIST})${LIST}` }, [list], 'static');
+  });
   def(AUDIO, 'addOnCommunicationDeviceChangedListener', `(${EXECUTOR}${COMM_LISTENER})V`, (r, _m, [, executor, listener]) => {
     if (isNull(executor) || isNull(listener)) r.throwJava('Ljava/lang/NullPointerException;', 'executor and listener must not be null');
     if (!communicationListeners.some(held => sameKey(held.listener, listener))) communicationListeners.push({ executor, listener });

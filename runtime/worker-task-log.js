@@ -20,7 +20,7 @@ function counterTotals(runtime, out) {
   for (let i = 0; i < BUCKETS; i++) out[i] = tb?.counts ? tb.counts[i] + (tb.lifeCounts ? tb.lifeCounts[i] : 0) : 0;
   return out;
 }
-const rasterMs = runtime => { const s = runtime?.rasterStats; return s ? (s.keyMs ?? 0) + (s.replayMs ?? 0) + (s.encodeMs ?? 0) : 0; };
+export const rasterMs = runtime => { const s = runtime?.rasterStats; return s ? (s.keyMs ?? 0) + (s.replayMs ?? 0) + (s.encodeMs ?? 0) : 0; };
 
 export class WorkerTaskLog {
   // `detail` (off by default; a measurement tool turns it on): each task also records its four costliest host-call keys (inclusive ms), at the price of copying the runtime's host

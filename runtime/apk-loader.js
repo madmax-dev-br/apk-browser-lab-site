@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8e11a37fba6a';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=8e11a37fba6a';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=8e11a37fba6a';
-import { inspectELF } from './native-inspector.js?v=8e11a37fba6a';
-import { elfBuildId } from './elf-build-id.js?v=8e11a37fba6a';
-import { inflateRaw } from './inflate.js?v=8e11a37fba6a';
-import { crc32, inflateEntry } from './zip-entry.js?v=8e11a37fba6a';
-import { resolveDevice } from './device-profile.js?v=8e11a37fba6a';
-import { resourceProfileFor } from './device-configuration.js?v=8e11a37fba6a';
-import { JniBridge } from './jni-host.js?v=8e11a37fba6a';
-import { providerForApk } from './native-provider-variants.js?v=8e11a37fba6a';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8e11a37fba6a';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8e11a37fba6a';
-import { AndroidResources } from './android-resources.js?v=8e11a37fba6a';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=8e11a37fba6a';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=8e11a37fba6a';
-import { FrameworkProvider } from './framework-provider.js?v=8e11a37fba6a';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=ad32040fbef9';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=ad32040fbef9';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=ad32040fbef9';
+import { inspectELF } from './native-inspector.js?v=ad32040fbef9';
+import { elfBuildId } from './elf-build-id.js?v=ad32040fbef9';
+import { inflateRaw } from './inflate.js?v=ad32040fbef9';
+import { crc32, inflateEntry } from './zip-entry.js?v=ad32040fbef9';
+import { resolveDevice } from './device-profile.js?v=ad32040fbef9';
+import { resourceProfileFor } from './device-configuration.js?v=ad32040fbef9';
+import { JniBridge } from './jni-host.js?v=ad32040fbef9';
+import { providerForApk } from './native-provider-variants.js?v=ad32040fbef9';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=ad32040fbef9';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=ad32040fbef9';
+import { AndroidResources } from './android-resources.js?v=ad32040fbef9';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=ad32040fbef9';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=ad32040fbef9';
+import { FrameworkProvider } from './framework-provider.js?v=ad32040fbef9';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -257,6 +257,12 @@ export function parseManifest(data) {
       if (components[name] || name === 'application') node.component = name === 'application' ? { metaData: (application.metaData ??= []) } : { metaData: [] };
       if (components[name] && typeof attrs.name === 'string') { const detail = { kind: name, name: resolveName(attrs.name), authorities: attrs.authorities ?? null, exported: attrs.exported, enabled: attrs.enabled, process: attrs.process ?? null, initOrder: attrs.initOrder ?? 0, multiprocess: attrs.multiprocess, directBootAware: attrs.directBootAware, grantUriPermissions: attrs.grantUriPermissions, permission: attrs.permission ?? null, readPermission: attrs.readPermission ?? null, writePermission: attrs.writePermission ?? null, foregroundServiceType: attrs.foregroundServiceType ?? 0, metaData: node.component.metaData, order: componentDetails.length }; node.component.detail = detail; componentDetails.push(detail); if (name === 'provider') providerDetails.push(detail); }
       if (name === 'action' && typeof attrs.name === 'string') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner?.detail) (owner.detail.actions ??= []).push(attrs.name); }
+      // a service's / receiver's <intent-filter> as IntentFilter sees it (actions, categories, <data> schemes and types, priority): what broadcast resolution matches (src/broadcast-queue.js)
+      if (name === 'intent-filter') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner?.detail) { node.componentFilter = { actions: [], categories: [], data: [], priority: Number(attrs.priority) | 0 }; (owner.detail.filters ??= []).push(node.componentFilter); } }
+      { const componentFilter = [...stack].reverse().find(n => n.componentFilter)?.componentFilter;
+        if (componentFilter && typeof attrs.name === 'string' && name === 'action') componentFilter.actions.push(attrs.name);
+        if (componentFilter && typeof attrs.name === 'string' && name === 'category') componentFilter.categories.push(attrs.name);
+        if (componentFilter && name === 'data') componentFilter.data.push({ scheme: typeof attrs.scheme === 'string' ? attrs.scheme : null, mimeType: typeof attrs.mimeType === 'string' ? attrs.mimeType : null }); }
       if (name === 'meta-data') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner && typeof attrs.name === 'string') owner.metaData.push({ name: attrs.name, value: attrs.value, valueType: attrTypes.value, resource: attrs.resource }); }
       if (name === 'activity' || name === 'activity-alias') {
         const rawName = name === 'activity-alias' ? attrs.targetActivity : attrs.name;
@@ -706,12 +712,16 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesLineBreakAttributes=lineBreakScan.found;
   const usesTextClock=clockScan.found,usesMenuWidgets=menuScan.found,usesProfileWidgets=profileScan.found,usesProgressBars=barScan.found,usesProfileAttributes=attributeScan.found;
   const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
-  const usesSpeech=files.some(file=>file.dex.types.some(type=>type.startsWith('Landroid/speech/tts/')));   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
+  const usesSpeech=files.some(file=>file.dex.types.some(type=>type.startsWith('Landroid/speech/tts/')));
+  // the original SMS decoding classes (framework-aosp/profiles/telephony): referenced by the APK, or possibly by a companion package (its code is not scanned at load: the "With microG"
+  // option's SMS Retriever decodes SMS_RECEIVED with them)
+  const usesTelephony=files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))||(options.companionPackages?.length??0)>0||!!options.microg;   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
+    {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
   for(const selection of profiles){
     const requested=selection.explicit===true||(selection.explicit!==false&&selection.automatic);if(!requested)continue;

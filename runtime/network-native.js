@@ -1,17 +1,19 @@
-import { APKError } from './apk-error.js?v=8e11a37fba6a';
-import { throwNew } from './java-throw.js?v=8e11a37fba6a';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=8e11a37fba6a';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=8e11a37fba6a';
-import { Blocked } from './scheduler.js?v=8e11a37fba6a';
-import { captureBody } from './network-capture.js?v=8e11a37fba6a';
-import { OS_CONSTANTS } from './os-constants-data.js?v=8e11a37fba6a';
-import { openExchange, describeFailure } from './network-transport.js?v=8e11a37fba6a';
-import { WorkerExecutor } from './network-worker-executor.js?v=8e11a37fba6a';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=8e11a37fba6a';
-import { TransportAuthority } from './transport-ca.js?v=8e11a37fba6a';
-import { openWebSocketSession } from './websocket-bridge.js?v=8e11a37fba6a';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=8e11a37fba6a';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=8e11a37fba6a';
+import { APKError } from './apk-error.js?v=ad32040fbef9';
+import { throwNew } from './java-throw.js?v=ad32040fbef9';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=ad32040fbef9';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=ad32040fbef9';
+import { Blocked } from './scheduler.js?v=ad32040fbef9';
+import { captureBody } from './network-capture.js?v=ad32040fbef9';
+import { OS_CONSTANTS } from './os-constants-data.js?v=ad32040fbef9';
+import { openExchange, describeFailure } from './network-transport.js?v=ad32040fbef9';
+import { WorkerExecutor } from './network-worker-executor.js?v=ad32040fbef9';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=ad32040fbef9';
+import { TransportAuthority } from './transport-ca.js?v=ad32040fbef9';
+import { openWebSocketSession } from './websocket-bridge.js?v=ad32040fbef9';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=ad32040fbef9';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=ad32040fbef9';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=ad32040fbef9';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=ad32040fbef9';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -32,6 +34,7 @@ import { destination, destinationOfUrl, identityKey, registerClientIdentity, for
 const NET = 'Ldev/apkweb/net/NetBridge;', LINUX = 'Llibcore/io/Linux;', STRING = 'Ljava/lang/String;', INET = 'Ljava/net/InetAddress;', GAI = 'Landroid/system/GaiException;', ERRNO = 'Landroid/system/ErrnoException;';
 const C = OS_CONSTANTS, BOUNDARY = 'network-boundary';
 const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024;
+const NOT_A_RELAY = 'the Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/<token>/?url={url}), so it has no channel to open';
 
 /** True for "a.b.c.d" and for IPv6 literals. */
 /** The host of the proxy a request goes through (Dispositivo › Proxy: a relay URL with {url}, or a prefix), for the network log; null without one. */
@@ -44,6 +47,7 @@ class Operation {
   constructor(handle, request) {
     this.handle = handle; this.request = request; this.head = null; this.queue = []; this.queued = 0; this.ended = false; this.error = null; this.closed = false;
     this.abortController = typeof AbortController === 'function' ? new AbortController() : null; this.reader = null; this.resume = null; this.consumed = 0; this.executor = 'main'; this.shared = null; this.received = 0; this.log = null;
+    this.trace = null;   // its timeline (src/net-trace.js), from start()
   }
   abort() { try { this.abortController?.abort(); } catch { /* already finished */ } try { this.reader?.cancel()?.catch?.(() => {}); } catch { /* ignored */ } this.onAbort?.(); }
 }
@@ -60,7 +64,7 @@ export class NetworkBridge {
   get policy() {
     if (this.platform.networkPolicy) return this.platform.networkPolicy;
     const network = this.platform.device?.network;
-    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], clientCertHosts: network?.clientCertHosts ?? [], fetch: null, redirect: 'auto' } };
+    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], clientCertHosts: network?.clientCertHosts ?? [], relayChannel: network?.relayChannel === true, fetch: null, redirect: 'auto' } };
     return this.derived.value;
   }
   /** The Worker's network log (src/netlog.js), or null (tests, hosts that attach none). */
@@ -77,7 +81,12 @@ export class NetworkBridge {
     else if (op.closed) { state.settled = true; state.record.closed++; }   // the app closed it before anything came back
   }
   get online() { return (this.platform.device?.connectivity ?? 'online') !== 'offline'; }
+  /** The timelines of the finished exchanges (src/net-trace.js): a measurement aid. */
+  get trace() { return this.traces ??= new NetTrace(); }
   get pending() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (op.executor !== 'mock' && !op.ended && op.error === null && !op.closed) n++; return n; }   // a mocked answer is a timer on the VM clock (delay()), not I/O
+  /** Exchanges whose progress reaches the VM only through this realm's event loop (its own fetch, not the network worker's shared memory), and asynchronous host jobs: what a
+   *  pump that never returns to the event loop holds back (src/apk-worker.js ioYieldMs). */
+  get pendingInRealm() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (op.executor === 'main' && !op.ended && op.error === null && !op.closed) n++; return n; }
   /** Asynchronous host work the VM may have to wait for (WebCrypto certificate signing): counted as pending so the scheduler waits for the event loop instead of reporting a deadlock. */
   track(promise) { this.jobs = (this.jobs ?? 0) + 1; const done = () => { this.jobs--; this.signal(); }; promise.then(done, done); return promise; }
   /** The session's lab transport CA (src/transport-ca.js): the certificates SSLSockets over virtual HTTP sockets present. */
@@ -149,16 +158,59 @@ export class NetworkBridge {
   /** request.mock: the caller's matchMock() answer (null = checked, none); when absent the request is matched here. */
   start(request, reserved = null) {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
+    op.trace = new ExchangeTrace(request.api ?? 'java.net', request.url, this.runtime.thread?.name ?? null);
     this.stats.requests++; this.noteHost(new URL(request.url).hostname);
     const mock = request.mock !== undefined ? request.mock : this.matchMock(request);
     if (this.requestObserver) this.requestObserver(request, mock);   // a background render lists the requests made while it runs (src/render-variant.js)
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl) }) ?? null;
+    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
-    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url) }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
-    else this.run(op).catch(error => { op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
+    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url), relayChannel: this.relayChannelSpec() }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    else this.run(op).catch(error => { this.noteChannelOf(op, error); op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
+  }
+
+  // ---- the relay's parallel channel (src/relay-mux.js; Device > "Parallel relay channel", off by default) ------------------------------------------------------------------------
+  /** Is the channel asked for: the setting on and a proxy set (the channel only exists for exchanges through the relay). */
+  relayChannelOn() { const policy = this.policy; return policy.relayChannel === true && !!policy.proxyUrl; }
+  /** What the network worker needs to open the channel in its own realm: { endpoint, headers } (headers: tests in Node, which add the page's Origin), { unavailable } or null. */
+  relayChannelSpec() {
+    if (!this.relayChannelOn()) return null;
+    const endpoint = muxEndpoint(this.policy); this.noteChannelSetting(endpoint);
+    return endpoint ? { endpoint, ...(this.policy.muxHeaders ? { headers: { ...this.policy.muxHeaders } } : {}) } : { unavailable: NOT_A_RELAY };
+  }
+  /** The channel for exchanges in this realm, or null when the setting is off. One per relay endpoint; a changed Proxy (or the setting off) retires the previous one (what is in flight on it finishes). */
+  relayChannel() {
+    if (!this.relayChannelOn()) { if (this.mux) { this.mux.retire(); this.mux = null; } return null; }   // turned off: what is in flight on it finishes, nothing new goes over it
+    const endpoint = muxEndpoint(this.policy); this.noteChannelSetting(endpoint);
+    if (!endpoint) return (this.muxUnavailable ??= unavailableChannel(NOT_A_RELAY));
+    if (this.mux?.endpoint !== endpoint) {
+      this.mux?.retire();
+      const Socket = this.policy.WebSocket ?? globalThis.WebSocket;
+      this.mux = new RelayMux({ endpoint, create: Socket ? url => new Socket(url) : null, onEvent: (kind, detail) => this.noteRelayChannel(kind, detail, endpoint) });
+    }
+    return this.mux;
+  }
+  /** The trace says once per relay that the setting is on (and how exchanges go without the channel). */
+  noteChannelSetting(endpoint) {
+    const key = endpoint ?? '(none)'; if (this.channelNoted === key) return; this.channelNoted = key;
+    this.runtime?.record?.(endpoint ? `NET relay channel: on (Device > Parallel relay channel); the exchanges through the relay at ${endpointHost(endpoint)} share one WebSocket (/<token>/mux); while it is not open they go as separate requests`
+      : `NET relay channel: on, but NOT used: ${NOT_A_RELAY}; every exchange goes as a separate request`);
+  }
+  /** A state change of a channel (this realm's or the network worker's): open, unavailable (an older relay, none running), dropped. Said in the trace once per change. */
+  noteRelayChannel(kind, detail = {}, endpoint = '') {
+    const where = endpointHost(endpoint), stats = this.stats.relayChannel ??= { opened: 0, drops: 0, unavailable: 0, exchanges: 0, fallbacks: 0, state: 'connecting' };
+    if (kind === 'open') { stats.opened++; stats.state = 'open'; this.channelLastNote = null; this.runtime?.record?.(`NET relay channel open: ${where}, protocol ${detail.version ?? 1}, window ${Math.round((detail.window ?? 0) / 1024)} KiB per exchange`); }
+    else if (kind === 'unavailable') { stats.unavailable++; stats.state = 'unavailable'; const text = `NET relay channel NOT available at ${where}: ${detail.reason}; exchanges go as separate requests (the channel is tried again in a few seconds)`; if (this.channelLastNote !== text) { this.channelLastNote = text; this.runtime?.record?.(text); } }
+    else if (kind === 'dropped') { stats.drops++; stats.state = 'dropped'; this.channelLastNote = null; this.runtime?.record?.(`NET relay channel dropped at ${where} (${detail.reason}): ${detail.inFlight ?? 0} exchange(s) in flight failed as a dropped connection (Connection reset); the next exchange opens it again`); }
+  }
+  /** Which path an exchange took (head.relayChannel / error.relayChannel, see openExchange), onto the operation and its log entry; counted. */
+  noteChannelOf(op, carrier) {
+    const channel = carrier?.relayChannel ?? null; if (!channel || op.relayChannel) return;
+    op.relayChannel = channel; op.relayChannelNote = carrier.relayChannelNote ?? null;
+    const stats = this.stats.relayChannel ??= { opened: 0, drops: 0, unavailable: 0, exchanges: 0, fallbacks: 0, state: 'connecting' };
+    if (channel === 'mux') stats.exchanges++; else stats.fallbacks++;
   }
   /**
    * A WebSocket the app asked for over a virtual HTTP socket (src/websocket-bridge.js): the browser's WebSocket to the same URL (ws:// for http, wss:// for https), after the
@@ -305,22 +357,23 @@ export class NetworkBridge {
     const { request } = op, policy = this.policy;
     const identity = this.clientIdentityReady(request.url); if (identity) await identity;   // the relay has the client identity before the request that needs it
     { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); if (dest && this.clientIdentities?.get(dest)?.job) this.noteClientIdentityUse(dest); }
-    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders, clientIdentity: this.clientIdentityFor(request.url) });
+    const { head, reader } = await openExchange(request, { fetch: this.fetchFunction(), proxyUrl: policy.proxyUrl, redirect: policy.redirect ?? 'auto', hostMap: policy.hostMap ?? [], signal: op.abortController?.signal, dropped: this.droppedRequestHeaders, clientIdentity: this.clientIdentityFor(request.url), mux: this.relayChannel() });
     if (head.clientIdentityRenewed) { delete head.clientIdentityRenewed; this.noteClientIdentityRenewed(destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url)); }
+    if (head.relayChannel) { this.noteChannelOf(op, head); delete head.relayChannel; delete head.relayChannelNote; }
     if (op.closed || op.error !== null) { try { await reader?.cancel(); } catch { /* ignored */ } return; }
     if (head.status >= 300 && head.status < 400) this.stats.redirectsObserved++;
-    op.head = head; this.observe(op); this.signal();
-    if (!reader) { op.ended = true; return; }
+    op.head = head; op.trace?.arrived('head'); this.observe(op); this.signal();
+    if (!reader) { op.ended = true; op.trace?.arrived('end'); return; }
     op.reader = reader;
     for (;;) {
       if (op.closed || op.error !== null) { try { await op.reader.cancel(); } catch { /* ignored */ } return; }
       if (op.queued >= HIGH_WATER) { await new Promise(resolve => { op.resume = resolve; }); continue; }
       let step;
       try { step = await op.reader.read(); } catch (error) { if (op.closed) return; op.error = describeFailure(error, request, request.timedOut); this.stats.failures++; return; }
-      if (step.done) { op.ended = true; return; }
+      if (step.done) { op.ended = true; op.trace?.arrived('end'); return; }
       const bytes = step.value instanceof Uint8Array ? step.value : new Uint8Array(step.value);
       for (let at = 0; at < bytes.length; at += CHUNK) { const piece = bytes.subarray(at, at + CHUNK); op.queue.push(piece); op.queued += piece.length; }
-      captureBody(op, bytes); this.stats.bytesIn += bytes.length; op.received += bytes.length; this.observe(op);
+      captureBody(op, bytes); this.stats.bytesIn += bytes.length; op.received += bytes.length; op.trace?.arrived('piece', bytes.length); this.observe(op);
       this.signal();
     }
   }
@@ -343,7 +396,7 @@ export class NetworkBridge {
     if (pieces.length && op.resume) { const resume = op.resume; op.resume = null; resume(); }
     return pieces;
   }
-  discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); this.mockWaiting?.delete(op); op.resume?.(); }
+  discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); this.mockWaiting?.delete(op); op.resume?.(); if (op.trace && !op.trace.socket) this.trace.finish(op.trace); }
 }
 
 /** The parsed res/xml network security config of the app (cached per manifest), or null when the manifest names none. A config that cannot be read fails explicitly. */
@@ -358,6 +411,8 @@ function networkSecurityConfigOf(runtime, defaultCleartext) {
   Object.assign(cache, { id, defaultCleartext, config }); return config;
 }
 export const networkOf = runtime => runtime.network ??= new NetworkBridge(runtime);
+/** The size in bytes of an exchange's answer: its declared Content-Length, else what has arrived (the scheduler's I/O boost serves the smallest first). */
+const answerSize = op => { const declared = Number(op.head?.headers?.find?.(([name]) => String(name).toLowerCase() === 'content-length')?.[1]); return Math.max(Number.isFinite(declared) ? declared : 0, op.received ?? 0); };
 
 function javaFailure(runtime, failure) { throwNew(runtime, failure.type, failure.message); }
 const refArray = (runtime, type, values) => { const array = runtime.newArray(type, values.length); runtime.object(array).elements = values; return array; };
@@ -451,9 +506,11 @@ export function createNetworkNativeBindings() {
     if (!reserved || reserved.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
     const op = net.start({ method: text(runtime, method), url, headers, body, redirect, connectTimeout, readTimeout, mock }, reserved);
     const budget = connectTimeout > 0 && readTimeout > 0 ? connectTimeout + readTimeout : connectTimeout > 0 ? connectTimeout : readTimeout;
+    op.trace?.park();
     return new Blocked({
-      ready: () => { net.refresh(op); return op.head !== null || op.error !== null || op.closed; }, deadline: timeoutAt(runtime, budget), reason: `network: ${method} ${parsed.hostname}`, interruptible: false,
+      ready: () => { net.refresh(op); const ready = op.head !== null || op.error !== null || op.closed; if (ready) op.trace?.ready(); return ready; }, deadline: timeoutAt(runtime, budget), reason: `network: ${method} ${parsed.hostname}`, interruptible: false, io: () => answerSize(op),
       finish: timedOut => {
+        if (op.trace) { op.trace.resume(); op.trace.headTaken ||= performance.now(); }
         if (op.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
         if (op.error) { net.discard(op); javaFailure(runtime, op.error); }
         if (timedOut && op.head === null) {
@@ -474,15 +531,17 @@ export function createNetworkNativeBindings() {
     const attempt = () => {
       net.refresh(op);
       if (op.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
-      if (op.queue.length) return net.take(op, target, offset, length);
+      if (op.queue.length) { const taken = net.take(op, target, offset, length); if (op.trace && op.ended && !op.queue.length) op.trace.bodyTaken ||= performance.now(); return taken; }
       if (op.error) { const failure = op.error; net.discard(op); javaFailure(runtime, failure); }
-      if (op.ended) return -1;
+      if (op.ended) { if (op.trace) op.trace.bodyTaken ||= performance.now(); return -1; }
       return null;
     };
+    op.trace?.read();
     const now = attempt(); if (now !== null) return now;
+    op.trace?.park();
     return new Blocked({
-      ready: () => { net.refresh(op); return op.queue.length > 0 || op.ended || op.error !== null || op.closed; }, deadline: timeoutAt(runtime, readTimeout), reason: `network read: ${op.request.method}`, interruptible: false, roots: [buffer],
-      finish: timedOut => { const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'timeout'); throw new APKError('network read woke without data', { kind: BOUNDARY }); },
+      ready: () => { net.refresh(op); const ready = op.queue.length > 0 || op.ended || op.error !== null || op.closed; if (ready) op.trace?.ready(); return ready; }, deadline: timeoutAt(runtime, readTimeout), reason: `network read: ${op.request.method}`, interruptible: false, roots: [buffer], io: () => answerSize(op),
+      finish: timedOut => { op.trace?.resume(); const value = attempt(); if (value !== null) return value; if (timedOut) throwNew(runtime, 'Ljava/net/SocketTimeoutException;', 'timeout'); throw new APKError('network read woke without data', { kind: BOUNDARY }); },
     });
   });
   add(NET, `cleartextPermitted(${STRING})Z`, (runtime, [host]) => cleartextPermitted(runtime, text(runtime, host)) ? 1 : 0);
