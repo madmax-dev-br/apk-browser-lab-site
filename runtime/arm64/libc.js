@@ -3,9 +3,9 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=850bf1b17ffb';
-import { BLOCKED } from './cpu.js?v=850bf1b17ffb';
-import { extendLibc } from './libc-extra.js?v=850bf1b17ffb';
+import { APKError } from '../apk-error.js?v=bcd37ec74124';
+import { BLOCKED } from './cpu.js?v=bcd37ec74124';
+import { extendLibc } from './libc-extra.js?v=bcd37ec74124';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => new TextDecoder().decode(bytes);

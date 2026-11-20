@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=850bf1b17ffb';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=850bf1b17ffb';
-import {getVectorGraphics} from './vector-native.js?v=850bf1b17ffb';
-import {deferRaster} from './deferred-raster.js?v=850bf1b17ffb';
+import {APKError} from './apk-runtime.js?v=bcd37ec74124';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=bcd37ec74124';
+import {getVectorGraphics} from './vector-native.js?v=bcd37ec74124';
+import {deferRaster} from './deferred-raster.js?v=bcd37ec74124';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -18,7 +18,9 @@ const fail=message=>{throw new APKError(message,{kind:'compose-canvas-boundary'}
 /** The Skia replay of a View's Canvas content is deferred to the read of `view.contentRaster` and follows the progressive raster scale (src/deferred-raster.js). */
 export function setContentRaster(r,view,graphics,target,width,height){
  // The deferred replay reads `target`, which is the View's own `contentCanvas` (see the callers): that record property keeps it alive for the collector.
- deferRaster(r,view,'contentRaster',scale=>graphics.snapshotCanvas(target,width,height,scale<1?{...r.contentRasterOptions,scale}:r.contentRasterOptions));
+ // force dark (src/force-dark-host.js): the replay takes the transform of the View's own RenderNode, decided when the raster is read
+ const options=scale=>scale<1?{...r.contentRasterOptions,scale}:r.contentRasterOptions,forceDark=r.platform?.forceDarkHost;
+ deferRaster(r,view,'contentRaster',scale=>graphics.snapshotCanvas(target,width,height,forceDark?forceDark.layerOptions(r,{ref:view.id},options(scale)):options(scale)));
 }
 export function createComposeCanvasHost(platform){
   let drawingTime=0,cachedTextRasterBytes=0;const textRasterSizes=new Map();
@@ -135,9 +137,10 @@ export function createComposeCanvasHost(platform){
     const horizontal=abs&7,vertical=abs&0x70,lines=text.split('\n'),font={textSize:size,flags:1,typefaceRef:typeface},metrics=r.skiaHost.measureText('',font).metrics,top=view.includeFontPadding===false?Math.round(metrics.ascent):Math.floor(metrics.bounds[1]),bottom=view.includeFontPadding===false?Math.round(metrics.descent):Math.ceil(metrics.bounds[3]);
     const nativeParagraph=!hint&&view.textParagraph,fontPadTop=nativeParagraph?view.textParagraph.padTop??0:0,blockHeight=nativeParagraph?view.textParagraph.height+fontPadTop+(view.textParagraph.padBottom??0):bottom-top+(lines.length-1)*(view.textLineHeight??bottom-top),dy=vertical===0x10?(innerHeight-blockHeight)/2:vertical===0x50?innerHeight-blockHeight:0,save=canvas(r,target,'save',[],'I');
     try{canvas(r,target,'clipRect',['F','F','F','F'],'Z',[raw(pad.left??0),raw(pad.top??0),raw(width-(pad.right??0)),raw(height-(pad.bottom??0))]);const scrollX=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollX:I`)??0,scrollY=view.updatingDisplayList?0:view.fields.get(`${VIEW}->mScrollY:I`)??0;
-      if(nativeParagraph){const renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',extra=view.textParagraph.extra??{},key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,face.families??null,face.fontVariations??null,color,align,view.layoutDirection,view.maxLines,extra]);
-        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,hint?text:view.textBreakText??text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,families:face.families??null,fontVariations:face.fontVariations??null,nativeTypeface:face.custom?face.face:null,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color,alignment:align,raster:true,...extra});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
-        r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy+fontPadTop-scrollY]});   // fontPadTop: StaticLayout's first line starts at the font's top, above the ascent the paragraph starts at
+      // the paragraph is a raster drawn with its colour: under force dark, the colour of text (the node that draws text is foreground: lightened); the raster op is text (mHasText)
+      if(nativeParagraph){const shown=platform.forceDarkHost?platform.forceDarkHost.textColor(r,receiver,color):color,renderWidth=view.textParagraph.layoutWidth,align=horizontal===1?'center':horizontal===5?'right':'left',extra=view.textParagraph.extra??{},key=JSON.stringify([text,renderWidth,size,face.weight,face.italic,face.families??null,face.fontVariations??null,shown,align,view.layoutDirection,view.maxLines,extra]);
+        if(view.canvasTextRasterKey!==key){const result=measureSkiaParagraph(r.skia,hint?text:view.textBreakText??text,{width:renderWidth,textSize:size,weight:face.weight,italic:face.italic,families:face.families??null,fontVariations:face.fontVariations??null,nativeTypeface:face.custom?face.face:null,direction:view.layoutDirection??0,maxLines:view.maxLines??null,ellipsis:platform.textViewApi.ellipsizeKind(r,receiver)==='END'&&view.maxLines!=null?'\u2026':null,color:shown,alignment:align,raster:true,...extra});if(Math.abs(result.height-view.textParagraph.height)>.001)fail('Native widget paragraph differs from its completed measurement');const length=result.raster.dataURL.length,next=cachedTextRasterBytes-(textRasterSizes.get(view.id)??0)+length;if(next>32*1024*1024)fail('Native widget paragraph raster cache exceeds32MiB');cachedTextRasterBytes=next;textRasterSizes.set(view.id,length);view.canvasTextRaster=result.raster;view.canvasTextRasterKey=key;}
+        r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'raster',text:true,raster:view.canvasTextRaster,args:[(pad.left??0)+(horizontal===1?(innerWidth-renderWidth)/2:horizontal===5?innerWidth-renderWidth:0)-scrollX,(pad.top??0)+dy+fontPadTop-scrollY]});   // fontPadTop: StaticLayout's first line starts at the font's top, above the ascent the paragraph starts at
       }else{const paint={argb:color>>>0,color:color>>>0,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3,textSize:size,textScaleX:1,textSkewX:0,letterSpacing:0,wordSpacing:0,hinting:1,...r.skiaHost.faceState(face)};   // the face the text was measured with: an app or system font, its variation, the synthetic styles
         lines.forEach((line,index)=>{const advance=r.skiaHost.measureText(line,font).width,dx=horizontal===1?(innerWidth-advance)/2:horizontal===5?innerWidth-advance:0;r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'paragraphRun',text:line,args:[(pad.left??0)+dx-scrollX,(pad.top??0)+dy-top+index*(view.textLineHeight??bottom-top)-scrollY],isRtl:!!view.layoutDirection,paint});});
       }
@@ -165,6 +168,12 @@ export function createComposeCanvasHost(platform){
   };
   const drawBackground=(r,receiver,target)=>{
     const view=r.object(receiver),[w,h]=dimensions(view);
+    // View.drawBackground records the background in a RenderNode of its own with USAGE_BACKGROUND: under force dark its draws are a background scope of this recording
+    const scope=(view.backgroundDrawable||view.background)&&r.skia?.rasterizeCanvas&&platform.forceDarkHost?.backgroundTransform(r,receiver)?r.object(target).nativeCanvasHandle??r.object(target).fields.get('Landroid/graphics/BaseCanvas;->mNativeCanvasWrapper:J'):null;
+    if(scope!==null&&scope!==undefined)r.skiaHost.recordNative(scope,{op:'usageBegin',usage:1});
+    try{drawBackgroundContent(r,receiver,target,view,w,h);}finally{if(scope!==null&&scope!==undefined)r.skiaHost.recordNative(scope,{op:'usageEnd'});}
+  };
+  const drawBackgroundContent=(r,receiver,target,view,w,h)=>{
     if(view.backgroundDrawable)drawable(r,view.backgroundDrawable,target,w,h);
     else if(view.background){
       const color=typeof view.background==='string'?Number.parseInt(view.background.slice(1),16)|0:view.background|0;
@@ -291,7 +300,7 @@ export function createComposeCanvasHost(platform){
             const draws=graphics.get(r.object(target).nativeCanvasHandle,'canvas').draws,after=draws.splice(view.groupDrawSplit??draws.length);
             graphics.get(r.object(overlay).nativeCanvasHandle,'canvas').draws.push(...after);
             if(draws.length)setContentRaster(r,view,graphics,target,gw,gh);else view.contentRaster=null;
-            if(after.length){deferRaster(r,view,'overlaySVG',scale=>graphics.snapshotCanvas(overlay,gw,gh,scale<1?{...r.layerRasterOptions,scale}:r.layerRasterOptions));}else view.overlaySVG=null;
+            if(after.length){deferRaster(r,view,'overlaySVG',scale=>{const options=scale<1?{...r.layerRasterOptions,scale}:r.layerRasterOptions;return graphics.snapshotCanvas(overlay,gw,gh,platform.forceDarkHost?platform.forceDarkHost.layerOptions(r,receiver,options):options);});}else view.overlaySVG=null;
             r.record(`DRAW ViewGroup draw override: original ${view.type} -> Skia CPU (${draws.length} under, ${after.length} over its children)`);
           }
         }

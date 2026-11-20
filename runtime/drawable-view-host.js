@@ -1,9 +1,11 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=850bf1b17ffb';
-import { APKError } from './apk-runtime.js?v=850bf1b17ffb';
-import { getVectorGraphics } from './vector-native.js?v=850bf1b17ffb';
-import { deferRaster } from './deferred-raster.js?v=850bf1b17ffb';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=850bf1b17ffb';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=850bf1b17ffb';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=bcd37ec74124';
+import { APKError } from './apk-runtime.js?v=bcd37ec74124';
+import { getVectorGraphics } from './vector-native.js?v=bcd37ec74124';
+import { deferRaster } from './deferred-raster.js?v=bcd37ec74124';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=bcd37ec74124';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=bcd37ec74124';
+import { createForceDarkHost } from './force-dark-host.js?v=bcd37ec74124';
+import { renderNodeByHandle } from './rendernode-native.js?v=bcd37ec74124';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -17,6 +19,7 @@ const fail = message => { throw new APKError(message, { kind: 'drawable-view-uns
 const same = (a, b) => a?.ref !== undefined && a.ref === b?.ref;
 export function createDrawableViewHost(platform) {
   const ninePatch = createNinePatchDrawableHost(platform);
+  const forceDark = platform.forceDarkHost ??= createForceDarkHost(platform);   // src/force-dark-host.js: shared with the content, text and snapshot paths
   const dispatch = (runtime, owner, name, parameters, result, receiver, values = [], mode = 'virtual') => runtime.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...values], mode);
   const compoundPadding=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.switchState)return switchHost.compoundPadding(runtime,receiver,view.padding);if(!view.buttonDrawable)return platform.textViewApi.compoundPadding(runtime,receiver);const result={left:0,top:0,right:0,bottom:0,...view.padding},width=dispatch(runtime,DRAWABLE,'getIntrinsicWidth',[],'I',view.buttonDrawable);result[view.layoutDirection===1?'right':'left']+=width;return result;};
   const buttonGravity=(runtime,receiver)=>{const view=runtime.object(receiver);if(view.gravity!=null)return view.gravity;const table=platform.resources?.frameworkTable;if(!table||!view.context)return 0x800033;const id=table.findId('attr/gravity');if(!id)return 0x800033;const attrs=runtime.newArray('[I',1);runtime.array(attrs).elements=[id];const array=platform.styleBackend.obtain(runtime,platform.styleBackend.theme(runtime,view.context),null,attrs,view.defStyleAttr||table.findId('attr/'+(runtime.isSubtype(view.type,'Landroid/widget/Switch;')?'switchStyle':'checkboxStyle')));try{return dispatch(runtime,'Landroid/content/res/TypedArray;','getInt',['I','I'],'I',array,[0,0x800033]);}finally{dispatch(runtime,'Landroid/content/res/TypedArray;','recycle',[],'V',array);}};
@@ -40,10 +43,13 @@ export function createDrawableViewHost(platform) {
     let recorded = false;
     try { draw(canvas); recorded = true; } finally { try { dispatch(runtime, NODE, 'endRecording', [], 'V', node); } catch (error) { if (recorded) throw error; /* the draw failure is the error to report */ } }
     const handle = runtime.object(node).fields.get(`${NODE}->mNativeRenderNode:J`);
+    renderNodeByHandle(runtime, handle).viewLayer = true;   // the View's own node: force dark takes the View's transform for it (src/skia-canvas-host.js)
     graphics.resetCanvas(replay, width, height);
     runtime.skiaHost.recordNative(runtime.object(replay).nativeCanvasHandle, { op: 'renderNode', node: handle });
   };
   const rawFloat = n => { const d = new DataView(new ArrayBuffer(4)); d.setFloat32(0, n, true); return d.getInt32(0, true); };
+  /** A force-dark usage scope in a recording (src/skia-canvas-host.js replay): what is drawn between the markers belongs to a background RenderNode. */
+  const usageMarker = (runtime, canvas, marker) => { if (!runtime.skiaHost || !runtime.skia?.rasterizeCanvas) return; const object = runtime.object(canvas), handle = object.nativeCanvasHandle ?? object.fields.get('Landroid/graphics/BaseCanvas;->mNativeCanvasWrapper:J'); if (handle !== undefined && handle !== null) runtime.skiaHost.recordNative(handle, marker); };
   /** Positions one View drawable (the background: the whole view; the image: inside the padding with the ImageView scale type / image matrix) and draws it into `canvas`. */
   const placeAndDraw = (runtime, receiver, canvas, drawable, image, width, height) => {
     const view = runtime.object(receiver), padding = view.padding || { left: 0, right: 0, top: 0, bottom: 0 };
@@ -75,7 +81,11 @@ export function createDrawableViewHost(platform) {
       if (!view.drawableCanvas) { view.drawableCanvas = runtime.allocate(CANVAS); dispatch(runtime, CANVAS, '<init>', [], 'V', view.drawableCanvas); }
       const graphics = getVectorGraphics(runtime), replay = view.drawableCanvas;
       recordLayer(runtime, receiver, 'drawableNode', replay, width, height, canvas => {
-      for (const [drawable, image] of [[view.backgroundDrawable, false], [view.imageDrawable, true]]) placeAndDraw(runtime, receiver, canvas, drawable, image, width, height);
+      // View.drawBackground draws the background into a RenderNode of its own with USAGE_BACKGROUND (View.getDrawableRenderNode): under force dark, a background scope
+      const backgroundScope = !!view.backgroundDrawable && forceDark.backgroundTransform(runtime, receiver) !== null;
+      if (backgroundScope) usageMarker(runtime, canvas, { op: 'usageBegin', usage: 1 });
+      try { placeAndDraw(runtime, receiver, canvas, view.backgroundDrawable, false, width, height); } finally { if (backgroundScope) usageMarker(runtime, canvas, { op: 'usageEnd' }); }
+      placeAndDraw(runtime, receiver, canvas, view.imageDrawable, true, width, height);
       // TextView.onDraw compound drawables (CheckedTextView's check indicator, icons beside text): drawn into the same layer, the text raster sits above it
       if (runtime.isSubtype(view.type, TEXT)) for (const { drawable, x, y } of platform.textViewApi.compoundPlacements(runtime, receiver, width, height)) {
         prepareCpuAnimatedVector(runtime, drawable); dispatch(runtime, CANVAS, 'save', [], 'I', canvas); dispatch(runtime, CANVAS, 'translate', ['F', 'F'], 'V', canvas, [rawFloat(x), rawFloat(y)]);
@@ -84,7 +94,7 @@ export function createDrawableViewHost(platform) {
       if (view.switchState) switchHost.draw(runtime, receiver, canvas, width, height);
       });
       // The layer's raster is replayed when it is read (src/deferred-raster.js: a frame superseded before a snapshot is never rasterized; reduced scale while the screen moves).
-      if (view.backgroundDrawable || view.imageDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) deferRaster(runtime, view, 'drawableSVG', scale => graphics.snapshotCanvas(replay, width, height, scale < 1 ? { ...runtime.layerRasterOptions, scale } : runtime.layerRasterOptions));   // layerRasterOptions: undefined on CPU (the default); { transport: 'gpu-png' } with the GPU renderer (src/gpu-raster.js)
+      if (view.backgroundDrawable || view.imageDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) deferRaster(runtime, view, 'drawableSVG', scale => graphics.snapshotCanvas(replay, width, height, forceDark.layerOptions(runtime, receiver, scale < 1 ? { ...runtime.layerRasterOptions, scale } : runtime.layerRasterOptions)));   // layerRasterOptions: undefined on CPU (the default); { transport: 'gpu-png' } with the GPU renderer (src/gpu-raster.js)
       else view.drawableSVG = null;
       if(view.foregroundDrawable){
         if(!view.foregroundCanvas){view.foregroundCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.foregroundCanvas);}
@@ -99,9 +109,9 @@ export function createDrawableViewHost(platform) {
         const read=name=>runtime.object(bounds[1]).fields.get(`${rect}->${name}:I`)??0;
         view.foregroundBounds=Object.fromEntries(['left','top','right','bottom'].map(name=>[name,read(name)]));
         recordLayer(runtime,receiver,'foregroundNode',view.foregroundCanvas,width,height,canvas=>dispatch(runtime,DRAWABLE,'draw',[CANVAS],'V',foreground,[canvas]));
-        const foregroundCanvas=view.foregroundCanvas;deferRaster(runtime,view,'foregroundSVG',scale=>graphics.snapshotCanvas(foregroundCanvas,width,height,scale<1?{...runtime.layerRasterOptions,scale}:runtime.layerRasterOptions));view.foregroundBoundsChanged=false;
+        const foregroundCanvas=view.foregroundCanvas;deferRaster(runtime,view,'foregroundSVG',scale=>graphics.snapshotCanvas(foregroundCanvas,width,height,forceDark.layerOptions(runtime,receiver,scale<1?{...runtime.layerRasterOptions,scale}:runtime.layerRasterOptions)));view.foregroundBoundsChanged=false;
       }else{view.foregroundSVG=null;view.foregroundBounds=null;}
-      if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};recordLayer(runtime,receiver,'buttonNode',view.buttonCanvas,iw,ih,canvas=>{dispatch(runtime,CANVAS,'translate',['F','F'],'V',canvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,canvas,width,height);});view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih);view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
+      if(view.buttonDrawable){if(!view.buttonCanvas){view.buttonCanvas=runtime.allocate(CANVAS);dispatch(runtime,CANVAS,'<init>',[],'V',view.buttonCanvas);}const bounds=buttonBounds(runtime,receiver,width,height),iw=bounds.right-bounds.left,ih=bounds.bottom-bounds.top;if(iw<=0||ih<=0||iw>4096||ih>4096)fail('CompoundButton indicator needs bounded positive intrinsic dimensions');const raw=n=>{const d=new DataView(new ArrayBuffer(4));d.setFloat32(0,n,true);return d.getInt32(0,true);};recordLayer(runtime,receiver,'buttonNode',view.buttonCanvas,iw,ih,canvas=>{dispatch(runtime,CANVAS,'translate',['F','F'],'V',canvas,[raw(-bounds.left),raw(-bounds.top)]);drawButton(runtime,receiver,canvas,width,height);});view.buttonSVG=graphics.snapshotCanvas(view.buttonCanvas,iw,ih,forceDark.layerOptions(runtime,receiver,undefined));view.compoundPadding=compoundPadding(runtime,receiver);}else{view.buttonSVG=null;view.buttonBounds=null;view.compoundPadding=null;}
       if (runtime.isSubtype(view.type, TEXT) && !view.buttonDrawable && !view.switchState) view.compoundPadding = platform.textViewApi.compoundPadding(runtime, receiver);   // the text raster starts inside the drawables' space
       view.needsDrawableDraw = false;
       runtime.record('DRAWABLE View.draw -> original Drawable DEX -> web Canvas commands');
@@ -250,7 +260,7 @@ export function createDrawableViewHost(platform) {
     parent: type => type === IMAGE ? VIEW : ninePatch.parent(type),
     interfaces: type => type === VIEW || type === IMAGE ? ['Landroid/graphics/drawable/Drawable$Callback;'] : [],
     viewKind(runtime, object) { return runtime.isSubtype(object.type, IMAGE) ? 'image' : null; },
-    drawTree(runtime, root, seen = new Set()) { if (!root) return; const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); if (view.vg?.controller && (view.vg.runAnimation || !view.vg.animationDone)) platform.viewGroupApi.frameLayoutAnimation(runtime, root); /* android:layoutAnimation: the first frame binds and starts the children's animations */ for (const child of view.children || []) this.drawTree(runtime, child, seen); },
+    drawTree(runtime, root, seen = new Set()) { if (!root) return; if (seen.size === 0) forceDark.beginFrame(runtime, root); forceDark.checkText(runtime, root); const view = runtime.object(root); if (seen.has(view.id) || seen.size >= 4096) fail('Cyclic/excessive drawable frame'); seen.add(view.id); if (view.visibility === 8 || view.visibility === 4) return; if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState) render(runtime, root); if (view.vg?.controller && (view.vg.runAnimation || !view.vg.animationDone)) platform.viewGroupApi.frameLayoutAnimation(runtime, root); /* android:layoutAnimation: the first frame binds and starts the children's animations */ for (const child of view.children || []) this.drawTree(runtime, child, seen); },
     /** ImageView.onVisibilityAggregated: the image drawable is visible while its View is attached and VISIBLE (an Animatable drawable stops counting time, see AnimatedImageDrawable.setVisible).
      *  The lab does not aggregate the visibility of the ancestors: the View's own visibility and its attachment decide. */
     imageVisibility(runtime, receiver, attached = !!runtime.object(receiver).attached) {
@@ -258,7 +268,16 @@ export function createDrawableViewHost(platform) {
       const visible = attached && (view.visibility ?? 0) === 0;
       if (!!dispatch(runtime, DRAWABLE, 'isVisible', [], 'Z', drawable) !== visible) dispatch(runtime, DRAWABLE, 'setVisible', ['Z', 'Z'], 'Z', drawable, [visible ? 1 : 0, 0]);
     },
-    afterAttach(runtime, receiver, attached) { if (attached !== undefined && runtime.object(receiver).attached !== undefined) this.imageVisibility(runtime, receiver, !!attached); const view = runtime.object(receiver); if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]); },
+    afterAttach(runtime, receiver, attached) {
+      if (attached !== undefined && runtime.object(receiver).attached !== undefined) this.imageVisibility(runtime, receiver, !!attached); const view = runtime.object(receiver);
+      if (runtime.isSubtype(view.type, IMAGE) || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.stateListAnimator || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) {
+        // View.onAttachedToWindow calls jumpDrawablesToCurrentState() (android-13.0.0_r1): a drawable is shown in the state the View is attached in, without the transition
+        // its state change started before (a CheckBox inflated checked shows its check, an AnimatedStateListDrawable ends its transition); subclasses add their own drawables.
+        // Then View.dispatchAttachedToWindow refreshes a drawable state still dirty: what that changes (a StateListAnimator given its first state) animates as on Android.
+        if (attached) runtime.dispatch({ owner: view.type, name: 'jumpDrawablesToCurrentState', signature: '()V', parameters: [], result: 'V' }, [receiver], 'virtual');
+        this.invoke(runtime, { owner: VIEW, name: 'refreshDrawableState' }, [receiver]);
+      }
+    },
     afterLayout(runtime, receiver) { const view = runtime.object(receiver); if (view.imageDrawable || view.backgroundDrawable || view.foregroundDrawable || view.buttonDrawable || view.switchState || (runtime.isSubtype(view.type, TEXT) && platform.textViewApi.compoundList(runtime, receiver).length)) render(runtime, receiver); },
     invoke(runtime, method, args) {
       const name = method.name;
@@ -319,7 +338,8 @@ export function createDrawableViewHost(platform) {
         if (next) { dispatch(runtime, SLA, 'setTarget', ['Landroid/view/View;'], 'V', next, [args[0]]); if (view.attached) dispatch(runtime, SLA, 'setState', ['[I'], 'V', next, [dispatch(runtime, VIEW, 'getDrawableState', [], '[I', args[0])]); }
         return;
       }
-      if (name === 'jumpDrawablesToCurrentState') { for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable]) if (drawable) dispatch(runtime, DRAWABLE, 'jumpToCurrentState', [], 'V', drawable); if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'jumpToCurrentState', [], 'V', view.stateListAnimator); switchHost.jump(runtime, args[0]); return; }
+      // View.jumpDrawablesToCurrentState, with what ImageView (its image) and TextView (its compound drawables) add in their overrides: the drawables these hosts hold, not the fields
+      if (name === 'jumpDrawablesToCurrentState') { for (const drawable of [view.backgroundDrawable, view.foregroundDrawable, view.buttonDrawable, ...(runtime.isSubtype(view.type, IMAGE) ? [view.imageDrawable] : []), ...(runtime.isSubtype(view.type, TEXT) ? platform.textViewApi.compoundList(runtime, args[0]) : [])]) if (drawable) dispatch(runtime, DRAWABLE, 'jumpToCurrentState', [], 'V', drawable); if (view.stateListAnimator) dispatch(runtime, 'Landroid/animation/StateListAnimator;', 'jumpToCurrentState', [], 'V', view.stateListAnimator); switchHost.jump(runtime, args[0]); return; }
       if (name === 'postInvalidateOnAnimation') return platform.requestDraw(runtime, args[0], 1000 / 60);   // the next frame of the display (Choreographer's animation callback), not this one
       if (name === 'invalidate' || name === 'postInvalidate') return platform.requestDraw(runtime, args[0]);   // a draw request is coalesced with the next frame
       if (name === 'setForeground') return setDrawable(runtime,args[0],'foregroundDrawable',args[1]);

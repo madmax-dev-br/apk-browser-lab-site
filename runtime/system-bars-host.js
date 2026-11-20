@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=850bf1b17ffb';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=bcd37ec74124';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -63,7 +63,12 @@ export function createSystemBarsHost(platform) {
     // Bar backgrounds: with enforced edge-to-edge the app's colors are ignored (transparent gesture bar; scrim behind 3 buttons when contrast is enforced).
     let statusColor, navColor;
     if (bars.enforcedEdgeToEdge && bars.decorFits !== true) { statusColor = TRANSPARENT; navColor = buttons && bars.navContrast ? (bars.lightNav ? 0xe6ffffff | 0 : SCRIM_DARK) : TRANSPARENT; }
-    else { statusColor = translucentStatus ? 0x66000000 | 0 : bars.draws ? bars.statusColor : 0xff000000 | 0; navColor = translucentNav ? 0x66000000 | 0 : bars.draws ? bars.navColor : 0xff000000 | 0; }
+    else {
+      // the colours the window draws itself (FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS: DecorView's status and navigation colour views, Views with a ColorDrawable background) are
+      // darkened under force dark like any background node of the window (src/force-dark-host.js)
+      const own = color => platform.forceDarkHost && r.root && platform.forceDarkHost.backgroundTransform(r, r.root) ? platform.forceDarkHost.backgroundColor(color) : color;
+      statusColor = translucentStatus ? 0x66000000 | 0 : bars.draws ? own(bars.statusColor) : 0xff000000 | 0; navColor = translucentNav ? 0x66000000 | 0 : bars.draws ? own(bars.navColor) : 0xff000000 | 0;
+    }
     const lightStatus = bars.lightStatus || !!(flags & UI.LIGHT_STATUS_BAR), lightNav = bars.lightNav || !!(flags & UI.LIGHT_NAVIGATION_BAR);
     const frameRect = edgeToEdge || layoutBehind ? { left: 0, top: 0, right: device.widthDp, bottom: device.heightDp } : { left: inset.left, top: inset.top, right: device.widthDp - inset.right, bottom: device.heightDp - inset.bottom };
     return { widthDp: device.widthDp, heightDp: device.heightDp, orientation: device.orientation, edgeToEdge, targetSdk: bars.targetSdk,

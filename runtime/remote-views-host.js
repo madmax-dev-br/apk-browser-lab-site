@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=850bf1b17ffb';
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
+import { createHostRegistry } from './host-contract.js?v=bcd37ec74124';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
 
 // android.widget.RemoteViews (android-13.0.0_r1 RemoteViews.java) for the virtual device: a description of a view hierarchy (a layout of an installed package) plus a list of actions
 // ("set this property on the view with this id"). apply(Context, ViewGroup) inflates the layout with the LayoutInflater and runs the actions in order on the inflated views; reapply runs them on an

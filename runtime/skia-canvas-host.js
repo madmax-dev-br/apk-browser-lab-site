@@ -1,17 +1,19 @@
-import {APKError} from './apk-runtime.js?v=850bf1b17ffb';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=850bf1b17ffb';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=850bf1b17ffb';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=850bf1b17ffb';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=850bf1b17ffb';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=850bf1b17ffb';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=850bf1b17ffb';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=850bf1b17ffb';
-import {createBitmapHost} from './bitmap-host.js?v=850bf1b17ffb';
-import { gcRoot } from './heap-gc.js?v=850bf1b17ffb';
-import {sha256Hex} from './sha256-sync.js?v=850bf1b17ffb';
-import {colorLongToArgb} from './color-long.js?v=850bf1b17ffb';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=850bf1b17ffb';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=850bf1b17ffb';
+import {APKError} from './apk-runtime.js?v=bcd37ec74124';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=bcd37ec74124';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=bcd37ec74124';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=bcd37ec74124';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=bcd37ec74124';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=bcd37ec74124';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=bcd37ec74124';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=bcd37ec74124';
+import {createBitmapHost} from './bitmap-host.js?v=bcd37ec74124';
+import { gcRoot } from './heap-gc.js?v=bcd37ec74124';
+import {sha256Hex} from './sha256-sync.js?v=bcd37ec74124';
+import {colorLongToArgb} from './color-long.js?v=bcd37ec74124';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=bcd37ec74124';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=bcd37ec74124';
+import {renderNodeByHandle} from './rendernode-native.js?v=bcd37ec74124';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=bcd37ec74124';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -291,6 +293,57 @@ function evictDecoded(cache,key,entry){cache.entries.delete(key);cache.bytes-=en
 export function releaseRecordedImage(image){const entry=imageEntries.get(image);if(entry===undefined){image.delete();return;}entry.users--;if(entry.evicted&&entry.users===0)entry.image.delete();}
 /** Drops every decoded image of a CanvasKit instance (the Skia host is being disposed). */
 export function disposeDecodedImages(CK){const cache=decodedImages.get(CK);if(!cache)return;for(const [key,entry] of [...cache.entries])evictDecoded(cache,key,entry);decodedImages.delete(CK);}
+// ---- force dark (src/force-dark.js): what RecordingCanvas.cpp's colorTransformForOp does to the ops of a node, at replay -------------------------------------------------------------
+// A bitmap's palette (Bitmap::palette, computed from its pixels once per content): named by the recorded data, as recordedImage names the decoded image. Bounded.
+const PALETTES=new Map();
+function imagePalette(CK,command,image){
+ const pixels=command.pixelData,data=pixels?pixels.base64:command.raster?.dataURL,key=typeof data==='string'?(pixels?`${pixels.colorType}/${pixels.alphaType}/${pixels.width}x${pixels.height}:`:'')+dataId(data):null;
+ if(key!==null&&PALETTES.has(key))return PALETTES.get(key);
+ const w=image.width(),h=image.height(),px=image.readPixels(0,0,{width:w,height:h,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});
+ const opaque=pixels?pixels.alphaType==='Opaque'||pixels.colorType==='RGB_565':image.getImageInfo?.().alphaType?.value===CK.AlphaType.Opaque.value;
+ const palette=px?bitmapPalette(px,w,h,opaque):'unknown';
+ if(key!==null){if(PALETTES.size>=4096)PALETTES.clear();PALETTES.set(key,palette);}
+ return palette;
+}
+/** SkColorFilter::filterColor of a recorded colour-filter description: the colour drawn through it on a 1x1 surface, read back unpremultiplied. */
+function filterColorThrough(CK,descriptor,color){
+ const surface=CK.MakeSurface(1,1);if(!surface)fail('Skia scratch surface allocation failed');const paint=new CK.Paint(),filter=makeSkiaColorFilter(CK,descriptor);
+ try{paint.setColor(argb(CK,color));paint.setBlendMode(CK.BlendMode.Src);if(filter)paint.setColorFilter(filter);const c=surface.getCanvas();c.clear(CK.TRANSPARENT);c.drawPaint(paint);surface.flush();const image=surface.makeImageSnapshot();
+  try{const px=image.readPixels(0,0,{width:1,height:1,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});return px?(px[3]<<24|px[0]<<16|px[1]<<8|px[2])>>>0:color>>>0;}finally{image.delete();}}
+ finally{filter?.delete();paint.delete();surface.dispose();}
+}
+/** The pixels `draw(canvas)` makes on a w x h scratch surface, with SkHighContrastFilter's lightness inversion applied after them, as a new image (unpremultiplied sRGB). */
+function invertedOffscreen(CK,w,h,draw){
+ if(!(w>0&&h>0&&w<=4096&&h<=4096&&w*h<=4*1024*1024))fail('Force-dark inverted layer exceeds Skia bounds');
+ const surface=CK.MakeSurface(w,h);if(!surface)fail('Skia force-dark layer allocation failed');
+ try{const c=surface.getCanvas();c.clear(CK.TRANSPARENT);draw(c);surface.flush();const snap=surface.makeImageSnapshot();let px;
+  try{px=snap.readPixels(0,0,{width:w,height:h,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});}finally{snap.delete();}
+  if(!px)fail('Skia force-dark layer read-back failed');invertLightnessPixels(px);
+  const image=CK.MakeImage({width:w,height:h,alphaType:CK.AlphaType.Unpremul,colorType:CK.ColorType.RGBA_8888,colorSpace:CK.ColorSpace.SRGB},px,w*4);if(!image)fail('Skia rejected the force-dark layer');return image;}
+ finally{surface.dispose();}
+}
+/**
+ * A recorded bitmap draw under a node's colour transform (transformPaint with the bitmap's palette): null when it is drawn as recorded, else { image, paint }: the image with the
+ * lightness inversion composed after the paint's colour filter (SkHighContrastFilter::Make(...)->makeComposed(paint colour filter)), and the paint without that filter. An ALPHA_8
+ * bitmap is drawn in its paint colour, so inverting the image is inverting that colour. The returned image belongs to the caller (deleted after the draw).
+ */
+function rasterForceDark(CK,command,transform){
+ const image=recordedImage(CK,command);
+ try{
+  const palette=imagePalette(CK,command,image),filter=command.paint?.colorFilterSnapshot??null;
+  if(!bitmapShouldInvert(transform,palette,filter?color=>filterColorThrough(CK,filter,color):null))return null;
+  const paint={...(command.paint??{argb:0xff000000,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0,blendMode:3}),colorFilterSnapshot:null};
+  if(command.alpha8){const tint=(command.paint?.argb??0xff000000)>>>0,shown=filter?filterColorThrough(CK,filter,tint|0xff000000):tint|0xff000000;paint.argb=(tint&0xff000000|invertLightnessColor(shown)&0xffffff)>>>0;return {image:null,paint};}
+  const inverted=invertedOffscreen(CK,image.width(),image.height(),c=>{const p=new CK.Paint();try{if(filter){const f=makeSkiaColorFilter(CK,filter);p.setColorFilter(f);f?.delete();}c.drawImage(image,0,0,p);}finally{p.delete();}});
+  return {image:inverted,paint};
+ }finally{releaseRecordedImage(image);}
+}
+/** Tree::computePalette's input: the fill colour of every full path of a captured vector tree (FullPath::forEachFillColor). */
+function vectorFillColors(graphics,tree){
+ const out=[],seen=new Set(),get=pointer=>typeof pointer==='object'?pointer:graphics.get(pointer);
+ const walk=(pointer,depth=0)=>{if(depth>128||seen.has(pointer))return;seen.add(pointer);const node=get(pointer);if(node?.kind==='group')for(const child of node.children)walk(child,depth+1);else if(node?.kind==='full')out.push(node.props.fillColor>>>0);};
+ walk(tree.root);return out;
+}
 /** Canvas.drawBitmapMesh: the bitmap sampled (bilinear, clamped) over a (meshWidth+1)x(meshHeight+1) lattice of two-triangle cells; per-vertex colors modulate it (SkBlendMode::kModulate). */
 function drawBitmapMesh(CK,canvas,image,mesh,paint){
  const cw=mesh.width,ch=mesh.height,count=(cw+1)*(ch+1),tex=new Float32Array(count*2),indices=[];
@@ -389,6 +442,19 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  const gpuTransport=options?.transport==='gpu'||options?.transport==='gpu-png',gpu=gpuTransport?runtime.gpuRaster?.engine:null;if(gpuTransport&&(!gpu||options.pixels||options.surfaceType))fail('Skia GPU raster needs an active GPU engine and a display raster');
  const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?gpu.begin(pw,ph,options.transport==='gpu-png'):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}let canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
  const activeNodes=new Set();let replayCount=0;   // a reduced replay (scale < 1) also scales the shadow light geometry, which Skia takes in device pixels (drawNodeShadow)
+ // Force dark (src/force-dark.js; src/force-dark-host.js decides it per window and per View layer): options.forceDark is the colour transform of this canvas's own ops ('light' or
+ // 'dark'; absent when the window has no force dark, or a View on the way allowed none). Each RenderNode replayed under it gets its own (RenderNode::handleForceDark: its usage hint,
+ // its text, its child nodes), none under a node that disallows force dark; a 'usageBegin' marker scope is a background (View.drawBackground's USAGE_BACKGROUND RenderNode).
+ let fd=options?.forceDark==='light'||options?.forceDark==='dark'?options.forceDark:null;const fdScopes=[];
+ const nodeForceDark=(handle,node)=>{
+   const children=[];let hasText=false;
+   for(const op of Array.isArray(node.displayList)?node.displayList:[]){
+    if(op.op==='renderNode'){const n=renderNodeByHandle(runtime,op.node);children.push({n,hint:n.usageHint??0,x:n.left+n.translationX,y:n.top+n.translationY,width:n.right-n.left,height:n.bottom-n.top});}
+    else if(op.op==='text'||op.op==='paragraphRun'||op.text===true)hasText=true;   // DisplayListData::drawTextBlob sets mHasText
+   }
+   return nodeTransform({hint:renderNodeByHandle(runtime,handle).usageHint??0,hasText,children},child=>{child.n.usageHint=1;});   // RenderNode::setUsageHint(Background) stays set
+ };
+ const withForceDark=(transform,body)=>{const saved=fd;fd=transform;try{body();}finally{fd=saved;}};
  let lightDx=0,lightDy=0;   // inside a stretch layer the device origin is the layer's: the light (device pixels of the whole surface) is moved by it
  const drawNodeShadow=node=>{
    const z=renderNodeShadowCaster(node);if(!z)return;const outline=node.outline,casterAlpha=node.alpha*outline.alpha;let path;
@@ -421,7 +487,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
    if(!(r>l&&b>t))return true;   // nothing of the node can show
    if((r-l)*(b-t)>4*1024*1024)return false;
    const k0=performance.now();const body=commandsKeyBody(runtime,graphics,node.displayList,width);if(stats)stats.stretchLayerKeyMs=(stats.stretchLayerKeyMs??0)+performance.now()-k0;if(body===null)return false;
-   const key=`${body}|${l},${t},${r},${b}|${m[0]},${m[2]},${m[4]},${m[5]}|${scale}`,layers=stretchLayers(runtime,gpu??CK,CK);
+   const key=`${body}|${l},${t},${r},${b}|${m[0]},${m[2]},${m[4]},${m[5]}|${scale}|${fd}`,layers=stretchLayers(runtime,gpu??CK,CK);
    let entry=layers.get(handle);if(entry)layers.delete(handle);else entry={key:null,seen:null,image:null,bytes:0};layers.set(handle,entry);   // most recently used last
    if(!(entry.image&&entry.key===key)){
     if(entry.seen!==key){entry.seen=key;dropStretchLayer(layers,entry);return false;}   // first replay of this content: drawn directly; promoted if the next one repeats it
@@ -440,14 +506,14 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  };
  const run=(command,shadow=false)=>{
    if(command.op==='layerBegin'){
-    const paint=command.paint?(command.paint.isLayerAlpha?(()=>{const p=new CK.Paint();p.setAlphaf(command.paint.alpha);return p;})():makePaint(CK,command.paint)):null;
+    const paint=command.paint?(command.paint.isLayerAlpha?(()=>{const p=new CK.Paint();p.setAlphaf(command.paint.alpha);return p;})():makePaint(CK,fd?transformPaint(fd,command.paint):command.paint)):null;   // SaveLayer has a paint: transformed
     // The bounds are in the coordinates of the matrix current at saveLayer; the replay keeps the canvas at the node's base matrix and gives each command its own, so the
     // layer's bounds are mapped here (their bounding box under a rotation: Skia treats saveLayer bounds as a hint to size the layer, the clip is the commands' own).
     if(command.bounds&&!(command.matrix?.length>6)){const m=command.matrix??[1,0,0,1,0,0],[l,t,r2,b]=command.bounds,xs=[l,r2].flatMap(x=>[t,b].map(y=>m[0]*x+m[2]*y+m[4])),ys=[l,r2].flatMap(x=>[t,b].map(y=>m[1]*x+m[3]*y+m[5]));canvas.saveLayer(paint,CK.LTRBRect(Math.min(...xs),Math.min(...ys),Math.max(...xs),Math.max(...ys)));}else canvas.saveLayer(paint);paint?.delete();return;   // under a perspective matrix the layer is not sized by the hint
    }
    if(command.op==='layerEnd'){canvas.restore();return;}
    canvas.save();applyClips(CK,canvas,command.clips);canvas.concat(matrix(command.matrix));
-   if(command.op==='picture'){replay(command.draws);}
+   if(command.op==='picture'){withForceDark(null,()=>replay(command.draws));}   // DrawPicture: only its paint would be transformed, never the picture's own ops
    else if(command.op==='renderNode'){
     if(activeNodes.has(command.node)||activeNodes.size>=128)fail('Cyclic/excessive RenderNode display-list graph');
     const node=getRenderNodeSnapshot(runtime,command.node);if(node.displayList&&node.alpha>0){
@@ -459,13 +525,28 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
      if(isolate){const layer=node.layerPaint?makePaint(CK,node.layerPaint):new CK.Paint();layer.setAlphaf((node.layerPaint?.alpha??1)*Math.max(0,Math.min(1,node.alpha)));canvas.saveLayer(layer);layer.delete();}
      const stretch=renderNodeStretchMatrix(node);   // hwui StretchEffect (approximation documented at renderNodeStretchMatrix); after the clips so the bounds stay fixed
      {const stats=runtime.rasterStats,list=node.displayList;if(stats&&Array.isArray(list)){stats.nodeReplays=(stats.nodeReplays??0)+1;stats.nodeCommands=(stats.nodeCommands??0)+list.length;if(REPLAYED_LISTS.has(list)){stats.nodeReplaysSame=(stats.nodeReplaysSame??0)+1;stats.nodeCommandsSame=(stats.nodeCommandsSame??0)+list.length;}else REPLAYED_LISTS.add(list);}}   // how often a node replays the display list it replayed before (what retained layers could reuse)
+     // RenderNode::prepareTreeImpl: a node that disallows force dark disables it for its subtree; a View layer node of this VM (drawable-view-host recordLayer) is the View's own
+     // node, whose transform the View tree decided (options.forceDark); any other node takes its own (handleForceDark)
+     const nodeFd=fd===null||node.allowForceDark===false?null:node.viewLayer?fd:nodeForceDark(command.node,node);
+     withForceDark(nodeFd,()=>{
      if(!stretch)replay(node.displayList);
      else{const stats=runtime.rasterStats;if(stats)stats.stretchReplays=(stats.stretchReplays??0)+1;if(!drawStretchLayer(command.node,node,stretch)){if(stats)stats.stretchDirect=(stats.stretchDirect??0)+1;canvas.concat(stretch);replay(node.displayList);}}
+     });
      if(isolate)canvas.restore();activeNodes.delete(command.node);
     }
-   }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);sourceVector(CK,canvas,graphics,tree,command.colorFilter);
-   }else if(command.argb!==undefined&&command.kind!=='skia'){const paint=makePaint(CK,command.paint??{argb:command.argb,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0});canvas.drawRect(CK.XYWHRect(command.x,command.y,command.width,command.height),paint);paint.delete();
-   }else if(command.kind==='skia'){const paint=command.paint?makePaint(CK,command.paint):null;
+   }else if(command.vectorTree){const tree=command.vectorState??graphics.get(command.vectorTree,'tree');canvas.translate(command.x,command.y);canvas.scale(command.width/tree.viewportWidth,command.height/tree.viewportHeight);if(command.mirrored){canvas.translate(tree.viewportWidth,0);canvas.scale(-1,1);}canvas.clipRect(CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.ClipOp.Intersect,true);
+    // DrawVectorDrawable has a palette (Tree::computePalette of the fill colours) and the tree's paint (its tint as colour filter, its root alpha): a bitmap op. Inverted, the tree is
+    // drawn at device resolution into a scratch layer through its colour filter, inverted, and drawn back at the root alpha.
+    if(fd&&bitmapShouldInvert(fd,fillColorsPalette(vectorFillColors(graphics,tree)),command.colorFilter?color=>filterColorThrough(CK,command.colorFilter,color):null)){
+     const m=canvas.getTotalMatrix(),sx=Math.hypot(m[0],m[3]),sy=Math.hypot(m[1],m[4]),w=Math.max(1,Math.ceil(tree.viewportWidth*sx)),h=Math.max(1,Math.ceil(tree.viewportHeight*sy));
+     const image=invertedOffscreen(CK,w,h,c=>{c.scale(w/tree.viewportWidth,h/tree.viewportHeight);sourceVector(CK,c,graphics,{...tree,alpha:1},command.colorFilter);});
+     const p=new CK.Paint();p.setAlphaf(tree.alpha);try{canvas.drawImageRectOptions(image,CK.LTRBRect(0,0,w,h),CK.LTRBRect(0,0,tree.viewportWidth,tree.viewportHeight),CK.FilterMode.Linear,CK.MipmapMode.None,p);}finally{p.delete();image.delete();}
+    }else sourceVector(CK,canvas,graphics,tree,command.colorFilter);
+   }else if(command.argb!==undefined&&command.kind!=='skia'){const recorded=command.paint??{argb:command.argb,flags:1,style:0,strokeWidth:0,strokeMiter:4,strokeCap:0,strokeJoin:0},paint=makePaint(CK,fd?transformPaint(fd,recorded):recorded);canvas.drawRect(CK.XYWHRect(command.x,command.y,command.width,command.height),paint);paint.delete();
+   }else if(command.kind==='skia'){
+    // force dark: a paint is transformed (applyColorTransform), a bitmap by its palette, a ripple by the inverse; the RenderThread-animated circle / round rect are drawables, untouched
+    const fdRaster=fd&&command.op==='raster'&&command.text!==true?rasterForceDark(CK,command,fd):null,untouched=fd===null||command.op==='raster'||command.op==='circleProps'||command.op==='roundRectProps'||command.op==='ripple';
+    const opPaint=fdRaster?fdRaster.paint:untouched?command.paint:transformPaint(fd,command.paint),paint=opPaint?makePaint(CK,opPaint):null;
     if(command.op==='path'){const path=CK.Path.MakeFromCmds(command.commands);path.setFillType([CK.FillType.Winding,CK.FillType.EvenOdd,CK.FillType.InverseWinding,CK.FillType.InverseEvenOdd][command.fillType]);canvas.drawPath(path,paint);path.delete();}
     else if(command.op==='line')canvas.drawLine(...command.args,paint);
     else if(command.op==='point')canvas.drawPoints(CK.PointMode.Points,command.args,paint);
@@ -489,6 +570,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
        ['in_tCircle3',[f(scale+noise*-0.0066*Math.cos(scale*0.35)),f(scale+noise*-0.0066*Math.sin(scale*0.35))]]];
       const rot=(angle)=>[f(Math.cos(angle)),f(Math.sin(angle))];
       overrides.push(['in_tRotation1',rot(noise*PI*0.0078125+1.7*PI)],['in_tRotation2',rot(noise*PI*-0.0078125+2*PI)],['in_tRotation3',rot(noise*PI*0.0078125+2.75*PI)]);
+      if(fd&&command.color!==undefined){const c=transformColorInverse(fd,command.color);overrides.push(['in_color',[((c>>>16)&255)/255,((c>>>8)&255)/255,(c&255)/255,(c>>>24)/255]]);}   // DrawRippleDrawable: mParams.color, the in_color AnimatedRippleDrawable sets
       drawPaint=makePaint(CK,{...paintOf(props.paint),shader:null});attachShader(CK,drawPaint,shader,overrides);
       if(!Number.isFinite(progress))fail('Non-finite ripple progress');
      }else drawPaint=makePaint(CK,paintOf(props.paint));
@@ -497,12 +579,12 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
       else canvas.drawCircle(number(props.cx),number(props.cy),number(props.radius),drawPaint);
      }finally{drawPaint.delete();}
     }
-    else if(command.op==='color')canvas.drawColor(argb(CK,command.color),{value:command.blendMode??3});
+    else if(command.op==='color')canvas.drawColor(argb(CK,fd?transformColor(fd,command.color):command.color),{value:command.blendMode??3});   // SkCanvas::drawColor records a DrawPaint
     else if(command.op==='paint')canvas.drawPaint(paint);
-    else if(command.op==='raster'){if(command.paint?.maskFilter)fail('Drawing a bitmap with a Paint that carries a BlurMaskFilter is not implemented');const image=recordedImage(CK,command);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
+    else if(command.op==='raster'){if(command.paint?.maskFilter)fail('Drawing a bitmap with a Paint that carries a BlurMaskFilter is not implemented');const image=fdRaster?.image??recordedImage(CK,command);try{if(image.width()>4096||image.height()>4096||image.width()*image.height()>4*1024*1024)fail('Recorded widget raster exceeds Skia bounds');const drawImage=p=>{if(command.mesh){drawBitmapMesh(CK,canvas,image,command.mesh,p);return;}if(command.imageMatrix)canvas.concat(command.imageMatrix);if(command.src&&command.dst){if(command.filter)canvas.drawImageRectOptions(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImageRect(image,CK.LTRBRect(...command.src),CK.LTRBRect(...command.dst),p);}else{if(command.imageScale&&command.imageScale!==1){canvas.translate(command.args[0],command.args[1]);canvas.scale(command.imageScale,command.imageScale);if(command.filter)canvas.drawImageOptions(image,0,0,CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,0,0,p);}else if(command.filter)canvas.drawImageOptions(image,command.args[0],command.args[1],CK.FilterMode.Linear,CK.MipmapMode.None,p);else canvas.drawImage(image,command.args[0],command.args[1],p);}};
      if(command.alpha8){
       // ALPHA_8 is coverage only: Skia tints it with the Paint color, then applies the Paint's alpha/filter/blend to the result.
-      const c=(command.paint?.argb??0xff000000)>>>0,filter=CK.ColorFilter.MakeMatrix([0,0,0,0,((c>>>16)&255)/255,0,0,0,0,((c>>>8)&255)/255,0,0,0,0,(c&255)/255,0,0,0,1,0]),mask=new CK.Paint();
+      const c=(opPaint?.argb??0xff000000)>>>0,filter=CK.ColorFilter.MakeMatrix([0,0,0,0,((c>>>16)&255)/255,0,0,0,0,((c>>>8)&255)/255,0,0,0,0,(c&255)/255,0,0,0,1,0]),mask=new CK.Paint();
       mask.setColorFilter(filter);canvas.saveLayer(paint);try{drawImage(mask);}finally{canvas.restore();mask.delete();filter.delete();}
      }else drawImage(paint);}finally{releaseRecordedImage(image);}}
     else if(command.op==='paragraphRun')drawSkiaTextRun(backend,canvas,command.text,command.args[0],command.args[1],command.paint,command.isRtl,paint,{start:command.runStart??0,end:command.runEnd??command.text.length});
@@ -520,6 +602,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  const replay=commands=>{let group=null;
   const flush=()=>{if(!group)return;const items=group.map((command,index)=>({command,index,z:(n=>n.elevation+n.translationZ)(getRenderNodeSnapshot(runtime,command.node))})).sort((x,y)=>x.z-y.z||x.index-y.index);group=null;for(const item of items)run(item.command,item.z>0);};
   for(const command of commands){if(++replayCount>65536)fail('RenderNode replay command limit exceeded');
+   if(command.op==='usageBegin'){fdScopes.push(fd);if(fd!==null)fd=command.usage===1?'dark':'light';continue;}if(command.op==='usageEnd'){if(fdScopes.length)fd=fdScopes.pop();continue;}
    if(command.op==='reorderBegin'){flush();group=[];continue;}if(command.op==='reorderEnd'){flush();continue;}
    if(group&&command.op==='renderNode'){group.push(command);continue;}run(command);}
   flush();

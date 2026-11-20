@@ -1,10 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=850bf1b17ffb';
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { registerPackageValueFields } from './package-value-fields.js?v=850bf1b17ffb';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=850bf1b17ffb';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=850bf1b17ffb';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=850bf1b17ffb';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=850bf1b17ffb';
+import { resolveIntentFields } from './intent-resolver.js?v=bcd37ec74124';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
+import { registerPackageValueFields } from './package-value-fields.js?v=bcd37ec74124';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=bcd37ec74124';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=bcd37ec74124';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=bcd37ec74124';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=bcd37ec74124';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager

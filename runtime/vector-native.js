@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { getSolidPaint } from './paint-host.js?v=850bf1b17ffb';
-import { getMatrixValues } from './matrix-native.js?v=850bf1b17ffb';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=850bf1b17ffb';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
+import { getSolidPaint } from './paint-host.js?v=bcd37ec74124';
+import { getMatrixValues } from './matrix-native.js?v=bcd37ec74124';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=bcd37ec74124';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -130,7 +130,9 @@ export function createVectorNativeBindings(){
  const vector=(name,p,r,fn)=>add(VECTOR,name,p,r,fn),parser=(name,p,r,fn)=>add(PARSER,name,p,r,fn);
  for(const [suffix,kind]of [['Group','group'],['FullPath','full'],['ClipPath','clip']]){
   const empty=g=>g.create(kind,{props:clone(kind==='group'?GROUP_DEFAULTS:FULL_DEFAULTS),children:[],path:'',commands:[]});
-  vector('nCreate'+suffix,[],'J',g=>empty(g));vector('nCreate'+suffix,['J'],'J',(g,[h])=>g.copy(h,kind));
+  // hwui Group(const Group&) / FullPath(const FullPath&) / ClipPath(const ClipPath&) (VectorDrawable.cpp): the name and the properties of the source node, never its children: the
+  // Java VGroup copy constructor adds copies of the children itself (nAddChild). A copied group that kept the source's children drew the source's paths too, under the copies.
+  vector('nCreate'+suffix,[],'J',g=>empty(g));vector('nCreate'+suffix,['J'],'J',(g,[h])=>{const node=g.copy(h,kind);if(kind==='group')g.get(node,'group').children=[];return node;});
  }
  vector('nCreateTree',['J'],'J',(g,[root])=>{g.get(root,'group');return g.create('tree',{root,viewportWidth:0,viewportHeight:0,alpha:1,antiAlias:true,allowCaching:true});});
  vector('nCreateTreeFromCopy',['J','J'],'J',(g,[source,root])=>{const tree=clone(g.get(source,'tree'));g.get(root,'group');return g.create('tree',{...tree,root,refs:0});});

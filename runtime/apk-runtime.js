@@ -1,35 +1,35 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=850bf1b17ffb';
-import { VMClock } from './vm-clock.js?v=850bf1b17ffb';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=850bf1b17ffb';
-import { OperationMonitor } from './operation-monitor.js?v=850bf1b17ffb';
-import { ExecutionProfile } from './execution-profile.js?v=850bf1b17ffb';
-import { SamplingProfiler } from './sampling-profiler.js?v=850bf1b17ffb';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=850bf1b17ffb';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=850bf1b17ffb';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=850bf1b17ffb';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=850bf1b17ffb';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=850bf1b17ffb';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=850bf1b17ffb';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=850bf1b17ffb';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=850bf1b17ffb';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=850bf1b17ffb';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=850bf1b17ffb';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=850bf1b17ffb';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=850bf1b17ffb';
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=850bf1b17ffb';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=850bf1b17ffb';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=850bf1b17ffb';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=850bf1b17ffb';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=850bf1b17ffb';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=850bf1b17ffb';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=850bf1b17ffb';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=850bf1b17ffb';
+import STATIC_SHIMS from './shim-static-methods.js?v=bcd37ec74124';
+import { VMClock } from './vm-clock.js?v=bcd37ec74124';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=bcd37ec74124';
+import { OperationMonitor } from './operation-monitor.js?v=bcd37ec74124';
+import { ExecutionProfile } from './execution-profile.js?v=bcd37ec74124';
+import { SamplingProfiler } from './sampling-profiler.js?v=bcd37ec74124';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=bcd37ec74124';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=bcd37ec74124';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=bcd37ec74124';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=bcd37ec74124';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=bcd37ec74124';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=bcd37ec74124';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=bcd37ec74124';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=bcd37ec74124';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=bcd37ec74124';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=bcd37ec74124';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=bcd37ec74124';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=bcd37ec74124';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=bcd37ec74124';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=bcd37ec74124';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=bcd37ec74124';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=bcd37ec74124';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=bcd37ec74124';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=bcd37ec74124';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=bcd37ec74124';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=bcd37ec74124';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=850bf1b17ffb';
-import { bootClassLacksMember } from './boot-class-members.js?v=850bf1b17ffb';
-export { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { BinaryReader } from './binary-reader.js?v=850bf1b17ffb';
+import { Scheduler, Blocked } from './scheduler.js?v=bcd37ec74124';
+import { bootClassLacksMember } from './boot-class-members.js?v=bcd37ec74124';
+export { APKError } from './apk-error.js?v=bcd37ec74124';
+import { BinaryReader } from './binary-reader.js?v=bcd37ec74124';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1941,6 +1941,7 @@ export class APKRuntime {
     };
     const roots = this.platform?.viewRoots?.(this) ?? [{ root: this.root, window: null }];
     const views = roots.map(({root, window, windowBackground}) => ({ ...build(root), ...(window ? { windowSurface: window } : {}), ...(windowBackground ? { windowBackground } : {}) })), counters = Object.create(null), activity = this.object(this.activity), seenClasses = new Set();
+    this.platform?.forceDarkHost?.snapshot(this, views);   // force dark: the colours the page draws itself (src/force-dark-host.js)
     let owner = this.activityType;
     while (owner && !seenClasses.has(owner)) {
       seenClasses.add(owner); const cls = this.classes.get(owner);

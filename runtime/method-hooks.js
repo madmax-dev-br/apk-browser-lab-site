@@ -13,10 +13,10 @@
 // abstract methods, static initializers, framework methods the lab implements in JavaScript (no DEX: nothing to hook), and a smali body for a framework method (levels 1
 // and 2 only, where the lab runs the AOSP original from DEX).
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { APKRuntime, DexFile, SHIMS, JavaException } from './apk-runtime.js?v=850bf1b17ffb';
-import { assembleSmali, SmaliError } from './smali-assembler.js?v=850bf1b17ffb';
-import { parseMethodSpec, parseReturnValue, smaliTypeToJava, hookRegistry, updateHooks, hookOn, hookDetail, HOOK_KINDS } from './method-overrides.js?v=850bf1b17ffb';
-import { createHeapReader, classDescriptor, dotted, typeName } from './plugin-queries.js?v=850bf1b17ffb';
+import { APKRuntime, DexFile, SHIMS, JavaException } from './apk-runtime.js?v=bcd37ec74124';
+import { assembleSmali, SmaliError } from './smali-assembler.js?v=bcd37ec74124';
+import { parseMethodSpec, parseReturnValue, smaliTypeToJava, hookRegistry, updateHooks, hookOn, hookDetail, HOOK_KINDS } from './method-overrides.js?v=bcd37ec74124';
+import { createHeapReader, classDescriptor, dotted, typeName } from './plugin-queries.js?v=bcd37ec74124';
 
 export const HOOK_LIMITS = Object.freeze({ hooks: 200, smaliChars: 200_000, message: 2000, maxPending: 2000, maxString: 2000, maxItems: 50, depth: 2 });
 const ACC_STATIC = 0x8, ACC_NATIVE = 0x100, ACC_ABSTRACT = 0x400, ACC_INTERFACE = 0x200;

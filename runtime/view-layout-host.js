@@ -1,8 +1,8 @@
-import { APKError } from './apk-runtime.js?v=850bf1b17ffb';
-import { breakParagraphs } from './text-layout-native.js?v=850bf1b17ffb';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=850bf1b17ffb';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=850bf1b17ffb';
-import { getVectorGraphics } from './vector-native.js?v=850bf1b17ffb';
+import { APKError } from './apk-runtime.js?v=bcd37ec74124';
+import { breakParagraphs } from './text-layout-native.js?v=bcd37ec74124';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=bcd37ec74124';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=bcd37ec74124';
+import { getVectorGraphics } from './vector-native.js?v=bcd37ec74124';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -157,6 +157,8 @@ export function createViewLayoutHost(platform) {
     try { const color = platform.composeCanvasHost?.textColor?.(runtime, receiver); return color == null ? 0xff757575 : color >>> 0; }
     catch (error) { if (error?.name === 'JavaException') throw error; return 0xff757575; }
   };
+  /** The colour a measured paragraph raster is drawn in under force dark (src/force-dark-host.js: text is lightened), noted on the View so a later change lays it out again. */
+  const forceDarkText = (runtime, receiver, color) => { const host = platform.forceDarkHost, view = runtime.object(receiver); if (!host) return color; const fd = host.textTransform(runtime, receiver); view.textRasterForceDark = fd; return fd ? host.textColor(runtime, receiver, color) >>> 0 : color; };
   /** Layout.Alignment of the paragraph from the horizontal part of TextView.getGravity (the view's own, or its style's: a Button's text is centred). */
   const textGravity = (runtime, receiver) => { const view = runtime.object(receiver); if (view.gravity != null) return view.gravity; try { return platform.composeCanvasHost?.textGravity?.(runtime, receiver) ?? 0x800033; } catch (error) { if (error?.name === 'JavaException') throw error; return 0x800033; } };
   const paragraphAlignment = (runtime, receiver) => { const view = runtime.object(receiver), gravity = textGravity(runtime, receiver), rtl = view.layoutDirection === 1, horizontal = gravity & 0x800007; return (horizontal & 7) === 1 ? 'center' : horizontal === 0x800005 ? (rtl ? 'left' : 'right') : horizontal === 5 ? 'right' : horizontal === 3 ? 'left' : 'start'; };
@@ -270,7 +272,7 @@ export function createViewLayoutHost(platform) {
       // TextView.onMeasure builds its Layout at the width the view ends up with (want = width - compound padding), not at the text's: a text narrower than android:minWidth or
       // than a fixed / match_parent width is aligned (gravity center, end) inside that width. Line breaks were decided at contentWidth; a wider box only moves the lines.
       const finalInner = (algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [Math.max(paragraphWidth, minWidth), wSpec, 0]) & SIZE) - (padding.left || 0) - (padding.right || 0);
-      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: Math.max(contentWidth, finalInner), textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, nativeTypeface: info.custom ? info.face : null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: paragraphColor(runtime, receiver), alignment: paragraphAlignment(runtime, receiver), raster: true, rasterScale: runtime.textRasterScale ?? 1, ...extra });
+      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: Math.max(contentWidth, finalInner), textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, nativeTypeface: info.custom ? info.face : null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: forceDarkText(runtime, receiver, paragraphColor(runtime, receiver)), alignment: paragraphAlignment(runtime, receiver), raster: true, rasterScale: runtime.textRasterScale ?? 1, ...extra });
       width = paragraphWidth;
       blockHeight = Math.ceil(paragraph.height) + padTop + padBottom;
       height = blockHeight + (padding.top || 0) + (padding.bottom || 0);
@@ -299,13 +301,15 @@ export function createViewLayoutHost(platform) {
       view.textLayout = textLayout; view.textBaseline = (padding.top || 0) + textLayout.baseline; view.textMetrics = { ...view.textMetrics, width, height, baseline: view.textBaseline, lineCount: textLayout.lineCount, source: 'original android.text.StaticLayout over the native measured text', scope: 'drawn by Layout.draw (' + textLayout.reason + ')' };
       const boxWidth = textLayout.inner, boxHeight = Math.max(0, (view.measuredHeight & SIZE) - (padding.top || 0) - (padding.bottom || 0));
       if (boxWidth > 0 && boxHeight > 0 && boxWidth <= 4096 && boxHeight <= 4096 && platform.composeCanvasHost?.drawTextLayout) {
-        const CANVAS = 'Landroid/graphics/Canvas;', color = paragraphColor(runtime, receiver) | 0, layout = platform.textViewApi.layoutFor(runtime, receiver, textLayout.inner), key = `${layout.ref}|${color}|${boxWidth}|${boxHeight}|${textGravity(runtime, receiver)}`;
+        // under force dark the Layout's text ops replay lightened (the node draws text: foreground), so its spans' colours are too
+        const fd = platform.forceDarkHost?.textTransform(runtime, receiver) ?? null; view.textRasterForceDark = fd;
+        const CANVAS = 'Landroid/graphics/Canvas;', color = paragraphColor(runtime, receiver) | 0, layout = platform.textViewApi.layoutFor(runtime, receiver, textLayout.inner), key = `${layout.ref}|${color}|${boxWidth}|${boxHeight}|${textGravity(runtime, receiver)}|${fd}`;
         if (view.textLayoutRasterKey !== key || !view.textLayoutRaster) {
           const BITMAP = 'Landroid/graphics/Bitmap;', CONFIG = 'Landroid/graphics/Bitmap$Config;', bitmap = call(runtime, null, BITMAP, 'createBitmap', `(II${CONFIG})${BITMAP}`, [boxWidth, boxHeight, runtime.readStatic({ owner: CONFIG, name: 'ARGB_8888', type: CONFIG, key: `${CONFIG}->ARGB_8888:${CONFIG}` })], 'static');
           try {
             const canvas = runtime.allocate(CANVAS); call(runtime, canvas, CANVAS, '<init>', `(${BITMAP})V`, [bitmap], 'direct');
             platform.composeCanvasHost.drawTextLayout(runtime, receiver, canvas, { left: 0, top: 0, innerWidth: boxWidth, innerHeight: boxHeight, color });
-            view.textLayoutRaster = getVectorGraphics(runtime).snapshotCanvas(canvas, boxWidth, boxHeight); view.textLayoutRasterKey = key;
+            view.textLayoutRaster = getVectorGraphics(runtime).snapshotCanvas(canvas, boxWidth, boxHeight, fd ? { forceDark: fd } : undefined); view.textLayoutRasterKey = key;
           } finally { call(runtime, bitmap, BITMAP, 'recycle', '()V'); }
         }
         view.textRaster = view.textLayoutRaster; view.textParagraph = { layoutDrawn: true, padTop: 0, padBottom: 0, height: boxHeight, layoutWidth: boxWidth, lineCount: textLayout.lineCount }; view.textOffsetY = 0;

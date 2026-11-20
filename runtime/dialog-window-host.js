@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=850bf1b17ffb';
-import { getVectorGraphics } from './vector-native.js?v=850bf1b17ffb';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=850bf1b17ffb';
+import { APKError } from './apk-runtime.js?v=bcd37ec74124';
+import { getVectorGraphics } from './vector-native.js?v=bcd37ec74124';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=bcd37ec74124';
 const VIEW='Landroid/view/View;',KEYEVENT='Landroid/view/KeyEvent;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
 const floatBuffer=new DataView(new ArrayBuffer(4)),bits=value=>{floatBuffer.setFloat32(0,value,true);return floatBuffer.getInt32(0,true);},number=value=>{floatBuffer.setInt32(0,value,true);return floatBuffer.getFloat32(0,true);};
 const keys=new Set(),add=(owner,methods)=>methods.forEach(method=>keys.add(owner+'->'+method));
@@ -70,7 +70,7 @@ export function createDialogWindowHost(platform){
    const width=platform.device.widthDp,height=platform.device.heightDp,graphics=getVectorGraphics(r),canvas=r.allocate(CANVAS);call(r,canvas,CANVAS,'<init>','()V',[],'direct');graphics.resetCanvas(canvas,width,height);
    if(call(r,drawable,DRAWABLE,'isStateful','()Z',[]))call(r,drawable,DRAWABLE,'setState','([I)Z',[r.newArray('[I',0)]);
    call(r,drawable,DRAWABLE,'setBounds','(IIII)V',[0,0,width,height]);call(r,drawable,DRAWABLE,'draw',`(${CANVAS})V`,[canvas]);
-   return{kind:'drawable',drawing:graphics.snapshotCanvas(canvas,width,height)};
+   return{kind:'drawable',drawing:graphics.snapshotCanvas(canvas,width,height,platform.forceDarkHost?.windowBackgroundOptions(r))};   // force dark: DecorView's background node
   },
   roots(r){const background=this.activityBackground(r),result=r.root?[{root:r.root,window:null,...(background?{windowBackground:background}:{})}]:[],seen=new Set(result.map(value=>value.root.ref));for(const record of records.values()){if(!record.attached||seen.has(record.root.ref))continue;seen.add(record.root.ref);const bounds=dimensions(r,record),flags=field(r,record.params,'flags'),dim=number(field(r,record.params,'dimAmount',bits(1),'F'));result.push({root:record.root,window:{id:record.id,kind:record.kind,...bounds,modal:!(flags&40),focused:record.focused,visible:visible(r,record),dimAmount:flags&2?dim:0,flags,source:'web-WindowManager/PhoneWindow-content-adapter'}});}return result;},
   /** DecorView.onMeasure windowMinWidthMinor / windowMinWidthMajor: the narrowest a floating window may measure (a dimension, or a fraction of the screen width); 0 when the theme sets none. */

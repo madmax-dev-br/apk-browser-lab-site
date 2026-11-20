@@ -4,8 +4,8 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=850bf1b17ffb';
-import { Arm64Cpu, BLOCKED } from './cpu.js?v=850bf1b17ffb';
+import { APKError } from '../apk-error.js?v=bcd37ec74124';
+import { Arm64Cpu, BLOCKED } from './cpu.js?v=bcd37ec74124';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 

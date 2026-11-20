@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=850bf1b17ffb';
-import { APKError } from './apk-error.js?v=850bf1b17ffb';
-import { HOST_STYLEABLES } from './host-styleables.js?v=850bf1b17ffb';
+import { createHostRegistry } from './host-contract.js?v=bcd37ec74124';
+import { APKError } from './apk-error.js?v=bcd37ec74124';
+import { HOST_STYLEABLES } from './host-styleables.js?v=bcd37ec74124';
 
 // android.widget.ProgressBar public API (API 33) with the semantics of android-13.0.0_r1 ProgressBar.java: min / max / progress / secondary progress with their clamping rules, the
 // determinate <-> indeterminate switch (getProgress() is 0 while indeterminate and setProgress is ignored), progress and indeterminate drawables with the four tint sets applied to the
@@ -70,13 +70,19 @@ export function createProgressBarApiHost(platform) {
     p.indeterminateDrawable = call(r, p.indeterminateDrawable, DRAWABLE, 'mutate', [], DRAWABLE); applyOne(r, self, p, 'indeterminate', p.indeterminateDrawable);
   };
   const swapCurrent = (r, self, drawable) => { const p = st(r, self); if (p.current !== drawable) { p.current = nullish(drawable) ? null : drawable; if (!r.object(self).indeterminate) applyLevel(r, self); redraw(r, self); } };
+  // ProgressBar.setProgressDrawable / setIndeterminateDrawable: the drawable that goes away loses its callback and its scheduled runnables, the new one calls back to this View
+  // (Drawable.invalidateSelf -> View.invalidateDrawable: a drawable that animates itself, as a Material progress indicator's spring-smoothed level, is drawn again on every change)
+  const CALLBACK = 'Landroid/graphics/drawable/Drawable$Callback;';
+  const detach = (r, self, drawable) => { if (nullish(drawable)) return; call(r, drawable, DRAWABLE, 'setCallback', [CALLBACK], 'V', [null]); call(r, self, VIEW, 'unscheduleDrawable', [DRAWABLE], 'V', [drawable]); };
   const attach = (r, self, drawable) => {
+    call(r, drawable, DRAWABLE, 'setCallback', [CALLBACK], 'V', [self]);
     call(r, drawable, DRAWABLE, 'setLayoutDirection', ['I'], 'Z', [call(r, self, VIEW, 'getLayoutDirection', [], 'I')]);
     stateOf(r, self, drawable);
   };
 
   def(BAR, 'setProgressDrawable', `(${DRAWABLE})V`, (r, _m, [self, d]) => {
     const p = st(r, self), next = nullish(d) ? null : d; if (p.progressDrawable === next) return;
+    detach(r, self, p.progressDrawable);
     p.progressDrawable = next;
     if (next !== null) {
       attach(r, self, next);
@@ -148,6 +154,7 @@ export function createProgressBarApiHost(platform) {
     const p = st(r, self), next = nullish(d) ? null : d; if (p.indeterminateDrawable === next) return;
     if (p.indeterminateDrawable !== null && r.isSubtype(r.object(p.indeterminateDrawable).type, ANIMATABLE)) call(r, p.indeterminateDrawable, ANIMATABLE, 'stop');
     p.started = false; p.animationStart = null;
+    detach(r, self, p.indeterminateDrawable);
     p.indeterminateDrawable = next;
     if (next !== null) { attach(r, self, next); applyIndeterminateTint(r, self); }
     if (r.object(self).indeterminate) { swapCurrent(r, self, next); redraw(r, self); }
