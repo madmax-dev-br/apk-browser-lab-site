@@ -1,0 +1,10 @@
+Apache HTTP legacy profile (org.apache.http.legacy)
+
+    scripts/build-aosp-apache-http-profile.sh      (after the default framework: BUILD_PROBE=0 scripts/build-aosp-framework.sh)
+
+The original android-13.0.0_r1 sources of platform/external/apache-http (src/ and android/src/, the library's two source groups in its Android.bp),
+pinned in framework-aosp/upstream-sources.json and listed in framework-aosp/apache-http-sources.txt, compiled unchanged into one DEX. Sources whose
+class the default framework DEX already defines are left out (build/excluded.txt), as the boot class path is searched first on a device.
+
+Loaded next to the default DEX when the package declares <uses-library android:name="org.apache.http.legacy"> (required or not) or targets an SDK
+below 28, which PackageManager treats as using the library (it left the boot class path in Android 9). Licence: Apache-2.0 (the project's NOTICE).

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=c582f7a02eb3';
-import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=c582f7a02eb3';
-import { JavaException } from './apk-runtime.js?v=c582f7a02eb3';
-import { bestDateTimePattern } from './date-skeleton.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=230d3f53d504';
+import { gcRoot } from './heap-gc.js?v=230d3f53d504';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=230d3f53d504';
+import { JavaException } from './apk-runtime.js?v=230d3f53d504';
+import { bestDateTimePattern } from './date-skeleton.js?v=230d3f53d504';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -202,6 +202,16 @@ export function createDateTimeHost(platform) {
   };
   for (const [signature, at] of [['()V', -1], [`(${LOCALE_TYPE})V`, 1], [`(Ljava/lang/Class;${LOCALE_TYPE})V`, 2]]) def(ICU_DFS, '<init>', signature, (r, _m, args) => { if (at > 0 && args[at] === null) r.throwJava('Ljava/lang/NullPointerException;', null); const made = makeSymbols(r, at > 0 ? args[at] : null); r.object(args[0]).symbols = made; r.object(args[0]).symbolsTag = made.tag; });
   for (const [signature, at] of [[`()${ICU_DFS}`, -1], [`(${LOCALE_TYPE})${ICU_DFS}`, 0]]) def(ICU_DFS, 'getInstance', signature, (r, _m, args) => { const o = r.allocate(ICU_DFS), made = makeSymbols(r, at >= 0 ? args[at] : null); r.object(o).symbols = made; r.object(o).symbolsTag = made.tag; return o; }, { static: true });
+  // DateFormatSymbols(ULocale): the ULocale's java.util.Locale; a calendar keyword other than gregorian (the names of another calendar's months) is not modelled and fails by name
+  def(ICU_DFS, '<init>', '(Landroid/icu/util/ULocale;)V', (r, _m, [self, uLocale]) => {
+    if (uLocale === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const calendar = (r.object(uLocale).keywords ?? {}).ca; if (calendar && calendar !== 'gregory' && calendar !== 'iso8601') throw new APKError(`android.icu.text.DateFormatSymbols for the ${calendar} calendar is not modelled (Gregorian names only)`, { kind: 'icu-text-unsupported' });
+    const made = makeSymbols(r, r.object(uLocale).locale ?? null); r.object(self).symbols = made; r.object(self).symbolsTag = made.tag;
+  });
+  // era names: Intl's era of a date before and after year 1 (BC, AD), long and narrow
+  const eraNames = (r, self, style) => { const tag = r.object(self).symbolsTag ?? r.throwJava('Ljava/lang/IllegalStateException;', 'DateFormatSymbols used before construction'); const era = date => new Intl.DateTimeFormat(tag, { timeZone: 'UTC', era: style, year: 'numeric' }).formatToParts(date).find(part => part.type === 'era')?.value ?? ''; return [era(new Date(Date.UTC(-1, 0, 1))), era(new Date(Date.UTC(2021, 0, 1)))]; };
+  def(ICU_DFS, 'getEraNames', `()[${STRING}`, (r, _m, [self]) => stringArray(r, eraNames(r, self, 'long')));
+  def(ICU_DFS, 'getNarrowEras', `()[${STRING}`, (r, _m, [self]) => stringArray(r, eraNames(r, self, 'narrow')));
   def(ICU_DFS, 'getAmPmStrings', `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self).amPm)); def(ICU_DFS, 'getEras', `()[${STRING}`, (r, _m, [self]) => stringArray(r, symbols(r, self).eras));
   def(ICU_DFS, 'getMonths', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'month', 0, 1))); def(ICU_DFS, 'getShortMonths', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'month', 0, 0)));
   def(ICU_DFS, 'getWeekdays', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'weekday', 0, 1))); def(ICU_DFS, 'getShortWeekdays', `()[${STRING}`, (r, _m, [self]) => stringArray(r, icuNames(r, self, 'weekday', 0, 0)));

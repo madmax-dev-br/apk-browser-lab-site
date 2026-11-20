@@ -1,12 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
-import { APKError } from './apk-error.js?v=c582f7a02eb3';
-import { cleartextPermitted } from './network-native.js?v=c582f7a02eb3';
-import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=c582f7a02eb3';
-import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=c582f7a02eb3';
-import { rotateRGBA } from './camera-frames.js?v=c582f7a02eb3';
-import { Blocked } from './scheduler.js?v=c582f7a02eb3';
-import { IntCells } from './java-arrays.js?v=c582f7a02eb3';
-import { state as ioState } from './libcore-io-native.js?v=c582f7a02eb3';
+import { createHostRegistry } from './host-contract.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=230d3f53d504';
+import { cleartextPermitted } from './network-native.js?v=230d3f53d504';
+import { probeIsoBmff, sniffContainer, videoSampleTable } from './media-container.js?v=230d3f53d504';
+import { parseAvcConfigurationRecord, avcCodecString } from './media-mp4.js?v=230d3f53d504';
+import { rotateRGBA } from './camera-frames.js?v=230d3f53d504';
+import { Blocked } from './scheduler.js?v=230d3f53d504';
+import { IntCells } from './java-arrays.js?v=230d3f53d504';
+import { state as ioState } from './libcore-io-native.js?v=230d3f53d504';
 
 // Small platform classes: android.os.WorkSource (a set of (uid, name) pairs the framework blames for work), and android.media.MediaMetadataRetriever (android.graphics.Movie is src/animated-image-host.js).
 // MediaMetadataRetriever reads the container metadata of MP4 / MOV / 3GP sources (src/media-container.js: duration, size, rotation, track kinds); a missing or unrecognised source fails the way
@@ -247,6 +247,12 @@ export function createMiscPlatformHost(platform) {
   def(UL, 'getBaseName', `()${STRING}`, (r, _m, [self]) => callV(r, locale(r, self), OBJECT, 'toString', [], STRING));
   for (const name of ['getDisplayName', 'getDisplayLanguage', 'getDisplayCountry']) { def(UL, name, `()${STRING}`, (r, _m, [self]) => callV(r, locale(r, self), LOCALE, name, [], STRING)); def(UL, name, `(${UL})${STRING}`, (r, _m, [self, inLocale]) => callV(r, locale(r, self), LOCALE, name, [LOCALE], STRING, [locale(r, inLocale)])); }
   def(UL, 'getKeywordValue', `(${STRING})${STRING}`, (r, _m, [self, key]) => { if (nullish(key)) npe(r); const k = text(r, key), short = Object.entries(KEY_LEGACY).find(([, legacy]) => legacy === k)?.[0] ?? k, v = (r.object(self).keywords ?? {})[short]; return v === undefined ? null : VALUE_LEGACY[v] ?? v; });
+  // setKeywordValue(key, value): a new ULocale with that keyword set (null removes it), as ICU's (legacy key and value names accepted, stored in their BCP-47 short form)
+  def(UL, 'setKeywordValue', `(${STRING}${STRING})${UL}`, (r, _m, [self, key, value]) => {
+    if (nullish(key)) npe(r); const k = text(r, key), short = Object.entries(KEY_LEGACY).find(([, legacy]) => legacy === k)?.[0] ?? k, keywords = { ...(r.object(self).keywords ?? {}) };
+    if (nullish(value)) delete keywords[short]; else { const v = text(r, value); keywords[short] = Object.entries(VALUE_LEGACY).find(([, legacy]) => legacy === v)?.[0] ?? v; }
+    return wrap(r, locale(r, self), keywords);
+  });
   def(UL, 'getKeywords', '()Ljava/util/Iterator;', (r, _m, [self]) => { const names = Object.keys(r.object(self).keywords ?? {}).map(k => KEY_LEGACY[k] ?? k).sort(); if (!names.length) return null; const list = construct(r, 'Ljava/util/ArrayList;', [], []); for (const n of names) callV(r, list, 'Ljava/util/ArrayList;', 'add', [OBJECT], 'Z', [n]); return callV(r, list, 'Ljava/util/ArrayList;', 'iterator', [], 'Ljava/util/Iterator;'); });
   // ---- ULocale.Builder: language / script / region / variant, language tag, and Unicode keywords (the ca, nu, co, hc, cu keys); anything else is rejected
   const BUILDER = 'Landroid/icu/util/ULocale$Builder;'; type(BUILDER, OBJECT, [], { allocatable: true });

@@ -1,7 +1,7 @@
-import { floatBits } from './host-contract.js?v=c582f7a02eb3';
-import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=c582f7a02eb3';
-import { createAccountStore } from './account-store.js?v=c582f7a02eb3';
+import { floatBits } from './host-contract.js?v=230d3f53d504';
+import { gcRoot } from './heap-gc.js?v=230d3f53d504';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=230d3f53d504';
+import { createAccountStore } from './account-store.js?v=230d3f53d504';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,

@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
-import { GC_ROOTS } from './heap-gc.js?v=c582f7a02eb3';
-import { LooperYield } from './message-queue-native.js?v=c582f7a02eb3';
-import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { createHostRegistry } from './host-contract.js?v=230d3f53d504';
+import { GC_ROOTS } from './heap-gc.js?v=230d3f53d504';
+import { LooperYield } from './message-queue-native.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=230d3f53d504';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -69,6 +69,9 @@ export function createLooperHost(platform) {
       return !!owner && !owner.main && owner !== dispatching;
     };
   };
+  // A query that only returns numbers reads queued messages through handles; on the WebAssembly core every handle made while host code runs is pinned until that host call
+  // returns, and these queries run again and again inside one long call while main is parked. Nothing they read outlives them, so their pins are dropped when they return.
+  const transient = (runtime, query) => { const pins = runtime?.wasm?.pins, mark = pins?.length; try { return query(); } finally { if (pins && pins.length > mark) pins.length = mark; } };
   const host = {
     ...registry, interfaces: registry.interfacesOf,
     armed: true,
@@ -159,14 +162,17 @@ export function createLooperHost(platform) {
       for (let message = get(runtime, main.queue, K.messages), guard = 0; !isNull(message) && guard < 200000; message = get(runtime, message, K.next), guard++) out.push(host.view(runtime, message));
       return out;
     },
-    count(runtime) { return host.snapshot(runtime).length + deferred.length; },
+    count(runtime) { return transient(runtime, () => host.snapshot(runtime).length + deferred.length); },
     /** Milliseconds until the queue has something to deliver: 0 if due now, null if it is empty (or only held back by a sync barrier). */
     nextDelay(now) {
       if (deferred.length) return 0;
-      const runtime = platform.vmRuntime, message = runtime ? host.peek(runtime) : null;
-      if (message === null) return null;
-      const when = Number(get(runtime, message, K.when));
-      return when <= uptime(now) ? 0 : when - now;
+      const runtime = platform.vmRuntime;
+      return transient(runtime, () => {
+        const message = runtime ? host.peek(runtime) : null;
+        if (message === null) return null;
+        const when = Number(get(runtime, message, K.when));
+        return when <= uptime(now) ? 0 : when - now;
+      });
     },
     /**
      * The next event the pump should run at `now`: the due head ({ event }), or -- once the head is overdue by more than `behindMs`, a flood -- a due UI event queued behind it
@@ -189,15 +195,20 @@ export function createLooperHost(platform) {
      */
     nextDueWhileParked(runtime, now) {
       const limit = uptime(now), other = otherProcess(runtime);
-      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (hostOnly(candidate) || other(candidate)) return { event: candidate, direct: true }; }
-      return null;
+      // found with the pins of the walk dropped (see transient), then the one message it returns read again, so only what the caller keeps stays pinned
+      const index = transient(runtime, () => { let i = 0; for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) return -1; if (hostOnly(candidate) || other(candidate)) return i; i++; } return -1; });
+      if (index < 0) return null;
+      let message = get(runtime, main.queue, K.messages); for (let i = 0; i < index && !isNull(message); i++) message = get(runtime, message, K.next);
+      return isNull(message) ? null : { event: host.view(runtime, message), direct: true };
     },
     /** Milliseconds until the first host task that may run while main is parked (see nextDueWhileParked): 0 when one is due, null when none is queued. */
     nextDelayWhileParked(runtime, now) {
-      const limit = uptime(now);
-      const other = otherProcess(runtime);
-      for (const candidate of host.snapshot(runtime)) { if (!hostOnly(candidate) && !other(candidate)) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
-      return null;
+      return transient(runtime, () => {
+        const limit = uptime(now);
+        const other = otherProcess(runtime);
+        for (const candidate of host.snapshot(runtime)) { if (!hostOnly(candidate) && !other(candidate)) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
+        return null;
+      });
     },
     // ---- running ----
     /** One iteration of Looper.loop(): MessageQueue.next() (which runs the IdleHandlers and, with nothing due, ends the call with a LooperYield), dispatchMessage, recycleUnchecked. */

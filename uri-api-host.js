@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
-import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
-import { APKError } from './apk-error.js?v=c582f7a02eb3';
-import { encodeUri } from './content-resolver-host.js?v=c582f7a02eb3';
+import { createHostRegistry } from './host-contract.js?v=230d3f53d504';
+import { gcRoot } from './heap-gc.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=230d3f53d504';
+import { encodeUri } from './content-resolver-host.js?v=230d3f53d504';
 
 // android.net.Uri members the StringUri model of content-resolver-host.js did not carry (android-13.0.0_r1 Uri.java): EMPTY, fromFile, fromParts, withAppendedPath, normalizeScheme,
 // compareTo. Uris are built by composing the string the AOSP HierarchicalUri / OpaqueUri would print and parsing it, so every accessor answers like the original.

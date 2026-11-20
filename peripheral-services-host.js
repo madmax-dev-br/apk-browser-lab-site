@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=c582f7a02eb3';
-import { APKError } from './apk-error.js?v=c582f7a02eb3';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=c582f7a02eb3';
-import { installCameraManager } from './camera-host.js?v=c582f7a02eb3';
+import { bitsFloat, floatBits } from './host-contract.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=230d3f53d504';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=230d3f53d504';
+import { installCameraManager } from './camera-host.js?v=230d3f53d504';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB

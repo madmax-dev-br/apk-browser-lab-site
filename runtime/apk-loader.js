@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=c582f7a02eb3';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=c582f7a02eb3';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=c582f7a02eb3';
-import { inspectELF } from './native-inspector.js?v=c582f7a02eb3';
-import { elfBuildId } from './elf-build-id.js?v=c582f7a02eb3';
-import { inflateRaw } from './inflate.js?v=c582f7a02eb3';
-import { crc32, inflateEntry } from './zip-entry.js?v=c582f7a02eb3';
-import { resolveDevice } from './device-profile.js?v=c582f7a02eb3';
-import { resourceProfileFor } from './device-configuration.js?v=c582f7a02eb3';
-import { JniBridge } from './jni-host.js?v=c582f7a02eb3';
-import { providerForApk } from './native-provider-variants.js?v=c582f7a02eb3';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=c582f7a02eb3';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=c582f7a02eb3';
-import { AndroidResources } from './android-resources.js?v=c582f7a02eb3';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=c582f7a02eb3';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=c582f7a02eb3';
-import { FrameworkProvider } from './framework-provider.js?v=c582f7a02eb3';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=230d3f53d504';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=230d3f53d504';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=230d3f53d504';
+import { inspectELF } from './native-inspector.js?v=230d3f53d504';
+import { elfBuildId } from './elf-build-id.js?v=230d3f53d504';
+import { inflateRaw } from './inflate.js?v=230d3f53d504';
+import { crc32, inflateEntry } from './zip-entry.js?v=230d3f53d504';
+import { resolveDevice } from './device-profile.js?v=230d3f53d504';
+import { resourceProfileFor } from './device-configuration.js?v=230d3f53d504';
+import { JniBridge } from './jni-host.js?v=230d3f53d504';
+import { providerForApk } from './native-provider-variants.js?v=230d3f53d504';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=230d3f53d504';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=230d3f53d504';
+import { AndroidResources } from './android-resources.js?v=230d3f53d504';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=230d3f53d504';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=230d3f53d504';
+import { FrameworkProvider } from './framework-provider.js?v=230d3f53d504';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -200,7 +200,7 @@ export function parseManifest(data) {
   let strings = null, packageName = null, applicationName = null;
   const activities = [], services = [], providers = [], receivers = [], providerDetails = [], componentDetails = [], stack = [], autoVerifyHosts = new Set();
   let application = {}, usesSdk = {}, manifestAttrs = {};
-  const usesPermissions = [], declaredPermissions = [];
+  const usesPermissions = [], declaredPermissions = [], usesLibraries = [];
   const queries = { packages: [], actions: [], authorities: [] };   // <queries> (API 30 package visibility): the packages, intent actions and provider authorities this package declares it interacts with   // <uses-permission>/<uses-permission-sdk-23> names and the app's own <permission> declarations
   const str = i => { if (!strings || i >= strings.length) fail('Invalid AXML string reference'); return strings[i]; };
   const resolveName = name => name.startsWith('.') ? packageName + name : name.includes('.') ? name : `${packageName}.${name}`;
@@ -251,6 +251,7 @@ export function parseManifest(data) {
       if (name === 'manifest') { packageName = attrs.package; manifestAttrs = { versionCode: attrs.versionCode, versionName: attrs.versionName, installLocation: attrs.installLocation }; }
       if (name === 'application') { application = { ...attrs }; if (typeof attrs.name === 'string') { applicationName = resolveName(attrs.name); application.name = applicationName; } }
       if (name === 'uses-sdk') usesSdk = { ...attrs };
+      if (name === 'uses-library' && typeof attrs.name === 'string') usesLibraries.push({ name: attrs.name, required: !(attrs.required === false || attrs.required === 0 || attrs.required === 'false') });   // android:required defaults to true
       if ((name === 'uses-permission' || name === 'uses-permission-sdk-23') && typeof attrs.name === 'string') usesPermissions.push({ name: attrs.name, maxSdkVersion: attrs.maxSdkVersion ?? null });
       if (name === 'permission' && typeof attrs.name === 'string') declaredPermissions.push({ name: attrs.name, protectionLevel: attrs.protectionLevel ?? 0 });
       if (stack.some(n => n.name === 'queries')) {
@@ -322,7 +323,7 @@ export function parseManifest(data) {
     else deduplicated.set(a.name, { ...a, descriptor: `L${a.name.replaceAll('.', '/')};` });
   }
   const launchers = [...deduplicated.values()].filter(a => a.launcher);
-  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, queries, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
+  return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, usesLibraries, queries, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
     componentCounts: { activities: deduplicated.size, services: services.length, providers: providers.length, receivers: receivers.length },
     launcherActivity: launchers.length === 1 ? launchers[0].name : null };
 }
@@ -726,12 +727,17 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // option's SMS Retriever decodes SMS_RECEIVED with them)
   const usesTelephony=files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))||(options.companionPackages?.length??0)>0||!!options.microg;   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
   // the original android.app.IntentService (framework-aosp/profiles/services): referenced by the APK, or possibly by a companion package (microG's check-in service is one)
+  // the org.apache.http.legacy shared library (framework-aosp/profiles/apache-http): declared with <uses-library> (required or not), or implied by a targetSdkVersion below 28, for which
+  // PackageManager adds it itself (it left the boot class path in Android 9)
+  const declaredApacheHttp=(manifest.usesLibraries??[]).some(library=>library.name==='org.apache.http.legacy'),apacheTarget=Number(manifest.usesSdk?.targetSdkVersion??manifest.usesSdk?.minSdkVersion??1);
+  const usesApacheHttp=declaredApacheHttp||apacheTarget<28;
   const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
+    {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];

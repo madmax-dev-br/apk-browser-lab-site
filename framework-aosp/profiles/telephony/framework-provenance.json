@@ -207,7 +207,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "fcd770648ba7fe37e69b9f8b57f8691d122121c3ddec1f54e74ab430e9e717df",
+  "requiresDefaultFrameworkSha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original SMS decoding classes (3GPP); a received SMS is delivered by the virtual device as SMS_RECEIVED with its PDUs (src/telephony-sms.js). The 3GPP2 (CDMA) classes and GsmAlphabet are not in the profile: a 3GPP2 PDU or a GSM 7-bit message body fails with NoClassDefFoundError naming the class",
   "activationPolicy": "an installed package DEX references android.telephony.SmsMessage or android.provider.Telephony (or explicit loader option)",
