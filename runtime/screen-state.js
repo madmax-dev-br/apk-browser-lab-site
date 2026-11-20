@@ -1,7 +1,7 @@
 // "Screen state": a plain-text picture of what the VM shows and why it may be blank, for "Copy diagnostics" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=f90be5f5e9be';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=f90be5f5e9be';
+import { reportSummary, collapseThreads } from './report-summary.js?v=fef4a080c36e';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=fef4a080c36e';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destroyed', 1: 'created', 2: 'stopped', 3: 'started/paused', 4: 'resumed (foreground)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');

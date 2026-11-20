@@ -30,7 +30,7 @@ export function declaredAuthenticators(entry, environment) {
     if (!meta || !environment?.getXml) continue;
     let root; try { root = environment.getXml(Number(meta.resource)); } catch { continue; }
     while (root && root.name !== 'account-authenticator' && Array.isArray(root.children) && root.children.length === 1 && !root.attributes?.length) root = root.children[0];
-    const attribute = name => { const found = environment.getAttribute?.(root, name) ?? root?.attributes?.find(a => a.name === name) ?? null; return found ? found.value ?? found.rawValue ?? found.data ?? null : null; };
+    const attribute = name => { let found = environment.getAttribute?.(root, name) ?? root?.attributes?.find(a => a.name === name) ?? null; while (found?.resolved) found = found.resolved; return found ? found.value ?? found.rawValue ?? found.data ?? null : null; };   // android:accountType="@string/...": the string it refers to
     const type = attribute('accountType'); if (typeof type !== 'string' || !type) continue;
     const custom = attribute('customTokens');
     out.push({ type, packageName: entry.name, service: detail.name, customTokens: custom === true || custom === 'true' || custom === -1 || custom === 1 });

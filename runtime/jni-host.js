@@ -1,18 +1,18 @@
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { constantField, nonConstantField } from './framework-constants.js?v=f90be5f5e9be';
-import { JavaException } from './apk-runtime.js?v=f90be5f5e9be';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=f90be5f5e9be';
-import { buildElfDescriptor } from './native-descriptor.js?v=f90be5f5e9be';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=f90be5f5e9be';
-import { NativeLinker, LinkError } from './native-linker.js?v=f90be5f5e9be';
-import { hostFunction } from './wasm-host-function.js?v=f90be5f5e9be';
-import { parseWasm } from './wasm-dylink.js?v=f90be5f5e9be';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=f90be5f5e9be';
-import { registerWasmMemory } from './unsafe-native.js?v=f90be5f5e9be';
-import { writeSkPath } from './skia-path-layout.js?v=f90be5f5e9be';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=f90be5f5e9be';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=f90be5f5e9be';
-import { withVariants } from './native-provider-variants.js?v=f90be5f5e9be';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { constantField, nonConstantField } from './framework-constants.js?v=fef4a080c36e';
+import { JavaException } from './apk-runtime.js?v=fef4a080c36e';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=fef4a080c36e';
+import { buildElfDescriptor } from './native-descriptor.js?v=fef4a080c36e';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=fef4a080c36e';
+import { NativeLinker, LinkError } from './native-linker.js?v=fef4a080c36e';
+import { hostFunction } from './wasm-host-function.js?v=fef4a080c36e';
+import { parseWasm } from './wasm-dylink.js?v=fef4a080c36e';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=fef4a080c36e';
+import { registerWasmMemory } from './unsafe-native.js?v=fef4a080c36e';
+import { writeSkPath } from './skia-path-layout.js?v=fef4a080c36e';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=fef4a080c36e';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=fef4a080c36e';
+import { withVariants } from './native-provider-variants.js?v=fef4a080c36e';
 
 // JNI -> WebAssembly bridge.
 //
@@ -313,7 +313,7 @@ export class JniBridge {
   #guard(name, body) {
     try { return body(); }
     catch (error) {
-      if (error instanceof JavaException) { this.pending = error.value; return undefined; }
+      if (error instanceof JavaException) { this.pending = error.value; if ((this.pendingNotes = (this.pendingNotes ?? 0) + 1) <= 40) { const r = this.runtime, o = r.object(error.value); r.record(`JNI ${name}: Java exception pending: ${r.typeOf(error.value)}: ${String(o.message ?? (typeof o.detailMessage === 'string' ? o.detailMessage : '') ?? '').slice(0, 200)}${this.currentLib?.recentCalls ? ` (native caller ${this.currentLib.caller()}; last JNI calls: ${this.currentLib.recentCalls().join(', ')})` : ''}`); } return undefined; }   // recorded (first 40): native code decides what to do with it
       throw error;
     }
   }
@@ -458,7 +458,7 @@ export class JniBridge {
   /** The JNI function bodies over another native process's memory (src/arm64/jni.js): `lib` gives memory, malloc/free and, for 64-bit code, pointerSize 8 with its own argument decoding. */
   handlersFor(lib) { return this.#handlers(lib); }
   /** A JNI function body with JNI's exception rule (a Java exception from a callback becomes the pending exception and the function returns 0): for bridges outside this file (src/arm64/jni.js). */
-  guardJni(name, body) { return this.#guard(name, body); }
+  guardJni(name, body, lib = null) { const previous = this.currentLib; this.currentLib = lib; try { return this.#guard(name, body); } finally { this.currentLib = previous; } }
   #handlers(lib) {
     const r = this.runtime, self = this;
     const view = () => new DataView(lib.memory.buffer), bytes = () => new Uint8Array(lib.memory.buffer);

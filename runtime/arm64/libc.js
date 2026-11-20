@@ -3,9 +3,9 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=f90be5f5e9be';
-import { BLOCKED } from './cpu.js?v=f90be5f5e9be';
-import { extendLibc } from './libc-extra.js?v=f90be5f5e9be';
+import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { BLOCKED } from './cpu.js?v=fef4a080c36e';
+import { extendLibc } from './libc-extra.js?v=fef4a080c36e';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => new TextDecoder().decode(bytes);
@@ -246,6 +246,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   };
   // ---- files over the VM's file system
   const fds = new Map(); let nextFd = 100;
+  lib.__ownsFd = fd => fds.has(fd);   // the process's descriptors, for Java code handed one (src/arm64/glue.js)
   const vfs = () => fs() ?? (() => { throw new APKError('ARM64 native code opened a file but the VM file system is not available here', { kind: 'arm64-files' }); })();
   // the character devices a process reads directly: random bytes, the null and zero devices
   const randomBytes = length => { const bytes = new Uint8Array(length); for (let i = 0; i < length; i += 65536) crypto.getRandomValues(bytes.subarray(i, Math.min(length, i + 65536))); return bytes; };
@@ -273,7 +274,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.fsync = lib.fdatasync = () => 0;
   lib.fcntl = () => 0; lib.flock = () => 0; lib.ioctl = (p) => setErrno(p, ENOSYS);
   // mmap: anonymous regions come from the address space; a file mapping copies the file (MAP_PRIVATE semantics; writes are not reflected back)
-  lib.mmap = lib.mmap64 = (p, c) => { const length = n(c, 1), flags = n(c, 3), fd = s32(c, 4), offset = n(c, 5); if (length >= 64 * 1048576) runtime?.record?.(`ARM64 mmap of ${Math.round(length / 1048576)} MiB (prot ${n(c, 2)}, flags 0x${flags.toString(16)}) from ${c.where?.(Number(c.x[30])) ?? 'native code'}: the lab's native memory is one flat buffer, so a reservation is backed in full`); const at = p.mapRegion(length, 0x1000); if (!(flags & 0x20) && fd >= 0) { const f = fds.get(fd); if (!f) return setErrno(p, EBADF); const data = fileBytes(f.path).subarray(offset, offset + length); p.memory.copyIn(at, data); if (flags & 1) p.sharedMappings = [...(p.sharedMappings ?? []), { at, length, path: f.path, offset, writable: !!(n(c, 2) & 2) }]; } return at; };
+  lib.mmap = lib.mmap64 = (p, c) => { const length = n(c, 1), flags = n(c, 3), fd = s32(c, 4), offset = n(c, 5); if (length >= 64 * 1048576) runtime?.record?.(`ARM64 mmap of ${Math.round(length / 1048576)} MiB (prot ${n(c, 2)}, flags 0x${flags.toString(16)}) from ${c.where?.(Number(c.x[30])) ?? 'native code'}: reserved in the process address space (pages are backed only when touched)`); const at = p.mapRegion(length, 0x1000); if (!(flags & 0x20) && fd >= 0) { const f = fds.get(fd); if (!f) return setErrno(p, EBADF); const data = fileBytes(f.path).subarray(offset, offset + length); p.memory.copyIn(at, data); if (flags & 1) p.sharedMappings = [...(p.sharedMappings ?? []), { at, length, path: f.path, offset, writable: !!(n(c, 2) & 2) }]; } return at; };
   lib.msync = (p, c) => { writeBack(p, n(c, 0), n(c, 1)); return 0; };
   lib.munmap = (p, c) => { const at = n(c, 0), length = n(c, 1); writeBack(p, at, length); p.sharedMappings = (p.sharedMappings ?? []).filter(m => !(m.at >= at && m.at < at + length)); return 0; };
   lib.mprotect = lib.madvise = () => 0;

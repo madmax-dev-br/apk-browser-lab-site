@@ -6,9 +6,9 @@
 // name nobody bound refuses the connection, as on a device). UDP has no path (the relay
 // tunnels TCP only): a UDP socket opens, every send fails with ENETUNREACH (recorded) and nothing arrives, as on a network that blocks UDP; QUIC stacks then fall back to TCP. A blocking call waits as a native thread wait (src/arm64/threads.js);
 // on the thread that runs Java the network cannot be waited for synchronously, so that call fails by name.
-import { APKError } from '../apk-error.js?v=f90be5f5e9be';
-import { BLOCKED } from './cpu.js?v=f90be5f5e9be';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=f90be5f5e9be';
+import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { BLOCKED } from './cpu.js?v=fef4a080c36e';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=fef4a080c36e';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
@@ -16,6 +16,7 @@ const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
 export function addSockets(lib, { runtime } = {}) {
   const n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i])), x = (c, i) => c.x[i];
   const objects = new Map(); let nextFd = 1000;
+  { const files = lib.__ownsFd; lib.__ownsFd = fd => objects.has(fd) || !!files?.(fd); }
   const names = new Map(), byAddress = new Map();
   const fail = (p, errno) => { p.memory.writeU32(p.errnoAddress, errno); return 0xffffffffffffffffn; };
   const unsupported = what => { throw new APKError(`ARM64 native code: ${what} is not provided by the lab`, { kind: 'arm64-network' }); };

@@ -8,6 +8,7 @@ export const FLAG = {
   EXCLUDE_FROM_RECENTS: 0x00800000, BROUGHT_TO_FRONT: 0x00400000, RESET_TASK_IF_NEEDED: 0x00200000, LAUNCHED_FROM_HISTORY: 0x00100000, NEW_DOCUMENT: 0x00080000, CLEAR_WHEN_TASK_RESET: 0x00080000,
   NO_USER_ACTION: 0x00040000, REORDER_TO_FRONT: 0x00020000, NO_ANIMATION: 0x00010000, CLEAR_TASK: 0x00008000, TASK_ON_HOME: 0x00004000, RETAIN_IN_RECENTS: 0x00002000, LAUNCH_ADJACENT: 0x00001000,
 };
+const dottedClass = type => type.slice(1, -1).replaceAll('/', '.');
 export const LAUNCH_MODE = { standard: 0, singleTop: 1, singleTask: 2, singleInstance: 3, singleInstancePerTask: 4 };
 export const DOCUMENT_MODE = { none: 0, intoExisting: 1, always: 2, never: 3 };
 const truthy = value => value === true || value === 'true' || (typeof value === 'number' && value !== 0);
@@ -85,6 +86,8 @@ export class ActivityStarter {
 
   start(runtime, intentObject, target, sourceFrame, { resultCaller = null, requestCode = -1, fromActivity = true, forward = null } = {}) {
     const p = this.p, intent = intentObject, info = p.activityInfo(target);
+    // ActivityRecord.mActivityComponent: the component the Intent names (an <activity-alias> stays the alias), which the singleTop checks compare, not the class behind it
+    const startedComponent = p.componentNameOf(runtime, intent, target), sameComponent = frame => (frame.component ?? dottedClass(frame.type)) === startedComponent;
     let flags = intent.flags | 0;
     // ActivityStarter.adjustLaunchFlagsToDocumentMode (documents are approximated as NEW_TASK launches, see activityInfoOf).
     if (info.documentLaunchMode === DOCUMENT_MODE.always) flags |= FLAG.NEW_TASK | FLAG.MULTIPLE_TASK;
@@ -128,7 +131,7 @@ export class ActivityStarter {
         if (found) plan.deliver = found; else adding = true;
       } else if (task.realActivity === target) {
         // The task's base Activity is launched again: the task comes to the front; SINGLE_TOP delivers to the top instance, another intent filter starts a new instance on top.
-        if (((flags & FLAG.SINGLE_TOP) !== 0 || lm === LAUNCH_MODE.singleTop) && top.type === target) plan.deliver = top;
+        if (((flags & FLAG.SINGLE_TOP) !== 0 || lm === LAUNCH_MODE.singleTop) && top.type === target && sameComponent(top)) plan.deliver = top;
         else if (task.intentKey !== this.filterKey(runtime, intent)) adding = true;
         else if (!reused) adding = true;
         else { plan.deliver = top; plan.bringOnly = true; }
@@ -144,7 +147,7 @@ export class ActivityStarter {
     // deliverToCurrentTopIfNeeded: the Activity at the very top is the target and the launch is SINGLE_TOP (flag or launchMode) without a result request.
     if (adding) {
       const front = task ?? p.tasks.at(-1), top = front ? topLive(front, plan.finish) : null;
-      if (top && !receiver && top.type === target && ((flags & FLAG.SINGLE_TOP) !== 0 || lm === LAUNCH_MODE.singleTop)) { plan.deliver = top; adding = false; plan.newTask = false; }
+      if (top && !receiver && top.type === target && sameComponent(top) && ((flags & FLAG.SINGLE_TOP) !== 0 || lm === LAUNCH_MODE.singleTop)) { plan.deliver = top; adding = false; plan.newTask = false; }
     }
     plan.add = adding;
     // A result requested from an Activity that lands in another task is cancelled at once (ActivityStarter.sendNewTaskResultRequestIfNeeded); a delivered-to-existing launch drops the request.

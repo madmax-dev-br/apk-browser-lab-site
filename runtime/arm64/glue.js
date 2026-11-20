@@ -1,11 +1,11 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=f90be5f5e9be';
-import { Arm64Process } from './process.js?v=f90be5f5e9be';
-import { createLibc } from './libc.js?v=f90be5f5e9be';
-import { attachArm64Jni } from './jni.js?v=f90be5f5e9be';
-import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=f90be5f5e9be';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=fef4a080c36e';
+import { Arm64Process } from './process.js?v=fef4a080c36e';
+import { createLibc } from './libc.js?v=fef4a080c36e';
+import { attachArm64Jni } from './jni.js?v=fef4a080c36e';
+import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=fef4a080c36e';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
@@ -33,7 +33,9 @@ export function createArm64Native(runtime) {
       pid: runtime.platform?.virtualProcess?.pid ?? 4321,
       queueTask: runtime.platform?.queueTask ? (fn, delay) => runtime.platform.queueTask(fn, delay, []) : null,
     });
-    process.threads.javaThreadName = () => runtime.thread?.name ?? 'main';   // names the Java thread in native wait reports (every Java thread calls native code as the process's main thread)
+    process.threads.javaThreadName = () => runtime.thread?.name ?? 'main';
+    process.threads.javaMain = () => runtime.scheduler?.main ?? null;
+    runtime.nativeOwnsFd = fd => !!process.hostLibrary.__ownsFd?.(fd);   // a descriptor native code created and handed to Java (a pipe, socket or file of the ARM64 process)   // names the Java thread in native wait reports (every Java thread calls native code as the process's main thread)
     runtime.jni ??= new JniBridge(runtime, new NativeLibraryProvider(), runtime.platform);
     lib = attachArm64Jni(process, runtime.jni);
     runtime.jni.libraries.set('<arm64-v8a>', lib);
@@ -65,7 +67,7 @@ export function createArm64Native(runtime) {
       const onLoad = loaded.exports.get('JNI_OnLoad');
       runtime.record(`JNI loaded ${soname} (arm64-v8a, interpreted${onLoad ? ', JNI_OnLoad' : ''})`);
       if (onLoad) {
-        const version = runtime.jni.enterNative(() => Number(BigInt.asIntN(32, proc.call(onLoad, [lib.vmPtr, 0]))));
+        const version = runtime.jni.enterNative(() => Number(BigInt.asIntN(32, proc.threads.asJavaThread(runtime.thread, () => proc.call(onLoad, [lib.vmPtr, 0])))));
         if (!VERSIONS.has(version)) runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `JNI_ERR returned from JNI_OnLoad in "${soname}" (version 0x${(version >>> 0).toString(16)})`);
       }
       return true;

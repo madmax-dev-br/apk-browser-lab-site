@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=f90be5f5e9be';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=fef4a080c36e';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,

@@ -1,0 +1,15 @@
+Original Android 13 apache-boot profile (the org.apache.http classes of framework.jar)
+
+    scripts/build-aosp-framework.sh                (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-apache-boot-profile.sh      (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/hidden-members.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/apache-boot-sources.txt, compiled unchanged (no source transform): the
+org.apache.http classes that Android keeps in framework.jar, on the boot class path, apart from the legacy Apache HTTP library (org.apache.http.legacy):
+org.apache.http.conn.ssl (AbstractVerifier, AllowAllHostnameVerifier, BrowserCompatHostnameVerifier, StrictHostnameVerifier, X509HostnameVerifier,
+AndroidDistinguishedNameParser, SSLSocketFactory), org.apache.http.conn.scheme (HostNameResolver, LayeredSocketFactory, SocketFactory),
+org.apache.http.params (CoreConnectionPNames, HttpConnectionParams, HttpParams) and org.apache.http.conn.ConnectTimeoutException.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
+(src/apk-loader.js) adds this DEX when the APK's DEX references one of these classes, when the apache-http profile is loaded (the legacy
+library builds on them), or when the loader option enableApacheBootProfile is true.

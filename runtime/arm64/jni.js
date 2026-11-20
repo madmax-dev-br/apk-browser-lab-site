@@ -2,10 +2,10 @@
 // entries that run the JNI bridge's own handlers (src/jni-host.js JniBridge.handlersFor: the same JNI semantics as for the lab's WebAssembly libraries), and the
 // library objects the bridge binds native methods to (Java_ export names and RegisterNatives). Arguments follow AAPCS64: integers and pointers in X0-X7, float and
 // double in V0-V7, the rest on the stack; "..." arguments of Call<Type>Method continue in the same registers, a va_list is AAPCS64's structure.
-import { APKError } from '../apk-error.js?v=f90be5f5e9be';
-import { JNI_FUNCTIONS } from '../jni-function-table.js?v=f90be5f5e9be';
-import { variadic, vaList } from './libc.js?v=f90be5f5e9be';
-import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=f90be5f5e9be';
+import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { JNI_FUNCTIONS } from '../jni-function-table.js?v=fef4a080c36e';
+import { variadic, vaList } from './libc.js?v=fef4a080c36e';
+import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=fef4a080c36e';
 
 const JNI_OK = 0, JNI_EVERSION = -3, VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 // JNI parameters that are 32-bit integers (jint, jsize, jboolean, jbyte, jchar, jshort) rather than pointers or references: on AAPCS64 only their low 32 bits are defined
@@ -18,6 +18,8 @@ const VARIADIC = /^(Call(Nonvirtual|Static)?\w+Method|NewObject)$/, VA_LIST = /^
 
 export function attachArm64Jni(process, bridge) {
   const mem = process.memory, tokens = new Map(); let nextToken = 1;
+  const recentJni = new Array(16).fill(null); let recentAt = 0;
+  const recentCalls = () => { const out = []; for (let i = 1; i <= 16; i++) { const n = recentJni[(recentAt - i) & 15]; if (n) out.push(n); } return out.reverse(); };
   const lib = {
     abi: 'arm64-v8a', pointerSize: 8, process, allocations: new Map(), exports: new Proxy({}, { get: (_t, name) => { for (const l of process.order) { const address = l.exports.get(name); if (address !== undefined) { const fn = () => { throw new APKError('ARM64 native functions are called through callNative', { kind: 'internal' }); }; fn.address = address; return fn; } } return undefined; } }),
     memory: { get buffer() { return mem.u8.buffer; } },
@@ -42,7 +44,7 @@ export function attachArm64Jni(process, bridge) {
       });
       if (fp.length > 8) throw new APKError('ARM64 JNI: more than 8 floating-point arguments (stack-passed FP arguments are not implemented)', { kind: 'arm64-unsupported' });
       const result = method.result;
-      const raw = process.call(address, gp, { floats: fp, returns: result === 'D' ? 'd' : result === 'F' ? 's' : 'x' });
+      const raw = process.threads.asJavaThread(bridge.runtime.thread, () => process.call(address, gp, { floats: fp, returns: result === 'D' ? 'd' : result === 'F' ? 's' : 'x' }));   // as the calling Java thread's native thread
       if (result === 'J') return BigInt.asIntN(64, raw);
       if (result === 'D' || result === 'F') return raw;
       if (result === 'V') return undefined;
@@ -57,6 +59,7 @@ export function attachArm64Jni(process, bridge) {
     if (name === 'reserved') { mem.writePtr(table + 8 * index, 0); return; }
     const handler = handlers[name], ints = INT32.get(name) ?? [];
     const entry = process.hostEntry(`jni:${name}`, (p, cpu) => {
+      recentJni[recentAt++ & 15] = name;   // the last JNI functions native code called, for exception reports
       if (!handler) throw new APKError(`ARM64 native code called JNI ${name}, which the JNI bridge does not implement`, { kind: 'jni-unsupported', function: name });
       const args = []; let gpi = 0, fpi = 0;
       const variadicCall = VARIADIC.test(name), vaListCall = VA_LIST.test(name), fixed = variadicCall || vaListCall ? params.length - 1 : params.length;
@@ -66,7 +69,7 @@ export function attachArm64Jni(process, bridge) {
         else if (t === 'i64') args.push(BigInt.asIntN(64, cpu.x[gpi++]));
         else { const raw = cpu.x[gpi++]; args.push(ints.includes(i) ? Number(BigInt.asIntN(32, raw)) : Number(raw)); }
       }
-      const run = () => bridge.guardJni(name, () => handler(...args));   // a Java exception from a callback is the pending exception; the native code continues, as on ART
+      const run = () => bridge.guardJni(name, () => handler(...args), lib);   // a Java exception from a callback is the pending exception; the native code continues, as on ART
       if (variadicCall || vaListCall) { const token = 0x7d0000000000 + nextToken++; tokens.set(token, variadicCall ? variadic(cpu, gpi, fpi) : vaList(mem, Number(cpu.x[gpi]))); args.push(token); try { return wrap(result, run()); } finally { tokens.delete(token); } }
       return wrap(result, run());
     });
@@ -85,7 +88,7 @@ export function attachArm64Jni(process, bridge) {
     (p, cpu) => { if (cpu.x[1]) mem.writePtr(Number(cpu.x[1]), envPtr); return JNI_OK; }];
   vmFns.forEach((fn, i) => mem.writePtr(vmTable + 8 * i, fn ? process.hostEntry(`jnivm:${i}`, fn) : 0));
   mem.writePtr(vmPtr, vmTable);
-  Object.assign(lib, { envPtr, vmPtr, directWindow: ARM64_WINDOW });   // direct ByteBuffers over this memory carry ARM64_WINDOW + address (src/unsafe-native.js)
+  Object.assign(lib, { envPtr, vmPtr, directWindow: ARM64_WINDOW, recentCalls, caller: () => process.activeCpu.where(Number(process.activeCpu.x[30])) });   // direct ByteBuffers over this memory carry ARM64_WINDOW + address (src/unsafe-native.js)
   registerArm64Memory(bridge.runtime, lib.memory);
   return lib;
 }

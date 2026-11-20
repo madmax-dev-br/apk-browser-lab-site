@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=f90be5f5e9be';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=f90be5f5e9be';
-import { networkOf } from './network-native.js?v=f90be5f5e9be';
+import { floatBits } from './host-contract.js?v=fef4a080c36e';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=fef4a080c36e';
+import { networkOf } from './network-native.js?v=fef4a080c36e';
 
 // Storage-related system services over the app's virtual filesystem and the lab's network bridge (android-13.0.0_r1 StorageManager, StorageStatsManager, DownloadManager,
 // NetworkStatsManager). The device has one 8 GiB volume (the numbers StatFs reports); downloads are real HTTP(S) exchanges made through the network bridge under the device's
@@ -85,6 +85,11 @@ export function createStorageServicesHost(platform) {
   for (const signature of ['(ILjava/lang/String;JJ)Landroid/app/usage/NetworkStats$Bucket;', '(ILjava/lang/String;JJ)Landroid/app/usage/NetworkStats;', '(ILjava/lang/String;JJI)Landroid/app/usage/NetworkStats;', '(ILjava/lang/String;JJI)Landroid/app/usage/NetworkStats$Bucket;']) {
     for (const name of ['querySummaryForDevice', 'querySummaryForUser', 'querySummary', 'queryDetailsForUid', 'queryDetails']) def(NETSTATS, name, signature, r => deniedStats(r));
   }
+  // NetworkStats.Bucket: a plain value class (public constructor); a new bucket's fields are 0 until a query fills one, which no query here does (they need the app op)
+  const BUCKET = 'Landroid/app/usage/NetworkStats$Bucket;';
+  type(BUCKET, OBJECT, [], { allocatable: true }); def(BUCKET, '<init>', '()V', () => {});
+  for (const name of ['getUid', 'getTag', 'getState', 'getMetered', 'getRoaming', 'getDefaultNetworkStatus']) def(BUCKET, name, '()I', () => 0);
+  for (const name of ['getStartTimeStamp', 'getEndTimeStamp', 'getRxBytes', 'getRxPackets', 'getTxBytes', 'getTxPackets']) def(BUCKET, name, '()J', () => 0n);
   def(NETSTATS, 'registerUsageCallback', '(ILjava/lang/String;JLandroid/app/usage/NetworkStatsManager$UsageCallback;)V', r => deniedStats(r));
   def(NETSTATS, 'unregisterUsageCallback', '(Landroid/app/usage/NetworkStatsManager$UsageCallback;)V', (r, _m, [, callback]) => { if (nullish(callback)) npe(r); });
 

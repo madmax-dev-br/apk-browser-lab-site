@@ -2,11 +2,11 @@
 // loads from its own lib/arm64-v8a/ directory (mapped and relocated by src/arm64/elf.js), and the system libraries Android provides (libc, libm, libdl, liblog,
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: libraries and mmap regions grow from 0x01000000, the heap is malloc's own region, the main
 // thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=f90be5f5e9be';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=f90be5f5e9be';
-import { Arm64Memory } from './memory.js?v=f90be5f5e9be';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=f90be5f5e9be';
-import { NativeThreads } from './threads.js?v=f90be5f5e9be';
+import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=fef4a080c36e';
+import { Arm64Memory } from './memory.js?v=fef4a080c36e';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=fef4a080c36e';
+import { NativeThreads } from './threads.js?v=fef4a080c36e';
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
@@ -40,8 +40,7 @@ export class Arm64Process {
   // ---- address space
   mapRegion(size, align = 0x1000) {
     let at = Math.ceil(this.nextMap / align) * align; const end = at + Math.ceil(size / 0x1000) * 0x1000;
-    this.memory.ensure(end + 0x10000); this.nextMap = end;
-    this.memory.fill(at, 0, end - at);
+    this.memory.ensure(end + 0x10000); this.nextMap = end;   // the address space only grows: a new region was never written, so it is already zero (and untouched pages stay unbacked)
     return at;
   }
   // malloc: size-class free lists over regions taken from the address space; 16-byte aligned, a 16-byte header holds the size

@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=f90be5f5e9be';
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { installViewXmlAttributes } from './view-xml-attributes.js?v=f90be5f5e9be';
-import { installTextViewXmlAttributes } from './textview-xml-attributes.js?v=f90be5f5e9be';
+import { createHostRegistry } from './host-contract.js?v=fef4a080c36e';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { installViewXmlAttributes } from './view-xml-attributes.js?v=fef4a080c36e';
+import { installTextViewXmlAttributes } from './textview-xml-attributes.js?v=fef4a080c36e';
 
 // Hidden (non-SDK) View / ViewGroup members of android-13.0.0_r1 that the original list widgets (AdapterView, AbsListView, ListView, FastScroller, CheckedTextView; compiled in the layouts
 // profile against framework-aosp/compile-contracts/list-widgets.txt) call on the lab's View model. Each has the semantics of View.java / ViewGroup.java for the virtual device: no

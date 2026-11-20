@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=f90be5f5e9be';
-import { Blocked } from './scheduler.js?v=f90be5f5e9be';
-import { gcRoot } from './heap-gc.js?v=f90be5f5e9be';
+import { createHostRegistry } from './host-contract.js?v=fef4a080c36e';
+import { Blocked } from './scheduler.js?v=fef4a080c36e';
+import { gcRoot } from './heap-gc.js?v=fef4a080c36e';
 
 // AccountManager's requests that go through an account authenticator (android.accounts.AccountManager / AccountManagerService, android-13.0.0_r1): addAccount, getAuthToken,
 // getAuthTokenByFeatures, confirmCredentials, updateCredentials, editProperties, hasFeatures, getAccountsByTypeAndFeatures, removeAccount, isCredentialsUpdateSuggested and

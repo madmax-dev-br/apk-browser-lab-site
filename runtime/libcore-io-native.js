@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { throwNew } from './java-throw.js?v=f90be5f5e9be';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=f90be5f5e9be';
-import { networkOf, isIpLiteral } from './network-native.js?v=f90be5f5e9be';
-import { Blocked } from './scheduler.js?v=f90be5f5e9be';
-import { installUdp } from './udp-native.js?v=f90be5f5e9be';
-import { createLoopback } from './loopback-socket.js?v=f90be5f5e9be';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=f90be5f5e9be';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=f90be5f5e9be';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { throwNew } from './java-throw.js?v=fef4a080c36e';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=fef4a080c36e';
+import { networkOf, isIpLiteral } from './network-native.js?v=fef4a080c36e';
+import { Blocked } from './scheduler.js?v=fef4a080c36e';
+import { installUdp } from './udp-native.js?v=fef4a080c36e';
+import { createLoopback } from './loopback-socket.js?v=fef4a080c36e';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=fef4a080c36e';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=fef4a080c36e';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -474,12 +474,14 @@ export function createLibcoreIoNativeBindings() {
     const desc = entryOf(runtime, 'posix_fallocate', fdRef).desc; if (desc.kind !== 'file' || !writable(desc)) err(runtime, 'posix_fallocate', 'EBADF');
     const end = Number(offset + length); if (end > desc.node.size) files(runtime).writeAt(desc.node, end, new Uint8Array(0), 0, 0);
   });
+  // a descriptor of the ARM64 native process handed to Java (ParcelFileDescriptor.adoptFd of a native pipe or socket): fdsan tags it like any of the process's descriptors
+  const nativeDesc = (runtime, fdRef) => { const number = fdNumber(runtime, fdRef); if (state(runtime).table.has(number) || !runtime.nativeOwnsFd?.(number)) return null; const tags = (runtime.nativeFdTags ??= new Map()); if (!tags.has(number)) tags.set(number, { ownerTag: 0n }); return tags.get(number); };
   L('android_fdsan_exchange_owner_tag(Ljava/io/FileDescriptor;JJ)V', (runtime, [, fdRef, previous, next]) => {
-    const desc = entryOf(runtime, 'android_fdsan_exchange_owner_tag', fdRef).desc;
+    const desc = nativeDesc(runtime, fdRef) ?? entryOf(runtime, 'android_fdsan_exchange_owner_tag', fdRef).desc;
     if (desc.ownerTag !== previous) runtime.record(`LOG E libc: fdsan: failed to exchange ownership of file descriptor: fd ${fdNumber(runtime, fdRef)} is owned by 0x${desc.ownerTag.toString(16)}, was expected to be 0x${previous.toString(16)}`);
     desc.ownerTag = next;
   });
-  L('android_fdsan_get_owner_tag(Ljava/io/FileDescriptor;)J', (runtime, [, fdRef]) => entryOf(runtime, 'android_fdsan_get_owner_tag', fdRef).desc.ownerTag);
+  L('android_fdsan_get_owner_tag(Ljava/io/FileDescriptor;)J', (runtime, [, fdRef]) => (nativeDesc(runtime, fdRef) ?? entryOf(runtime, 'android_fdsan_get_owner_tag', fdRef).desc).ownerTag);
 
   // ---- paths
   L('access(Ljava/lang/String;I)Z', (runtime, [, path, mode]) => {
@@ -559,6 +561,9 @@ export function createLibcoreIoNativeBindings() {
   const fileOf = (runtime, file) => runtime.stringCharacters(runtime.object(file).fields.get(`${FILE}->path:${STRING}`));
   const find = (runtime, path) => lookup(files(runtime), path);
   add(UFS, 'initIDs()V', () => undefined);
+  // getSpace0 (File.getTotalSpace / getFreeSpace / getUsableSpace): statvfs of the one emulated data volume that android.os.StatFs reports (src/java-io-host.js: 2097152
+  // blocks of 4 KiB, 1468006 free and available); a path that does not exist is 0, as UnixFileSystem_md.c answers a failed statvfs
+  add(UFS, 'getSpace0(Ljava/io/File;I)J', (runtime, [, file, kind]) => { const { node } = find(runtime, fileOf(runtime, file)); if (!node) return 0n; return 4096n * (kind === 0 ? 2097152n : 1468006n); });
   add(UFS, 'canonicalize0(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => files(runtime).canonical(requireString(runtime, path)));
   add(UFS, 'getBooleanAttributes0(Ljava/lang/String;)I', (runtime, [, path]) => { const { node } = find(runtime, requireString(runtime, path)); return node ? BA_EXISTS | (node.type === 'dir' ? BA_DIRECTORY : BA_REGULAR) : 0; });
   add(UFS, 'getLastModifiedTime0(Ljava/io/File;)J', (runtime, [, file]) => { const { node } = find(runtime, fileOf(runtime, file)); return node ? BigInt(Math.trunc(node.mtime)) : 0n; });

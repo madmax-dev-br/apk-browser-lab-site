@@ -1,33 +1,31 @@
-import { createArm64Native } from './arm64/glue.js?v=f90be5f5e9be';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=f90be5f5e9be';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=f90be5f5e9be';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=f90be5f5e9be';
-import { inspectELF } from './native-inspector.js?v=f90be5f5e9be';
-import { elfBuildId } from './elf-build-id.js?v=f90be5f5e9be';
-import { inflateRaw } from './inflate.js?v=f90be5f5e9be';
-import { crc32, inflateEntry } from './zip-entry.js?v=f90be5f5e9be';
-import { resolveDevice } from './device-profile.js?v=f90be5f5e9be';
-import { resourceProfileFor } from './device-configuration.js?v=f90be5f5e9be';
-import { JniBridge } from './jni-host.js?v=f90be5f5e9be';
-import { providerForApk } from './native-provider-variants.js?v=f90be5f5e9be';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=f90be5f5e9be';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=f90be5f5e9be';
-import { AndroidResources } from './android-resources.js?v=f90be5f5e9be';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=f90be5f5e9be';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=f90be5f5e9be';
-import { FrameworkProvider } from './framework-provider.js?v=f90be5f5e9be';
+import { createArm64Native } from './arm64/glue.js?v=fef4a080c36e';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=fef4a080c36e';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=fef4a080c36e';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=fef4a080c36e';
+import { inspectELF } from './native-inspector.js?v=fef4a080c36e';
+import { elfBuildId } from './elf-build-id.js?v=fef4a080c36e';
+import { crc32 } from './zip-entry.js?v=fef4a080c36e';
+import { resolveDevice } from './device-profile.js?v=fef4a080c36e';
+import { resourceProfileFor } from './device-configuration.js?v=fef4a080c36e';
+import { JniBridge } from './jni-host.js?v=fef4a080c36e';
+import { providerForApk } from './native-provider-variants.js?v=fef4a080c36e';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=fef4a080c36e';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=fef4a080c36e';
+import { AndroidResources } from './android-resources.js?v=fef4a080c36e';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=fef4a080c36e';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=fef4a080c36e';
+import { FrameworkProvider } from './framework-provider.js?v=fef4a080c36e';
+import { APKArchive } from './apk-archive.js?v=fef4a080c36e';
+export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
-const MAX_APK = 1024 * 1024 * 1024;
 const MAX_DEX = 64 * 1024 * 1024;
 // Android sets no combined DEX limit. Parsed DEX takes about 5x its size in JS heap
 // (22 MB of DEX -> ~115 MB), so this keeps the parse within a desktop tab's heap.
 export const MAX_DEX_TOTAL = 768 * 1024 * 1024;
 // ART has no fixed multidex count; this only bounds memory for hostile archives.
 const MAX_DEX_FILES = 1024;
-// The ZIP end record counts entries in 16 bits; this accepts every non-ZIP64 APK.
-const MAX_ZIP_ENTRIES = 65535;
 // CRC-32 and the deflate-raw expansion of an entry live in src/zip-entry.js, shared with the helper Workers that expand DEX files in parallel (src/zip-inflate-pool.js).
 export { crc32 };
 
@@ -42,124 +40,6 @@ async function frameworkBytesHash(files) {
   return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(value => value.toString(16).padStart(2, '0')).join('');
 }
 
-/** Central-directory ZIP reader. Entries are expanded on demand with explicit bounds. */
-export class APKArchive {
-  constructor(input) {
-    const b = this.reader = new BinaryReader(input);
-    if (b.length < 22 || b.length > MAX_APK) fail('Invalid APK size: expected a ZIP from 22 bytes to 1 GiB');
-    let end = -1;
-    for (let p = b.length - 22; p >= Math.max(0, b.length - 65557); p--)
-      if (b.u32(p) === 0x06054b50 && p + 22 + b.u16(p + 20) === b.length) { end = p; break; }
-    if (end < 0) fail('Invalid APK: ZIP central directory not found');
-    const count = b.u16(end + 10), directorySize = b.u32(end + 12), start = b.u32(end + 16);
-    if (b.u16(end + 4) || b.u16(end + 6) || b.u16(end + 8) !== count || !count || count > MAX_ZIP_ENTRIES || start + directorySize > end)
-      fail('Unsupported APK ZIP layout: ZIP64, multiple volumes or excessive entries');
-    this.entries = new Map(); this.centralDirectoryOffset = start;
-    let p = start, filenameBytes = 0;
-    for (let i = 0; i < count; i++) {
-      if (b.u32(p) !== 0x02014b50) fail('Malformed APK central directory entry');
-      const flags = b.u16(p + 8), method = b.u16(p + 10), crc = b.u32(p + 16), compressed = b.u32(p + 20), size = b.u32(p + 24);
-      const nameSize = b.u16(p + 28), extra = b.u16(p + 30), comment = b.u16(p + 32), offset = b.u32(p + 42);
-      filenameBytes += nameSize;
-      if (!nameSize || nameSize > 4096 || filenameBytes > 8 * 1024 * 1024) fail('APK ZIP filenames exceed bounds');
-      const name = utf8.decode(b.slice(p + 46, nameSize));
-      if (this.entries.has(name)) fail(`Duplicate APK ZIP entry: ${name}`);
-      if (compressed === 0xffffffff || size === 0xffffffff || offset === 0xffffffff) fail('ZIP64 APK entries are unsupported');
-      this.entries.set(name, { name, flags, method, crc, compressed, size, offset });
-      p += 46 + nameSize + extra + comment;
-      if (p > start + directorySize || p > end) fail('Malformed APK central directory size');
-    }
-    if (p !== start + directorySize) fail('Malformed APK central directory length');
-    this.directoryStart = start;
-    // The prepared file (.apklab: the APK's entries stored decompressed under apk/) was withdrawn: it saved about 0.1 s of a load, weighed up to 2.5 times the APK and
-    // gave the app a different base.apk. It is refused by name instead of failing as a damaged APK.
-    if (this.entries.has('apklab.json') && !this.entries.has('AndroidManifest.xml')) fail('Prepared files (.apklab) are no longer accepted: open the original APK.');
-  }
-  payload(name) {
-    const e = this.entries.get(name), b = this.reader;
-    if (!e) fail(`APK is missing ${name}`);
-    if (e.flags & 1) fail(`Encrypted APK entry is unsupported: ${name}`);
-    if (![0, 8].includes(e.method)) fail(`Unsupported ZIP compression ${e.method}: ${name}`);
-    if (b.u32(e.offset) !== 0x04034b50 || b.u16(e.offset + 8) !== e.method || (b.u16(e.offset + 6) & 1))
-      fail(`Malformed APK local entry: ${name}`);
-    const nameSize = b.u16(e.offset + 26), extra = b.u16(e.offset + 28);
-    if (utf8.decode(b.slice(e.offset + 30, nameSize)) !== name) fail(`APK local filename mismatch: ${name}`);
-    const start = e.offset + 30 + nameSize + extra;
-    if (start + e.compressed > this.directoryStart) fail(`APK entry overlaps central directory: ${name}`);
-    return { entry: e, compressed: b.slice(start, e.compressed), start };
-  }
-  /** Where an entry's data sits in the archive file: { stored, start, length }. A stored (uncompressed) entry can be read in place, which is what a file descriptor over it needs (AssetManager.openFd). */
-  entryRange(name) { const { entry, start } = this.payload(name); return { stored: entry.method === 0, start, length: entry.compressed }; }
-  /** Synchronous variant for the run-time VM (Class.getResource, AssetManager.open): same bounds and CRC checks as extract(). */
-  /** Bounded read for load-time inspection (profile selection): the same checks as extractSync, not counted as resource preparation. */
-  inspectSync(name, limit) { return this.readEntrySync(name, limit); }
-  extractSync(name, limit) { return this.readEntrySync(name, limit); }
-  readEntrySync(name, limit) {
-    const e = this.entries.get(name);
-    if (!e) fail(`APK is missing ${name}`);
-    if (!Number.isSafeInteger(limit) || limit < 0) fail('APK extraction requires a nonnegative byte limit');
-    if (e.size > limit) fail(`${name} exceeds ${Math.round(limit / 1024 / 1024)} MiB limit`);
-    const { compressed } = this.payload(name);
-    let data;
-    if (e.method === 0) data = compressed.slice();
-    else { try { data = inflateRaw(compressed, e.size); } catch (error) { fail(`Unable to decompress ${name}: ${error.message}`); } }
-    if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
-    return data;
-  }
-  /** Starts expanding `names` (deflated entries within `limit`) in the helper Workers of `pool` (src/zip-inflate-pool.js); extract() then takes the result instead of expanding
-   *  on this thread. Nothing is checked or reported here: extract() does every check, and an entry whose helper failed is expanded again by extract() itself. */
-  prefetch(names, limit, pool) {
-    if (!pool) return;
-    this.prefetched ??= new Map();
-    for (const name of names) {
-      const e = this.entries.get(name);
-      if (!e || e.method !== 8 || !Number.isSafeInteger(limit) || e.size > limit || this.prefetched.has(name)) continue;
-      let compressed; try { ({ compressed } = this.payload(name)); } catch { continue; }   // a malformed entry fails in extract(), with its own message
-      this.prefetched.set(name, { limit, job: pool.inflate({ compressed, name, size: e.size, limit }).catch(() => null) });
-    }
-  }
-  async extract(name, limit) {
-    const e = this.entries.get(name);
-    if (!Number.isSafeInteger(limit) || limit < 0) fail('APK extraction requires a nonnegative byte limit');
-    if (e?.size > limit) fail(`${name} exceeds ${Math.round(limit / 1024 / 1024)} MiB limit`);
-    const { compressed } = this.payload(name);
-    let data, crc = null;
-    if (e.method === 0) data = compressed.slice();
-    else {
-      const ahead = this.prefetched?.get(name); if (ahead) this.prefetched.delete(name);
-      const done = ahead && ahead.limit === limit ? await ahead.job : null;   // a helper's result, or null: expand here (a helper error is reproduced with this thread's message)
-      if (done) { data = done.bytes; crc = done.crc; }
-      else data = await inflateEntry(compressed, { name, size: e.size, limit });
-    }
-    if (data.length !== e.size || (crc ?? crc32(data)) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
-    return data;
-  }
-  /** Header-only probe: bounded output, deliberately does not claim full-entry CRC validation. */
-  async extractPrefix(name, limit = 64) {
-    if (!Number.isSafeInteger(limit) || limit < 0 || limit > 65536) fail('APK prefix probe limit must be 0–65536 bytes');
-    const { entry, compressed } = this.payload(name);
-    if (entry.method === 0) return compressed.subarray(0, Math.min(limit, entry.size));
-    if (typeof DecompressionStream !== 'function') fail('Header probe requires deflate-raw decompression');
-    let cursor = 0;
-    const stream = new ReadableStream({ pull(controller) {
-      if (cursor >= compressed.length) { controller.close(); return; }
-      const end = Math.min(cursor + 1024, compressed.length);
-      controller.enqueue(compressed.subarray(cursor, end)); cursor = end;
-    } });
-    const reader = stream.pipeThrough(new DecompressionStream('deflate-raw')).getReader();
-    const result = new Uint8Array(Math.min(limit, entry.size));
-    let length = 0;
-    try {
-      while (length < result.length) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        const amount = Math.min(value.length, result.length - length);
-        result.set(value.subarray(0, amount), length); length += amount;
-      }
-    } finally { await reader.cancel(); }
-    return result.subarray(0, length);
-  }
-}
 
 /** Reads binary Android XML launcher declarations; no Android process or remote service. */
 // AOSP frameworks/base/core/res/res/values/public-final.xml (api 1-34) ids for the AndroidManifest attributes this loader reads.
@@ -277,10 +157,11 @@ export function parseManifest(data) {
       if (name === 'activity' || name === 'activity-alias') {
         const rawName = name === 'activity-alias' ? attrs.targetActivity : attrs.name;
         if (typeof packageName !== 'string' || typeof rawName !== 'string') fail('Manifest activity/package name is missing');
-        node.activity = { ...attrs, name: resolveName(rawName), launcher: false };
+        node.activity = { ...attrs, name: resolveName(rawName), launcher: false, ...(name === 'activity-alias' && typeof attrs.name === 'string' ? { alias: resolveName(attrs.name) } : {}) };
         node.component = { metaData: [] }; node.activity.metaData = node.component.metaData;   // an activity's <meta-data> belongs to the activity, not to <application>
         if (typeof attrs.parentActivityName === 'string') node.activity.parentActivityName = resolveName(attrs.parentActivityName);
         activities.push(node.activity);
+        if (name === 'activity-alias' && typeof attrs.name === 'string') componentDetails.push({ kind: 'activity-alias', name: resolveName(attrs.name), targetActivity: resolveName(rawName), exported: attrs.exported, enabled: attrs.enabled });   // the alias is a component of its own (PackageManager answers for its name)
       }
       const owner = [...stack].reverse().find(n => n.activity)?.activity;
       if (name === 'intent-filter' && owner) {
@@ -312,7 +193,7 @@ export function parseManifest(data) {
       const node = stack.pop();
       if (node.name !== str(b.u32(p + 20))) fail('Mismatched AXML closing element');
       // a disabled <activity>/<activity-alias> (android:enabled="false") is not resolved by PackageManager, so its MAIN/LAUNCHER filter does not make a launcher entry
-      if (node.filter?.main && node.filter.launcher && !(node.filter.activity.enabled === false || node.filter.activity.enabled === 0 || node.filter.activity.enabled === 'false')) node.filter.activity.launcher = true;
+      if (node.filter?.main && node.filter.launcher && !(node.filter.activity.enabled === false || node.filter.activity.enabled === 0 || node.filter.activity.enabled === 'false')) { node.filter.activity.launcher = true; node.filter.activity.launcherComponent = node.filter.activity.alias ?? node.filter.activity.name; }
       if (node.filter?.view && node.filter.browsable && node.filter.autoVerify && node.filter.schemes.some(scheme => scheme === 'http' || scheme === 'https')) for (const host of node.filter.hosts) autoVerifyHosts.add(host);   // the domains DomainVerificationManager reports for this package
     }
     p += size;
@@ -320,13 +201,13 @@ export function parseManifest(data) {
   if (!strings || stack.length || typeof packageName !== 'string') fail('Incomplete AndroidManifest.xml');
   const deduplicated = new Map();
   for (const a of activities) {
-    if (deduplicated.has(a.name)) { const kept = deduplicated.get(a.name); kept.launcher ||= a.launcher; if (a.filters?.length) (kept.filters ??= []).push(...a.filters); }
+    if (deduplicated.has(a.name)) { const kept = deduplicated.get(a.name); kept.launcher ||= a.launcher; kept.launcherComponent ??= a.launcherComponent; if (a.filters?.length) (kept.filters ??= []).push(...a.filters); }
     else deduplicated.set(a.name, { ...a, descriptor: `L${a.name.replaceAll('.', '/')};` });
   }
   const launchers = [...deduplicated.values()].filter(a => a.launcher);
   return { packageName, applicationName, application, usesSdk, usesPermissions, declaredPermissions, usesLibraries, queries, activities: [...deduplicated.values()], services, providers, receivers, providerDetails, componentDetails, manifestAttrs, autoVerifyHosts: [...autoVerifyHosts],
     componentCounts: { activities: deduplicated.size, services: services.length, providers: providers.length, receivers: receivers.length },
-    launcherActivity: launchers.length === 1 ? launchers[0].name : null };
+    launcherActivity: launchers.length === 1 ? launchers[0].name : null, launcherComponent: launchers.length === 1 ? launchers[0].launcherComponent ?? launchers[0].name : null };
 }
 
 export async function prepareResources(archive, names, options, report, yieldControl, warnings) {
@@ -785,6 +666,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // the original media session data classes (framework-aosp/profiles/media): referenced by the APK
   const MEDIA_TYPES=new Set(['Landroid/media/session/PlaybackState;','Landroid/media/session/PlaybackState$Builder;','Landroid/media/session/PlaybackState$CustomAction;','Landroid/media/MediaMetadata;','Landroid/media/MediaMetadata$Builder;','Landroid/media/MediaDescription;','Landroid/media/MediaDescription$Builder;','Landroid/media/Rating;']);
   const usesMedia=files.some(file=>file.dex.types.some(type=>MEDIA_TYPES.has(type)));
+  // the org.apache.http classes of framework.jar (framework-aosp/profiles/apache-boot): referenced by the APK, or under the legacy apache-http profile
+  const BOOT_HTTP=/^Lorg\/apache\/http\/(conn\/(ssl|scheme)\/|params\/(CoreConnectionPNames|HttpConnectionParams|HttpParams);|conn\/ConnectTimeoutException;)/;
+  const appUsesBootHttp=files.some(file=>file.dex.types.some(type=>BOOT_HTTP.test(type)));
   const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
   // the original account authenticator classes (framework-aosp/profiles/accounts): referenced by the APK (an app that is an account authenticator), or possibly by a companion package
   // (microG's authenticator and its login and consent screens)
@@ -797,6 +681,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:appUsesConfiguration?'APK-references-android.content.res.Configuration':'companion-package-installed'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
     {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
+    {name:'apache-boot',explicit:options.enableApacheBootProfile,automatic:appUsesBootHttp||(options.enableApacheHttpProfile===true||(options.enableApacheHttpProfile!==false&&usesApacheHttp)),reason:appUsesBootHttp?'APK-references-boot-org.apache.http':'apache-http-profile-loaded'},
     {name:'media',explicit:options.enableMediaProfile,automatic:usesMedia,reason:'APK-references-android.media.session.PlaybackState-or-MediaMetadata'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
@@ -922,6 +807,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,
       applicationName: manifest.applicationName, packageName: manifest.packageName, manifest, apkBytes: arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer) }) });
+  runtime.launcherComponent = manifest.launcherComponent ?? null;   // the component the LAUNCHER filter is on: an <activity-alias> when the launcher entry is one (the launched instance's ActivityRecord component)
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
   runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed

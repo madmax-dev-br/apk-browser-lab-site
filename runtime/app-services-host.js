@@ -1,10 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=f90be5f5e9be';
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { registerPackageValueFields } from './package-value-fields.js?v=f90be5f5e9be';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=f90be5f5e9be';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=f90be5f5e9be';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=f90be5f5e9be';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=f90be5f5e9be';
+import { resolveIntentFields } from './intent-resolver.js?v=fef4a080c36e';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { registerPackageValueFields } from './package-value-fields.js?v=fef4a080c36e';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=fef4a080c36e';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=fef4a080c36e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=fef4a080c36e';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=fef4a080c36e';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -949,18 +949,18 @@ export function createAppServicesHost(platform) {
   // getXInfo(...).enabled and Intent resolution of disabled components are not re-derived from it yet (components are never resolved by Intent in this VM).
   const COMPONENT_STATES = new Map();
   const componentKey = (r, component) => { const c = r.object(component); return `${c.packageName}/${c.className}`; };
-  const KNOWN_KINDS = new Set(['activity', 'service', 'receiver', 'provider']);
+  const KNOWN_KINDS = new Set(['activity', 'activity-alias', 'service', 'receiver', 'provider']);
   def(PACKAGE_MANAGER, 'setComponentEnabledSetting', '(Landroid/content/ComponentName;II)V', (r, _m, [, component, state, flags]) => {
     if (component === null || component === 0) r.throwJava('Ljava/lang/NullPointerException;', 'componentName');
     if (![0, 1, 2, 3, 4].includes(state)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Invalid new component state: ' + state);
-    const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).includes(c.className);
+    const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).some(a => (a?.name ?? a) === c.className);
     if (c.packageName !== appPkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
     if (state === 0) COMPONENT_STATES.delete(componentKey(r, component)); else COMPONENT_STATES.set(componentKey(r, component), state);
     r.record(`PM setComponentEnabledSetting ${c.className} state=${state} flags=${flags}`);
   });
   def(PACKAGE_MANAGER, 'getComponentEnabledSetting', '(Landroid/content/ComponentName;)I', (r, _m, [, component]) => {
     if (component === null || component === 0) r.throwJava('Ljava/lang/NullPointerException;', 'componentName');
-    const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).includes(c.className);
+    const c = r.object(component), declared = (platform.manifest?.componentDetails ?? []).some(detail => KNOWN_KINDS.has(detail.kind) && detail.name === c.className) || (platform.manifest?.activities ?? []).some(a => (a?.name ?? a) === c.className);
     if (c.packageName !== appPkg() || !declared) r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown component: ComponentInfo{${c.packageName}/${c.className}}`);
     return COMPONENT_STATES.get(componentKey(r, component)) ?? 0;
   });

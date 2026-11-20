@@ -1,34 +1,36 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=f90be5f5e9be';
-import { VMClock } from './vm-clock.js?v=f90be5f5e9be';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=f90be5f5e9be';
-import { OperationMonitor } from './operation-monitor.js?v=f90be5f5e9be';
-import { ExecutionProfile } from './execution-profile.js?v=f90be5f5e9be';
-import { SamplingProfiler } from './sampling-profiler.js?v=f90be5f5e9be';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=f90be5f5e9be';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=f90be5f5e9be';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=f90be5f5e9be';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=f90be5f5e9be';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=f90be5f5e9be';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=f90be5f5e9be';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=f90be5f5e9be';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=f90be5f5e9be';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=f90be5f5e9be';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=f90be5f5e9be';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=f90be5f5e9be';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=f90be5f5e9be';
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=f90be5f5e9be';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=f90be5f5e9be';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=f90be5f5e9be';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=f90be5f5e9be';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=f90be5f5e9be';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=f90be5f5e9be';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=f90be5f5e9be';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=f90be5f5e9be';
+import STATIC_SHIMS from './shim-static-methods.js?v=fef4a080c36e';
+import { VMClock } from './vm-clock.js?v=fef4a080c36e';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=fef4a080c36e';
+import { OperationMonitor } from './operation-monitor.js?v=fef4a080c36e';
+import { ExecutionProfile } from './execution-profile.js?v=fef4a080c36e';
+import { SamplingProfiler } from './sampling-profiler.js?v=fef4a080c36e';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=fef4a080c36e';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=fef4a080c36e';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=fef4a080c36e';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=fef4a080c36e';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=fef4a080c36e';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=fef4a080c36e';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=fef4a080c36e';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=fef4a080c36e';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=fef4a080c36e';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=fef4a080c36e';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=fef4a080c36e';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=fef4a080c36e';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=fef4a080c36e';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=fef4a080c36e';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=fef4a080c36e';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=fef4a080c36e';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=fef4a080c36e';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=fef4a080c36e';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=fef4a080c36e';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=fef4a080c36e';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=f90be5f5e9be';
-import { bootClassLacksMember } from './boot-class-members.js?v=f90be5f5e9be';
-export { APKError } from './apk-error.js?v=f90be5f5e9be';
+import { Scheduler, Blocked } from './scheduler.js?v=fef4a080c36e';
+import { bootClassLacksMember } from './boot-class-members.js?v=fef4a080c36e';
+export { APKError } from './apk-error.js?v=fef4a080c36e';
+import { BinaryReader } from './binary-reader.js?v=fef4a080c36e';
+export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -39,42 +41,6 @@ export class JavaException extends APKError {
   constructor(value, message, details = null) { super(message, details); this.name = 'JavaException'; this.value = value; }
 }
 
-export class BinaryReader {
-  constructor(input) {
-    this.bytes = input instanceof Uint8Array ? input : new Uint8Array(input);
-    this.view = new DataView(this.bytes.buffer, this.bytes.byteOffset, this.bytes.byteLength);
-    this.length = this.bytes.length;
-  }
-  check(offset, size = 1) {
-    if (!Number.isSafeInteger(offset) || !Number.isSafeInteger(size) || offset < 0 || size < 0 || offset > this.length - size)
-      fail(`Malformed input: range ${offset}+${size} exceeds ${this.length}`);
-  }
-  u8(p) { this.check(p); return this.view.getUint8(p); }
-  u16(p) { this.check(p, 2); return this.view.getUint16(p, true); }
-  u32(p) { this.check(p, 4); return this.view.getUint32(p, true); }
-  slice(p, n) { this.check(p, n); return this.bytes.subarray(p, p + n); }
-  // The table must fit in the file; ART has no separate entry-count cap.
-  table(n, p, width) { this.check(p, n * width); }
-  uleb(cursor) {
-    let value = 0;
-    for (let shift = 0; shift <= 28; shift += 7) {
-      const b = this.u8(cursor.p++);
-      if (shift === 28 && b > 15) fail('Malformed ULEB128');
-      value += (b & 127) * 2 ** shift;
-      if (!(b & 128)) return value;
-    }
-    fail('Malformed ULEB128');
-  }
-  sleb(cursor) {
-    let value = 0, shift = 0, byte;
-    do {
-      if (shift >= 35) fail('Malformed SLEB128');
-      byte = this.u8(cursor.p++); value |= (byte & 127) << shift; shift += 7;
-    } while (byte & 128);
-    if (shift < 32 && byte & 64) value |= -1 << shift;
-    return value | 0;
-  }
-}
 
 // Java chars to a JavaScript string. A typed run of 64 or more units goes through a UTF-16LE TextDecoder (about 17 times faster than String.fromCharCode over 8 KiB spreads: a
 // 1.6 MB asset read through a Reader appends ~200 such chunks to a StringBuilder): `fatal`, so a lone surrogate (which Java strings may hold and the decoder would replace with
@@ -730,7 +696,7 @@ addBridge('java/lang/String', ['split(Ljava/lang/String;I)[Ljava/lang/String;', 
 addBridge('java/lang/String', ['replace(CC)Ljava/lang/String;', 'replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;']);
 addBridge('java/lang/System', ['loadLibrary(Ljava/lang/String;)V', 'load(Ljava/lang/String;)V',
   'arraycopy(Ljava/lang/Object;ILjava/lang/Object;II)V', 'identityHashCode(Ljava/lang/Object;)I', 'currentTimeMillis()J', 'nanoTime()J']);
-addBridge('java/lang/Runtime', ['getRuntime()Ljava/lang/Runtime;', 'loadLibrary(Ljava/lang/String;)V', 'load(Ljava/lang/String;)V']);
+addBridge('java/lang/Runtime', ['getRuntime()Ljava/lang/Runtime;', 'loadLibrary(Ljava/lang/String;)V', 'load(Ljava/lang/String;)V', 'load(Ljava/lang/String;Ljava/lang/ClassLoader;)V', 'loadLibrary(Ljava/lang/String;Ljava/lang/ClassLoader;)V', 'load0(Ljava/lang/Class;Ljava/lang/String;)V', 'loadLibrary0(Ljava/lang/ClassLoader;Ljava/lang/String;)V', 'loadLibrary0(Ljava/lang/Class;Ljava/lang/String;)V']);
 addBridge('java/lang/Enum', ['<init>(Ljava/lang/String;I)V', 'name()Ljava/lang/String;', 'ordinal()I', 'toString()Ljava/lang/String;']);
 addBridge('java/lang/Enum', ['valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;', 'compareTo(Ljava/lang/Enum;)I', 'compareTo(Ljava/lang/Object;)I', 'getDeclaringClass()Ljava/lang/Class;']);
 addBridge('java/lang/Integer', ['valueOf(I)Ljava/lang/Integer;', 'intValue()I', 'parseInt(Ljava/lang/String;)I', 'parseInt(Ljava/lang/String;I)I']);
@@ -3373,10 +3339,13 @@ export class APKRuntime {
       if (name === 'loadClass') return this.resolveClass(args[1], false, args[0]);
       if (name === 'getParent') return null;
     }
-    if ((method.owner === 'Ljava/lang/System;' || method.owner === 'Ljava/lang/Runtime;') && ['load', 'loadLibrary'].includes(name))
+    if ((method.owner === 'Ljava/lang/System;' || method.owner === 'Ljava/lang/Runtime;') && ['load', 'loadLibrary'].includes(name.replace(/0$/, '')))
     {
       // System.load/loadLibrary (Runtime.nativeLoad): a null name is a NullPointerException before any loading; otherwise the request is reported verbatim.
-      const requested = args[staticCall ? 0 : 1];
+      // Runtime's hidden forms take the caller's class or class loader too: load(String, ClassLoader) / loadLibrary(String, ClassLoader) name first, load0(Class, String) /
+      // loadLibrary0(ClassLoader, String) name second; the loader does not change whose library it is here (the app's, as for System.load).
+      const zero = name.endsWith('0'); if (zero) name = name.slice(0, -1);
+      const requested = args[staticCall ? 0 : zero ? 2 : 1];
       if (isNull(requested)) this.throwJava('Ljava/lang/NullPointerException;', name === 'load' ? 'filename == null' : 'nativeLibraryName == null');
       const text = this.stringCharacters(requested);
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);

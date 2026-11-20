@@ -1,7 +1,7 @@
-import { floatBits } from './host-contract.js?v=f90be5f5e9be';
-import { gcRoot } from './heap-gc.js?v=f90be5f5e9be';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=f90be5f5e9be';
-import { createAccountStore } from './account-store.js?v=f90be5f5e9be';
+import { floatBits } from './host-contract.js?v=fef4a080c36e';
+import { gcRoot } from './heap-gc.js?v=fef4a080c36e';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=fef4a080c36e';
+import { createAccountStore } from './account-store.js?v=fef4a080c36e';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -66,10 +66,31 @@ export function createSystemManagersHost(platform) {
   const proxyMode = (r, opString, proxied) => { const mode = modeOf(r, opString, proxied), proxy = callerOf(r); return mode === ALLOWED && proxy && proxy !== proxied ? modeOf(r, opString, proxy) : mode; };
   for (const name of ['unsafeCheckOp', 'unsafeCheckOpRaw', 'unsafeCheckOpNoThrow', 'unsafeCheckOpRawNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op); return modeOf(r, o, checkPackage(r, id, packageName)); });
   for (const name of ['checkOp', 'checkOpNoThrow']) def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => { const o = opOf(r, op), mode = modeOf(r, o, checkPackage(r, id, packageName)); return name === 'checkOp' ? mustBeAllowed(r, mode, o, id) : mode; });
-  const note = (r, name, op, id, packageName) => { const o = opOf(r, op); verifyIncomingUid(r, id); const mode = modeOf(r, o, checkPackage(r, id, packageName)); return name === 'noteOp' ? mustBeAllowed(r, mode, o, id) : mode; };
+  // OnOpNotedCallback (API 30, data-access auditing): the app's own noteOp of an allowed op reaches onSelfNoted on the calling thread, as AppOpsManager.collectNotedOpForSelf does.
+  // The lab's system services do not note ops on the app's behalf, so onNoted / onAsyncNoted are not called.
+  const NOTED_CALLBACK = 'Landroid/app/AppOpsManager$OnOpNotedCallback;', SYNC_NOTED = 'Landroid/app/SyncNotedAppOp;';
+  type(NOTED_CALLBACK, OBJECT, [], { allocatable: true }); def(NOTED_CALLBACK, '<init>', '()V', () => {});
+  type(SYNC_NOTED, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true });
+  def(SYNC_NOTED, '<init>', `(II${STRING}${STRING})V`, (r, _m, [self, , opCode, tag]) => { r.object(self).syncNoted = { op: [...OPS.keys()][opCode] ?? null, tag }; });
+  def(SYNC_NOTED, 'getOp', `()${STRING}`, (r, _m, [self]) => r.object(self).syncNoted?.op ?? null);
+  def(SYNC_NOTED, 'getAttributionTag', `()${STRING}`, (r, _m, [self]) => r.object(self).syncNoted?.tag ?? null);
+  def(SYNC_NOTED, 'describeContents', '()I', () => 0);
+  let notedCallback = null;
+  def(APPOPS, 'setOnOpNotedCallback', `(Ljava/util/concurrent/Executor;${NOTED_CALLBACK})V`, (r, _m, [, executor, callback]) => {
+    if (nullish(callback)) { notedCallback = null; return; }
+    if (nullish(executor)) npe(r, 'asyncExecutor');
+    if (notedCallback) r.throwJava('Ljava/lang/IllegalStateException;', 'COLLECT_NOTED_APP_OPS callback already set');
+    notedCallback = { executor, callback };
+  });
+  const selfNoted = (r, opString, tag) => {
+    if (!notedCallback) return;
+    const op = r.allocate(SYNC_NOTED); r.object(op).syncNoted = { op: opString, tag: nullish(tag) ? null : tag };
+    call(r, notedCallback.callback, NOTED_CALLBACK, 'onSelfNoted', [SYNC_NOTED], 'V', [op]);
+  };
+  const note = (r, name, op, id, packageName, tag = null) => { const o = opOf(r, op); verifyIncomingUid(r, id); const mode = modeOf(r, o, checkPackage(r, id, packageName)); if (name === 'noteOp') mustBeAllowed(r, mode, o, id); if (mode === ALLOWED && id === uid()) selfNoted(r, o, tag); return mode; };
   for (const name of ['noteOp', 'noteOpNoThrow']) {
     def(APPOPS, name, `(${STRING}I${STRING})I`, (r, _m, [, op, id, packageName]) => note(r, name, op, id, packageName));
-    def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName]) => note(r, name, op, id, packageName));
+    def(APPOPS, name, `(${STRING}I${STRING}${STRING}${STRING})I`, (r, _m, [, op, id, packageName, tag]) => note(r, name, op, id, packageName, tag));
   }
   const noteProxy = (r, name, op, proxiedPackage, proxiedUid) => { const o = opOf(r, op), mode = proxyMode(r, o, checkPackage(r, proxiedUid, proxiedPackage)); return name === 'noteProxyOp' ? mustBeAllowed(r, mode, o, proxiedUid) : mode; };
   for (const name of ['noteProxyOp', 'noteProxyOpNoThrow']) {

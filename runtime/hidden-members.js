@@ -1,5 +1,5 @@
-import TABLES from './hidden-member-tables.js?v=f90be5f5e9be';
-import { constantField } from './framework-constants.js?v=f90be5f5e9be';
+import TABLES from './hidden-member-tables.js?v=fef4a080c36e';
+import { constantField } from './framework-constants.js?v=fef4a080c36e';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with

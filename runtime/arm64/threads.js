@@ -4,8 +4,8 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=f90be5f5e9be';
-import { Arm64Cpu, BLOCKED } from './cpu.js?v=f90be5f5e9be';
+import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { Arm64Cpu, BLOCKED } from './cpu.js?v=fef4a080c36e';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 
@@ -17,6 +17,24 @@ export class NativeThreads {
     this.exitEntry = process.hostEntry('pthread:exit', (p, cpu) => { this.finish(this.current, cpu.x[0]); cpu.exited = true; });
   }
   get running() { return this.current; }
+  /**
+   * The native identity of a Java thread that calls into native code (a JNI native method, JNI_OnLoad): on a device each Java thread is its own native thread, with its
+   * own tid, TLS block (pthread keys, errno, the thread-local storage of every library) and stack. Here the call runs on the calling CPU's stack, synchronously, but as
+   * that thread: `javaThread` is the VM's thread record (null or the scheduler's main thread: the process's main thread).
+   */
+  asJavaThread(javaThread, fn) {
+    const p = this.process, isMain = !javaThread || javaThread === this.javaMain?.();
+    let record = isMain ? this.threads.get(p.pid) : (this.javaRecords ??= new WeakMap()).get(javaThread);
+    if (!record) {
+      const region = p.mapRegion(0x10000, 0x1000), tp = region + 0x100; p.initThreadTls(tp);
+      record = { tid: this.nextTid++, cpu: p.cpu, state: 'running', tp, errno: tp - 0xf0, keys: new Map(), java: true, name: javaThread.name ?? null };
+      this.javaRecords.set(javaThread, record); this.log(`ARM64 native thread ${record.tid} is Java thread "${record.name ?? '?'}"`);
+    }
+    if (record === this.current) return fn();
+    const previous = this.current, previousTp = p.cpu.tpidr;
+    this.current = record; p.cpu.tpidr = BigInt(record.tp);
+    try { return fn(); } finally { this.current = previous; p.cpu.tpidr = previousTp; }
+  }
   create(start, arg) {
     const p = this.process, stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000), tp = region + stackSize + 0x100;
     p.initThreadTls(tp);
@@ -29,7 +47,7 @@ export class NativeThreads {
   }
   finish(thread, value) { thread.state = 'done'; thread.result = value; this.log(`ARM64 native thread ${thread.tid} ended`); }
   /** Can the thread that is running now be suspended at this call (true), or must its wait be driven synchronously (false)? */
-  canSuspend(cpu) { const t = this.current; return !t.main && t.cpu === cpu && (cpu.nested ?? 0) === 0; }
+  canSuspend(cpu) { const t = this.current; return !t.main && !t.java && t.cpu === cpu && (cpu.nested ?? 0) === 0; }
   /** The waiting primitive for host functions: returns BLOCKED (the call is retried when the thread runs again) or, for a synchronous caller, runs the other threads until `ready()`. */
   // `wakeAt()`: the earliest time the condition may turn true by time alone (a timer), when it does not wait for another thread
   wait(cpu, ready, { what, deadline = Infinity, wakeAt = null } = {}) {

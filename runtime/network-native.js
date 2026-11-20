@@ -1,19 +1,19 @@
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { throwNew } from './java-throw.js?v=f90be5f5e9be';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=f90be5f5e9be';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=f90be5f5e9be';
-import { Blocked } from './scheduler.js?v=f90be5f5e9be';
-import { captureBody } from './network-capture.js?v=f90be5f5e9be';
-import { OS_CONSTANTS } from './os-constants-data.js?v=f90be5f5e9be';
-import { openExchange, describeFailure } from './network-transport.js?v=f90be5f5e9be';
-import { WorkerExecutor } from './network-worker-executor.js?v=f90be5f5e9be';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=f90be5f5e9be';
-import { TransportAuthority } from './transport-ca.js?v=f90be5f5e9be';
-import { openWebSocketSession } from './websocket-bridge.js?v=f90be5f5e9be';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=f90be5f5e9be';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=f90be5f5e9be';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=f90be5f5e9be';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=f90be5f5e9be';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { throwNew } from './java-throw.js?v=fef4a080c36e';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=fef4a080c36e';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=fef4a080c36e';
+import { Blocked } from './scheduler.js?v=fef4a080c36e';
+import { captureBody } from './network-capture.js?v=fef4a080c36e';
+import { OS_CONSTANTS } from './os-constants-data.js?v=fef4a080c36e';
+import { openExchange, describeFailure } from './network-transport.js?v=fef4a080c36e';
+import { WorkerExecutor } from './network-worker-executor.js?v=fef4a080c36e';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=fef4a080c36e';
+import { TransportAuthority } from './transport-ca.js?v=fef4a080c36e';
+import { openWebSocketSession } from './websocket-bridge.js?v=fef4a080c36e';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=fef4a080c36e';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=fef4a080c36e';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=fef4a080c36e';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=fef4a080c36e';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.

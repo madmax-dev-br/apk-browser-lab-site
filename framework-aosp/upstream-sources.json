@@ -38478,5 +38478,145 @@
     "sha256": "2fffd9e704f8b64f6f6f254540ba88d07e9ef4192b21b4dea8c59a965463c6aa",
     "bytes": 10573,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ConnectTimeoutException.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ConnectTimeoutException.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ConnectTimeoutException.java?format=TEXT",
+    "sha256": "fa547fe55db0541079aea8f76b34931a31c138f2eebdba0a792faf2d96ea1d0c",
+    "bytes": 2490,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/scheme/HostNameResolver.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/scheme/HostNameResolver.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/scheme/HostNameResolver.java?format=TEXT",
+    "sha256": "b5091455a6c1bce1d8d46eb918b8f0c06b5ad0db553b919036859cca3a9540c9",
+    "bytes": 1666,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/scheme/LayeredSocketFactory.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/scheme/LayeredSocketFactory.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/scheme/LayeredSocketFactory.java?format=TEXT",
+    "sha256": "23f003df6e0342282e608e4e9b65c89e4445a590ec9f05b2f09ef2e6ec8d11fa",
+    "bytes": 2941,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/scheme/SocketFactory.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/scheme/SocketFactory.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/scheme/SocketFactory.java?format=TEXT",
+    "sha256": "acea5d39e39d83538e46b9cefffe2b8eb276d4bbe696c2d2a2670aefce034cff",
+    "bytes": 5664,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/AbstractVerifier.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/AbstractVerifier.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/AbstractVerifier.java?format=TEXT",
+    "sha256": "3221845931591ebdf641563a03e9b11ec209bb5ac89e22771c3d779d212c301d",
+    "bytes": 10567,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/AllowAllHostnameVerifier.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/AllowAllHostnameVerifier.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/AllowAllHostnameVerifier.java?format=TEXT",
+    "sha256": "5ef84bb0558c97c3ca0174c2096605dec8df813704a60f3d807d0082ad817aae",
+    "bytes": 2236,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/AndroidDistinguishedNameParser.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/AndroidDistinguishedNameParser.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/AndroidDistinguishedNameParser.java?format=TEXT",
+    "sha256": "465a1510276d69cbe5e757e8b8d2f46f5f2e6dab10dd15366489f83f76aad725",
+    "bytes": 15089,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/BrowserCompatHostnameVerifier.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/BrowserCompatHostnameVerifier.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/BrowserCompatHostnameVerifier.java?format=TEXT",
+    "sha256": "de0def41da042671b8c89b618cd4963d34105e55ff7982fa3bbfa8285857c5ca",
+    "bytes": 2573,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/SSLSocketFactory.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/SSLSocketFactory.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/SSLSocketFactory.java?format=TEXT",
+    "sha256": "f6aefa4f94f3ecbe160a4112515d97acf9658cca2362f58468be056d0172c2a8",
+    "bytes": 15969,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/StrictHostnameVerifier.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/StrictHostnameVerifier.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/StrictHostnameVerifier.java?format=TEXT",
+    "sha256": "a94d2c544f1f66a7274e4f7d757741cf1cab692b27f7da1308b4cba3ad143b02",
+    "bytes": 2974,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/conn/ssl/X509HostnameVerifier.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/conn/ssl/X509HostnameVerifier.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/conn/ssl/X509HostnameVerifier.java?format=TEXT",
+    "sha256": "8c54950daf43838ef59ccf975b0ad9f1eb793408769782a78ad2276b71a5b197",
+    "bytes": 3771,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/params/CoreConnectionPNames.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/params/CoreConnectionPNames.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/params/CoreConnectionPNames.java?format=TEXT",
+    "sha256": "3f7980bf2acce75cdf20284a6351e1d88d1f65c1174ab91d54891b588698a8ba",
+    "bytes": 5475,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/params/HttpConnectionParams.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/params/HttpConnectionParams.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/params/HttpConnectionParams.java?format=TEXT",
+    "sha256": "af44f722f684a5babc790f9122868624c3422c6a6ed02047657096382e6ee747",
+    "bytes": 9292,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/org/apache/http/params/HttpParams.java",
+    "localPath": "framework-aosp/upstream/org/apache/http/params/HttpParams.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/org/apache/http/params/HttpParams.java?format=TEXT",
+    "sha256": "4ff907685a4126997950c79cf23d672e794d3a7e42b9a588576dc23de60c3306",
+    "bytes": 6359,
+    "license": "Apache-2.0"
   }
 ]

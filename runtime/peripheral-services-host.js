@@ -1,7 +1,8 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=f90be5f5e9be';
-import { APKError } from './apk-error.js?v=f90be5f5e9be';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=f90be5f5e9be';
-import { installCameraManager } from './camera-host.js?v=f90be5f5e9be';
+import { bitsFloat, floatBits } from './host-contract.js?v=fef4a080c36e';
+import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { installSoundPool } from './sound-pool-host.js?v=fef4a080c36e';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=fef4a080c36e';
+import { installCameraManager } from './camera-host.js?v=fef4a080c36e';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -348,6 +349,8 @@ export function createPeripheralServicesHost(platform) {
   def(SESSION_MANAGER, 'addOnActiveSessionsChangedListener', '(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;Landroid/content/ComponentName;)V', r => denied(r));
   def(SESSION_MANAGER, 'removeOnActiveSessionsChangedListener', '(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;)V', () => {});
   def(SESSION_MANAGER, 'getSession2Tokens', `()${LIST}`, r => emptyList(r));
+
+  installSoundPool({ platform, registry, nullish, iae, construct, call });   // android.media.SoundPool (src/sound-pool-host.js)
 
   const base = kit.finish({ nullServices: NULL_SERVICES });
   return {
