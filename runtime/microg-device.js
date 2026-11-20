@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=ad32040fbef9';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=ad32040fbef9';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=ad32040fbef9';
-import { parseReturnValue } from './method-overrides.js?v=ad32040fbef9';
-import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=810dec7f6181';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=810dec7f6181';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=810dec7f6181';
+import { parseReturnValue } from './method-overrides.js?v=810dec7f6181';
+import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=810dec7f6181';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');

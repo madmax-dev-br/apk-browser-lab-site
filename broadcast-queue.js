@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=ad32040fbef9';
-import { gcRoot } from './heap-gc.js?v=ad32040fbef9';
+import { APKError } from './apk-error.js?v=810dec7f6181';
+import { gcRoot } from './heap-gc.js?v=810dec7f6181';
 
 // The broadcast queue of the virtual device (ActivityManagerService.broadcastIntentLocked + BroadcastQueue, android-13.0.0_r1), for every installed package (the app and the
 // companion packages of src/package-registry.js):
