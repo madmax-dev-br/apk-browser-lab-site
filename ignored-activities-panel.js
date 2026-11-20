@@ -1,7 +1,7 @@
 // The "Activities ignoradas" section of the Controles panel (src/ignored-activities.js): a debugging tool that drops the starts of the Activities on the list. The section previews the
 // Activities the manifest declares (click one to add it), keeps N rows per package in localStorage (every access guarded) and applies them live to the Worker; counts come back with
 // every snapshot.
-import { activityDescriptor } from './ignored-activities.js?v=2fd1aecf5813';
+import { activityDescriptor } from './ignored-activities.js?v=448e4ced7d81';
 
 const KEY_PREFIX = 'apkweb-ignored-activities-v1:';
 const MAX_ROWS = 50;
