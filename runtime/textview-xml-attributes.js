@@ -1,4 +1,4 @@
-import { floatBits, bitsFloat } from './host-contract.js?v=e5138148cfef';
+import { floatBits, bitsFloat } from './host-contract.js?v=850bf1b17ffb';
 
 // The attribute pass of the android.widget.TextView and android.widget.CompoundButton constructors, as android-13.0.0_r1 runs it (TextView.java TextView(Context, AttributeSet,
 // int, int), readTextAppearance, applyTextAppearance; CompoundButton.java CompoundButton(Context, AttributeSet, int, int)). EditText, Button and CheckBox read nothing of their

@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How APK Browser Lab runs an Android APK in the browser: from the file to the screen, threads and time, memory, rendering, network, native code, tools and limitations.">
-  <link rel="stylesheet" href="./site-pages.css?v=e5138148cfef">
-  <link rel="stylesheet" href="./lab-tokens.css?v=e5138148cfef">
+  <link rel="stylesheet" href="./site-pages.css?v=850bf1b17ffb">
+  <link rel="stylesheet" href="./lab-tokens.css?v=850bf1b17ffb">
 </head>
 <body>
   <header class="topbar">
@@ -276,12 +276,13 @@ Vary: Origin</code></pre></div>
 
       <section id="nativo" aria-labelledby="h-nativo">
         <h2 id="h-nativo">Native code</h2>
-        <p>ARM or x86 <code>.so</code> libraries do not run in the browser. The lab takes another path:</p>
+        <p>ARM or x86 <code>.so</code> libraries do not run natively in the browser. The lab takes two paths:</p>
         <ul>
           <li><b>Android native code, from the original source.</b> Skia (CanvasKit), ICU, resource selection (<code>ResTable_config::match</code>), AOSP's <code>Path</code> curve approximation, BoringSSL and the Conscrypt JNI layer are compiled from C/C++ to WebAssembly, with hashes and provenance.</li>
           <li><b>Open-source libraries in wasm32.</b> For open libraries that apps load (for example Hermes, React Native, fbjni, SQLCipher), the lab has wasm32 builds with <code>provenance.json</code> and a pinned SHA-256. Its own dynamic linker (<code>src/native-linker.js</code>) links them into a per-process memory, and the bytes are only fetched when the app calls <code>System.loadLibrary</code>.</li>
           <li><b>JNI.</b> The JNI bridge (<code>src/jni-host.js</code>) gives those libraries the JNI function table; a function not yet implemented fails with a specific error.</li>
-          <li><b>No build, no execution.</b> An app library without a matching build produces an explicit <code>UnsatisfiedLinkError</code>; the app only continues if it handles the error itself.</li>
+          <li><b>The app's own ARM64 libraries, interpreted (optional).</b> With the device option <b>Run ARM64 native code</b>, the app's <code>lib/arm64-v8a</code> libraries run in an A64 interpreter written in JavaScript (<code>src/arm64/</code>): an ELF loader with Android's relocation formats, bionic's libc as host functions, native threads, NEON, raw system calls, sockets over the relay, files over the VM file system, system properties and JNI with Android's exception rules. Each Java thread that calls native code is a native thread of its own. An instruction, function or system call the interpreter lacks stops the run by name. It is much slower than a phone (<code>docs/ARM64-NATIVE.md</code>).</li>
+          <li><b>No build, no execution.</b> With the option off, an app library without a matching build produces an explicit <code>UnsatisfiedLinkError</code>; the app only continues if it handles the error itself.</li>
           <li><b>Protection is never bypassed.</b> Libraries that look like app protection, anti-fraud or attestation (<code>src/protected-native.js</code>) never get a stub, not even in tolerant mode. Integrity checks, root or emulator detection and the app's encryption run as the app wrote them, or fail.</li>
         </ul>
         <p class="source">Static work queue of the framework natives: <code>docs/NATIVE-CLOSURE.md</code>.</p>
@@ -315,9 +316,10 @@ Vary: Origin</code></pre></div>
         <p>The lab is experimental. These limits are in the code and in the project's documentation:</p>
         <ul class="limits">
           <li><b>Not every Android API exists.</b><span>In the APKs of the public catalog, 886 of 7,865 referenced platform methods (11.3%) still have no implementation, concentrated in graphics, Views and widgets (<code>docs/CORE-GAPS.md</code>). Calling one is an explicit error with the method name.</span></li>
+          <li><b>Code that depends on ART's internals.</b><span>The lab runs Java on its own VM, not on ART. Native code that reads ART's internal structures (its symbols, thread lists, or Java objects read straight from memory) stops where it meets the difference (<code>docs/ARM64-NATIVE.md</code>).</span></li>
           <li><b>It is a JavaScript interpreter.</b><span>There is a baseline compiler, but not an optimizing JIT. A Compose frame still runs about 350,000 instructions at about 100 ns each, which alone limits a Compose animation to around 28 frames per second (<code>docs/INTERACTION-PERFORMANCE.md</code>).</span></li>
           <li><b>CPU drawing.</b><span>Skia rasterizes on the CPU in the Worker; there is no RenderThread and no GPU. 3D rotation of Views fails explicitly.</span></li>
-          <li><b>Network only through the browser.</b><span>No TCP, no real UDP, no inbound connections. What the server does not authorize through CORS does not get through without the relay; browser blocking extensions also stop requests.</span></li>
+          <li><b>Network only through the browser.</b><span>No UDP and no inbound connections; TCP from native code only through the relay's tunnel. What the server does not authorize through CORS does not get through without the relay; browser blocking extensions also stop requests.</span></li>
           <li><b>WebView loads in the browser itself.</b><span>The content of a <code>WebView</code> is an iframe of the page, subject to the browser's rules; WebView pages do not go through endpoint mocks.</span></li>
           <li><b>Native code only with a wasm32 build.</b><span><code>.so</code> libraries without a matching build do not run and produce <code>UnsatisfiedLinkError</code>.</span></li>
           <li><b>Protection is not faked.</b><span>Integrity checks, attestation, root or emulator checks and protected natives run as they are or fail; the lab does not change device identifiers to get past them.</span></li>
@@ -337,6 +339,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=e5138148cfef"></script>
+  <script type="module" src="./site-pages.js?v=850bf1b17ffb"></script>
 </body>
 </html>
