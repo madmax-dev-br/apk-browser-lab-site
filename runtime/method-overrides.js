@@ -10,7 +10,7 @@
 // callers, frameless getters and shapes) are reset by `updateHooks` for the methods whose change was added or removed, so their next call goes through dispatchCore too; a call
 // that dispatchCore answers through a hook never fills a cache. The WebAssembly core routes every hooked method's calls to dispatchCore (vmcore/js/host-bridge.js syncRouting).
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { PendingCall, BodyInvoke } from './interpreter.js?v=d5fbbbba7c85';
+import { PendingCall, BodyInvoke } from './interpreter.js?v=5376509d4366';
 
 const PRIMITIVES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 const JAVA_PRIMITIVES = Object.fromEntries(Object.entries(PRIMITIVES).map(([smali, name]) => [name, smali]));
