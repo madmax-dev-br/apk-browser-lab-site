@@ -5,7 +5,7 @@
 //   - a <small> hint inside a field's label text (label.cp-field > span > small, label.cp-check > span > small): its tab is named after the field;
 //   - a static paragraph (p.cp-note without role="status", not listed in KEEP): its tab is named after the field that points at it (aria-describedby), the field right
 //     before it, the sub-section it sits in (data-help-title, legend or .cp-subtitle), or "Overview"; a debugging warning (p.cp-note.ov-warning) gets a "!" on its tab and on the icon.
-import { createModalHost } from './lab-modal.js?v=da38fa425504';
+import { createModalHost } from './lab-modal.js?v=75ac67a1c845';
 
 const KEEP = new Set(['perms-empty', 'vm-memory-device']);   // state messages without role="status": they say what to do next
 const OVERVIEW = 'Overview';
