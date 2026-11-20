@@ -1,10 +1,10 @@
-import { gcRoot } from './heap-gc.js?v=aaf505bc5b3f';
-import { APKError } from './apk-error.js?v=aaf505bc5b3f';
-import { createHostRegistry } from './host-contract.js?v=aaf505bc5b3f';
-import { getVectorGraphics } from './vector-native.js?v=aaf505bc5b3f';
-import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=aaf505bc5b3f';
-import { createBitmapOps } from './bitmap-ops-host.js?v=aaf505bc5b3f';
-import { encodeOpaqueStoredPng } from './png-store.js?v=aaf505bc5b3f';
+import { gcRoot } from './heap-gc.js?v=91b59af8dcf0';
+import { APKError } from './apk-error.js?v=91b59af8dcf0';
+import { createHostRegistry } from './host-contract.js?v=91b59af8dcf0';
+import { getVectorGraphics } from './vector-native.js?v=91b59af8dcf0';
+import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=91b59af8dcf0';
+import { createBitmapOps } from './bitmap-ops-host.js?v=91b59af8dcf0';
+import { encodeOpaqueStoredPng } from './png-store.js?v=91b59af8dcf0';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access

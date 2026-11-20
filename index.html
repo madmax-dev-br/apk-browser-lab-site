@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=aaf505bc5b3f") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=aaf505bc5b3f">
-  <link rel="stylesheet" href="./lab-theme.css?v=aaf505bc5b3f">
-  <meta name="apk-browser-build" content="aaf505bc5b3f">
+  <style>@import url("./styles.css?v=91b59af8dcf0") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=91b59af8dcf0">
+  <link rel="stylesheet" href="./lab-theme.css?v=91b59af8dcf0">
+  <meta name="apk-browser-build" content="91b59af8dcf0">
 </head>
 <body>
   <header class="topbar">
@@ -102,7 +102,7 @@
                 <p id="dev-microg-data-status" class="cp-note" role="status"></p>
               </div>
               <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
-              <div id="dev-microg-entries" class="cp-microg-entries" hidden>
+              <div id="dev-microg-entries" class="cp-microg-entries" data-help-title="microG entry points" hidden>
                 <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
                 <ul id="dev-microg-entry-list" class="cp-list"></ul>
               </div>
@@ -308,7 +308,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=aaf505bc5b3f"></script>
+  <script type="module" src="./app.js?v=91b59af8dcf0"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

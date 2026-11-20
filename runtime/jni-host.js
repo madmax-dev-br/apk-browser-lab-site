@@ -1,18 +1,18 @@
-import { APKError } from './apk-error.js?v=aaf505bc5b3f';
-import { constantField, nonConstantField } from './framework-constants.js?v=aaf505bc5b3f';
-import { JavaException } from './apk-runtime.js?v=aaf505bc5b3f';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=aaf505bc5b3f';
-import { buildElfDescriptor } from './native-descriptor.js?v=aaf505bc5b3f';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=aaf505bc5b3f';
-import { NativeLinker, LinkError } from './native-linker.js?v=aaf505bc5b3f';
-import { hostFunction } from './wasm-host-function.js?v=aaf505bc5b3f';
-import { parseWasm } from './wasm-dylink.js?v=aaf505bc5b3f';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=aaf505bc5b3f';
-import { registerWasmMemory } from './unsafe-native.js?v=aaf505bc5b3f';
-import { writeSkPath } from './skia-path-layout.js?v=aaf505bc5b3f';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=aaf505bc5b3f';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=aaf505bc5b3f';
-import { withVariants } from './native-provider-variants.js?v=aaf505bc5b3f';
+import { APKError } from './apk-error.js?v=91b59af8dcf0';
+import { constantField, nonConstantField } from './framework-constants.js?v=91b59af8dcf0';
+import { JavaException } from './apk-runtime.js?v=91b59af8dcf0';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=91b59af8dcf0';
+import { buildElfDescriptor } from './native-descriptor.js?v=91b59af8dcf0';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=91b59af8dcf0';
+import { NativeLinker, LinkError } from './native-linker.js?v=91b59af8dcf0';
+import { hostFunction } from './wasm-host-function.js?v=91b59af8dcf0';
+import { parseWasm } from './wasm-dylink.js?v=91b59af8dcf0';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=91b59af8dcf0';
+import { registerWasmMemory } from './unsafe-native.js?v=91b59af8dcf0';
+import { writeSkPath } from './skia-path-layout.js?v=91b59af8dcf0';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=91b59af8dcf0';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=91b59af8dcf0';
+import { withVariants } from './native-provider-variants.js?v=91b59af8dcf0';
 
 // JNI -> WebAssembly bridge.
 //

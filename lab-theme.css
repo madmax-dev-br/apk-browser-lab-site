@@ -3,7 +3,7 @@
    How it sits over styles.css: index.html imports styles.css into the cascade layer `legacy`, so every rule in this file (unlayered) wins over every rule there,
    whatever the specificity, and none of the old light/dark colour rules needs to be undone one by one. Two consequences to keep in mind when editing:
    1. A property set here on an element replaces ALL of styles.css' variants of that property on it (states, media queries). Do not set `display` on elements whose
-      visibility styles.css switches (.trace / .tool-dock-tool, .help-tip-bubble, .fullscreen-close, .ov-results, .tool-dock-badge, .ci-body); restate state
+      visibility styles.css switches (.trace / .tool-dock-tool, .fullscreen-close, .ov-results, .tool-dock-badge, .ci-body); restate state
       variants (open, selected, data-state) when you restyle a property that has them.
    2. The device is not designed here. Nothing below may match inside #android-device or #boot-overlay: their rules stay the ones in styles.css (the same file the
       embeddable player uses), and section 0 pins the values they used to inherit from the page.
@@ -239,11 +239,19 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .mcp-config-head{gap:10px;margin-bottom:6px;font-size:14px;color:var(--soft);align-items:flex-start}
 .mcp-config-json{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--code-bg);color:var(--code-ink);font:400 12px/1.5 var(--mono)}
 /* "?" help tips */
-.help-tip-icon{width:16px;height:16px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background-color:transparent;color:var(--muted);font:600 12px/14px var(--sans);cursor:help}
+.help-tip-icon{width:16px;height:16px;padding:0;border:1px solid var(--line-strong);border-radius:50%;background-color:transparent;color:var(--muted);font:600 12px/14px var(--sans);cursor:pointer}
 .help-tip.warning .help-tip-icon{border-color:var(--amber);color:var(--amber-ink);background-color:var(--amber-soft)}
-.help-tip-bubble,.cp-field .help-tip-bubble,.cp-check .help-tip-bubble{width:min(300px,72vw);padding:10px 12px;border:1px solid var(--line-strong);border-radius:var(--r-control);background-color:var(--surface);color:var(--ink);box-shadow:0 8px 24px rgba(19,26,43,.16);font:400 12px/1.5 var(--sans)}
-.help-tip-bubble small,.help-tip-bubble .cp-note{font-size:12px;line-height:1.5;color:var(--ink);background-color:transparent;padding:0}
-.help-tip-bubble code{color:var(--code-ink)}
+.help-tip-icon:hover{border-color:var(--accent);color:var(--accent-ink)}
+/* the section's help dialog (src/help-tips.js): one tab per field or topic */
+.help-dialog{font:400 14px/1.6 var(--sans);color:var(--ink)}
+.help-dialog small,.help-dialog .cp-note{display:block;margin:0 0 10px;font-size:14px;line-height:1.6;color:var(--ink);background-color:transparent;padding:0}
+.help-dialog code{font:400 12.5px/1.5 var(--mono);color:var(--code-ink)}
+.help-tablist{border-right:1px solid var(--line)}
+.help-tab{border:0;border-left:2px solid transparent;border-radius:0;background:transparent;color:var(--muted);font:500 13px/18px var(--sans);text-align:left;padding:7px 12px;white-space:normal}
+.help-tab:hover:not(:disabled){background:var(--surface-2);color:var(--ink);border-color:transparent;border-left-color:var(--line-strong)}
+.help-tab[aria-selected=true],.help-tab[aria-selected=true]:hover{color:var(--accent-ink);background:var(--accent-soft);border-left-color:var(--accent)}
+.help-tab-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-right:6px;border-radius:50%;background:var(--amber-soft);color:var(--amber-ink);font:700 10px/1 var(--sans)}
+@media (max-width:620px){.help-tablist{border-right:0;border-bottom:1px solid var(--line)}.help-tab{border-left:0;border-bottom:2px solid transparent;white-space:nowrap}.help-tab[aria-selected=true]{border-bottom-color:var(--accent)}}
 
 /* ---- 5. Stage: the device on the drawing ---------------------------------------------------------------------------------------------------------------------- */
 .preview{background:transparent;border:0;border-radius:0;overflow:visible;align-self:start;min-width:0}
@@ -590,8 +598,6 @@ div.ci-tree{min-width:0;max-height:480px;overflow:auto;border:1px solid var(--li
 .rail-footer{display:flex;flex-direction:column;gap:4px;margin-top:auto;padding:16px 20px 20px;border-top:1px solid var(--line);font-size:12px;line-height:18px;color:var(--muted)}
 .rail-footer a{color:var(--accent-ink);text-decoration:underline;text-underline-offset:.18em}
 
-/* Help bubbles are fixed to the viewport (placed by src/help-tips.js): the rail scrolls and would clip them. */
-.help-tip-bubble,.cp-field .help-tip-bubble,.cp-check .help-tip-bubble{position:fixed;z-index:1200;top:0;left:0}
 
 /* MCP: which agent's setup is shown (Controles › MCP, step 2) */
 .mcp-agent-pick{display:flex;gap:4px;margin:8px 0 6px}

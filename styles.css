@@ -347,21 +347,27 @@
 
 .ready-chip{font:600 8px ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.4px;padding:3px 6px;border-radius:4px;margin-right:8px;color:#9a7b2f;background:#fbf4e2;white-space:nowrap}.ready-chip[data-ready=true]{color:#257a4a;background:#e5f6ec}:root[data-theme=dark] .ready-chip{background:#2a2414;color:#e3c46b}:root[data-theme=dark] .ready-chip[data-ready=true]{background:#13281c;color:#6fd59a}
 
-/* "?" help tips (src/help-tips.js): the long explanations of the Controles panel, shown while the icon is hovered or focused */
+/* "?" help (src/help-tips.js): one icon per Controles section, opening its explanations in a dialog with one tab per field or topic */
+.help-dialog{font:12.5px/1.6 Inter,-apple-system,sans-serif;white-space:normal}
+.help-dialog small,.help-dialog .cp-note{display:block;margin:0 0 10px;font-size:12.5px;line-height:1.6;color:inherit}
+.help-dialog code{font:11.5px ui-monospace,monospace}
+.help-dialog-tabs{display:grid;grid-template-columns:minmax(150px,210px) minmax(0,1fr);gap:0 16px;min-height:100%}
+.help-tablist{display:flex;flex-direction:column;gap:2px;overflow:auto;padding-right:8px;border-right:1px solid var(--line)}
+.help-tab{border:0;border-left:2px solid transparent;background:transparent;text-align:left;padding:6px 10px;font:500 12px/1.4 Inter,-apple-system,sans-serif;color:#5d6473;cursor:pointer;border-radius:0}
+.help-tab[aria-selected=true]{color:var(--accent);border-left-color:var(--accent);background:#f1f0fd}
+.help-tab-mark{display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;margin-right:6px;border-radius:50%;background:#fdf6e3;color:#a26b00;font:700 9px/1 sans-serif}
+.help-panels{min-width:0;overflow:auto}
+.help-panels>.help-item:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.lab-modal-body:has(>.help-dialog-tabs){display:flex;flex-direction:column}.lab-modal-body>.help-dialog-tabs{flex:1;min-height:0}
+@media (max-width:620px){.help-dialog-tabs{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:10px}.help-tablist{flex-direction:row;overflow-x:auto;padding:0 0 4px;border-right:0;border-bottom:1px solid var(--line)}.help-tab{white-space:nowrap;border-left:0;border-bottom:2px solid transparent}.help-tab[aria-selected=true]{border-bottom-color:var(--accent)}}
 .help-tip,.cp-field .help-tip,.cp-check .help-tip{position:relative;display:inline-flex;flex-direction:row;vertical-align:middle;margin-left:6px;gap:0}
-.cp-field>span:has(>.help-tip),.cp-check>span:has(>.help-tip){flex-direction:row;flex-wrap:wrap;align-items:center;column-gap:0}   /* the label text and its "?" on one line */
-.help-tip-icon{width:15px;height:15px;padding:0;border-radius:50%;border:1px solid #c9cdd8;background:#f4f5f8;color:#6b7180;font:700 9px/13px Inter,-apple-system,sans-serif;cursor:help;display:inline-flex;align-items:center;justify-content:center}
+.help-tip-icon{width:15px;height:15px;padding:0;border-radius:50%;border:1px solid #c9cdd8;background:#f4f5f8;color:#6b7180;font:700 9px/13px Inter,-apple-system,sans-serif;cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
 .help-tip.warning .help-tip-icon{border-color:#e6c27a;background:#fdf6e3;color:#a26b00}
 .help-tip-icon:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.help-tip-bubble,.cp-field .help-tip-bubble,.cp-check .help-tip-bubble{display:none;flex-direction:column;gap:6px;position:absolute;z-index:40;top:calc(100% + 6px);left:-8px;width:min(300px,70vw);padding:9px 11px;border-radius:7px;background:#20232c;color:#e8eaf0;box-shadow:0 6px 20px #0003;font:400 10px/1.55 Inter,-apple-system,sans-serif;text-align:left;white-space:normal;cursor:default}
-.help-tip-bubble small,.help-tip-bubble .cp-note{display:block;margin:0;font-size:10px;line-height:1.55;color:inherit}
-.help-tip-bubble code{font:9.5px ui-monospace,monospace;color:#fff}
-.help-tip:hover>.help-tip-bubble,.help-tip>.help-tip-icon:focus+.help-tip-bubble,.help-tip>.help-tip-bubble:hover{display:flex}
 .cp-group>summary .help-tip{margin-left:0}
 :root[data-theme=dark] .help-tip-icon{border-color:#3a3f4d;background:#1d2029;color:#a7adbd}
+/* dark */:root[data-theme=dark] .help-tab{color:#a7adbd}:root[data-theme=dark] .help-tab[aria-selected=true]{background:#24223a;color:#b9b2ff}
 :root[data-theme=dark] .help-tip.warning .help-tip-icon{border-color:#6b5320;background:#2a2414;color:#e3c46b}
-:root[data-theme=dark] .help-tip-bubble{background:#f2f3f7;color:#252a35;box-shadow:0 6px 20px #0008}
-:root[data-theme=dark] .help-tip-bubble code{color:#111}
 /* Bottom tool dock (Android Studio-like): icon bar fixed at the bottom; the open tool's panel sits above it with a draggable top edge; the body's padding-bottom (set by tool-dock.js) keeps the page scrollable above it */
 .tool-dock{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;flex-direction:column;font-family:Inter,-apple-system,sans-serif;pointer-events:none}
 .tool-dock>*{pointer-events:auto}
