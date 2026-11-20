@@ -1,9 +1,9 @@
-import {APKError} from './apk-runtime.js?v=810dec7f6181';
-import {PathApproxProvider} from './path-approx-provider.js?v=810dec7f6181';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=810dec7f6181';
-import {createFontFallback} from './font-fallback.js?v=810dec7f6181';
-import {createSystemFontStore} from './system-fonts.js?v=810dec7f6181';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=810dec7f6181';
+import {APKError} from './apk-runtime.js?v=57e968aaaf17';
+import {PathApproxProvider} from './path-approx-provider.js?v=57e968aaaf17';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=57e968aaaf17';
+import {createFontFallback} from './font-fallback.js?v=57e968aaaf17';
+import {createSystemFontStore} from './system-fonts.js?v=57e968aaaf17';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=57e968aaaf17';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){

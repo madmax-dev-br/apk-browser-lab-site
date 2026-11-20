@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=810dec7f6181';
-import { APKError } from './apk-error.js?v=810dec7f6181';
-import { APKArchive } from './apk-loader.js?v=810dec7f6181';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=810dec7f6181';
-import { createHostRegistry } from './host-contract.js?v=810dec7f6181';
-import { normalizePath } from './virtual-fs.js?v=810dec7f6181';
+import { unsignedBytes } from './java-arrays.js?v=57e968aaaf17';
+import { APKError } from './apk-error.js?v=57e968aaaf17';
+import { APKArchive } from './apk-loader.js?v=57e968aaaf17';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=57e968aaaf17';
+import { createHostRegistry } from './host-contract.js?v=57e968aaaf17';
+import { normalizePath } from './virtual-fs.js?v=57e968aaaf17';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -137,6 +137,17 @@ export function createClassLoaderHost(platform) {
     if (!loader || (app && loader.ref === app.ref)) return runtime.dynamicPlain.get(plain) ?? false; // lenient for the app loader (dexElements merges are not tracked)
     return false;
   };
+  // ART opens a DEX file once per process (OatFileManager): every class loader over the same unchanged file maps the same bytes and loads only the classes it is asked for.
+  // The lab keeps the extracted classes*.dex of a file per virtual-fs node, so another loader over one APK (microG creates one PathClassLoader over its base.apk per Dynamite
+  // module, besides the package's own loader) shares them instead of inflating them again, and the aggregate DEX limit counts them once (DexProgram.addDynamicFile).
+  const dexBytesOfFile = new WeakMap();
+  const sharedDexBytes = (node, name, extract) => {
+    if (!node) return extract();
+    const stamp = `${node.size}:${node.mtime}:${node.rev ?? 0}`; let slot = dexBytesOfFile.get(node);
+    if (!slot || slot.stamp !== stamp || slot.buf !== node.buf) dexBytesOfFile.set(node, slot = { stamp, buf: node.buf, entries: new Map() });   // rewritten: opened again
+    let bytes = slot.entries.get(name); if (!bytes) slot.entries.set(name, bytes = extract());
+    return bytes;
+  };
   const bytesOfPath = (runtime, path) => {
     const fs = platform.javaIo.fs(), node = fs.node(path);
     if (!node || node.type !== 'file') runtime.throwJava('Ljava/io/FileNotFoundException;', `${path} (No such file or directory)`);
@@ -151,7 +162,7 @@ export function createClassLoaderHost(platform) {
       const archive = new APKArchive(bytes), names = [...archive.entries.keys()].filter(n => /^classes\d*\.dex$/.test(n)).sort();
       if (!names.length) runtime.throwJava('Ljava/lang/ClassNotFoundException;', `No classes.dex in ${normalized}`);
       // every DEX file of the archive first, so the loader decides over all their classes at once (multidex references cross files)
-      const files = names.map(name => { const data = archive.extractSync(name, MAX_DEX), label = `${normalized}!${name}`; try { return { data, label, parsed: new DexFile(data, { filename: label, maxBytes: MAX_DEX }) }; } catch (error) { throw new APKError(`Invalid DEX payload (${label}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); } });
+      const node = platform.javaIo.fs().node(normalized), files = names.map(name => { const data = sharedDexBytes(node, name, () => archive.extractSync(name, MAX_DEX)), label = `${normalized}!${name}`; try { return { data, label, parsed: new DexFile(data, { filename: label, maxBytes: MAX_DEX }) }; } catch (error) { throw new APKError(`Invalid DEX payload (${label}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); } });
       const decision = decide(runtime, owner, files.flatMap(f => [...f.parsed.classes.keys()]));
       for (const file of files) unit.push(defineDex(runtime, owner, file.data, file.label, { parsed: file.parsed, decision }));
     } else unit.push(defineDex(runtime, owner, bytes, normalized));
@@ -329,7 +340,7 @@ export function createClassLoaderHost(platform) {
     const st = newState(runtime, ref, null, base); st.packageEntry = entry;
     runtime.record(`CLASSLOADER #${st.id} PathClassLoader of package ${entry.name} parent=null(boot)`);
     // Each DEX file is read once for its class list and type table, then once more with the type table renamed (DexFile decodes ids on demand, so both reads are cheap).
-    const dexes = entry.dexFiles.map(name => { const bytes = entry.reader(name); try { return { name, bytes, parsed: new DexFile(bytes, { filename: `${base}!${name}`, maxBytes: MAX_DEX }) }; } catch (error) { throw new APKError(`Invalid DEX in package ${entry.name} (${name}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); } });
+    const node = platform.javaIo.fs().node(base), dexes = entry.dexFiles.map(name => { const bytes = sharedDexBytes(node, name, () => entry.reader(name)); try { return { name, bytes, parsed: new DexFile(bytes, { filename: `${base}!${name}`, maxBytes: MAX_DEX }) }; } catch (error) { throw new APKError(`Invalid DEX in package ${entry.name} (${name}): ${error.message}`, { kind: 'invalid-dynamic-dex' }); } });
     const packageClasses = new Set(); for (const { parsed } of dexes) for (const type of parsed.classes.keys()) packageClasses.add(type);
     const units = [];
     for (const { name, bytes, parsed } of dexes) units.push(defineDex(runtime, ref, bytes, `${base}!${name}`, { isolated: true, packageClasses, parsed }));
