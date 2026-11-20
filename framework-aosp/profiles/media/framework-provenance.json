@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "profile": "media",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "7a8117985aa21aafba4834c43cf4a376718dc5bdc871cb641cd4c837ead3b405",
+  "bytes": 29328,
+  "methods": 234,
+  "classes": [
+    "Landroid/media/MediaDescription$1;",
+    "Landroid/media/MediaDescription$Builder;",
+    "Landroid/media/MediaDescription;",
+    "Landroid/media/MediaMetadata$1;",
+    "Landroid/media/MediaMetadata$BitmapKey;",
+    "Landroid/media/MediaMetadata$Builder;",
+    "Landroid/media/MediaMetadata$LongKey;",
+    "Landroid/media/MediaMetadata$RatingKey;",
+    "Landroid/media/MediaMetadata$TextKey;",
+    "Landroid/media/MediaMetadata;",
+    "Landroid/media/Rating$1;",
+    "Landroid/media/Rating$StarStyle;",
+    "Landroid/media/Rating$Style;",
+    "Landroid/media/Rating;",
+    "Landroid/media/session/PlaybackState$1;",
+    "Landroid/media/session/PlaybackState$Actions;",
+    "Landroid/media/session/PlaybackState$Builder;",
+    "Landroid/media/session/PlaybackState$CustomAction$1;",
+    "Landroid/media/session/PlaybackState$CustomAction$Builder;",
+    "Landroid/media/session/PlaybackState$CustomAction;",
+    "Landroid/media/session/PlaybackState$State;",
+    "Landroid/media/session/PlaybackState;"
+  ],
+  "classCount": 22,
+  "algorithmPatches": [],
+  "sourceTransforms": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/session/PlaybackState.java",
+      "localPath": "framework-aosp/upstream/android/media/session/PlaybackState.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/session/PlaybackState.java?format=TEXT",
+      "sha256": "82df388d63dcac0cbdac3330094b68e33d1dd088d61220dd7b80b052430796ef",
+      "bytes": 34330,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaMetadata.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaMetadata.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaMetadata.java?format=TEXT",
+      "sha256": "c55f1f0864d7af7d116498849895c3bc4d6bdbcd7a6bd5935bb4af0685ca3fad",
+      "bytes": 38903,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaDescription.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaDescription.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaDescription.java?format=TEXT",
+      "sha256": "00eac65ed0515980d8739653f75d40be9512323abcfb8c6a5302bc5f0546d0cf",
+      "bytes": 11859,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/Rating.java",
+      "localPath": "framework-aosp/upstream/android/media/Rating.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/Rating.java?format=TEXT",
+      "sha256": "2fffd9e704f8b64f6f6f254540ba88d07e9ef4192b21b4dea8c59a965463c6aa",
+      "bytes": 10573,
+      "license": "Apache-2.0"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original media data classes (PlaybackState, MediaMetadata, MediaDescription, Rating) that the lab's MediaSession and MediaController host classes pass through unchanged",
+  "activationPolicy": "an installed package DEX references android.media.session.PlaybackState, android.media.MediaMetadata, android.media.MediaDescription or android.media.Rating (or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

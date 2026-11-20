@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=953f70426d12';
-import { createHostRegistry } from './host-contract.js?v=953f70426d12';
-import { Blocked, VMThread } from './scheduler.js?v=953f70426d12';
-import { Invoke } from './interpreter.js?v=953f70426d12';
-import { GC_ROOTS } from './heap-gc.js?v=953f70426d12';
+import { APKError } from './apk-error.js?v=8a2b0d58d249';
+import { createHostRegistry } from './host-contract.js?v=8a2b0d58d249';
+import { Blocked, VMThread } from './scheduler.js?v=8a2b0d58d249';
+import { Invoke } from './interpreter.js?v=8a2b0d58d249';
+import { GC_ROOTS } from './heap-gc.js?v=8a2b0d58d249';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -722,6 +722,7 @@ export function createConcurrencyHost(platform) {
   def(EXECUTORS, 'unconfigurableExecutorService', '(Ljava/util/concurrent/ExecutorService;)Ljava/util/concurrent/ExecutorService;', (r, _m, [e]) => e ?? throwNew(r, 'Ljava/lang/NullPointerException;'), { static: true });
   def(EXECUTORS, 'unconfigurableScheduledExecutorService', '(Ljava/util/concurrent/ScheduledExecutorService;)Ljava/util/concurrent/ScheduledExecutorService;', (r, _m, [e]) => e ?? throwNew(r, 'Ljava/lang/NullPointerException;'), { static: true });
   def(EXECUTORS, 'defaultThreadFactory', `()${FACTORY}`, r => defaultFactory(r), { static: true });
+  def(EXECUTORS, 'callable', `(${RUNNABLE})${CALLABLE}`, (r, _m, [task]) => { if (task === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const c = r.allocate('Ljava/util/concurrent/Executors$RunnableAdapter;'); r.object(c).adapter = { task, result: null }; return c; }, { static: true });   // Executors.callable(task): the result is null
   def(EXECUTORS, 'callable', `(${RUNNABLE}${OBJECT})${CALLABLE}`, (r, _m, [task, result]) => { const c = r.allocate('Ljava/util/concurrent/Executors$RunnableAdapter;'); r.object(c).adapter = { task, result }; return c; }, { static: true });
   type('Ljava/util/concurrent/Executors$RunnableAdapter;', OBJECT, [CALLABLE], { allocatable: true });
   def('Ljava/util/concurrent/Executors$RunnableAdapter;', 'call', `()${OBJECT}`, (r, _m, [self]) => { const a = r.object(self).adapter; return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [a.task], 'virtual', () => a.result); });

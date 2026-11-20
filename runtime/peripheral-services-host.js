@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=953f70426d12';
-import { APKError } from './apk-error.js?v=953f70426d12';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=953f70426d12';
-import { installCameraManager } from './camera-host.js?v=953f70426d12';
+import { bitsFloat, floatBits } from './host-contract.js?v=8a2b0d58d249';
+import { APKError } from './apk-error.js?v=8a2b0d58d249';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=8a2b0d58d249';
+import { installCameraManager } from './camera-host.js?v=8a2b0d58d249';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -264,6 +264,90 @@ export function createPeripheralServicesHost(platform) {
   const categoryName = (r, _m, [self]) => { const c = r.object(self).mediaCategory; return c ? c.name ?? null : 'System'; };
   def(CATEGORY, 'getName', `()${CHARSEQ}`, categoryName); def(CATEGORY, 'getName', `(${CONTEXT})${CHARSEQ}`, categoryName);
   def(CATEGORY, 'getSupportedTypes', '()I', (r, _m, [self]) => r.object(self).mediaCategory?.types ?? SYSTEM_TYPES); def(CATEGORY, 'isGroupable', '()Z', (r, _m, [self]) => (r.object(self).mediaCategory?.groupable ? 1 : 0)); def(CATEGORY, 'isSystem', '()Z', (r, _m, [self]) => (r.object(self).mediaCategory ? 0 : 1));
+
+  // ---- android.media.session (MediaSession.java, MediaController.java, MediaSessionManager.java): sessions of this app and their controllers, in-process. The session's state
+  // objects (PlaybackState, MediaMetadata, the queue, extras) are the app's own and pass through unchanged; a change is delivered to every registered controller callback on its
+  // Handler, and a TransportControls command to the session callback on its Handler, after the call returns, as the session service does. Listing other apps' sessions needs
+  // MEDIA_CONTENT_CONTROL (a system permission): a third-party app gets the SecurityException.
+  const SESSION = 'Landroid/media/session/MediaSession;', TOKEN = 'Landroid/media/session/MediaSession$Token;', SESSION_CALLBACK = 'Landroid/media/session/MediaSession$Callback;';
+  const CONTROLLER = 'Landroid/media/session/MediaController;', CONTROLLER_CALLBACK = 'Landroid/media/session/MediaController$Callback;', TRANSPORT = 'Landroid/media/session/MediaController$TransportControls;';
+  const SESSION_MANAGER = service('media_session', 'Landroid/media/session/MediaSessionManager;'), DELIVERY = 'Lapkweb/bridge/MediaSessionDelivery;';
+  const PSTATE = 'Landroid/media/session/PlaybackState;', META = 'Landroid/media/MediaMetadata;', RATING = 'Landroid/media/Rating;', BUNDLE = 'Landroid/os/Bundle;', URI = 'Landroid/net/Uri;';
+  const HANDLER = 'Landroid/os/Handler;', LOOPER = 'Landroid/os/Looper;', RUNNABLE = 'Ljava/lang/Runnable;', PENDING = 'Landroid/app/PendingIntent;', CS = 'Ljava/lang/CharSequence;';
+  type(SESSION, OBJECT, [], { allocatable: true }); type(TOKEN, OBJECT, ['Landroid/os/Parcelable;']); type(SESSION_CALLBACK, OBJECT, [], { allocatable: true });
+  type(CONTROLLER, OBJECT, [], { allocatable: true }); type(CONTROLLER_CALLBACK, OBJECT, [], { allocatable: true }); type(TRANSPORT, OBJECT); type(DELIVERY, OBJECT, [RUNNABLE], { allocatable: true });
+  def(DELIVERY, 'run', '()V', (r, _m, [self]) => { const record = r.object(self), task = record.task; record.task = null; record.held = null; return task?.(); });
+  const post = (r, handler, task, held = []) => { const runnable = r.makeObject(DELIVERY), record = r.object(runnable); record.task = task; record.held = held.filter(v => !nullish(v)); call(r, handler, HANDLER, 'post', [RUNNABLE], 'Z', [runnable]); };
+  const looperHandler = (r, handler) => {   // the Handler given, else one on the calling thread's Looper, else on the main Looper (MediaController.registerCallback / MediaSession.setCallback)
+    if (!nullish(handler)) return handler;
+    const statics = name => r.dispatch({ owner: LOOPER, name, parameters: [], result: LOOPER, signature: `()${LOOPER}` }, [], 'static');
+    const looper = statics('myLooper'); return construct(r, HANDLER, [LOOPER], [nullish(looper) ? statics('getMainLooper') : looper]);
+  };
+  const sessionOf = (r, self) => r.object(self).mediaSession ?? ise(r, 'MediaSession used before it was constructed');
+  const sessionCtor = (r, _m, [self, context, tag]) => {
+    if (nullish(context)) iae(r, 'context cannot be null.'); if (nullish(tag) || text(r, tag) === '') iae(r, 'tag cannot be null or empty');
+    const token = r.makeObject(TOKEN); r.object(token).sessionRef = self;
+    r.object(self).mediaSession = { tag: text(r, tag), token, active: false, released: false, callback: null, handler: null, state: null, metadata: null, queue: null, queueTitle: null, extras: null, flags: 0, ratingType: 0, activity: null, controllers: [] };
+  };
+  def(SESSION, '<init>', `(${CONTEXT}${STRING})V`, sessionCtor); def(SESSION, '<init>', `(${CONTEXT}${STRING}${BUNDLE})V`, sessionCtor);
+  const toControllers = (r, session, method, signature, value) => { for (const entry of session.controllers) post(r, entry.handler, () => { if (session.controllers.includes(entry)) call(r, entry.callback, CONTROLLER_CALLBACK, method, signature, 'V', value === undefined ? [] : [value]); }, [entry.callback, value]); };
+  const setter = (name, signature, key, method) => def(SESSION, name, `(${signature})V`, (r, _m, [self, value]) => { const s = sessionOf(r, self); s[key] = nullish(value) ? null : value; if (method) toControllers(r, s, method, [signature], s[key]); });
+  setter('setPlaybackState', PSTATE, 'state', 'onPlaybackStateChanged'); setter('setMetadata', META, 'metadata', 'onMetadataChanged'); setter('setQueue', LIST, 'queue', 'onQueueChanged');
+  setter('setQueueTitle', CS, 'queueTitle', 'onQueueTitleChanged'); setter('setExtras', BUNDLE, 'extras', 'onExtrasChanged'); setter('setSessionActivity', PENDING, 'activity', null);
+  setter('setMediaButtonReceiver', PENDING, 'buttonReceiver', null); setter('setMediaButtonBroadcastReceiver', 'Landroid/content/ComponentName;', 'buttonComponent', null);
+  setter('setPlaybackToLocal', 'Landroid/media/AudioAttributes;', 'audioAttributes', null); setter('setPlaybackToRemote', 'Landroid/media/VolumeProvider;', 'volumeProvider', null);
+  def(SESSION, 'setFlags', '(I)V', (r, _m, [self, flags]) => { sessionOf(r, self).flags = flags; }); def(SESSION, 'setRatingType', '(I)V', (r, _m, [self, type]) => { sessionOf(r, self).ratingType = type; });
+  def(SESSION, 'setActive', '(Z)V', (r, _m, [self, active]) => { sessionOf(r, self).active = !!active; }); def(SESSION, 'isActive', '()Z', (r, _m, [self]) => (sessionOf(r, self).active ? 1 : 0));
+  const setCallback = (r, _m, [self, callback, handler]) => { const s = sessionOf(r, self); s.callback = nullish(callback) ? null : callback; s.handler = nullish(callback) ? null : looperHandler(r, handler ?? null); };
+  def(SESSION, 'setCallback', `(${SESSION_CALLBACK})V`, setCallback); def(SESSION, 'setCallback', `(${SESSION_CALLBACK}${HANDLER})V`, setCallback);
+  def(SESSION, 'sendSessionEvent', `(${STRING}${BUNDLE})V`, (r, _m, [self, event, extras]) => { if (nullish(event) || text(r, event) === '') iae(r, 'event cannot be null or empty'); const s = sessionOf(r, self); for (const entry of s.controllers) post(r, entry.handler, () => call(r, entry.callback, CONTROLLER_CALLBACK, 'onSessionEvent', [STRING, BUNDLE], 'V', [event, extras]), [entry.callback, event, extras]); });
+  def(SESSION, 'getSessionToken', `()${TOKEN}`, (r, _m, [self]) => sessionOf(r, self).token);
+  def(SESSION, 'getController', `()${CONTROLLER}`, (r, _m, [self, ]) => { const s = sessionOf(r, self); return s.controller ??= (() => { const c = r.makeObject(CONTROLLER); r.object(c).mediaController = { session: self }; return c; })(); });
+  def(SESSION, 'release', '()V', (r, _m, [self]) => { const s = sessionOf(r, self); if (s.released) return; s.released = true; s.active = false; const entries = s.controllers.splice(0); for (const entry of entries) post(r, entry.handler, () => call(r, entry.callback, CONTROLLER_CALLBACK, 'onSessionDestroyed', [], 'V', []), [entry.callback]); });
+  def(TOKEN, 'describeContents', '()I', () => 0);
+  def(TOKEN, 'equals', `(${OBJECT})Z`, (r, _m, [self, other]) => (!nullish(other) && r.object(other).sessionRef?.ref === r.object(self).sessionRef?.ref ? 1 : 0));
+  def(TOKEN, 'hashCode', '()I', (r, _m, [self]) => r.object(self).sessionRef?.ref ?? 0);
+  // MediaSession.QueueItem (nested in MediaSession.java): a MediaDescription with a queue id; the id must not be UNKNOWN_ID (-1)
+  const QUEUE_ITEM = 'Landroid/media/session/MediaSession$QueueItem;', DESCRIPTION = 'Landroid/media/MediaDescription;';
+  type(QUEUE_ITEM, OBJECT, ['Landroid/os/Parcelable;'], { allocatable: true });
+  def(QUEUE_ITEM, '<init>', `(${DESCRIPTION}J)V`, (r, _m, [self, description, id]) => { if (nullish(description)) iae(r, 'Description cannot be null'); if (BigInt(id) === -1n) iae(r, 'Id cannot be QueueItem.UNKNOWN_ID'); r.object(self).queueItem = { description, id: BigInt(id) }; });
+  def(QUEUE_ITEM, 'getDescription', `()${DESCRIPTION}`, (r, _m, [self]) => r.object(self).queueItem.description);
+  def(QUEUE_ITEM, 'getQueueId', '()J', (r, _m, [self]) => r.object(self).queueItem.id);
+  def(QUEUE_ITEM, 'describeContents', '()I', () => 0);
+  // MediaSession.Callback: every method is empty on the base class (the app overrides what it handles)
+  def(SESSION_CALLBACK, '<init>', '()V', () => {});
+  for (const [name, signature] of [['onPrepare', '()V'], ['onPrepareFromMediaId', `(${STRING}${BUNDLE})V`], ['onPrepareFromSearch', `(${STRING}${BUNDLE})V`], ['onPrepareFromUri', `(${URI}${BUNDLE})V`], ['onPlay', '()V'], ['onPlayFromSearch', `(${STRING}${BUNDLE})V`], ['onPlayFromMediaId', `(${STRING}${BUNDLE})V`], ['onPlayFromUri', `(${URI}${BUNDLE})V`], ['onSkipToQueueItem', '(J)V'], ['onPause', '()V'], ['onSkipToNext', '()V'], ['onSkipToPrevious', '()V'], ['onFastForward', '()V'], ['onRewind', '()V'], ['onStop', '()V'], ['onSeekTo', '(J)V'], ['onSetRating', `(${RATING})V`], ['onSetPlaybackSpeed', '(F)V'], ['onCustomAction', `(${STRING}${BUNDLE})V`], ['onCommand', `(${STRING}${BUNDLE}Landroid/os/ResultReceiver;)V`]]) def(SESSION_CALLBACK, name, signature, () => {});
+  def(SESSION_CALLBACK, 'onMediaButtonEvent', '(Landroid/content/Intent;)Z', () => 0);
+  // MediaController over a session of this process
+  const controllerOf = (r, self) => r.object(self).mediaController ?? ise(r, 'MediaController used before it was constructed');
+  const sessionBehind = (r, self) => sessionOf(r, controllerOf(r, self).session);
+  def(CONTROLLER, '<init>', `(${CONTEXT}${TOKEN})V`, (r, _m, [self, context, token]) => { if (nullish(context)) iae(r, 'context shouldn\'t be null'); if (nullish(token)) iae(r, 'token shouldn\'t be null'); const ref = r.object(token).sessionRef; if (!ref) iae(r, 'token is not a session of this device'); r.object(self).mediaController = { session: ref }; });
+  for (const [name, result, key] of [['getPlaybackState', PSTATE, 'state'], ['getMetadata', META, 'metadata'], ['getQueue', LIST, 'queue'], ['getQueueTitle', CS, 'queueTitle'], ['getExtras', BUNDLE, 'extras'], ['getSessionActivity', PENDING, 'activity']]) def(CONTROLLER, name, `()${result}`, (r, _m, [self]) => sessionBehind(r, self)[key] ?? null);
+  def(CONTROLLER, 'getFlags', '()J', (r, _m, [self]) => BigInt(sessionBehind(r, self).flags)); def(CONTROLLER, 'getRatingType', '()I', (r, _m, [self]) => sessionBehind(r, self).ratingType);
+  def(CONTROLLER, 'getPackageName', `()${STRING}`, () => platform.packageName); def(CONTROLLER, 'getTag', `()${STRING}`, (r, _m, [self]) => sessionBehind(r, self).tag);
+  def(CONTROLLER, 'getSessionToken', `()${TOKEN}`, (r, _m, [self]) => sessionBehind(r, self).token);
+  const register = (r, _m, [self, callback, handler]) => { if (nullish(callback)) iae(r, 'callback must not be null'); const s = sessionBehind(r, self); if (!s.controllers.some(e => e.callback.ref === callback.ref)) s.controllers.push({ callback, handler: looperHandler(r, handler ?? null) }); };
+  def(CONTROLLER, 'registerCallback', `(${CONTROLLER_CALLBACK})V`, register); def(CONTROLLER, 'registerCallback', `(${CONTROLLER_CALLBACK}${HANDLER})V`, register);
+  def(CONTROLLER, 'unregisterCallback', `(${CONTROLLER_CALLBACK})V`, (r, _m, [self, callback]) => { if (nullish(callback)) iae(r, 'callback must not be null'); const s = sessionBehind(r, self); s.controllers = s.controllers.filter(e => e.callback.ref !== callback.ref); });
+  def(CONTROLLER, 'getTransportControls', `()${TRANSPORT}`, (r, _m, [self]) => { const c = controllerOf(r, self); return c.transport ??= (() => { const t = r.makeObject(TRANSPORT); r.object(t).transportSession = c.session; return t; })(); });
+  def(CONTROLLER_CALLBACK, '<init>', '()V', () => {});
+  for (const [name, signature] of [['onSessionDestroyed', '()V'], ['onSessionEvent', `(${STRING}${BUNDLE})V`], ['onPlaybackStateChanged', `(${PSTATE})V`], ['onMetadataChanged', `(${META})V`], ['onQueueChanged', `(${LIST})V`], ['onQueueTitleChanged', `(${CS})V`], ['onExtrasChanged', `(${BUNDLE})V`], ['onAudioInfoChanged', '(Landroid/media/session/MediaController$PlaybackInfo;)V']]) def(CONTROLLER_CALLBACK, name, signature, () => {});
+  // TransportControls: each command reaches the session callback on its Handler (nothing happens when the session has no callback or was released)
+  const command = (name, signature) => def(TRANSPORT, name, `(${signature.join('')})V`, (r, _m, [self, ...args]) => {
+    const s = sessionOf(r, r.object(self).transportSession); if (s.released || !s.callback) return;
+    const target = { play: 'onPlay', pause: 'onPause', stop: 'onStop', skipToNext: 'onSkipToNext', skipToPrevious: 'onSkipToPrevious', fastForward: 'onFastForward', rewind: 'onRewind', seekTo: 'onSeekTo', prepare: 'onPrepare', playFromMediaId: 'onPlayFromMediaId', playFromSearch: 'onPlayFromSearch', playFromUri: 'onPlayFromUri', prepareFromMediaId: 'onPrepareFromMediaId', prepareFromSearch: 'onPrepareFromSearch', prepareFromUri: 'onPrepareFromUri', skipToQueueItem: 'onSkipToQueueItem', setRating: 'onSetRating', setPlaybackSpeed: 'onSetPlaybackSpeed', sendCustomAction: 'onCustomAction' }[name];
+    const callback = s.callback; post(r, s.handler, () => call(r, callback, SESSION_CALLBACK, target, signature, 'V', args), [callback, ...args]);
+  });
+  for (const name of ['play', 'pause', 'stop', 'skipToNext', 'skipToPrevious', 'fastForward', 'rewind', 'prepare']) command(name, []);
+  command('seekTo', ['J']); command('skipToQueueItem', ['J']); command('setRating', [RATING]); command('setPlaybackSpeed', ['F']); command('sendCustomAction', [STRING, BUNDLE]);
+  for (const name of ['playFromMediaId', 'playFromSearch', 'prepareFromMediaId', 'prepareFromSearch']) command(name, [STRING, BUNDLE]);
+  for (const name of ['playFromUri', 'prepareFromUri']) command(name, [URI, BUNDLE]);
+  // MediaSessionManager: other apps' sessions are not this app's to see
+  const denied = r => r.throwJava('Ljava/lang/SecurityException;', 'Missing permission to control media.');
+  def(SESSION_MANAGER, 'getActiveSessions', `(Landroid/content/ComponentName;)${LIST}`, r => denied(r));
+  def(SESSION_MANAGER, 'addOnActiveSessionsChangedListener', '(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;Landroid/content/ComponentName;)V', r => denied(r));
+  def(SESSION_MANAGER, 'removeOnActiveSessionsChangedListener', '(Landroid/media/session/MediaSessionManager$OnActiveSessionsChangedListener;)V', () => {});
+  def(SESSION_MANAGER, 'getSession2Tokens', `()${LIST}`, r => emptyList(r));
 
   const base = kit.finish({ nullServices: NULL_SERVICES });
   return {

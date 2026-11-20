@@ -38438,5 +38438,45 @@
     "sha256": "0ed2d99a619851ab46bc391c65a2bb5184647ab12ce732b25799742a5d5b09ca",
     "bytes": 19105,
     "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/session/PlaybackState.java",
+    "localPath": "framework-aosp/upstream/android/media/session/PlaybackState.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/session/PlaybackState.java?format=TEXT",
+    "sha256": "82df388d63dcac0cbdac3330094b68e33d1dd088d61220dd7b80b052430796ef",
+    "bytes": 34330,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaMetadata.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaMetadata.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaMetadata.java?format=TEXT",
+    "sha256": "c55f1f0864d7af7d116498849895c3bc4d6bdbcd7a6bd5935bb4af0685ca3fad",
+    "bytes": 38903,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaDescription.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaDescription.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaDescription.java?format=TEXT",
+    "sha256": "00eac65ed0515980d8739653f75d40be9512323abcfb8c6a5302bc5f0546d0cf",
+    "bytes": 11859,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/Rating.java",
+    "localPath": "framework-aosp/upstream/android/media/Rating.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/Rating.java?format=TEXT",
+    "sha256": "2fffd9e704f8b64f6f6f254540ba88d07e9ef4192b21b4dea8c59a965463c6aa",
+    "bytes": 10573,
+    "license": "Apache-2.0"
   }
 ]

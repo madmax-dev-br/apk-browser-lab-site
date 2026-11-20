@@ -1,7 +1,7 @@
-import { floatBits } from './host-contract.js?v=953f70426d12';
-import { gcRoot } from './heap-gc.js?v=953f70426d12';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=953f70426d12';
-import { createAccountStore } from './account-store.js?v=953f70426d12';
+import { floatBits } from './host-contract.js?v=8a2b0d58d249';
+import { gcRoot } from './heap-gc.js?v=8a2b0d58d249';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=8a2b0d58d249';
+import { createAccountStore } from './account-store.js?v=8a2b0d58d249';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -173,6 +173,9 @@ export function createSystemManagersHost(platform) {
   def(CAPTIONING, 'getUserStyle', `()${CAPTION_STYLE}`, r => captionStyle(r));
   def(CAPTIONING, 'isSystemAudioCaptioningEnabled', '()Z', () => 0);
   def(CAPTIONING, 'isSystemAudioCaptioningUiEnabled', '()Z', () => 0);
+  // CaptioningChangeListener: an abstract class whose callbacks are empty (the app overrides those it needs); captions never change on this device, so none is called
+  type(CAPTION_LISTENER, OBJECT, [], { allocatable: true }); def(CAPTION_LISTENER, '<init>', '()V', () => {});
+  for (const [name, signature] of [['onEnabledChanged', '(Z)V'], ['onUserStyleChanged', `(${CAPTION_STYLE})V`], ['onLocaleChanged', '(Ljava/util/Locale;)V'], ['onFontScaleChanged', '(F)V'], ['onSystemAudioCaptioningChanged', '(Z)V'], ['onSystemAudioCaptioningUiChanged', '(Z)V']]) def(CAPTION_LISTENER, name, signature, () => {});
   def(CAPTIONING, 'addCaptioningChangeListener', `(${CAPTION_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   def(CAPTIONING, 'removeCaptioningChangeListener', `(${CAPTION_LISTENER})V`, (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
 

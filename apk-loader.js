@@ -1,21 +1,21 @@
-import { createArm64Native } from './arm64/glue.js?v=953f70426d12';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=953f70426d12';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=953f70426d12';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=953f70426d12';
-import { inspectELF } from './native-inspector.js?v=953f70426d12';
-import { elfBuildId } from './elf-build-id.js?v=953f70426d12';
-import { inflateRaw } from './inflate.js?v=953f70426d12';
-import { crc32, inflateEntry } from './zip-entry.js?v=953f70426d12';
-import { resolveDevice } from './device-profile.js?v=953f70426d12';
-import { resourceProfileFor } from './device-configuration.js?v=953f70426d12';
-import { JniBridge } from './jni-host.js?v=953f70426d12';
-import { providerForApk } from './native-provider-variants.js?v=953f70426d12';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=953f70426d12';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=953f70426d12';
-import { AndroidResources } from './android-resources.js?v=953f70426d12';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=953f70426d12';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=953f70426d12';
-import { FrameworkProvider } from './framework-provider.js?v=953f70426d12';
+import { createArm64Native } from './arm64/glue.js?v=8a2b0d58d249';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8a2b0d58d249';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=8a2b0d58d249';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=8a2b0d58d249';
+import { inspectELF } from './native-inspector.js?v=8a2b0d58d249';
+import { elfBuildId } from './elf-build-id.js?v=8a2b0d58d249';
+import { inflateRaw } from './inflate.js?v=8a2b0d58d249';
+import { crc32, inflateEntry } from './zip-entry.js?v=8a2b0d58d249';
+import { resolveDevice } from './device-profile.js?v=8a2b0d58d249';
+import { resourceProfileFor } from './device-configuration.js?v=8a2b0d58d249';
+import { JniBridge } from './jni-host.js?v=8a2b0d58d249';
+import { providerForApk } from './native-provider-variants.js?v=8a2b0d58d249';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8a2b0d58d249';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8a2b0d58d249';
+import { AndroidResources } from './android-resources.js?v=8a2b0d58d249';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=8a2b0d58d249';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=8a2b0d58d249';
+import { FrameworkProvider } from './framework-provider.js?v=8a2b0d58d249';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -782,6 +782,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // PackageManager adds it itself (it left the boot class path in Android 9)
   const declaredApacheHttp=(manifest.usesLibraries??[]).some(library=>library.name==='org.apache.http.legacy'),apacheTarget=Number(manifest.usesSdk?.targetSdkVersion??manifest.usesSdk?.minSdkVersion??1);
   const usesApacheHttp=declaredApacheHttp||apacheTarget<28;
+  // the original media session data classes (framework-aosp/profiles/media): referenced by the APK
+  const MEDIA_TYPES=new Set(['Landroid/media/session/PlaybackState;','Landroid/media/session/PlaybackState$Builder;','Landroid/media/session/PlaybackState$CustomAction;','Landroid/media/MediaMetadata;','Landroid/media/MediaMetadata$Builder;','Landroid/media/MediaDescription;','Landroid/media/MediaDescription$Builder;','Landroid/media/Rating;']);
+  const usesMedia=files.some(file=>file.dex.types.some(type=>MEDIA_TYPES.has(type)));
   const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
   // the original account authenticator classes (framework-aosp/profiles/accounts): referenced by the APK (an app that is an account authenticator), or possibly by a companion package
   // (microG's authenticator and its login and consent screens)
@@ -794,6 +797,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:appUsesConfiguration?'APK-references-android.content.res.Configuration':'companion-package-installed'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
     {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
+    {name:'media',explicit:options.enableMediaProfile,automatic:usesMedia,reason:'APK-references-android.media.session.PlaybackState-or-MediaMetadata'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},

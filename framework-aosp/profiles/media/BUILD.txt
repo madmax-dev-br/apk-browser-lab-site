@@ -1,0 +1,13 @@
+Original Android 13 media profile (android.media.session.PlaybackState, android.media.MediaMetadata, MediaDescription, Rating)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-media-profile.sh        (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/hidden-members.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/media-sources.txt, compiled unchanged (no source transform):
+android.media.session.PlaybackState (with its Builder and CustomAction), android.media.MediaMetadata (with its Builder), android.media.MediaDescription
+(with its Builder) and android.media.Rating. MediaSession, MediaController and MediaSessionManager are the lab's host classes
+(src/peripheral-services-host.js), which keep the objects an app publishes and hand the same objects to its controllers.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
+(src/apk-loader.js) adds this DEX when the APK's DEX references one of these classes, or when the loader option enableMediaProfile is true.
