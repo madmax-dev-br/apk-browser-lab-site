@@ -1,21 +1,21 @@
-import { createArm64Native } from './arm64/glue.js?v=fef4a080c36e';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=fef4a080c36e';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=fef4a080c36e';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=fef4a080c36e';
-import { inspectELF } from './native-inspector.js?v=fef4a080c36e';
-import { elfBuildId } from './elf-build-id.js?v=fef4a080c36e';
-import { crc32 } from './zip-entry.js?v=fef4a080c36e';
-import { resolveDevice } from './device-profile.js?v=fef4a080c36e';
-import { resourceProfileFor } from './device-configuration.js?v=fef4a080c36e';
-import { JniBridge } from './jni-host.js?v=fef4a080c36e';
-import { providerForApk } from './native-provider-variants.js?v=fef4a080c36e';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=fef4a080c36e';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=fef4a080c36e';
-import { AndroidResources } from './android-resources.js?v=fef4a080c36e';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=fef4a080c36e';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=fef4a080c36e';
-import { FrameworkProvider } from './framework-provider.js?v=fef4a080c36e';
-import { APKArchive } from './apk-archive.js?v=fef4a080c36e';
+import { createArm64Native } from './arm64/glue.js?v=e5138148cfef';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e5138148cfef';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=e5138148cfef';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=e5138148cfef';
+import { inspectELF } from './native-inspector.js?v=e5138148cfef';
+import { elfBuildId } from './elf-build-id.js?v=e5138148cfef';
+import { crc32 } from './zip-entry.js?v=e5138148cfef';
+import { resolveDevice } from './device-profile.js?v=e5138148cfef';
+import { resourceProfileFor } from './device-configuration.js?v=e5138148cfef';
+import { JniBridge } from './jni-host.js?v=e5138148cfef';
+import { providerForApk } from './native-provider-variants.js?v=e5138148cfef';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e5138148cfef';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e5138148cfef';
+import { AndroidResources } from './android-resources.js?v=e5138148cfef';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=e5138148cfef';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=e5138148cfef';
+import { FrameworkProvider } from './framework-provider.js?v=e5138148cfef';
+import { APKArchive } from './apk-archive.js?v=e5138148cfef';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -219,7 +219,7 @@ export async function prepareResources(archive, names, options, report, yieldCon
     parsedLayoutBytes: 0, inspectionComplete: false, errors: [], omittedErrors: 0 };
   if (options.resources === false || (!arsc && !frameworkTable)) {
     if (options.resources === false && arsc) summary.errors.push('Resource parsing disabled by caller.');
-    options.onLayoutFiles?.(layoutFiles);
+    options.onLayoutFiles?.(layoutFiles); options.onColorFiles?.(null);
     return { environment: null, summary };
   }
   const layouts = new Map(), layoutErrors = new Map();
@@ -229,7 +229,7 @@ export async function prepareResources(archive, names, options, report, yieldCon
   };
   const callbacks = { onWarning: note, chooseConfiguration: options.resourceConfiguration?.chooseConfiguration,
     resolveExternal: id => ((Number(id) >>> 24) === 1 ? frameworkTable?.resolve(id) : null) };
-  let table = new AndroidResources(null, callbacks);
+  let table = new AndroidResources(null, callbacks), colorFiles = null;
   await report('resources', 0, layoutFiles.length + 1, 'resources.arsc', arsc ? 'Reading Android resource table' : 'Using supplied framework resource table');
   try {
     if (arsc) { table = new AndroidResources(await archive.extract('resources.arsc', 64 * 1024 * 1024), callbacks); summary.tableParsed = true; summary.entries = table.entries.size; }
@@ -237,16 +237,17 @@ export async function prepareResources(archive, names, options, report, yieldCon
     for (const split of archive.splits ?? []) if (split.archive.entries.has('resources.arsc')) { table.merge(new AndroidResources(await split.archive.extract('resources.arsc', 64 * 1024 * 1024), callbacks)); summary.entries = table.entries.size; summary.splitTables = (summary.splitTables ?? 0) + 1; }
     // Resource shrinkers/obfuscators may rename res/layout files to arbitrary ZIP
     // paths. The compiled resource type, not the filename, identifies layouts.
-    const referenced = new Set(layoutFiles);
+    const referenced = new Set(layoutFiles); colorFiles = new Set();
     for (const variants of table.entries.values()) for (const entry of variants) {
       if (entry.resourceType === 'layout' && entry.kind === 'string' && typeof entry.value === 'string') {
         if (archive.entries.has(entry.value)) referenced.add(entry.value);
         else note(`Layout resource ${entry.fullName} points to absent ${entry.value}`);
-      }
+      } else if (entry.resourceType === 'color' && entry.kind === 'string' && typeof entry.value === 'string' && entry.value.endsWith('.xml') && archive.entries.has(entry.value)) colorFiles.add(entry.value);   // color state lists
     }
     layoutFiles = [...referenced].sort(); summary.layoutFiles = layoutFiles.length;
-  } catch (error) { note(`resources.arsc: ${error.message}`); }
+  } catch (error) { note(`resources.arsc: ${error.message}`); colorFiles = null; }
   options.onLayoutFiles?.(layoutFiles);   // the layout files by resource type, whatever their ZIP path: what the load scans for layout-only widgets
+  options.onColorFiles?.(colorFiles && [...colorFiles].sort());   // the color state list files by resource type (the load scans them for android:lStar)
   await report('resources', 1, layoutFiles.length + 1, 'resources.arsc', 'Android resource table inspected');
   await yieldControl();
   // Eager preparation is a startup-cost budget, not a semantic limit: files beyond it are parsed on first use (resolveXML), as Android parses on demand.
@@ -541,6 +542,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // The APK's layout files as the resource table names them (type "layout", whatever the ZIP path: a release build with shortened resource paths has no res/layout*/ entries), known as
   // soon as resources.arsc is read; null when the resources could not be prepared that far (the scan below then falls back to the res/layout*/ paths).
   let layoutFilesKnown; const layoutFilesReady = new Promise(resolve => { layoutFilesKnown = resolve; });
+  let colorFilesKnown; const colorFilesReady = new Promise(resolve => { colorFilesKnown = resolve; });   // the color state list files, likewise (the color profile's scan)
   const resourcesReady = holdUntilReleased(async (hold) => { try {
     let frameworkResources = null;
     if (options.frameworkResourceProvider) {
@@ -555,9 +557,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
     if(resourceConfiguration?.reconfigure&&options.device){const device=resolveDevice(options.device);resourceConfiguration.reconfigure(resourceProfileFor(device,{left:0,right:0,top:device.statusBarHeightDp??24,bottom:device.navigation==='buttons'?48:24}));}
     if(resourceConfiguration&&frameworkResources)frameworkResources.table.options.chooseConfiguration=resourceConfiguration.chooseConfiguration;
     const resources = await prepareResources(archive, names, { ...options, frameworkResources: frameworkResources?.table,
-      frameworkGetXml: frameworkResources?.getXml,resourceConfiguration, onLayoutFiles: layoutFilesKnown }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
+      frameworkGetXml: frameworkResources?.getXml,resourceConfiguration, onLayoutFiles: layoutFilesKnown, onColorFiles: colorFilesKnown }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
     return { frameworkResources, resourceConfiguration, resources };
-  } finally { layoutFilesKnown(null); } }, { onProgress: options.onProgress, warnings });
+  } finally { layoutFilesKnown(null); colorFilesKnown(null); } }, { onProgress: options.onProgress, warnings });
   const files = [], dexSummaries = [];
   for (let i = 0; i < dexFiles.length; i++) {
     const filename = dexFiles[i];
@@ -675,6 +677,12 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const ACCOUNT_TYPES=new Set(['Landroid/accounts/AbstractAccountAuthenticator;','Landroid/accounts/AccountAuthenticatorResponse;','Landroid/accounts/AccountAuthenticatorActivity;','Landroid/accounts/IAccountAuthenticator;','Landroid/accounts/IAccountAuthenticatorResponse;']);
   const appAuthenticator=files.some(file=>file.dex.types.some(type=>ACCOUNT_TYPES.has(type)));
   const usesAccounts=appAuthenticator||(options.companionPackages?.length??0)>0||!!options.microg;
+  // the original color math (framework-aosp/profiles/color): ColorStateList applies android:lStar with it. A color state list of the APK that gives the attribute (its id in the
+  // compiled XML's resource map; a file that cannot be read counts as giving it, which only loads more), or a companion package (its resources are not scanned at load)
+  const LSTAR_ID=[0x47,0x06,0x01,0x01];   // android:lStar 0x01010647
+  const usesColorMath=(options.companionPackages?.length??0)>0||!!options.microg||options.enableColorProfile===undefined&&!!options.frameworkProfileProviders?.color&&((await colorFilesReady)??[...archive.entries.keys()].filter(name=>/^res\/color[^/]*\/[^/]+\.xml$/.test(name))).slice(0,4096).some(name=>{
+    const size=archive.entries.get(name)?.size;if(size===undefined)return false;if(size>65536)return true;let data;try{data=archive.inspectSync(name,65536);}catch{return true;}return containsPattern(data,LSTAR_ID);
+  });
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
@@ -685,6 +693,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'media',explicit:options.enableMediaProfile,automatic:usesMedia,reason:'APK-references-android.media.session.PlaybackState-or-MediaMetadata'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
+    {name:'color',explicit:options.enableColorProfile,automatic:usesColorMath,reason:(options.companionPackages?.length??0)>0||!!options.microg?'companion-package-installed':'APK-color-state-list-gives-android:lStar'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
   for(const selection of profiles){

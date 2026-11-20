@@ -38618,5 +38618,55 @@
     "sha256": "4ff907685a4126997950c79cf23d672e794d3a7e42b9a588576dc23de60c3306",
     "bytes": 6359,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/graphics/ColorUtils.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/graphics/ColorUtils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/graphics/ColorUtils.java?format=TEXT",
+    "sha256": "9e5508b83f9ca838feaa122a332218143116bbd413df0db96111ae8c93d23009",
+    "bytes": 27821,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/graphics/cam/Cam.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/graphics/cam/Cam.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/graphics/cam/Cam.java?format=TEXT",
+    "sha256": "f8ee3f0690c70a1a44e7a95136e2d7e1553669496bc52e6e12811a1e98525abb",
+    "bytes": 21950,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/graphics/cam/CamUtils.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/graphics/cam/CamUtils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/graphics/cam/CamUtils.java?format=TEXT",
+    "sha256": "f5f1420a3e3cc62f36ac8317cad121d6e49a17be41e62cbac08d81561f0a4b4d",
+    "bytes": 11014,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/graphics/cam/Frame.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/graphics/cam/Frame.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/graphics/cam/Frame.java?format=TEXT",
+    "sha256": "cdd8cb2533cff64c16e0de97f9a2bc9a13288c1e68fc0827c854e33b8e83162e",
+    "bytes": 7987,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/com/android/internal/graphics/cam/HctSolver.java",
+    "localPath": "framework-aosp/upstream/com/android/internal/graphics/cam/HctSolver.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/com/android/internal/graphics/cam/HctSolver.java?format=TEXT",
+    "sha256": "09cb5abf3a2859068904307681ae2c02721d9ca5ee3c4d5ebdf49ab218a459d3",
+    "bytes": 29618,
+    "license": "Apache-2.0"
   }
 ]

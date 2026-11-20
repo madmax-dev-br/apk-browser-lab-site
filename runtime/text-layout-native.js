@@ -1,8 +1,8 @@
-import {APKError} from './apk-error.js?v=fef4a080c36e';
-import {getPaintStateByHandle} from './paint-host.js?v=fef4a080c36e';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=fef4a080c36e';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=fef4a080c36e';
-import { runTextStyle, shapingFace } from './skia-paragraph.js?v=fef4a080c36e';
+import {APKError} from './apk-error.js?v=e5138148cfef';
+import {getPaintStateByHandle} from './paint-host.js?v=e5138148cfef';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=e5138148cfef';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=e5138148cfef';
+import { runTextStyle, shapingFace } from './skia-paragraph.js?v=e5138148cfef';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -111,7 +111,7 @@ export function createTextLayoutNativeBindings(){
  });
  add(BUILDER,'nAddReplacementRun',['J','J','I','I','F'],'V',()=>fail('ReplacementSpan native measured-text runs are unavailable'));
  add(BUILDER,'nBuildMeasuredText',['J','J','[C','Z','Z','Z'],'J',(r,[h,hint,buffer,hyphenation,layout,fast])=>{
-  const b=get(r,h,'builder'),text=chars(r,buffer);validateText(text);if(fast)fail('MeasuredText without kerning (fast mode) is unavailable');   // hyphenation points would come from Minikin's pattern files, which the virtual device does not have: computing them finds noneif(hint)get(r,hint,'measured');
+  const b=get(r,h,'builder'),text=chars(r,buffer);validateText(text);   // hyphenation points would come from Minikin's pattern files, which the virtual device does not have: computing them finds none. The fast mode (MeasuredText.Builder.HYPHENATION_MODE_FAST, Minikin's ignoreHyphenKerning) only measures the pieces around a hyphenation point without the hyphen's kerning: with no point found it measures the same text as the normal modeif(hint)get(r,hint,'measured');
   if((b.runs.at(-1)?.end??0)!==text.length)fail('Measured-text styles do not cover the actual text');
   const m={text,runs:b.runs.map(run=>({...run,paint:{...run.paint}})),computeLayout:!!layout};
   m.scaleX=m.runs[0]?.paint.textScaleX??1;if(m.runs.some(run=>run.paint.textScaleX!==m.scaleX))fail('Text runs with different Paint.getTextScaleX() values in one paragraph (ScaleXSpan) are not available: the paragraph shaper has one horizontal scale');

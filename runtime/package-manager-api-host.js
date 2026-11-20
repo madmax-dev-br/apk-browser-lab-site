@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=fef4a080c36e';
-import { APKError } from './apk-error.js?v=fef4a080c36e';
+import { createHostRegistry } from './host-contract.js?v=e5138148cfef';
+import { APKError } from './apk-error.js?v=e5138148cfef';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -108,9 +108,20 @@ export function createPackageManagerApiHost(platform) {
     return fields.get(`${ITEM}->name:${STRING}`) ?? fields.get(`${ITEM}->packageName:${STRING}`);
   };
   def(ITEM, 'loadLabel', `(${PM})${CHARS}`, (r, _m, [self, pm]) => { if (nullish(pm)) npe(r); return itemLabel(r, self, pm); });
-  const iconResource = (r, self) => { const own = itemFields(r, self).get(`${ITEM}->icon:I`) ?? 0; if (own) return own; const icon = platform.manifest?.application?.icon; return typeof icon === 'number' ? icon : 0; };
+  // ComponentInfo.getIconResource: its own icon, else its application's; the item's package names the resources the icon is read from (PackageManager.loadItemIcon ->
+  // getDrawable(packageName, icon, appInfo)), so an ApplicationInfo or ComponentInfo of a second installed package loads that package's icon
+  const itemPackage = (r, self) => text(r, itemFields(r, self).get(`${ITEM}->packageName:${STRING}`)) ?? own();
+  const iconResource = (r, self) => {
+    const mine = itemFields(r, self).get(`${ITEM}->icon:I`) ?? 0; if (mine) return mine;
+    const app = appInfoOf(r, self); if (!nullish(app)) { const icon = itemFields(r, app).get(`${ITEM}->icon:I`) ?? 0; if (icon) return icon; }
+    if (itemPackage(r, self) !== own()) return 0;
+    const icon = platform.manifest?.application?.icon; return typeof icon === 'number' ? icon : 0;
+  };
   def(COMPONENT_INFO, 'getIconResource', '()I', (r, _m, [self]) => iconResource(r, self));
-  def(ITEM, 'loadIcon', `(${PM})${DRAWABLE}`, (r, _m, [self, pm]) => { if (nullish(pm)) npe(r); const id = iconResource(r, self); return id ? iconOf(r, id) : defaultIcon(r); });
+  // the icon of an item of a package that is neither this app nor a visible companion (a system package): a framework resource is read from the system Resources; any other
+  // id has no resources to be read from, and PackageManager.loadItemIcon falls back to the default icon, as getDrawable's NameNotFoundException does on a device
+  const itemIcon = (r, id, pkg) => !id ? defaultIcon(r) : pkg === own() || companionNamed(r, pkg) ? iconOf(r, id, pkg) : (id >>> 24) === 1 ? call(r, callStatic(r, RESOURCES, 'getSystem', [], RESOURCES), RESOURCES, 'getDrawable', ['I', 'Landroid/content/res/Resources$Theme;'], DRAWABLE, [id, null]) : defaultIcon(r);
+  def(ITEM, 'loadIcon', `(${PM})${DRAWABLE}`, (r, _m, [self, pm]) => { if (nullish(pm)) npe(r); return itemIcon(r, iconResource(r, self), itemPackage(r, self)); });
   def(ITEM, 'loadXmlMetaData', `(${PM}${STRING})Landroid/content/res/XmlResourceParser;`, (r, _m, [self, pm, name]) => {
     const meta = itemFields(r, self).get(`${ITEM}->metaData:${BUNDLE}`) ?? null; if (nullish(meta) || nullish(name)) return null;
     if (!call(r, meta, BUNDLE, 'containsKey', [STRING], 'Z', [name])) return null;
@@ -123,7 +134,7 @@ export function createPackageManagerApiHost(platform) {
     const info = componentOf(r, self); if (nullish(info)) return null;
     const label = itemLabel(r, info, pm); return nullish(label) ? null : r.stringCharacters(call(r, label, OBJECT, 'toString', [], STRING)).trim();
   });
-  def(RESOLVE_INFO, 'loadIcon', `(${PM})${DRAWABLE}`, (r, _m, [self, pm]) => { const info = componentOf(r, self); if (nullish(info)) return defaultIcon(r); const id = iconResource(r, info); return id ? iconOf(r, id) : defaultIcon(r); });
+  def(RESOLVE_INFO, 'loadIcon', `(${PM})${DRAWABLE}`, (r, _m, [self, pm]) => { const info = componentOf(r, self); if (nullish(info)) return defaultIcon(r); return itemIcon(r, iconResource(r, info), itemPackage(r, info)); });
   def(RESOLVE_INFO, 'getIconResource', '()I', (r, _m, [self]) => { const own = itemFields(r, self).get(`${RESOLVE_INFO}->icon:I`) ?? 0; if (own) return own; const info = componentOf(r, self); return nullish(info) ? 0 : iconResource(r, info); });
   def(PM, 'getUserBadgedIcon', `(${DRAWABLE}Landroid/os/UserHandle;)${DRAWABLE}`, (r, _m, [, icon]) => icon);   // single user: no work badge
   def(PM, 'getUserBadgedDrawableForDensity', `(${DRAWABLE}Landroid/os/UserHandle;Landroid/graphics/Rect;I)${DRAWABLE}`, (r, _m, [, drawable]) => drawable);

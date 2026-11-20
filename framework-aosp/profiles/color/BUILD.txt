@@ -1,0 +1,21 @@
+Original Android 13 color profile (com.android.internal.graphics.ColorUtils and the CAM16 / HCT color math)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-color-profile.sh        (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/color-state-list-lstar.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/color-sources.txt, compiled unchanged (no source transform):
+com.android.internal.graphics.ColorUtils and com.android.internal.graphics.cam.Cam, CamUtils, Frame and HctSolver. They depend only on
+android.graphics.Color and android.util.MathUtils of the default DEX.
+
+Who calls them: android.content.res.ColorStateList (an original class of the default DEX). When an <item> of a color state list gives
+android:lStar, ColorStateList.modulateColor converts the color to CAM16 (ColorUtils.colorToCAM), keeps its hue and chroma, asks for the
+requested L* (ColorUtils.CAMToColor -> HctSolver.solveToInt) and then applies the alpha modulation, exactly as on Android 13. Material 3
+color resources use it.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
+(src/apk-loader.js) adds this DEX when a color state list of the APK (a res/color*/ XML, or any XML the resource table types as a
+color, whatever its ZIP path) gives android:lStar (attribute 0x01010647 in the XML's resource map), when a companion package is
+installed (its resources are not scanned at load; microG's Material 3 screens use lStar colors), or when the loader option
+enableColorProfile is true. Without the profile an lStar item fails explicitly:
+"Unsupported API/method: Lcom/android/internal/graphics/ColorUtils;->colorToCAM(I)Lcom/android/internal/graphics/cam/Cam;".

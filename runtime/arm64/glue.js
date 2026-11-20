@@ -1,11 +1,11 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=fef4a080c36e';
-import { Arm64Process } from './process.js?v=fef4a080c36e';
-import { createLibc } from './libc.js?v=fef4a080c36e';
-import { attachArm64Jni } from './jni.js?v=fef4a080c36e';
-import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=fef4a080c36e';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=e5138148cfef';
+import { Arm64Process } from './process.js?v=e5138148cfef';
+import { createLibc } from './libc.js?v=e5138148cfef';
+import { attachArm64Jni } from './jni.js?v=e5138148cfef';
+import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=e5138148cfef';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';

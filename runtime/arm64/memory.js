@@ -1,7 +1,7 @@
 // The flat address space of the ARM64 native process (src/arm64/): one little-endian buffer from address 0. Libraries are mapped by src/arm64/elf.js, the heap
 // (malloc) and the thread stacks by src/arm64/process.js. An access outside it is a segmentation fault: it stops the run with an error naming the address and
 // the instruction, as SIGSEGV would end the process.
-import { APKError } from '../apk-error.js?v=fef4a080c36e';
+import { APKError } from '../apk-error.js?v=e5138148cfef';
 
 export class Arm64Memory {
   // The address space is one resizable ArrayBuffer grown in place: the operating system backs its pages only when they are touched, so a large reservation (a runtime that

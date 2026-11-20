@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=fef4a080c36e';
-import { networkOf } from './network-native.js?v=fef4a080c36e';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=fef4a080c36e';
-import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=fef4a080c36e';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=fef4a080c36e';
-import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=fef4a080c36e';
-import { endpointHost } from './relay-mux.js?v=fef4a080c36e';
-import { siteOf } from './cookie-host.js?v=fef4a080c36e';
+import { APKError } from './apk-error.js?v=e5138148cfef';
+import { networkOf } from './network-native.js?v=e5138148cfef';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=e5138148cfef';
+import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=e5138148cfef';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=e5138148cfef';
+import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=e5138148cfef';
+import { endpointHost } from './relay-mux.js?v=e5138148cfef';
+import { siteOf } from './cookie-host.js?v=e5138148cfef';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and

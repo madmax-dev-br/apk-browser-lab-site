@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=fef4a080c36e';
+import { APKError } from './apk-runtime.js?v=e5138148cfef';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -194,7 +194,18 @@ export function measureSkiaRunAdvances(backend,text,{isRtl=false,start=0,end=tex
     const missing=unresolved(paragraph);if(missing.length)fail('Run font lacks glyphs: '+missing.slice(0,8).map(code=>'U+'+code.toString(16)).join(','));
     if(paragraph.getNumberOfLines()!==1)fail('Run shaping unexpectedly produced multiple lines');
     const upTo=offset=>{let width=0;for(const box of paragraph.getRectsForRange(start,offset,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight))width+=box.rect[2]-box.rect[0];return width;};
-    let previous=0;for(let index=start;index<end;index++){const next=upTo(index+1);advances[index-start]=Math.fround(Math.max(0,next-previous)*textScaleX);previous=Math.max(previous,next);}
+    // Minikin (Layout::doLayoutRun) adds the advance of every glyph to the first UTF-16 unit of its cluster, so a cluster's advance is on its first unit and the others are 0 (a
+    // surrogate pair, a ligature, a conjunct, a base and its marks). The cluster starts are the text offsets of the shaped glyphs (UTF-8 in SkParagraph's runs); a code point
+    // with no glyph of its own belongs to the cluster before it. The white space SkParagraph leaves out of its shaped line (at the end of the run, or a run of spaces only) is
+    // one cluster per code point, as HarfBuzz shapes it.
+    const utf16At=new Map();for(let index=0,bytes=0;;){utf16At.set(bytes,index);if(index>=text.length)break;const code=text.codePointAt(index);bytes+=code<0x80?1:code<0x800?2:code<0x10000?3:4;index+=code>0xffff?2:1;}
+    const starts=new Set();let lines=null,shapedEnd=0;
+    try{lines=paragraph.getShapedLines();for(const line of lines)for(const run of line.runs)for(const offset of run.offsets){const index=utf16At.get(offset);if(index===undefined)continue;shapedEnd=Math.max(shapedEnd,index);if(index>=start&&index<end)starts.add(index);}}
+    finally{for(const line of lines??[])for(const run of line.runs)run.typeface?.delete();}
+    for(let index=Math.max(start,shapedEnd);index<end;index+=text.codePointAt(index)>0xffff?2:1)starts.add(index);
+    starts.add(start);
+    const bounds=[...starts].sort((a,b)=>a-b);bounds.push(end);
+    let previous=0;for(let i=0;i+1<bounds.length;i++){const next=upTo(bounds[i+1]);advances[bounds[i]-start]=Math.fround(Math.max(0,next-previous)*textScaleX);previous=Math.max(previous,next);}
     if(!Number.isFinite(previous))fail('SkParagraph returned a non-finite run advance');
     return {total:Math.fround(previous*textScaleX),advances};
   }finally{paragraph?.delete();builder?.delete();}
