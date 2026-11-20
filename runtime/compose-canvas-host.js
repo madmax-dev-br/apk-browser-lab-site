@@ -1,10 +1,10 @@
-import {APKError} from './apk-runtime.js?v=bcd37ec74124';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=bcd37ec74124';
-import {getVectorGraphics} from './vector-native.js?v=bcd37ec74124';
-import {deferRaster} from './deferred-raster.js?v=bcd37ec74124';
+import {APKError} from './apk-runtime.js?v=d5fbbbba7c85';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=d5fbbbba7c85';
+import {getVectorGraphics} from './vector-native.js?v=d5fbbbba7c85';
+import {deferRaster} from './deferred-raster.js?v=d5fbbbba7c85';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
-const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
+import {isComposeOwner} from './compose-owner.js?v=d5fbbbba7c85';
 const keys=new Set();
 for(const signature of ['insertReorderBarrier()V','insertInorderBarrier()V'])keys.add('Landroid/graphics/Canvas;->'+signature);
 for(const [owner,signatures] of [[VIEW,['draw(Landroid/graphics/Canvas;)V','onDraw(Landroid/graphics/Canvas;)V','dispatchDraw(Landroid/graphics/Canvas;)V','getDrawingTime()J','updateDisplayListIfDirty()Landroid/graphics/RenderNode;']],[GROUP,['dispatchDraw(Landroid/graphics/Canvas;)V','drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z']]])for(const signature of signatures)keys.add(owner+'->'+signature);
@@ -286,8 +286,8 @@ export function createComposeCanvasHost(platform){
         };
         // A group of the app whose class overrides draw(Canvas) (TextInputLayout draws its floating hint and the box's underline there, after super.draw has drawn the children):
         // the override runs as a parent would call it; what it draws before its children (onDraw) is the content layer, what it draws after them is a layer over them (overlaySVG).
-        const drawOverride=isGroup&&!r.isSubtype(view.type,OWNER)?r.objectOverride(view.type,'draw(Landroid/graphics/Canvas;)V'):null,appGroupDraw=!!drawOverride&&!r.dex.bootClasses?.has(drawOverride.owner);
-        const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!r.isSubtype(view.type,OWNER)&&!appGroupDraw;
+        const composeOwner=isComposeOwner(r,view.type),drawOverride=isGroup&&!composeOwner?r.objectOverride(view.type,'draw(Landroid/graphics/Canvas;)V'):null,appGroupDraw=!!drawOverride&&!r.dex.bootClasses?.has(drawOverride.owner);
+        const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!composeOwner&&!appGroupDraw;
         if(appGroupDraw){
           const [gw,gh]=dimensions(view);
           if(view.laidOut&&gw&&gh&&r.skiaHost){
@@ -325,13 +325,13 @@ export function createComposeCanvasHost(platform){
             r.record(`DRAW framework View: original ${view.type} onDraw -> Skia CPU`);
           })!==false)return;
         }
-        if(r.isSubtype(view.type,OWNER)||customLeaf&&ownDraw){
+        if(composeOwner||customLeaf&&ownDraw){
           const [width,height]=dimensions(view);if(!view.laidOut||!width||!height)return;
           if(!r.skiaHost)fail('Compose drawing requires the verified Skia Canvas backend');
           const target=view.contentCanvas??=r.allocate(CANVAS);
           if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
           const graphics=getVectorGraphics(r);graphics.resetCanvas(target,width,height);
-          if(r.isSubtype(view.type,OWNER)){
+          if(composeOwner){
             // The Compose owner draws into its RenderNode's recording DisplayListCanvas (hardware path: GraphicsLayer RenderNodes, reorder barriers, HWUI-model shadows); the software Canvas below only replays that node.
             const node=updateDisplayList(r,receiver),handle=[...r.object(node).fields.entries()].find(([key])=>key.endsWith('->mNativeRenderNode:J'))?.[1];
             if(handle===undefined)fail('Compose owner RenderNode has no native handle');

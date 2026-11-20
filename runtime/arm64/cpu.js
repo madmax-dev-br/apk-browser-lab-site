@@ -5,8 +5,9 @@
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=bcd37ec74124';
-import { executeNeon } from './neon.js?v=bcd37ec74124';
+import { APKError } from '../apk-error.js?v=d5fbbbba7c85';
+import { executeNeon } from './neon.js?v=d5fbbbba7c85';
+import { DecodeCache } from './decode-cache.js?v=d5fbbbba7c85';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -38,6 +39,7 @@ function decodeBitMasks(n, imms, immr, immediate, width) {
   return { wmask: replicate(ror(welem, r, esize), esize, width), tmask: replicate(telem, esize, width) };
 }
 
+export { decodeBitMasks, ror, ones };   // also src/arm64/decode-cache.js
 export class Arm64Cpu {
   constructor(memory, { host = () => { throw new Error('no host'); }, maxSteps = 2e9 } = {}) {
     this.mem = memory; this.host = host; this.maxSteps = maxSteps;
@@ -93,14 +95,14 @@ export class Arm64Cpu {
   }
   /** Runs until `stopAt` ('done'), or `budget` instructions ('yield'), or a host function that must wait for another thread ('blocked': pc stays on that call to retry it). */
   run(stopAt, budget = Infinity) {
-    const mem = this.mem; let left = budget;
+    const mem = this.mem, cache = mem.decodeCache ??= new DecodeCache(mem); let left = budget;
     while (this.pc !== stopAt) {
       if (this.pc >= HOST_BASE) { const returnTo = Number(this.x[30]); if (this.host(this, (this.pc - HOST_BASE) / 16) === BLOCKED) return 'blocked'; if (this.exited) return 'exited'; if (this.jumpTo !== undefined) { this.pc = this.jumpTo; this.jumpTo = undefined; } else this.pc = returnTo; continue; }   // jumpTo: longjmp's target
       if (--left < 0) return 'yield';
       if (++this.steps > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps}) exceeded at pc 0x${this.pc.toString(16)}`, { kind: 'arm64-budget' });
-      const word = mem.fetch32(this.pc), at = this.pc;
+      const at = this.pc, step = cache.get(this, at);   // decoded once per address (src/arm64/decode-cache.js)
       this.pc += 4;
-      this.execute(word, at);
+      step(this);
       if (this.svcBlocked) { this.svcBlocked = false; return 'blocked'; }
     }
     return 'done';

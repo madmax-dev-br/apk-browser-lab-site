@@ -1,7 +1,7 @@
 // The flat address space of the ARM64 native process (src/arm64/): one little-endian buffer from address 0. Libraries are mapped by src/arm64/elf.js, the heap
 // (malloc) and the thread stacks by src/arm64/process.js. An access outside it is a segmentation fault: it stops the run with an error naming the address and
 // the instruction, as SIGSEGV would end the process.
-import { APKError } from '../apk-error.js?v=bcd37ec74124';
+import { APKError } from '../apk-error.js?v=d5fbbbba7c85';
 
 export class Arm64Memory {
   // The address space is one resizable ArrayBuffer grown in place: the operating system backs its pages only when they are touched, so a large reservation (a runtime that
@@ -36,7 +36,7 @@ export class Arm64Memory {
     }
   }
   write(address, value, bytes) {
-    this.check(address, bytes, 'write');
+    this.check(address, bytes, 'write'); if (this.decodeCache !== undefined) this.decodeCache.written(address, bytes);
     switch (bytes) {
       case 1: this.u8[address] = Number(value & 0xffn); return; case 2: this.dv.setUint16(address, Number(value & 0xffffn), true); return;
       case 4: this.dv.setUint32(address, Number(value & 0xffffffffn), true); return; case 8: this.dv.setBigUint64(address, BigInt.asUintN(64, value), true); return;
@@ -44,10 +44,10 @@ export class Arm64Memory {
     }
   }
   read64(address) { return this.read(address, 8); } write64(address, value) { this.write(address, BigInt(value), 8); }
-  readU32(address) { this.check(address, 4, 'read'); return this.dv.getUint32(address, true); } writeU32(address, value) { this.check(address, 4, 'write'); this.dv.setUint32(address, value >>> 0, true); }
+  readU32(address) { this.check(address, 4, 'read'); return this.dv.getUint32(address, true); } writeU32(address, value) { this.check(address, 4, 'write'); if (this.decodeCache !== undefined) this.decodeCache.written(address, 4); this.dv.setUint32(address, value >>> 0, true); }
   readPtr(address) { return Number(this.read(address, 8)); } writePtr(address, value) { this.write(address, BigInt(value), 8); }
   bytes(address, length) { this.check(address, length, 'read'); return this.u8.subarray(address, address + length); }
-  copyIn(address, data) { this.check(address, data.length, 'write'); this.u8.set(data, address); }
-  fill(address, value, length) { this.check(address, length, 'write'); this.u8.fill(value, address, address + length); }
+  copyIn(address, data) { this.check(address, data.length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.written(address, data.length); this.u8.set(data, address); }
+  fill(address, value, length) { this.check(address, length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.written(address, length); this.u8.fill(value, address, address + length); }
   cString(address, limit = 1 << 20) { this.check(address, 1, 'read'); let end = address; while (this.u8[end] !== 0) { end++; if (end - address > limit || end >= this.size) this.fault(address, end - address, 'unterminated string read'); } return this.u8.subarray(address, end); }
 }
