@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=5376509d4366';
+import { APKError } from './apk-runtime.js?v=aaf505bc5b3f';
 const KEY_LISTENER = 'Landroid/text/method/KeyListener;', TEXT_KEYS = 'Landroid/text/method/TextKeyListener;', CAPITALIZE = 'Landroid/text/method/TextKeyListener$Capitalize;';
 const SINGLE_LINE = 'Landroid/text/method/SingleLineTransformationMethod;', TRANSFORM = 'Landroid/text/method/TransformationMethod;';
 const FACTORY = 'Landroid/text/Editable$Factory;', EDITABLE = 'Landroid/text/Editable;', TEXT = 'Landroid/widget/TextView;';

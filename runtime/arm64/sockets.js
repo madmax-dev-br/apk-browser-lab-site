@@ -6,9 +6,9 @@
 // name nobody bound refuses the connection, as on a device). UDP has no path (the relay
 // tunnels TCP only): a UDP socket opens, every send fails with ENETUNREACH (recorded) and nothing arrives, as on a network that blocks UDP; QUIC stacks then fall back to TCP. A blocking call waits as a native thread wait (src/arm64/threads.js);
 // on the thread that runs Java the network cannot be waited for synchronously, so that call fails by name.
-import { APKError } from '../apk-error.js?v=5376509d4366';
-import { BLOCKED } from './cpu.js?v=5376509d4366';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=5376509d4366';
+import { APKError } from '../apk-error.js?v=aaf505bc5b3f';
+import { BLOCKED } from './cpu.js?v=aaf505bc5b3f';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=aaf505bc5b3f';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;

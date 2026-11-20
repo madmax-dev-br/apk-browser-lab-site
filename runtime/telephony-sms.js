@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=5376509d4366';
+import { APKError } from './apk-error.js?v=aaf505bc5b3f';
 
 // An incoming SMS on the virtual device (the Device panel's "Incoming SMS", the Node API platform.telephony.receiveSms). The device plays the radio and the network: it builds the
 // 3GPP TS 23.040 SMS-DELIVER PDUs a network would deliver (no service-centre address, TP-OA the sender, TP-DCS 0x08 = UCS-2 so any text is carried as it is typed, the

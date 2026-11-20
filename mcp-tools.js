@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=5376509d4366';
+import { blockValue, outputsOf } from './plugin-host.js?v=aaf505bc5b3f';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
