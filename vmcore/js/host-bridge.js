@@ -62,22 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=c2aef97d559f';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=c2aef97d559f';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=c2aef97d559f';
-import { HandleTable } from './handles.js?v=c2aef97d559f';
-import { Exceptions } from './exceptions.js?v=c2aef97d559f';
-import { coreImports } from './boundary-imports.js?v=c2aef97d559f';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=c2aef97d559f';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=c2aef97d559f';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=c2aef97d559f';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=c2aef97d559f';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=c2aef97d559f';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=c2aef97d559f';
-import { Blocked } from '../../runtime/scheduler.js?v=c2aef97d559f';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=c2aef97d559f';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=c2aef97d559f';
-import { PaintRecords } from './paint-record.js?v=c2aef97d559f';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=da38fa425504';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=da38fa425504';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=da38fa425504';
+import { HandleTable } from './handles.js?v=da38fa425504';
+import { Exceptions } from './exceptions.js?v=da38fa425504';
+import { coreImports } from './boundary-imports.js?v=da38fa425504';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=da38fa425504';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=da38fa425504';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=da38fa425504';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=da38fa425504';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=da38fa425504';
+import { timedExports, timedBridge } from './core-timing.js?v=da38fa425504';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=da38fa425504';
+import { Blocked } from '../../runtime/scheduler.js?v=da38fa425504';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=da38fa425504';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=da38fa425504';
+import { PaintRecords } from './paint-record.js?v=da38fa425504';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -108,7 +109,6 @@ export const Status = Object.freeze({ OK: 0, BUDGET: 1, OUT_OF_MEMORY: 5, UNSUPP
   HOST_THROW: 0x7fff0110, HOST_FRAME: 0x7fff0111 });
 export const STATUS_NAMES = Object.freeze({ ...STATUS, 64: 'host step not supported', 65: 'host failed', 66: 'host wait', 80: 'thread blocked', 81: 'yielded' });
 const METHOD_KIND_UNBOUND = 0x7fff0003, METHOD_KIND_UNLINKED = 0x7fff0001;
-const TIME_SAMPLE = 16;   // one bridged call in 16 per bridge reads the clock (bridgeBody)
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
 const OWN_STEP = Object.freeze({ kind: 'own', parked: null });   // CoreThreads' base step of a nested run with nothing parked (runOn)
 const VM_GC = 24, STRING = 'Ljava/lang/String;', CLASS_TYPE = 'Ljava/lang/Class;', CLASS_OBJECT_CLASS = 8, INITIALIZED = 2;
@@ -149,7 +149,7 @@ export class WasmEngine {
     this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives, ...LINKER_LIMITS });
     this.exceptions = new Exceptions(this.linker);
     this.WIDE_HIGH = runtime.argumentWords(['J'], [0n])[1];   // the JavaScript VM's marker of a long/double's second register
-    this.pins = []; this.pendingHost = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
+    this.pins = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
     this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0, grows: 0, grownBytes: 0 };
     installHostLinking(this.linker, runtime, { staticValue: (reference, slot) => this.writeValue(slot, reference.type, runtime.readStatic(reference)) });
     this.installRouting();
@@ -218,9 +218,10 @@ export class WasmEngine {
     const { linker, exceptions, memory } = this;
     // the linker's work (a method's code copied and its constants resolved the first time they are used) is first-time work: timed as the JavaScript VM times its method decoding
     const tbLink = this.runtime.tb, resolve = (t, method, what) => { const previous = tbLink.enter(BUCKET.DECODE); try { return linker.imports.resolve(t, method, what); } finally { tbLink.leave(previous); } };
-    const imports = coreImports(memory, { resolve, exception: (...a) => this.exceptionEvent(...a), bridge: (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0),
+    this.runtime.tb.setBase(BUCKET.OTHER);   // outside the core's runs the Worker runs host code and scheduler JavaScript (src/time-breakdown.js)
+    const imports = coreImports(memory, { resolve, exception: (...a) => this.exceptionEvent(...a), bridge: timedBridge(this.runtime.tb, (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0)),
       field: (t, object, caller, constant, op, reg) => this.hostField(t >>> 0, object >>> 0, caller >>> 0, constant >>> 0, op >>> 0, reg >>> 0) });
-    const { exports } = await WebAssembly.instantiate(module, imports);
+    const { exports: rawExports } = await WebAssembly.instantiate(module, imports), exports = timedExports(rawExports, this.runtime.tb);   // the core's runs own the clock (vmcore/js/core-timing.js)
     this.x = exports;
     if (exports.vm_native_count() !== NATIVE_COUNT) throw new Error(`vmcore: core.wasm has ${exports.vm_native_count()} natives, vmcore/js/natives.js lists ${NATIVE_COUNT}`);
     const LAYOUT = this.layout; this.mainRecord = LAYOUT.THREADS;
@@ -446,9 +447,7 @@ export class WasmEngine {
       }
       return handles.handleOf(at);
     };
-    // The breakdown's per-key and per-thread host counts of unsampled bridged calls (bridgeBody) are added before anything reads or resets them, or switches the thread.
     const tb = rt.tb;
-    for (const name of ['snapshot', 'reset', 'thread']) { const original = tb[name]; tb[name] = function (...a) { if (engine.pendingHost.length) engine.flushHostCounts(); return original.apply(this, a); }; }
     // Boxes are records with a payload (natives.h): boxPrimitive goes through the core's own (vm_box), with the cache the box natives use. Boolean keeps the JavaScript VM's
     // path (its two constants are host-modelled statics).
     const boxPrimitive = proto.boxPrimitive;
@@ -458,10 +457,10 @@ export class WasmEngine {
     const identity = linker.hostState + HOST_STATE_THREAD.valid;
     rt.onThreadIdentity = () => { engine.u32[identity >>> 2] = 0; };
     rt.onThreadIdentity();
-    // the time breakdown's buckets as the JavaScript VM charges them: Java run from host code is interpreter time (APKRuntime.execute), class initialization its own
+    // the time breakdown's buckets: Java run from host code is a core run (timedExports), class initialization its own
     // (an initialized class returns before the clock is read, as APKRuntime.initialize does)
     rt.initialize = type => { if (engine.initialized(type)) return; const previous = tb.enter(BUCKET.INIT); try { return engine.initialize(type); } finally { tb.leave(previous); } };
-    rt.execute = (method, code, args) => { const previous = tb.enter(BUCKET.INTERP); try { return engine.execute(method, args); } finally { tb.leave(previous); } };
+    rt.execute = (method, code, args) => engine.execute(method, args);   // the core's run owns the clock (timedExports)
     rt.readStatic = reference => engine.readStatic(reference, proto.readStatic);
     rt.writeStatic = (reference, value) => engine.writeStatic(reference, value, proto.writeStatic);
     rt.captureStack = () => engine.captureStack();
@@ -771,39 +770,12 @@ export class WasmEngine {
   }
   /**
    * APKRuntime.bridge(bridge.selected, args, mode, bridge.key, bridge) -- the direct body of a pure java.lang bridge (DIRECT_BRIDGES) or bridgeCore -- with its time accounting
-   * (src/time-breakdown.js) kept equal in what it counts and sampled in what it times: every call counts one host-bucket entry, one call of its key and one host call of the
-   * thread, exactly; one call in TIME_SAMPLE of each bridge reads the clock around the body, and its host time stands for the TIME_SAMPLE calls (charged to the host bucket and to
-   * the key, and taken off the bucket the unsampled ones ran in), instead of two clock reads per call. A bridge seen running Java inside (a nested run) is timed on every call
-   * from then on: extrapolating one call of it would multiply the Java it ran. The key and thread counts of the unsampled calls are added on the sampled
-   * one (and whenever the breakdown is read: flushHostCounts).
+   * (TimeBreakdown.callBegin / callEnd): every call is counted, and the clock is read only for the calls that stand for the others (the first ones, the one the core's import wrapper
+   * sampled, a bridge that runs Java inside or is slow, every call in precise mode).
    */
   bridgeBody(rt, bridge, args, mode) {
-    const tb = rt.tb;
-    if (bridge.vmNests === true) {   // a bridge that runs Java inside (a callback, a traversal): every call timed, the Java it runs charged where APKRuntime.execute charges it
-      const previous = tb.enter(BUCKET.HOST), startedAt = tb.last;
-      try { return this.runBridge(rt, bridge, args, mode); }
-      finally { tb.leave(previous); tb.hostCall(bridge.key, tb.last - startedAt); }
-    }
-    const sample = bridge.vmSample = (bridge.vmSample ?? 0) + 1, nested = this.stats.nested;
-    if (sample < TIME_SAMPLE) {
-      tb.counts[BUCKET.HOST]++;
-      bridge.vmPending = (bridge.vmPending ?? 0) + 1;
-      if (bridge.vmListed !== true) { bridge.vmListed = true; this.pendingHost.push(bridge); }
-      try { return this.runBridge(rt, bridge, args, mode); } finally { if (this.stats.nested !== nested) bridge.vmNests = true; }
-    }
-    bridge.vmSample = 0;
-    const previous = tb.enter(BUCKET.HOST), startedAt = tb.last, hostBefore = tb.ms[BUCKET.HOST];
-    try { return this.runBridge(rt, bridge, args, mode); }
-    finally {
-      tb.leave(previous);
-      const ms = tb.last - startedAt;
-      if (this.stats.nested === nested) {   // a leaf call: its time stands for the TIME_SAMPLE calls of this bridge since the last sample
-        const others = (TIME_SAMPLE - 1) * (tb.ms[BUCKET.HOST] - hostBefore);
-        tb.ms[BUCKET.HOST] += others; tb.ms[previous] -= others; if (previous === BUCKET.INTERP) tb.acc.ms -= others;
-        tb.hostCall(bridge.key, TIME_SAMPLE * ms);
-      } else { bridge.vmNests = true; tb.hostCall(bridge.key, ms); }
-      if (bridge.vmPending > 0) this.flushHost(tb, bridge);
-    }
+    const tb = rt.tb, previous = tb.callBegin(bridge, bridge.key), startedAt = tb.last, runs = tb.runs;
+    try { return this.runBridge(rt, bridge, args, mode); } finally { tb.callEnd(bridge, previous, startedAt, runs); }
   }
   runBridge(rt, bridge, args, mode) {
     if (rt.fastCallPaths !== false) {
@@ -812,15 +784,6 @@ export class WasmEngine {
     }
     return rt.bridgeCore(bridge.selected, args, mode, bridge.key, bridge);
   }
-  /** Adds the pending (unsampled) calls of `bridge` to the breakdown's key and thread counts, as TimeBreakdown.hostCall would have one by one. */
-  flushHost(tb, bridge) {
-    const n = bridge.vmPending; bridge.vmPending = 0; if (!n) return;
-    let entry = tb.host.get(bridge.key);
-    if (entry === undefined) { if (tb.host.size < 4000) tb.host.set(bridge.key, entry = { n: 0, ms: 0 }); }
-    if (entry !== undefined) entry.n += n;
-    const acc = tb.acc; acc.calls += n; acc.hosts.set(bridge.key, (acc.hosts.get(bridge.key) ?? 0) + n);
-  }
-  flushHostCounts() { const tb = this.runtime.tb; for (const bridge of this.pendingHost) { this.flushHost(tb, bridge); bridge.vmListed = false; } this.pendingHost.length = 0; }
   /**
    * Binds the C native of the bridge the JavaScript VM just selected for host record `methodId` (natives.js BRIDGE_NATIVES): the record's kind becomes the native, so the next
    * calls through it run in C. Only where the routing cannot select another bridge for a later call through the same record: a static call (its resolution does not depend on
@@ -965,7 +928,10 @@ export class WasmEngine {
     const x = this.x, h = this.h, linker = this.linker, handles = this.handles, space = this.space, t0 = performance.now();
     const addresses = new Set(), visit = id => { const address = handles.addressById.get(id); if (address !== undefined) addresses.add(address); };
     let phase = 'roots';
-    const scanner = scanHostRoots(this.runtime, id => { if (phase === 'roots') visit(id); else { const address = handles.addressById.get(id); if (address !== undefined) x.gc_mark_root(h, address); } });
+    // the scan of JavaScript host state is its own bucket of the time breakdown, apart from the core's collector: entered once for the root walk, once per round of companions and of
+    // ephemeron values (a clock read pair per round, not per companion: the per-address lookups between two companions are in it too)
+    const tb = this.runtime.tb; let scanner, scanFrom = tb.enter(BUCKET.SCAN);
+    try { scanner = scanHostRoots(this.runtime, id => { if (phase === 'roots') visit(id); else { const address = handles.addressById.get(id); if (address !== undefined) x.gc_mark_root(h, address); } }); } finally { tb.leave(scanFrom); }
     const rootsMs = performance.now() - t0, rootNodes = scanner.nodes(); let companions = 0;
     for (const address of this.pins) addresses.add(address);
     this.stats.pinsAtCollection = Math.max(this.stats.pinsAtCollection, this.pins.length); this.stats.rootIds = addresses.size;
@@ -983,12 +949,14 @@ export class WasmEngine {
     phase = 'companions';
     const ephemeronMaps = this.runtime.ephemeronMaps ?? new Set(), scannedValues = new Set();
     const ephemerons = () => {
-      let progress = false;
-      for (const map of ephemeronMaps) for (const [key, value] of map) {
-        if (typeof key !== 'number' || value === null || typeof value !== 'object' || scannedValues.has(value)) continue;
-        const address = handles.addressById.get(key); if (address === undefined || !x.gc_is_marked(h, address)) continue;
-        scannedValues.add(value); scanner.scan(value); progress = true;
-      }
+      let progress = false; scanFrom = tb.enter(BUCKET.SCAN);
+      try {
+        for (const map of ephemeronMaps) for (const [key, value] of map) {
+          if (typeof key !== 'number' || value === null || typeof value !== 'object' || scannedValues.has(value)) continue;
+          const address = handles.addressById.get(key); if (address === undefined || !x.gc_is_marked(h, address)) continue;
+          scannedValues.add(value); scanner.scan(value); progress = true;
+        }
+      } finally { tb.leave(scanFrom); }
       if (progress) x.gc_drain(h);
       return progress;
     };
@@ -999,11 +967,14 @@ export class WasmEngine {
       if (overflow) { for (const address of handles.idByAddress.keys()) if (x.gc_is_marked(h, address)) marked.push(address); }
       else for (let i = 0; i < count; i++) marked.push(this.u32[reports + i]);
       x.gc_reports_clear(h);
-      for (const address of marked) {
-        const id = handles.idByAddress.get(address), f = id === undefined ? undefined : space.facades.get(id);
-        if (f === undefined) continue;
-        this.stats.companionScans++; companions++; scanner.scanCompanion(f); if (f.fieldExtra) scanner.scan(f.fieldExtra);   // a companion of primitives only is read in place (heap-gc.js scanCompanion)
-      }
+      scanFrom = tb.enter(BUCKET.SCAN);
+      try {
+        for (const address of marked) {
+          const id = handles.idByAddress.get(address), f = id === undefined ? undefined : space.facades.get(id);
+          if (f === undefined) continue;
+          this.stats.companionScans++; companions++; scanner.scanCompanion(f); if (f.fieldExtra) scanner.scan(f.fieldExtra);   // a companion of primitives only is read in place (heap-gc.js scanCompanion)
+        }
+      } finally { tb.leave(scanFrom); }
       x.gc_drain(h);
     }
     const t1 = performance.now();

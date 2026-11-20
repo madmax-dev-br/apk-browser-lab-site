@@ -1,11 +1,11 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=c2aef97d559f';
-import { BLOCKED } from './cpu.js?v=c2aef97d559f';
-import { formatC, variadic } from './libc.js?v=c2aef97d559f';
-import { lookup } from '../libcore-io-native.js?v=c2aef97d559f';
-import { utf8 } from './text.js?v=c2aef97d559f';
+import { APKError } from '../apk-error.js?v=da38fa425504';
+import { BLOCKED } from './cpu.js?v=da38fa425504';
+import { formatC, variadic } from './libc.js?v=da38fa425504';
+import { lookup } from '../libcore-io-native.js?v=da38fa425504';
+import { utf8 } from './text.js?v=da38fa425504';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));

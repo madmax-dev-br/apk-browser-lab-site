@@ -1,13 +1,13 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=c2aef97d559f';
-import { staticRetentionLines } from './heap-gc.js?v=c2aef97d559f';
-import { overrideSummaryLines } from './method-overrides.js?v=c2aef97d559f';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=c2aef97d559f';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=c2aef97d559f';
-import { hostMapSummaryLines } from './host-map.js?v=c2aef97d559f';
-import { attributeGap } from './worker-task-log.js?v=c2aef97d559f';
-import { loadImageText } from './load-image.js?v=c2aef97d559f';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=da38fa425504';
+import { staticRetentionLines } from './heap-gc.js?v=da38fa425504';
+import { overrideSummaryLines } from './method-overrides.js?v=da38fa425504';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=da38fa425504';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=da38fa425504';
+import { hostMapSummaryLines } from './host-map.js?v=da38fa425504';
+import { attributeGap } from './worker-task-log.js?v=da38fa425504';
+import { loadImageText } from './load-image.js?v=da38fa425504';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -181,9 +181,11 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const log = globalThis.__apkWorkerTasks;
     if (log?.since && span > 0 && typeof performance !== 'undefined') {
       const from = performance.timeOrigin + it.startedAt, to = performance.timeOrigin + it.endedAt, gap = attributeGap(log.since(from), from, to), sum = key => gap.tasks.reduce((total, task) => total + (task[key] ?? 0), 0);
-      const parts = Object.entries(gap.share).filter(([, value]) => value >= 1).sort((a, b) => b[1] - a[1]).map(([key, value]) => `${key} ${ms(value)}`);
       const firstTime = sum('inits') || sum('decodes') ? ` (${sum('inits')} classes initialized, ${sum('decodes')} methods prepared, ${sum('collections')} collections)` : '';
-      out.push(`  Worker time over that interaction (${gap.tasks.length} tasks): ${parts.join(', ') || 'nothing measured'}${gap.idle >= 1 ? `, idle ${ms(gap.idle)}` : ''}${firstTime}`);
+      // the same buckets in the same words as the last operation's line; background jobs (the API-gap scan, a plugin query) are not bucketed, and idle is never work
+      const buckets = new Float64Array(BUCKET_COUNT), sh = gap.share; buckets[BUCKET.CORE] = sh.core; buckets[BUCKET.GLUE] = sh.glue; buckets[BUCKET.HOST] = sh.host; buckets[BUCKET.DECODE] = sh['first-time']; buckets[BUCKET.GC] = sh.collector; buckets[BUCKET.SCAN] = sh.scan;
+      buckets[BUCKET.RASTER] = sh.raster; buckets[BUCKET.SNAPSHOT] = sh.snapshot; buckets[BUCKET.OTHER] = sh.other; buckets[BUCKET.NATIVE] = sh.native ?? 0; buckets[BUCKET.IDLE] = gap.idle;
+      out.push(`  ${bucketsText(buckets, `Worker time over that interaction (${gap.tasks.length} tasks)`, [[sh.background, 'background jobs']])}${firstTime}`);
       const kinds = {}; for (const task of gap.tasks) { const entry = kinds[task.kind] ??= { n: 0, ms: 0, max: 0 }; entry.n++; entry.ms += task.ms; entry.max = Math.max(entry.max, task.ms); }
       const byKind = Object.entries(kinds).sort((a, b) => b[1].ms - a[1].ms).slice(0, 6).map(([kind, k]) => `${kind} ${k.n}× ${ms(k.ms)} (longest ${ms(k.max)})`);
       if (byKind.length) out.push(`  Worker tasks over that interaction: ${byKind.join(', ')}`);
@@ -207,7 +209,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
       const thread = runtime.scheduler?.threads?.find(candidate => candidate.name === p.thread), frames = (thread?.frames ?? []).filter(frame => frame.method).reverse();
       const app = frames.filter(frame => !runtime.dex.bootDexes?.has(frame.method.dex)), chosen = (app.length ? app : frames).slice(0, 4);
       if (chosen.length) out.push(`  loop in: ${chosen.map(frame => `${dotted(frame.method.owner)}.${frame.method.name}`).join(' ← ')} (the exit condition is in the innermost method)`);
-    } out.push(TimeBreakdown.text(tb)); } });   // where the host time of this operation went
+    } out.push(bucketsText(tb.ms, `Worker time in the last operation${runtime.monitor?.lastBreakdown?.operation ? ` (${runtime.monitor.lastBreakdown.operation}, ${Math.round(runtime.monitor.lastBreakdown.wallMs ?? 0)} ms)` : ''}`)); out.push(`  ${TimeBreakdown.details(tb)}`); } });   // where the time of this operation went
   part(() => {   // the virtual clocks, all on one timeline, and where the queue head sits
     const clock = runtime.platform?.clock; if (!clock?.readings) return; const c = clock.readings(), queue = runtime.platform.eventQueue ?? [];
     const whens = queue.map(event => event.when ?? c.uptime).sort((a, b) => a - b);

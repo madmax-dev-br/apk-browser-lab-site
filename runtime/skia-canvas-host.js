@@ -1,19 +1,20 @@
-import {APKError} from './apk-runtime.js?v=c2aef97d559f';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=c2aef97d559f';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=c2aef97d559f';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=c2aef97d559f';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=c2aef97d559f';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=c2aef97d559f';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=c2aef97d559f';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=c2aef97d559f';
-import {createBitmapHost} from './bitmap-host.js?v=c2aef97d559f';
-import { gcRoot } from './heap-gc.js?v=c2aef97d559f';
-import {sha256Hex} from './sha256-sync.js?v=c2aef97d559f';
-import {colorLongToArgb} from './color-long.js?v=c2aef97d559f';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=c2aef97d559f';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=c2aef97d559f';
-import {renderNodeByHandle} from './rendernode-native.js?v=c2aef97d559f';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=c2aef97d559f';
+import {APKError} from './apk-runtime.js?v=da38fa425504';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=da38fa425504';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=da38fa425504';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=da38fa425504';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=da38fa425504';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=da38fa425504';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=da38fa425504';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=da38fa425504';
+import {createBitmapHost} from './bitmap-host.js?v=da38fa425504';
+import { gcRoot } from './heap-gc.js?v=da38fa425504';
+import {sha256Hex} from './sha256-sync.js?v=da38fa425504';
+import {colorLongToArgb} from './color-long.js?v=da38fa425504';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=da38fa425504';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=da38fa425504';
+import {renderNodeByHandle} from './rendernode-native.js?v=da38fa425504';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=da38fa425504';
+import {BUCKET} from './time-breakdown.js?v=da38fa425504';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -366,7 +367,12 @@ function bitmapSurfaceSpec(CK,type){
  if(!spec)fail('No Skia surface color type for Bitmap config '+type);if(spec[0]===undefined)fail('This CanvasKit build has no color type for Bitmap.Config.'+type);
  return {colorType:spec[0],bytes:spec[1],alphaType:spec[2]};
 }
+// A raster of a recorded canvas owns the clock as the raster bucket of the time breakdown (src/time-breakdown.js): two clock reads per raster, not per draw call.
 export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,options={}){
+ const tb=runtime.tb;if(!tb)return rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height,options);
+ const previous=tb.enter(BUCKET.RASTER);try{return rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height,options);}finally{tb.leave(previous);}
+}
+function rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height,options={}){
  if(options?.transport==='gpu'||options?.transport==='gpu-png')return rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options);   // experimental GPU replay (src/gpu-raster.js); the CPU path below is unchanged
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');

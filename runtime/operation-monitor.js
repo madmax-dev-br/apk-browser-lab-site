@@ -1,7 +1,7 @@
-import { TimeBreakdown } from './time-breakdown.js?v=c2aef97d559f';
-import { APKError } from './apk-error.js?v=c2aef97d559f';
-import { gcBlockReason } from './heap-gc.js?v=c2aef97d559f';
-import { Blocked } from './scheduler.js?v=c2aef97d559f';
+import { TimeBreakdown } from './time-breakdown.js?v=da38fa425504';
+import { APKError } from './apk-error.js?v=da38fa425504';
+import { gcBlockReason } from './heap-gc.js?v=da38fa425504';
+import { Blocked } from './scheduler.js?v=da38fa425504';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -28,7 +28,8 @@ export class OperationMonitor {
     this.lastBeat = now; this.rt.hostCall = null; this.rt.tb?.reset();
     if (this.sink) this.beat(now, 'begin');
   }
-  end() { this.lastWakes = this.op?.wakes ?? this.lastWakes; if (this.op !== null) this.lastBreakdown = { operation: this.op.name, wallMs: Math.round(performance.now() - this.op.start), instructions: this.instructions() - this.op.startInstructions, events: this.op.events, ...this.rt.tb.snapshot() }; if (this.lastBreakdown && this.lastBreakdown.wallMs > (this.biggestBreakdown?.wallMs ?? -1)) this.biggestBreakdown = this.lastBreakdown; this.op = null; this.rt.hostCall = null; }
+  // end(): the host-call tables and the thread split of the breakdown only for an operation long enough to matter (it runs for every pump)
+  end() { this.lastWakes = this.op?.wakes ?? this.lastWakes; if (this.op !== null) { const wallMs = Math.round(performance.now() - this.op.start); this.lastBreakdown = { operation: this.op.name, wallMs, instructions: this.instructions() - this.op.startInstructions, events: this.op.events, ...this.rt.tb.snapshot(wallMs >= 50) }; } if (this.lastBreakdown && this.lastBreakdown.wallMs > (this.biggestBreakdown?.wallMs ?? -1)) this.biggestBreakdown = this.lastBreakdown; this.op = null; this.rt.hostCall = null; }
   instructions() { const by = this.rt.executionByOrigin; return (by?.apk?.instructions ?? 0) + (by?.framework?.instructions ?? 0); }
 
   /** Cheap check at the scheduler tick, thread switches, idle rounds and event dispatch: heartbeat when due, operation budget. */

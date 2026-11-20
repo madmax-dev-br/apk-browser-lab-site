@@ -1,36 +1,36 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=c2aef97d559f';
-import { VMClock } from './vm-clock.js?v=c2aef97d559f';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=c2aef97d559f';
-import { OperationMonitor } from './operation-monitor.js?v=c2aef97d559f';
-import { ExecutionProfile } from './execution-profile.js?v=c2aef97d559f';
-import { SamplingProfiler } from './sampling-profiler.js?v=c2aef97d559f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c2aef97d559f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c2aef97d559f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c2aef97d559f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c2aef97d559f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c2aef97d559f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=c2aef97d559f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c2aef97d559f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c2aef97d559f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c2aef97d559f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c2aef97d559f';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=c2aef97d559f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c2aef97d559f';
-import { APKError } from './apk-error.js?v=c2aef97d559f';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c2aef97d559f';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=c2aef97d559f';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=c2aef97d559f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c2aef97d559f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c2aef97d559f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c2aef97d559f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c2aef97d559f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=c2aef97d559f';
+import STATIC_SHIMS from './shim-static-methods.js?v=da38fa425504';
+import { VMClock } from './vm-clock.js?v=da38fa425504';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=da38fa425504';
+import { OperationMonitor } from './operation-monitor.js?v=da38fa425504';
+import { ExecutionProfile } from './execution-profile.js?v=da38fa425504';
+import { SamplingProfiler } from './sampling-profiler.js?v=da38fa425504';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=da38fa425504';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=da38fa425504';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=da38fa425504';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=da38fa425504';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=da38fa425504';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=da38fa425504';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=da38fa425504';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=da38fa425504';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=da38fa425504';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=da38fa425504';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=da38fa425504';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=da38fa425504';
+import { APKError } from './apk-error.js?v=da38fa425504';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=da38fa425504';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=da38fa425504';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=da38fa425504';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=da38fa425504';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=da38fa425504';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=da38fa425504';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=da38fa425504';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=da38fa425504';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=c2aef97d559f';
-import { bootClassLacksMember } from './boot-class-members.js?v=c2aef97d559f';
-export { APKError } from './apk-error.js?v=c2aef97d559f';
-import { BinaryReader } from './binary-reader.js?v=c2aef97d559f';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=c2aef97d559f';
+import { Scheduler, Blocked } from './scheduler.js?v=da38fa425504';
+import { bootClassLacksMember } from './boot-class-members.js?v=da38fa425504';
+export { APKError } from './apk-error.js?v=da38fa425504';
+import { BinaryReader } from './binary-reader.js?v=da38fa425504';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=da38fa425504';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1158,7 +1158,7 @@ export class APKRuntime {
     // stopped that legitimate work. A spinning thread still hits the fuse (tests/instruction-budget.test.mjs sets its own small fuse); `maxEventWallMs` bounds host time too.
     this.maxInstructionsPerEvent = maxInstructionsPerEvent; this.maxEventInstructions = maxInstructionsPerEvent * 8;
     // Wall-clock watchdog (host time of one event); 0 = off (tests and probes are deterministic), the Worker turns it on. Checked at every scheduling quantum, so it also trips for code that never switches threads.
-    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(); if (GC_STRESS) this.gcEnabled = true; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.sampler = new SamplingProfiler(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
+    this.sliceDeadline = 0; this.gcSafeDepth = 0; this.tb = new TimeBreakdown(engine === 'wasm' ? BUCKET.OTHER : BUCKET.CORE); if (GC_STRESS) this.gcEnabled = true; this.hostRoots = []; this.hostAllocs = []; this.hostGrace = new Int32Array(8192); this.hostGraceAt = 0; this.vmDrainRuntime = null; this.bytecodeAlloc = false; this.profile = new ExecutionProfile(this); this.sampler = new SamplingProfiler(this); this.monitor = new OperationMonitor(this); this.hostCall = null; this.maxEventWallMs = maxEventWallMs; this.eventWallStart = 0; this.peakThreadSteps = 0; this.peakEventTotal = 0;   // per thread / across the threads of one host event
     this.dex = dex;
     this.classes = dex.resolvedClasses ?? dex.classes;
     this.launcherActivity = launcherActivity;
@@ -2241,7 +2241,7 @@ export class APKRuntime {
     const method = resolution.definition.method;
     this.executionByOrigin.host.calls++;
     this.record(resolution.hostText ??= `HOST ${method.key} [AOSP:${method.dex.filename}]`); this.lastHostCall = method.key; this.monitor.hostEnter(method.key, method);
-    const tb = this.tb, previousBucket = tb.enter(BUCKET.HOST), startedAt = tb.last; let result; try { result = binding(this, this.hostArguments(method, args, mode), method); } finally { tb.leave(previousBucket); tb.hostCall(method.key, tb.last - startedAt); } this.hostCall = null;   // a framework native counts in the host table as a bridged call does
+    const tb = this.tb, previousBucket = tb.callBegin(resolution, method.key), startedAt = tb.last, runs = tb.runs; let result; try { result = binding(this, this.hostArguments(method, args, mode), method); } finally { tb.callEnd(resolution, previousBucket, startedAt, runs); } this.hostCall = null;   // a framework native counts in the host table as a bridged call does
     if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${method.key}`);
     return hostReturn(method, result);
   }
@@ -2845,15 +2845,14 @@ export class APKRuntime {
     return words;
   }
   bridge(method, words, mode, knownKey, resolution) {
-    const tb = this.tb, previous = tb.enter(BUCKET.HOST);
-    const startedAt = tb.last;
+    const tb = this.tb, holder = resolution !== undefined ? resolution : method, previous = tb.callBegin(holder, knownKey ?? method.key), startedAt = tb.last, runs = tb.runs;
     try {
       if (resolution !== undefined && knownKey != null && this.fastCallPaths !== false) {   // a pure java.lang bridge (DIRECT_BRIDGES): its body runs over the words, without the argument compaction and the chunk walk
         let direct = resolution.direct; if (direct === undefined) direct = resolution.direct = this.directBridge(knownKey);
         if (direct !== null && words.length === (resolution.wordCount ??= wordCount(method.parameters) + (mode === 'static' ? 0 : 1))) return direct(this, words);
       }
       return this.bridgeCore(method, words, mode, knownKey, resolution);
-    } finally { tb.leave(previous); if (knownKey !== undefined && knownKey !== null) tb.hostCall(knownKey, tb.last - startedAt); }
+    } finally { tb.callEnd(holder, previous, startedAt, runs); }
   }
   /** The direct body (DIRECT_BRIDGES) for a bridge key that no Skia, platform or ICU host claims, or null: those hosts are consulted before the bridge chunks and must keep winning. */
   directBridge(key) {
