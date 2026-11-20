@@ -17,6 +17,12 @@
 // Limits: a per-app cap (default 64 MiB of file bytes). A flush that would exceed it is refused as a whole (the last good stored state stays) and reported via status().
 //
 // Backends share one small interface so Node tests run the same code over memory: { load(key), commit(key, {manifest, put, remove}), clear(key), manifest(key), list() }.
+//
+// Device data (attachDeviceData below): a package a device option preinstalls (a companion package such as microG, docs/MICROG.md) keeps its data the same way, but as data of
+// the DEVICE, not of the app being run: keyed `device|<package>|<SHA-256 of the certificates the device reports for it>`, so every app run on the device with the option on sees the
+// same data (as on a phone, where Play services' data does not belong to the app that uses it). Its roots are the package's four data roots and its accounts in the device's
+// account store (src/account-store.js accountsFile). It is restored before launch, flushed at the app's sync points (platform.appData is then a group of both), follows the same
+// "Keep app data between reloads" choice and is cleared on its own ("Clear microG data").
 
 export const MANIFEST_VERSION = 1;
 export const DEFAULT_LIMIT_BYTES = 64 * 1024 * 1024;
@@ -25,6 +31,10 @@ const EXCLUDED_NAMES = new Set(['code_cache']);
 
 // + the app's keys of the Android Keystore (the software Keystore 2 service keeps them in /data/misc/keystore, which keystore2's own database survives a reboot in, like the app data)
 export const dataRoots = packageName => [`/data/user/0/${packageName}`, `/data/user_de/0/${packageName}`, `/storage/emulated/0/Android/data/${packageName}`, `/data/misc/keystore/user_0/${packageName}`];
+/** A device package's roots: its data roots and the file of its accounts in the device's account store (AccountManagerService's accounts_ce, src/account-store.js). */
+export const deviceDataRoots = packageName => [...dataRoots(packageName), `/data/system_ce/0/accounts_ce/${packageName}.json`];
+/** Storage key of a device package's data (attachDeviceData): not the app's, so it is shared by every app run on the device. */
+export const DEVICE_KEY_PREFIX = 'device|';
 
 const hex = bytes => [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
 /** Storage key of an app: package name + SHA-256 over its signing certificates (DER), or `unsigned`. */
@@ -103,7 +113,8 @@ export function defaultBackend() { try { return globalThis.indexedDB ? createInd
 
 // ---------------------------------------------------------------- persistence of one app
 export class AppDataPersistence {
-  constructor({ backend, key, certSha256 = 'unsigned', packageName, fs, limitBytes = DEFAULT_LIMIT_BYTES, debounceMs = DEFAULT_DEBOUNCE_MS, now = () => Date.now(), record = () => {}, onStatus = null, timers = null, onClockBehind = null }) {
+  constructor({ backend, key, certSha256 = 'unsigned', packageName, fs, limitBytes = DEFAULT_LIMIT_BYTES, debounceMs = DEFAULT_DEBOUNCE_MS, now = () => Date.now(), record = () => {}, onStatus = null, timers = null, onClockBehind = null, roots = null, tag = 'APPDATA' }) {
+    this.roots = roots ?? dataRoots(packageName); this.tag = tag;   // what is stored (default: the app's own data roots) and the trace tag of its lines
     this.onClockBehind = onClockBehind; this.backend = backend; this.key = key; this.certSha256 = certSha256; this.packageName = packageName; this.fs = fs; this.limitBytes = limitBytes; this.debounceMs = debounceMs;
     this.now = now; this.record = record; this.onStatus = onStatus; this.setTimer = timers?.set ?? ((fn, ms) => setTimeout(fn, ms)); this.clearTimer = timers?.clear ?? (handle => clearTimeout(handle));
     this.persisted = new Map();   // path -> fingerprint of the file as last handed to the backend
@@ -113,7 +124,7 @@ export class AppDataPersistence {
     this.queuedWork = new Set();   // SharedPreferences.apply() disk writes not yet performed (QueuedWork)
   }
   inScope(path) {
-    for (const root of dataRoots(this.packageName)) if (path === root || path.startsWith(root + '/')) {
+    for (const root of this.roots) if (path === root || path.startsWith(root + '/')) {
       for (const part of path.slice(root.length).split('/')) if (EXCLUDED_NAMES.has(part)) return false;
       return true;
     }
@@ -126,10 +137,10 @@ export class AppDataPersistence {
     if (this.restored) return this.status(); this.restored = true;
     const stored = await this.backend.load(this.key); if (!stored) return this.status();
     const { manifest, files } = stored;
-    if (manifest.version !== MANIFEST_VERSION || manifest.packageName !== this.packageName || manifest.certSha256 !== this.certSha256) { this.record('APPDATA stored data ignored (incompatible manifest)'); return this.status(); }
+    if (manifest.version !== MANIFEST_VERSION || manifest.packageName !== this.packageName || manifest.certSha256 !== this.certSha256) { this.record(`${this.tag} stored data ignored (incompatible manifest)`); return this.status(); }
     // The VM's wall clock skips idle time, so the last session may have stored timestamps (file times, scheduled work, tokens) later than a fresh session's clock: time must not run backwards for
     // the app, whose persisted deadlines would otherwise sit hours in the future. The clock moves forward to the last stored instant.
-    { const behind = Number(manifest.updatedAt) - this.now(); if (Number.isFinite(behind) && behind > 0) { this.onClockBehind?.(behind); this.record(`APPDATA wall clock advanced ${Math.round(behind)} ms to the last stored instant`); } }
+    { const behind = Number(manifest.updatedAt) - this.now(); if (Number.isFinite(behind) && behind > 0) { this.onClockBehind?.(behind); this.record(`${this.tag} wall clock advanced ${Math.round(behind)} ms to the last stored instant`); } }
     const dirs = Object.entries(manifest.dirs ?? {}).sort((a, b) => a[0].length - b[0].length);
     for (const [path, meta] of dirs) {
       if (!this.inScope(path)) continue;
@@ -138,14 +149,14 @@ export class AppDataPersistence {
     }
     let restored = 0;
     for (const [path, meta] of Object.entries(manifest.files)) {
-      const bytes = files.get(path); if (!bytes || !this.inScope(path)) { this.record(`APPDATA ${path}: missing in storage, skipped`); continue; }
+      const bytes = files.get(path); if (!bytes || !this.inScope(path)) { this.record(`${this.tag} ${path}: missing in storage, skipped`); continue; }
       this.fs.mkdirs(this.fs.parentOf(path));
-      const node = this.fs.open(path, { create: true, truncate: true, write: true }); if (typeof node === 'string') { this.record(`APPDATA ${path}: cannot restore (${node})`); continue; }
+      const node = this.fs.open(path, { create: true, truncate: true, write: true }); if (typeof node === 'string') { this.record(`${this.tag} ${path}: cannot restore (${node})`); continue; }
       this.fs.writeAt(node, 0, bytes, 0, bytes.length); node.mtime = meta.mtime; node.mode = meta.mode; restored++;
       this.persisted.set(path, this.fingerprint(node));
     }
     this.state.restoredFiles = restored; this.state.files = restored; this.state.bytes = manifest.bytes ?? 0;
-    this.record(`APPDATA restored ${restored} file(s), ${this.state.bytes} bytes for ${this.packageName}`);
+    this.record(`${this.tag} restored ${restored} file(s), ${this.state.bytes} bytes ${this.tag === 'APPDATA' ? `for ${this.packageName}` : `(${this.packageName})`}`);
     this.emit(); return this.status();
   }
   fingerprint(node) { return `${node.size}:${node.mtime}:${node.rev ?? 0}`; }
@@ -171,7 +182,7 @@ export class AppDataPersistence {
   }
   /** QueuedWork.waitToFinish: perform the SharedPreferences.apply() writes that have not run yet. */
   /** (each queued write removes itself from the set when it runs) */
-  finishQueuedWork() { for (const work of [...this.queuedWork]) { try { work(); } catch (error) { this.record(`APPDATA queued work failed: ${error?.message ?? error}`); } } }
+  finishQueuedWork() { for (const work of [...this.queuedWork]) { try { work(); } catch (error) { this.record(`${this.tag} queued work failed: ${error?.message ?? error}`); } } }
   flush(reason = 'flush') {
     if (this.detached) return Promise.resolve();
     if (this.inflight) { this.again = true; this.lastRequestedReason = reason; return this.inflight; }
@@ -196,7 +207,7 @@ export class AppDataPersistence {
     this.state.bytes = manifest.bytes; this.state.files = files.size;
     if (!changed) return;
     if (manifest.bytes > this.limitBytes) {   // refuse the whole flush: the last stored state stays consistent
-      if (!this.state.overLimit) this.record(`APPDATA over the ${this.limitBytes}-byte cap (${manifest.bytes} bytes): not stored`);
+      if (!this.state.overLimit) this.record(`${this.tag} over the ${this.limitBytes}-byte cap (${manifest.bytes} bytes): not stored${this.tag === 'APPDATA' ? '' : ` (${this.packageName})`}`);
       this.state.overLimit = true; this.emit(); return;
     }
     this.state.overLimit = false;
@@ -207,7 +218,7 @@ export class AppDataPersistence {
       this.state.flushes++; this.state.lastFlushAt = manifest.updatedAt; this.state.lastReason = reason; this.state.error = null;
     } catch (error) {
       this.persisted = new Map(); this.persistedDirs = new Set(); void before; void beforeDirs;   // unknown backend state: the next flush rewrites everything
-      this.state.error = String(error?.message ?? error); this.record(`APPDATA write failed (${reason}): ${this.state.error}`);
+      this.state.error = String(error?.message ?? error); this.record(`${this.tag} write failed (${reason}): ${this.state.error}${this.tag === 'APPDATA' ? '' : ` (${this.packageName})`}`);
     }
     this.emit();
   }
@@ -236,4 +247,82 @@ export async function attachAppData(runtime, { backend = defaultBackend(), keep 
   await persistence.restore();
   platform.appData = persistence;
   return { persistence, key, status: persistence.status() };
+}
+
+/**
+ * Several persistences flushed as one (platform.appData when device data is attached next to the app's): the VM's sync points (SharedPreferences commit, a SQLite commit, Activity
+ * onPause/onStop, the Keystore) reach every member, and the members share one QueuedWork set (SharedPreferences.apply writes), so finishing it from any of them finishes all.
+ */
+export function persistenceGroup(members) {
+  const list = members.filter(Boolean), queuedWork = list[0]?.queuedWork ?? new Set();
+  for (const member of list) member.queuedWork = queuedWork;
+  return {
+    members: list, queuedWork,
+    touch() { for (const member of list) member.touch(); },
+    syncPoint(reason = 'sync') { return Promise.all(list.map(member => member.syncPoint(reason))); },
+    flush(reason = 'flush') { return Promise.all(list.map(member => member.flush(reason))); },
+    finishQueuedWork() { list[0]?.finishQueuedWork(); },
+    async idle() { for (const member of list) await member.idle(); },
+    status() { return list[0]?.status() ?? null; },
+  };
+}
+
+/** The trace label of a device option's data ("DEVICE microG DATA ..."). */
+const deviceLabel = option => option === 'microg' ? 'microG' : String(option ?? 'device');
+/** The storage key of a device package: `device|<package>|<SHA-256 over the certificates the device reports for it>` (for microG: its fake-signature certificate, the same in every microG version). */
+export async function deviceKeyFor(packageName, certificates = []) { const { key, certSha256 } = await appKeyFor(packageName, certificates); return { key: DEVICE_KEY_PREFIX + key, certSha256 }; }
+
+/**
+ * Wires the persistence of the device's preinstalled packages (the companion packages a device option installed, entry.deviceOption: microG's two packages) into a freshly loaded
+ * runtime, before launch: each package's stored data goes back into the VFS before any of its code can run (its process starts lazily, after launch), then
+ * platform.appData becomes a group of the app's persistence (already attached by attachAppData, when there is one) and these, so the VM's sync points store both.
+ * `keep: false` reads and writes nothing (the status still says what is stored); `clear: true` wipes the stored data first. platform.deviceData answers the status per package
+ * (the snapshot's deviceOptions.<option>.data). Returns { persistences, status: [per-package status] }.
+ */
+export async function attachDeviceData(runtime, { backend = defaultBackend(), keep = true, limitBytes = DEFAULT_LIMIT_BYTES, debounceMs = DEFAULT_DEBOUNCE_MS, onStatus = null, timers = null, clear = false } = {}) {
+  const platform = runtime.platform, registry = platform.packages;
+  const entries = (registry?.companions?.() ?? []).filter(entry => entry.deviceOption);
+  if (!entries.length || !backend) return { persistences: [], status: [] };
+  const persistences = [], statuses = new Map();
+  const report = () => { try { onStatus?.([...statuses.values()]); } catch { /* the page may be gone */ } };
+  for (const entry of entries) {
+    const certificates = (registry.signingCertificatesOf?.(runtime, entry) ?? entry.signingCertificates?.(runtime) ?? []);
+    const { key, certSha256 } = await deviceKeyFor(entry.name, certificates), tag = `DEVICE ${deviceLabel(entry.deviceOption)} DATA`;
+    if (clear) await backend.clear(key);
+    if (!keep) {
+      const stored = await backend.manifest(key).catch(() => null);
+      statuses.set(entry.name, { enabled: false, reason: 'disabled', key, packageName: entry.name, certSha256, option: entry.deviceOption, bytes: stored?.bytes ?? 0, files: Object.keys(stored?.files ?? {}).length, limitBytes });
+      continue;
+    }
+    const persistence = new AppDataPersistence({ backend, key, certSha256, packageName: entry.name, fs: platform.javaIo.fs(), limitBytes, debounceMs, roots: deviceDataRoots(entry.name), tag,
+      now: () => runtime.clock?.wall?.() ?? Date.now(), onClockBehind: ms => runtime.clock?.skip?.(ms), record: line => runtime.record(line), timers,
+      onStatus: status => { statuses.set(entry.name, { ...status, option: entry.deviceOption }); report(); } });
+    persistence.option = entry.deviceOption;
+    await persistence.restore();
+    statuses.set(entry.name, { ...persistence.status(), option: entry.deviceOption });
+    persistences.push(persistence);
+  }
+  platform.accounts?.reload?.();   // an account store created before the restore reads its accounts again
+  if (persistences.length) platform.appData = persistenceGroup([platform.appData, ...persistences]);
+  platform.deviceData = { persistences, status: () => [...statuses.values()].map(status => ({ ...status })) };
+  report();
+  return { persistences, status: [...statuses.values()] };
+}
+
+/**
+ * "Clear microG data": the stored data of the device option's packages is wiped and this run stops persisting it (the running device keeps going with what it has in memory until
+ * the APK is reopened, as for "Clear app data"). Works with or without live persistences (a run with "Keep app data" off clears what earlier runs stored). Returns the statuses.
+ */
+export async function clearDeviceData(runtime, { backend = defaultBackend(), persistences = [] } = {}) {
+  const registry = runtime?.platform?.packages, entries = (registry?.companions?.() ?? []).filter(entry => entry.deviceOption), out = [];
+  const live = new Map(persistences.map(persistence => [persistence.packageName, persistence]));
+  for (const entry of entries) {
+    const persistence = live.get(entry.name);
+    if (persistence) { out.push({ ...(await persistence.clear()), option: entry.deviceOption }); continue; }
+    const { key, certSha256 } = await deviceKeyFor(entry.name, registry.signingCertificatesOf?.(runtime, entry) ?? []);
+    if (backend) await backend.clear(key);
+    out.push({ enabled: false, cleared: true, key, packageName: entry.name, certSha256, option: entry.deviceOption, bytes: 0, files: 0 });
+  }
+  if (entries.length) runtime.record(`DEVICE ${deviceLabel(entries[0].deviceOption)} DATA cleared (${entries.map(entry => entry.name).join(', ')}): the stored data is gone; this run keeps what it has in memory until the APK is reopened`);
+  return out;
 }

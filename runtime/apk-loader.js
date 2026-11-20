@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=230d3f53d504';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=230d3f53d504';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=230d3f53d504';
-import { inspectELF } from './native-inspector.js?v=230d3f53d504';
-import { elfBuildId } from './elf-build-id.js?v=230d3f53d504';
-import { inflateRaw } from './inflate.js?v=230d3f53d504';
-import { crc32, inflateEntry } from './zip-entry.js?v=230d3f53d504';
-import { resolveDevice } from './device-profile.js?v=230d3f53d504';
-import { resourceProfileFor } from './device-configuration.js?v=230d3f53d504';
-import { JniBridge } from './jni-host.js?v=230d3f53d504';
-import { providerForApk } from './native-provider-variants.js?v=230d3f53d504';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=230d3f53d504';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=230d3f53d504';
-import { AndroidResources } from './android-resources.js?v=230d3f53d504';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=230d3f53d504';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=230d3f53d504';
-import { FrameworkProvider } from './framework-provider.js?v=230d3f53d504';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=2fd1aecf5813';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=2fd1aecf5813';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=2fd1aecf5813';
+import { inspectELF } from './native-inspector.js?v=2fd1aecf5813';
+import { elfBuildId } from './elf-build-id.js?v=2fd1aecf5813';
+import { inflateRaw } from './inflate.js?v=2fd1aecf5813';
+import { crc32, inflateEntry } from './zip-entry.js?v=2fd1aecf5813';
+import { resolveDevice } from './device-profile.js?v=2fd1aecf5813';
+import { resourceProfileFor } from './device-configuration.js?v=2fd1aecf5813';
+import { JniBridge } from './jni-host.js?v=2fd1aecf5813';
+import { providerForApk } from './native-provider-variants.js?v=2fd1aecf5813';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=2fd1aecf5813';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=2fd1aecf5813';
+import { AndroidResources } from './android-resources.js?v=2fd1aecf5813';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=2fd1aecf5813';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=2fd1aecf5813';
+import { FrameworkProvider } from './framework-provider.js?v=2fd1aecf5813';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -721,7 +721,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   }
   const usesLineBreakAttributes=lineBreakScan.found;
   const usesTextClock=clockScan.found,usesMenuWidgets=menuScan.found,usesProfileWidgets=profileScan.found,usesProgressBars=barScan.found,usesProfileAttributes=attributeScan.found;
-  const usesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
+  // (a companion package's code is not scanned at load: the "With microG" option's screens are AppCompat Activities, whose delegate makes a configuration Context)
+  const appUsesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
+  const usesConfiguration=appUsesConfiguration||(options.companionPackages?.length??0)>0||!!options.microg;
   const usesSpeech=files.some(file=>file.dex.types.some(type=>type.startsWith('Landroid/speech/tts/')));
   // the original SMS decoding classes (framework-aosp/profiles/telephony): referenced by the APK, or possibly by a companion package (its code is not scanned at load: the "With microG"
   // option's SMS Retriever decodes SMS_RECEIVED with them)
@@ -732,13 +734,19 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const declaredApacheHttp=(manifest.usesLibraries??[]).some(library=>library.name==='org.apache.http.legacy'),apacheTarget=Number(manifest.usesSdk?.targetSdkVersion??manifest.usesSdk?.minSdkVersion??1);
   const usesApacheHttp=declaredApacheHttp||apacheTarget<28;
   const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
+  // the original account authenticator classes (framework-aosp/profiles/accounts): referenced by the APK (an app that is an account authenticator), or possibly by a companion package
+  // (microG's authenticator and its login and consent screens)
+  const ACCOUNT_TYPES=new Set(['Landroid/accounts/AbstractAccountAuthenticator;','Landroid/accounts/AccountAuthenticatorResponse;','Landroid/accounts/AccountAuthenticatorActivity;','Landroid/accounts/IAccountAuthenticator;','Landroid/accounts/IAccountAuthenticatorResponse;']);
+  const appAuthenticator=files.some(file=>file.dex.types.some(type=>ACCOUNT_TYPES.has(type)));
+  const usesAccounts=appAuthenticator||(options.companionPackages?.length??0)>0||!!options.microg;
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
-    {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
+    {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:appUsesConfiguration?'APK-references-android.content.res.Configuration':'companion-package-installed'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
     {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
+    {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
   for(const selection of profiles){

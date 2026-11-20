@@ -1,59 +1,61 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=230d3f53d504';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=230d3f53d504';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=230d3f53d504';
-import { drawFrameGraph } from './frame-graph.js?v=230d3f53d504';
-import { clientIdentityStatus } from './client-identity.js?v=230d3f53d504';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState } from './device-settings.js?v=230d3f53d504';
-import { initCollapsibleSections } from './panel-sections.js?v=230d3f53d504';
-import { warmupLabel } from './warmup.js?v=230d3f53d504';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=230d3f53d504';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=230d3f53d504';
-import { initHelpTips } from './help-tips.js?v=230d3f53d504';
-import { createToolDock } from './tool-dock.js?v=230d3f53d504';
-import { createPermissionsPanel } from './permissions-panel.js?v=230d3f53d504';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=230d3f53d504';
-import { createAppDataPanel } from './app-data-panel.js?v=230d3f53d504';
-import { createCameraLab } from './camera-lab.js?v=230d3f53d504';
-import { createOverridesPanel } from './overrides-panel.js?v=230d3f53d504';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=230d3f53d504';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=230d3f53d504';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=230d3f53d504';
-import { MICROG_SERVICES } from './microg-services.js?v=230d3f53d504';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=230d3f53d504';
-import { createHostMapPanel } from './host-map-panel.js?v=230d3f53d504';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=230d3f53d504';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=230d3f53d504';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=230d3f53d504';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=230d3f53d504';
-import { createDeviceView, createViewState } from './device-view.js?v=230d3f53d504';
-import { createTaskSwitcher } from './task-switcher.js?v=230d3f53d504';
-import { createDeviceZoom } from './device-zoom.js?v=230d3f53d504';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=230d3f53d504';
-import { formatApiGapReport } from './api-gap-scan.js?v=230d3f53d504';
-import { createLogcatPanel } from './logcat-panel.js?v=230d3f53d504';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=230d3f53d504';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=230d3f53d504';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=230d3f53d504';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=230d3f53d504';
-import { createAppPalette } from './app-palette.js?v=230d3f53d504';
-import { createScreenRecorder } from './screen-recorder.js?v=230d3f53d504';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=230d3f53d504';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=230d3f53d504';
-import { createAdb } from './adb-commands.js?v=230d3f53d504';
-import { createAdbTerminal } from './adb-terminal.js?v=230d3f53d504';
-import { memorySummary } from './worker-memory.js?v=230d3f53d504';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=230d3f53d504';
-import { createModalHost } from './lab-modal.js?v=230d3f53d504';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=230d3f53d504';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=230d3f53d504';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=230d3f53d504';
-import { createDragLayer } from './lab-drag.js?v=230d3f53d504';
-import { createLabScroll } from './lab-scroll.js?v=230d3f53d504';
-import { createGlSurfaces } from './gl-surfaces.js?v=230d3f53d504';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=230d3f53d504';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=230d3f53d504';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=230d3f53d504';
-import { resolveIntentFields } from './intent-resolver.js?v=230d3f53d504';
+import { APKWorkerClient } from './apk-worker-client.js?v=2fd1aecf5813';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=2fd1aecf5813';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=2fd1aecf5813';
+import { drawFrameGraph } from './frame-graph.js?v=2fd1aecf5813';
+import { clientIdentityStatus } from './client-identity.js?v=2fd1aecf5813';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState } from './device-settings.js?v=2fd1aecf5813';
+import { initCollapsibleSections } from './panel-sections.js?v=2fd1aecf5813';
+import { warmupLabel } from './warmup.js?v=2fd1aecf5813';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=2fd1aecf5813';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=2fd1aecf5813';
+import { initHelpTips } from './help-tips.js?v=2fd1aecf5813';
+import { createToolDock } from './tool-dock.js?v=2fd1aecf5813';
+import { createPermissionsPanel } from './permissions-panel.js?v=2fd1aecf5813';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=2fd1aecf5813';
+import { createAppDataPanel } from './app-data-panel.js?v=2fd1aecf5813';
+import { createCameraLab } from './camera-lab.js?v=2fd1aecf5813';
+import { createOverridesPanel } from './overrides-panel.js?v=2fd1aecf5813';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=2fd1aecf5813';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=2fd1aecf5813';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=2fd1aecf5813';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=2fd1aecf5813';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=2fd1aecf5813';
+import { MICROG_SERVICES } from './microg-services.js?v=2fd1aecf5813';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=2fd1aecf5813';
+import { createHostMapPanel } from './host-map-panel.js?v=2fd1aecf5813';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=2fd1aecf5813';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=2fd1aecf5813';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=2fd1aecf5813';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=2fd1aecf5813';
+import { createDeviceView, createViewState } from './device-view.js?v=2fd1aecf5813';
+import { createTaskSwitcher } from './task-switcher.js?v=2fd1aecf5813';
+import { createDeviceZoom } from './device-zoom.js?v=2fd1aecf5813';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=2fd1aecf5813';
+import { formatApiGapReport } from './api-gap-scan.js?v=2fd1aecf5813';
+import { createLogcatPanel } from './logcat-panel.js?v=2fd1aecf5813';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=2fd1aecf5813';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=2fd1aecf5813';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=2fd1aecf5813';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=2fd1aecf5813';
+import { createAppPalette } from './app-palette.js?v=2fd1aecf5813';
+import { createScreenRecorder } from './screen-recorder.js?v=2fd1aecf5813';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=2fd1aecf5813';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=2fd1aecf5813';
+import { createAdb } from './adb-commands.js?v=2fd1aecf5813';
+import { createAdbTerminal } from './adb-terminal.js?v=2fd1aecf5813';
+import { memorySummary } from './worker-memory.js?v=2fd1aecf5813';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=2fd1aecf5813';
+import { createModalHost } from './lab-modal.js?v=2fd1aecf5813';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=2fd1aecf5813';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=2fd1aecf5813';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=2fd1aecf5813';
+import { createDragLayer } from './lab-drag.js?v=2fd1aecf5813';
+import { createLabScroll } from './lab-scroll.js?v=2fd1aecf5813';
+import { createGlSurfaces } from './gl-surfaces.js?v=2fd1aecf5813';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=2fd1aecf5813';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=2fd1aecf5813';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=2fd1aecf5813';
+import { resolveIntentFields } from './intent-resolver.js?v=2fd1aecf5813';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -135,6 +137,8 @@ function setBusy(busy) {
   $('back-button').disabled = busy || !state.runtime || !state.canGoBack;
   $('inspect-native-button').disabled = busy || !state.runtime;
   if ($('clear-app-data')) $('clear-app-data').disabled = busy || !state.runtime;
+  if ($('clear-microg-data')) $('clear-microg-data').disabled = !canClearMicrogData({ busy, running: !!state.runtime, loadedMicrog: state.loadedMicrog });
+  showMicrogAccount();
   $('native-abi').disabled = busy; $('native-library').disabled = busy;
   document.querySelectorAll('[data-inspect-apk]').forEach((button) => { button.disabled = button.dataset.available === 'false'; });   // another APK can be picked at any time (it replaces the current VM)
 }
@@ -358,6 +362,37 @@ function showAppData(info) {
     : info.error ? `App data: error while saving (${info.error}) · ${used}` : info.overLimit ? `App data over the limit: the write was refused and the last saved state was kept · ${used}` : `App data stored: ${used}${info.restoredFiles ? ` · ${info.restoredFiles} restored` : ''}`;
 }
 apkVM.onAppData = showAppData;
+// ---- microG's device data (src/app-data-store.js attachDeviceData, src/microg-data-panel.js): the status line and "Clear microG data".
+function showMicrogData(statuses) { const element = $('dev-microg-data-status'); if (element) element.textContent = microgDataText(statuses, { loadedMicrog: !!state.runtime && state.loadedMicrog === true }); }
+apkVM.onMicrogData = showMicrogData;
+// ---- "Add Google account (microG)" (src/microg-account-panel.js, src/account-sessions.js addAccountFromSettings): Settings > Accounts > Add, done by the device; microG's sign-in screen opens on it.
+function accountUi() { return state.microgAccount ??= { pending: false, outcome: null }; }   // on `state`: setBusy (above) runs before this part of the module
+function microgAccountInputs() { let settings = null; try { settings = deviceState.settings; } catch { /* deviceState is created further down: setBusy may run first */ } return { busy: state.busy, running: !!state.runtime, loadedMicrog: state.loadedMicrog === true, checkin: settings?.microgServices?.checkin === true, relay: !!settings?.network?.proxyUrl }; }
+function showMicrogAccount() {
+  const inputs = microgAccountInputs(), button = $('add-microg-account'), status = $('dev-microg-account-status');
+  if (button) button.disabled = accountUi().pending || !canAddGoogleAccount(inputs);
+  if (status) status.textContent = googleAccountText({ ...inputs, pending: accountUi().pending, outcome: accountUi().outcome });
+}
+apkVM.onMicrogAccount = outcome => {
+  accountUi().pending = false; accountUi().outcome = outcome ?? null; showMicrogAccount();
+  appendTrace(outcome?.ok ? 'Add Google account (microG): microG added a Google account' : `Add Google account (microG): no account added (${outcome?.error ?? 'no answer'})`);
+};
+$('add-microg-account')?.addEventListener('click', async () => {
+  if (!canAddGoogleAccount(microgAccountInputs()) || accountUi().pending) return;
+  try {
+    const answer = await apkVM.addMicrogAccount();
+    if (!answer?.started) { accountUi().outcome = { ok: false, error: answer?.reason === 'checkin-off' ? 'Device registration is off in microG' : 'microG is not running on this device' }; showMicrogAccount(); return; }
+    accountUi().pending = true; accountUi().outcome = null; showMicrogAccount();
+    appendTrace('Add Google account (microG): microG\'s sign-in screen opens on the device (Settings > Accounts > Add account); the credentials typed there go to Google through the relay');
+    setStatus('microG\'s sign-in screen is open on the device');
+  } catch (error) { reportAPKError(error, 'Could not start Add Google account', { crash: false }); }
+});
+$('clear-microg-data')?.addEventListener('click', async () => {
+  if (!canClearMicrogData({ busy: state.busy, running: !!state.runtime, loadedMicrog: state.loadedMicrog })) return;
+  if (!confirm('Delete microG\'s stored data on this device (its device registration, Google accounts, settings and databases)? It is shared by every app opened with microG. The running app keeps going until the APK is reopened.')) return;
+  try { const statuses = await apkVM.clearMicrogData(); showMicrogData(statuses); appendTrace('microG data deleted (stored device data of com.google.android.gms and com.android.vending); reopen the APK to start microG from scratch.'); setStatus('microG data deleted · reopen the APK to start microG from scratch'); }
+  catch (error) { reportAPKError(error, 'Could not clear the microG data', { crash: false }); }
+});
 apkVM.onApiGaps = report => { state.apiGaps = report; };
 // Page plugins (docs/PLUGINS.md, src/plugin-host.js): each enabled plugin runs in its own Worker and only reads. With no plugin running nothing here does any work.
 let pluginsPanel = null;
@@ -671,7 +706,7 @@ async function importSource(source, autoRun = false) {
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processed in the browser`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     frameMeter.reset();   // the frame counts of "Show frame rate" start with the app
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), microg: deviceState.settings.microg === true, microgServices: deviceState.settings.microgServices }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), microg: deviceState.settings.microg === true, microgServices: deviceState.settings.microgServices }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showMicrogData(result.microgData ?? null); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
@@ -820,6 +855,7 @@ const microgServicesPanel = createMicrogServicesPanel({ $, onChange: services =>
   for (const service of MICROG_SERVICES) if ((before[service.id] === true) !== services[service.id]) appendTrace(`microG service ${service.label} turned ${services[service.id] ? `on: microG talks to ${service.who} (${service.hosts.join(', ')})` : 'off'} (Device > microG services)`);
   applyDeviceSettings({ ...readDevicePanel(), microgServices: services });
   if (apkVM.worker && state.loadedMicrog === true) apkVM.setMicrogServices(services).then(current => microgServicesPanel.update(current, true), () => {});
+  showMicrogAccount();
 } });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
 pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost, toolbarRoot: $('plugin-toolbar'), onPower: level => apkVM.setPluginPower(level).catch(() => {}) });

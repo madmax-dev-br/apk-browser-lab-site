@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=230d3f53d504';
-import { Invoke } from './interpreter.js?v=230d3f53d504';
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=230d3f53d504';
+import { gcRoot } from './heap-gc.js?v=2fd1aecf5813';
+import { Invoke } from './interpreter.js?v=2fd1aecf5813';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=2fd1aecf5813';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -216,7 +216,7 @@ export function createSystemServicesHost(platform) {
   });
   def(BINDER, 'transact', `(I${PARCEL_T}${PARCEL_T}I)Z`, (r, _m, [self, code, data, reply, flags]) => {
     const cross = foreign(r, self);
-    if (cross) return crossTransact(r, self, code, data, reply, flags, cross);
+    if (cross) return crossTransact(r, self, code, data, reply, flags, cross, true);
     if (data) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [data, 0]);
     let result;
     try { result = vcall(r, r.typeOf(self), 'onTransact', ['I', PARCEL_T, PARCEL_T, 'I'], 'Z', [self, code, data, reply, flags]); }
@@ -246,7 +246,7 @@ export function createSystemServicesHost(platform) {
     const next = () => {
       const item = queue.items.shift();
       if (!item) { platform.packages.bindThreadCaller(st, null); queue.running = false; const at = onewayQueues.indexOf(queue); if (at >= 0) onewayQueues.splice(at, 1); return undefined; }
-      platform.packages.bindThreadCaller(st, platform.packages.byName(item.callerName));
+      platform.packages.bindThreadCaller(st, platform.packages.callerByName(item.callerName));
       const done = () => { vcall(r, PARCEL_T, 'recycle', [], 'V', [item.parcelRef]); return next(); };
       vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [item.parcelRef, 0]);
       const output = r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
@@ -261,7 +261,7 @@ export function createSystemServicesHost(platform) {
     r.scheduler.start(st, (_rt, running) => { if (running.began) { if (running.lastOutcome?.error) throw running.lastOutcome.error; return undefined; } running.began = true; return next(); });
   };
   /** A transaction from another installed package: synchronous on the calling thread with the caller's identity; FLAG_ONEWAY (1) posts it to the main Looper over a copy of the data. */
-  const crossTransact = (r, self, code, data, reply, flags, { caller, owner }) => {
+  const crossTransact = (r, self, code, data, reply, flags, { caller, owner }, continuation = false) => {
     // Binder.execTransact in the callee's process always hands onTransact a reply Parcel (a oneway transaction's reply is discarded), so a Stub that writes a reply for a method
     // the caller's interface declares oneway still works; for a oneway call an exception is only logged, never written back.
     const obtain = () => r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
@@ -281,15 +281,46 @@ export function createSystemServicesHost(platform) {
       enqueueOneway(r, self, { binderRef: self, parcelRef: copy, code, flags, callerName: caller.name, ownerName: owner.name });
       return 1;
     }
+    // Called from Java (an AIDL Proxy): the callee's onTransact runs as frames of this thread (a continuation), with the caller's identity until it returns. A callee that waits (a
+    // lock, a future, the network) then parks this thread like any Java wait, instead of waiting inside a nested host call, where the VM cannot yield to the browser's event loop.
+    if (continuation) {
+      const registry = platform.packages, entered = registry.enterCaller(r, caller), output = reply ?? obtain();
+      if (data) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [data, 0]);
+      const done = value => { registry.leaveCaller(r, entered); if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]); else vcall(r, PARCEL_T, 'recycle', [], 'V', [output]); return value ? 1 : 0; };
+      return new Invoke({ owner: r.typeOf(self), name: 'onTransact', parameters: ['I', PARCEL_T, PARCEL_T, 'I'], result: 'Z', signature: `(I${PARCEL_T}${PARCEL_T}I)Z` }, [self, code, data, output, flags], 'virtual', done,
+        error => {
+          registry.leaveCaller(r, entered);
+          const value = error?.value; if (!value || !(r.isSubtype(r.typeOf(value), 'Ljava/lang/RuntimeException;') || r.isSubtype(r.typeOf(value), 'Landroid/os/RemoteException;'))) throw error;
+          vcall(r, PARCEL_T, 'setDataSize', ['I'], 'V', [output, 0]); vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [output, 0]); vcall(r, PARCEL_T, 'writeException', ['Ljava/lang/Exception;'], 'V', [output, value]);
+          if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]); else vcall(r, PARCEL_T, 'recycle', [], 'V', [output]);
+          return 1;
+        });
+    }
     const result = serve(data, reply);
     if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]);
     return result;
   };
+  // system_server's reference to a binder of a package (what a BinderProxy is in system_server): an AIDL Proxy built over it writes its Parcel and transact runs the binder's onTransact
+  // as a transaction from the system (uid 1000; src/package-registry.js `system`), a oneway one on a Binder thread of the callee as above. Used by the device's own services that call
+  // into a package (AccountManagerService calling an account authenticator, src/account-sessions.js), on a device with the app alone too.
+  const SYSTEM_REF = 'Lapkweb/bridge/SystemBinderRef;';
+  registry.type(SYSTEM_REF, 'Ljava/lang/Object;', ['Landroid/os/IBinder;'], { allocatable: true });
+  def(SYSTEM_REF, 'queryLocalInterface', `(Ljava/lang/String;)${IINTERFACE}`, () => null);
+  def(SYSTEM_REF, 'getInterfaceDescriptor', '()Ljava/lang/String;', (r, _m, [self]) => r.object(r.object(self).target).binderDescriptor ?? null);
+  def(SYSTEM_REF, 'pingBinder', '()Z', () => 1); def(SYSTEM_REF, 'isBinderAlive', '()Z', () => 1);
+  def(SYSTEM_REF, 'linkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)V', () => {}); def(SYSTEM_REF, 'unlinkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)Z', () => 1);
+  def(SYSTEM_REF, 'transact', `(I${PARCEL_T}${PARCEL_T}I)Z`, (r, _m, [self, code, data, reply, flags]) => {
+    const target = r.object(self).target, registry = platform.packages;
+    return crossTransact(r, target, code, data, reply, flags, { caller: registry.system, owner: r.object(target).binderPackage ?? registry.main }, true);
+  });
+  platform.systemBinderRef = (r, binder) => { const ref = r.allocate(SYSTEM_REF); r.object(ref).target = binder; return ref; };
   def(BINDER, 'allowBlocking', `(${'Landroid/os/IBinder;'})Landroid/os/IBinder;`, (r, _m, [binder]) => binder, { static: true });
   def(BINDER, 'linkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)V', () => {}); def(BINDER, 'unlinkToDeath', '(Landroid/os/IBinder$DeathRecipient;I)Z', () => 1);
   def(BINDER, 'flushPendingCommands', '()V', () => {}, { static: true });
-  def(BINDER, 'getCallingPid', '()I', r => P() ? P().callingIdentity(r).pid : r.platform.virtualProcess.pid, { static: true }); def(BINDER, 'getCallingUid', '()I', r => P() ? P().callingIdentity(r).uid : r.platform.virtualProcess.uid, { static: true });
-  def(BINDER, 'clearCallingIdentity', '()J', r => P() ? P().clearCallingIdentity(r) : 0n, { static: true }); def(BINDER, 'restoreCallingIdentity', '(J)V', (r, _m, [token]) => { P()?.restoreCallingIdentity(r, token); }, { static: true });
+  // the caller of the transaction this thread serves: another package's, or the system's (a device service calling into the app, which happens on a device with the app alone too)
+  const identity = r => P() ?? (platform.packages?.inTransaction?.(r) ? platform.packages : null);
+  def(BINDER, 'getCallingPid', '()I', r => identity(r) ? identity(r).callingIdentity(r).pid : r.platform.virtualProcess.pid, { static: true }); def(BINDER, 'getCallingUid', '()I', r => identity(r) ? identity(r).callingIdentity(r).uid : r.platform.virtualProcess.uid, { static: true });
+  def(BINDER, 'clearCallingIdentity', '()J', r => identity(r) ? identity(r).clearCallingIdentity(r) : 0n, { static: true }); def(BINDER, 'restoreCallingIdentity', '(J)V', (r, _m, [token]) => { identity(r)?.restoreCallingIdentity(r, token); }, { static: true });
 
   // ---- java.lang.Number conversions (byteValue/shortValue/intValue/longValue/floatValue/doubleValue between all numeric boxes, Java narrowing rules) ------
   const NUMBER_BOXES = { 'Ljava/lang/Byte;': 'B', 'Ljava/lang/Short;': 'S', 'Ljava/lang/Integer;': 'I', 'Ljava/lang/Long;': 'J', 'Ljava/lang/Float;': 'F', 'Ljava/lang/Double;': 'D' };

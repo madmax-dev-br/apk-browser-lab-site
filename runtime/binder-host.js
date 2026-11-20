@@ -1,10 +1,12 @@
-import { createHostRegistry } from './host-contract.js?v=230d3f53d504';
+import { createHostRegistry } from './host-contract.js?v=2fd1aecf5813';
 
 // The platform side of android.os.Parcel (original Parcel.java in framework.dex, natives in parcel-native.js): hidden framework hooks Parcel calls around transactions, and the
 // Parcel serialisation of the VM's Bundle/PersistableBundle (BaseBundle.writeToParcelInner / readFromParcelInner wire format: length, BUNDLE_MAGIC, count, then key + typed value
 // per entry). Bundles are host objects (src/android-platform.js); their entries are converted to Java values and written with the original Parcel.writeValue, and read back with
 // Parcel.readValue, so every value type Parcel supports (primitives, Strings, arrays, Parcelables, nested Bundles, Serializables, lists) round-trips.
 const PARCEL = 'Landroid/os/Parcel;', BUNDLE = 'Landroid/os/Bundle;', PERSISTABLE = 'Landroid/os/PersistableBundle;', BASE = 'Landroid/os/BaseBundle;', LOADER = 'Ljava/lang/ClassLoader;';
+// Parcel.isLengthPrefixed (android-13.0.0_r1): VAL_MAP 2, VAL_PARCELABLE 4, VAL_LIST 11, VAL_SPARSEARRAY 12, VAL_PARCELABLEARRAY 16, VAL_OBJECTARRAY 17, VAL_SERIALIZABLE 21
+const LENGTH_PREFIXED = new Set([2, 4, 11, 12, 16, 17, 21]);
 const BUNDLE_MAGIC = 0x4C444E42, BOXES = { 'Ljava/lang/Integer;': 'I', 'Ljava/lang/Long;': 'J', 'Ljava/lang/Boolean;': 'Z', 'Ljava/lang/Float;': 'F', 'Ljava/lang/Double;': 'D', 'Ljava/lang/Short;': 'S', 'Ljava/lang/Byte;': 'B', 'Ljava/lang/Character;': 'C' };
 
 export function createBinderHost(platform) {
@@ -37,7 +39,12 @@ export function createBinderHost(platform) {
     p(r, parcel, 'writeInt', ['I'], 'V', [-1]); p(r, parcel, 'writeInt', ['I'], 'V', [BUNDLE_MAGIC]);
     const start = p(r, parcel, 'dataPosition', [], 'I');
     p(r, parcel, 'writeInt', ['I'], 'V', [entries.size]);
-    for (const key of [...entries.keys()]) { p(r, parcel, 'writeString', ['Ljava/lang/String;'], 'V', [key]); p(r, parcel, 'writeValue', ['Ljava/lang/Object;'], 'V', [javaValue(r, bundle, key)]); }
+    for (const key of [...entries.keys()]) {
+      p(r, parcel, 'writeString', ['Ljava/lang/String;'], 'V', [key]);
+      const entry = entries.get(key);
+      if (entry.unreadable && entry.raw) p(r, parcel, 'appendFrom', [PARCEL, 'I', 'I'], 'V', [entry.raw, 0, p(r, entry.raw, 'dataSize', [], 'I')]);   // a value never read: its bytes as they came
+      else p(r, parcel, 'writeValue', ['Ljava/lang/Object;'], 'V', [javaValue(r, bundle, key)]);
+    }
     const end = p(r, parcel, 'dataPosition', [], 'I');
     p(r, parcel, 'setDataPosition', ['I'], 'V', [lengthPosition]); p(r, parcel, 'writeInt', ['I'], 'V', [end - start]); p(r, parcel, 'setDataPosition', ['I'], 'V', [end]);
   }
@@ -50,7 +57,21 @@ export function createBinderHost(platform) {
     if (magic !== BUNDLE_MAGIC) r.throwJava('Landroid/os/BadParcelableException;', 'Bad magic number for Bundle: 0x' + (magic >>> 0).toString(16));
     const count = p(r, parcel, 'readInt', [], 'I');
     for (let i = 0; i < count; i++) {
-      const key = p(r, parcel, 'readString', [], 'Ljava/lang/String;'), value = p(r, parcel, 'readValue', [LOADER], 'Ljava/lang/Object;', [loader ?? null]);
+      const key = p(r, parcel, 'readString', [], 'Ljava/lang/String;'), start = p(r, parcel, 'dataPosition', [], 'I'), kind = p(r, parcel, 'readInt', [], 'I');
+      // Android 13 reads a length-prefixed value (a Parcelable, a Serializable, a list, a map, an array of objects) lazily (Parcel.readValue with LazyValue): its class is looked up when
+      // the key is read, not when the Bundle is. A value whose class this package cannot load therefore fails only for that key (BadParcelableException then), and the other keys read;
+      // its bytes are kept and written back unchanged when the Bundle is parcelled again.
+      const end = LENGTH_PREFIXED.has(kind) ? p(r, parcel, 'dataPosition', [], 'I') + 4 + p(r, parcel, 'readInt', [], 'I') : null;
+      p(r, parcel, 'setDataPosition', ['I'], 'V', [start]);
+      let value;
+      try { value = p(r, parcel, 'readValue', [LOADER], 'Ljava/lang/Object;', [loader ?? null]); }
+      catch (error) {
+        if (end === null || error?.name !== 'JavaException' || !r.isSubtype(r.typeOf(error.value), 'Ljava/lang/RuntimeException;')) throw error;
+        const raw = r.dispatch({ owner: PARCEL, name: 'obtain', parameters: [], result: PARCEL, signature: `()${PARCEL}` }, [], 'static');
+        p(r, parcel, 'setDataPosition', ['I'], 'V', [start]); p(r, raw, 'appendFrom', [PARCEL, 'I', 'I'], 'V', [parcel, start, end - start]); p(r, parcel, 'setDataPosition', ['I'], 'V', [end]);
+        entries.set(r.stringCharacters(key), { type: 'Landroid/os/Parcelable;', value: null, unreadable: error.value, raw });
+        continue;
+      }
       entries.set(r.stringCharacters(key), { ...entryOf(r, value), lazy: true });   // a value read from a Parcel is verified against the class of the first typed getter (BaseBundle.getValueAt)
     }
     r.object(bundle).bundleVersion = (r.object(bundle).bundleVersion || 0) + 1;

@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=230d3f53d504';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=230d3f53d504';
-import { parseReturnValue } from './method-overrides.js?v=230d3f53d504';
-import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=230d3f53d504';
-import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=230d3f53d504';
-import { installDroidGuard, droidGuardNativeUnavailable } from './microg-droidguard.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=2fd1aecf5813';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=2fd1aecf5813';
+import { parseReturnValue } from './method-overrides.js?v=2fd1aecf5813';
+import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=2fd1aecf5813';
+import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=2fd1aecf5813';
+import { installDroidGuard, droidGuardNativeUnavailable } from './microg-droidguard.js?v=2fd1aecf5813';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');
@@ -26,6 +26,8 @@ const dealias = text => String(text).replace(DEALIAS, ';');
 export const MICROG_VERSION = '0.3.18.252432';
 export const MICROG_GMS = 'com.google.android.gms', MICROG_VENDING = 'com.android.vending';
 export const MICROG_PACKAGES = Object.freeze([MICROG_GMS, MICROG_VENDING]);
+/** The account type microG's authenticator declares (its res/xml/authenticator.xml): a Google account. */
+export const MICROG_ACCOUNT_TYPE = 'com.google';
 /** The authority of microG's SettingsProvider (SettingsContract.getAuthority: "<package>.microg.settings"). */
 export const MICROG_SETTINGS_AUTHORITY = `${MICROG_GMS}.microg.settings`;
 /** The files the page/Worker fetches for the option, relative to the site root. */
@@ -324,9 +326,11 @@ const ENTRY_POINT_SWITCHES = Object.freeze({ checkin: ['checkin_enable_service']
 /** One intercepted call of an entry point's method: the mock's value, or a reported "not implemented" failure followed by microG's own body (RUN_BODY). */
 function intercept(runtime, microg, state, definition, args) {
   const def = state.def, handler = microg.mocks.get(def.id), switches = ENTRY_POINT_SWITCHES[def.id];
-  if (!handler && switches && switches.every(key => microg.settings?.[key] === true)) {
+  // A Google account's token is microG's online work once the user signed in to a Google account in microG's login screen (the account is in the device's account store)
+  const signedIn = def.id === 'account-token' && (runtime.platform.accountStore?.()?.accounts ?? []).some(account => account.type === MICROG_ACCOUNT_TYPE);
+  if (!handler && (signedIn || (switches && switches.every(key => microg.settings?.[key] === true)))) {
     state.onlineHits = (state.onlineHits ?? 0) + 1;
-    if (state.onlineHits === 1) runtime.record(`DEVICE microG ONLINE ${def.id}: ${def.label}; microG's own code runs (turned on: ${switches.join(', ')})`);
+    if (state.onlineHits === 1) runtime.record(`DEVICE microG ONLINE ${def.id}: ${def.label}; microG's own code runs (${signedIn ? 'a Google account was added in microG\'s login screen' : `turned on: ${switches.join(', ')}`})`);
     return RUN_BODY;
   }
   if (!handler) {

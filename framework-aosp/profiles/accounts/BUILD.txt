@@ -1,0 +1,22 @@
+Original Android 13 accounts profile (account authenticators)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-accounts-profile.sh     (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/account-authenticator.test.mjs
+
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/accounts-sources.txt, compiled unchanged (no source
+transform): android.accounts.AbstractAccountAuthenticator (and its Transport), AccountAuthenticatorResponse, AccountAuthenticatorActivity;
+and the Java the SDK's aidl writes for the originals listed in framework-aosp/accounts-aidl-sources.txt (IAccountAuthenticator,
+IAccountAuthenticatorResponse: interface, Stub and Proxy, through scripts/generate-service-aidl.py --no-refusals; Account.aidl and Bundle.aidl
+only declare the parcelables they name). android.accounts.AccountManager and Account are the lab's (host class / default DEX).
+
+The other end of the protocol is the lab's AccountManagerService (src/account-sessions.js): for AccountManager.addAccount, getAuthToken,
+confirmCredentials, updateCredentials, editProperties, hasFeatures, getAuthTokenLabel, removeAccount (getAccountRemovalAllowed) and
+isCredentialsUpdateSuggested it binds the authenticator's service of the package that declares the account type, as the system (uid 1000, so the
+original Transport's checkBinderPermission finds ACCOUNT_MANAGER), calls it through the generated Proxy (a oneway transaction), and hands the
+IAccountAuthenticatorResponse answer (onResult / onRequestContinued / onError) to the caller's AccountManagerFuture, starting a KEY_INTENT with
+the caller's Activity as AccountManager does.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
+(src/apk-loader.js) adds this DEX when the APK's DEX references one of these classes, when a companion package is installed that may (the
+"With microG" option: microG's account authenticator and its login and consent screens), or when the loader option enableAccountsProfile is true.

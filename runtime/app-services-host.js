@@ -1,10 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=230d3f53d504';
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { registerPackageValueFields } from './package-value-fields.js?v=230d3f53d504';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=230d3f53d504';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=230d3f53d504';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=230d3f53d504';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=230d3f53d504';
+import { resolveIntentFields } from './intent-resolver.js?v=2fd1aecf5813';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { registerPackageValueFields } from './package-value-fields.js?v=2fd1aecf5813';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=2fd1aecf5813';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=2fd1aecf5813';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=2fd1aecf5813';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=2fd1aecf5813';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -117,7 +117,7 @@ export function createAppServicesHost(platform) {
   const holdsFor = (r, entry, permission) => entry && !entry.main ? pkgs().holds(r, entry, permission) : holdsPermission(r, permission);
   const check = (r, permission) => holdsFor(r, selfEntry(), needPermission(r, permission)) ? PERMISSION_GRANTED : PERMISSION_DENIED;
   /** Inside a Binder transaction from another package (src/package-registry.js): that package; else null (the calling process is this one). */
-  const callingEntry = r => pkgs()?.multi && pkgs().callingPackage(r) !== null ? pkgs().callingIdentity(r).entry : null;
+  const callingEntry = r => pkgs() && (pkgs().multi || pkgs().inTransaction(r)) && pkgs().callingPackage(r) !== null ? pkgs().callingIdentity(r).entry : null;
   const checkUid = (r, permission, pid, uid) => {
     const name = needPermission(r, permission), entry = pkgs()?.multi ? pkgs().byUid(uid) : null;
     if (entry && !entry.main) return entry.pid === pid && pkgs().holds(r, entry, name) ? PERMISSION_GRANTED : PERMISSION_DENIED;
@@ -201,6 +201,43 @@ export function createAppServicesHost(platform) {
       call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
       if (!service.started) { boundServices.delete(binding.key); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${binding.key}`); }
     }, 0, [service.ref]);
+  };
+  /**
+   * bindService made by system_server (ActiveServices for a system caller: AccountManagerService binding an account authenticator, src/account-sessions.js): the service `className` of
+   * package `entry` (the app or a companion), exported or not, created on demand in that package's process; `connected(binder)` runs on the main thread once onBind returned
+   * (onServiceConnected). Returns the unbind function, or null when the package declares no such (enabled) service.
+   */
+  let systemConnections = 0;
+  platform.bindServiceAsSystem = (r, entry, className, intent, connected) => {
+    const P = pkgs(); let key, create;
+    if (entry.main) {
+      const descriptor = `L${className.replaceAll('.', '/')};`;
+      if (!(platform.manifest?.services ?? []).includes(className) || !r.classes.has(descriptor)) return null;
+      key = className; create = () => { const created = createService(r, className, descriptor); r.record(`SERVICE create+bind ${className}`); return created; };
+    } else {
+      const detail = P.detailsOf(entry, 'service').find(d => d.name === className); if (!detail || isFalse(detail.enabled)) return null;
+      const resolved = { entry, className, key: serviceKey(entry, className) }; key = resolved.key; create = () => createPackageService(r, resolved);
+    }
+    const token = `system:${++systemConnections}`, component = componentOf(r, entry.name, className); let unbound = false;
+    r.record(`SERVICE bind ${key} from android (uid 1000)`);
+    platform.queueTask(() => {
+      if (unbound) return;
+      const service = boundServices.get(key) ?? create();
+      if (!service.bound) { service.bound = true; service.intent = intent; service.component = component; service.binder = call(r, r.typeOf(service.ref), 'onBind', [INTENT], 'Landroid/os/IBinder;', [service.ref, intent]); }
+      service.connections.add(token);
+      connected(service.binder);
+    }, 0, [intent, component]);
+    return () => {
+      if (unbound) return; unbound = true;
+      const service = boundServices.get(key); if (!service) return;
+      service.connections.delete(token);
+      if (!service.connections.size && service.bound) platform.queueTask(() => {
+        if (service.connections.size || !service.bound || boundServices.get(key) !== service) return;
+        const descriptor = r.typeOf(service.ref); service.bound = false;
+        call(r, descriptor, 'onUnbind', [INTENT], 'Z', [service.ref, service.intent]);
+        if (!service.started) { boundServices.delete(key); call(r, descriptor, 'onDestroy', [], 'V', [service.ref]); r.record(`SERVICE unbind+destroy ${key}`); }
+      }, 0, [service.ref]);
+    };
   };
   const startPackageService = (r, caller, target, intent, component) => {
     const resolved = resolvePackageService(r, caller, target, intent, component, 'start'); if (!resolved) return null;

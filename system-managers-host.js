@@ -1,7 +1,7 @@
-import { floatBits } from './host-contract.js?v=230d3f53d504';
-import { gcRoot } from './heap-gc.js?v=230d3f53d504';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=230d3f53d504';
-import { createAccountStore } from './account-store.js?v=230d3f53d504';
+import { floatBits } from './host-contract.js?v=2fd1aecf5813';
+import { gcRoot } from './heap-gc.js?v=2fd1aecf5813';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=2fd1aecf5813';
+import { createAccountStore } from './account-store.js?v=2fd1aecf5813';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -543,13 +543,16 @@ export function createSystemManagersHost(platform) {
   const LISTENER = 'Landroid/accounts/OnAccountsUpdateListener;';
   /** The package a call comes from (Binder.getCallingUid of AccountManagerService): a companion's code on the stack (or its transaction) is that companion, else the app. */
   let lastRuntime = null;
-  const callerEntry = r => (lastRuntime = r, platform.packages?.multi ? platform.packages.callingIdentity(r).entry : null) ?? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true };
+  // (the process that calls AccountManagerService: the package whose code runs, not the caller of a transaction that code serves; src/package-registry.js serviceCaller)
+  const callerEntry = r => (lastRuntime = r, platform.packages?.multi ? platform.packages.serviceCaller(r) : null) ?? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true };
   const gcListeners = gcRoot(new Set());   // the registered listeners stay alive while registered, as the service holds them
   const accounts = () => platform.accounts ??= createAccountStore({
     packages: () => [{ entry: platform.packages?.main ?? { name: pkg(), manifest: platform.manifest }, environment: () => platform.resources },
       ...(platform.packages?.companions?.() ?? []).map(entry => ({ entry, environment: () => platform.packages.resourcesEnvironment(entry) }))],
     sameSigners: (a, b) => { const registry = platform.packages, x = registry?.byName?.(a), y = registry?.byName?.(b); try { return !!(x && y && registry.sameSigners?.(lastRuntime, x, y)); } catch { return false; } },
-    record: line => lastRuntime?.record?.(line) });
+    record: line => lastRuntime?.record?.(line),
+    // the accounts of a companion package's authenticator are kept on the VM's disk (ACCOUNTS_DIR/<package>.json), carried across loads with that package's device data
+    files: { fs: platform.javaIo.fs(), persisted: name => !!platform.packages?.companions?.().some(entry => entry.name === name) } });
   platform.accountStore = accounts;
   const field = (r, account, name) => { const value = r.readInstanceField?.(account, `${ACCOUNT}->${name}:${STRING}`) ?? r.object(account).fields?.get(`${ACCOUNT}->${name}:${STRING}`); return nullish(value) ? null : text(r, value); };
   const accountOf = (r, account) => { if (nullish(account)) iae(r, 'account is null'); return { name: field(r, account, 'name'), type: field(r, account, 'type') }; };
@@ -577,23 +580,25 @@ export function createSystemManagersHost(platform) {
     if (!nullish(extras)) { const keys = call(r, call(r, extras, BUNDLE, 'keySet', [], 'Ljava/util/Set;'), 'Ljava/util/Set;', 'toArray', [], `[${OBJECT}`); for (const key of r.array(keys).elements) { const value = call(r, extras, BUNDLE, 'getString', [STRING], STRING, [key]); data.set(text(r, key), nullish(value) ? null : text(r, value)); } }
     if (!a.name || !a.type || !accounts().add(a.name, a.type, nullish(password) ? null : text(r, password), data)) return 0;
     r.record(`ACCOUNTS added an account of type ${a.type} (authenticator ${accounts().authenticatorFor(a.type)?.packageName})`);
-    changed(r); return 1;
+    accounts().saved(a.type); changed(r); return 1;
   });
-  def(ACCOUNT_MANAGER, 'removeAccountExplicitly', `(${ACCOUNT})Z`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'explicitly remove'); const removed = accounts().remove(a.name, a.type); if (removed) changed(r); return removed ? 1 : 0; });
+  def(ACCOUNT_MANAGER, 'removeAccountExplicitly', `(${ACCOUNT})Z`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'explicitly remove'); const removed = accounts().remove(a.name, a.type); if (removed) { accounts().saved(a.type); changed(r); } return removed ? 1 : 0; });
   def(ACCOUNT_MANAGER, 'getPassword', `(${ACCOUNT})${STRING}`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'get secrets for'); return known(r, a)?.password ?? null; });
-  def(ACCOUNT_MANAGER, 'setPassword', `(${ACCOUNT}${STRING})V`, (r, _m, [, account, password]) => { const a = accountOf(r, account); ownerOnly(r, a, 'set secrets for'); const stored = known(r, a); if (stored) { stored.password = nullish(password) ? null : text(r, password); stored.tokens.clear(); } });
-  def(ACCOUNT_MANAGER, 'clearPassword', `(${ACCOUNT})V`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'clear passwords for'); const stored = known(r, a); if (stored) { stored.password = null; stored.tokens.clear(); } });
+  def(ACCOUNT_MANAGER, 'setPassword', `(${ACCOUNT}${STRING})V`, (r, _m, [, account, password]) => { const a = accountOf(r, account); ownerOnly(r, a, 'set secrets for'); const stored = known(r, a); if (stored) { stored.password = nullish(password) ? null : text(r, password); stored.tokens.clear(); accounts().saved(a.type); } });
+  def(ACCOUNT_MANAGER, 'clearPassword', `(${ACCOUNT})V`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'clear passwords for'); const stored = known(r, a); if (stored) { stored.password = null; stored.tokens.clear(); accounts().saved(a.type); } });
   def(ACCOUNT_MANAGER, 'getUserData', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, key]) => { const a = accountOf(r, account); if (nullish(key)) iae(r, 'key is null'); ownerOnly(r, a, 'get user data for'); return known(r, a)?.userData.get(text(r, key)) ?? null; });
-  def(ACCOUNT_MANAGER, 'setUserData', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, key, value]) => { const a = accountOf(r, account); if (nullish(key)) iae(r, 'key is null'); ownerOnly(r, a, 'set user data for'); const stored = known(r, a); if (stored) { if (nullish(value)) stored.userData.delete(text(r, key)); else stored.userData.set(text(r, key), text(r, value)); } });
+  def(ACCOUNT_MANAGER, 'setUserData', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, key, value]) => { const a = accountOf(r, account); if (nullish(key)) iae(r, 'key is null'); ownerOnly(r, a, 'set user data for'); const stored = known(r, a); if (stored) { if (nullish(value)) stored.userData.delete(text(r, key)); else stored.userData.set(text(r, key), text(r, value)); accounts().saved(a.type); } });
   def(ACCOUNT_MANAGER, 'peekAuthToken', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, tokenType]) => { const a = accountOf(r, account); if (nullish(tokenType)) iae(r, 'authTokenType is null'); ownerOnly(r, a, 'peek authtokens of'); return known(r, a)?.tokens.get(text(r, tokenType)) ?? null; });
-  def(ACCOUNT_MANAGER, 'setAuthToken', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, tokenType, token]) => { const a = accountOf(r, account); if (nullish(tokenType)) iae(r, 'authTokenType is null'); ownerOnly(r, a, 'set authtokens for'); const stored = known(r, a); if (stored) { if (nullish(token)) stored.tokens.delete(text(r, tokenType)); else stored.tokens.set(text(r, tokenType), text(r, token)); } });
+  def(ACCOUNT_MANAGER, 'setAuthToken', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, tokenType, token]) => { const a = accountOf(r, account); if (nullish(tokenType)) iae(r, 'authTokenType is null'); ownerOnly(r, a, 'set authtokens for'); const stored = known(r, a); if (stored) { if (nullish(token)) stored.tokens.delete(text(r, tokenType)); else stored.tokens.set(text(r, tokenType), text(r, token)); accounts().saved(a.type); } });
   def(ACCOUNT_MANAGER, 'invalidateAuthToken', `(${STRING}${STRING})V`, (r, _m, [, type, token]) => {
     if (nullish(type)) iae(r, 'accountType is null');
     if (nullish(token)) return;
     const kind = text(r, type), value = text(r, token);
-    for (const stored of accounts().accounts) if (stored.type === kind) for (const [name, cached] of [...stored.tokens]) if (cached === value) stored.tokens.delete(name);
+    let removed = false;
+    for (const stored of accounts().accounts) if (stored.type === kind) for (const [name, cached] of [...stored.tokens]) if (cached === value) { stored.tokens.delete(name); removed = true; }
+    if (removed) accounts().saved(kind);
   });
-  def(ACCOUNT_MANAGER, 'setAccountVisibility', `(${ACCOUNT}${STRING}I)Z`, (r, _m, [, account, packageName, visibility]) => { const a = accountOf(r, account); const name = requireText(r, packageName, 'packageName'); ownerOnly(r, a, 'set visibility of'); const stored = known(r, a); if (!stored) return 0; stored.visibility.set(name, visibility | 0); changed(r); return 1; });
+  def(ACCOUNT_MANAGER, 'setAccountVisibility', `(${ACCOUNT}${STRING}I)Z`, (r, _m, [, account, packageName, visibility]) => { const a = accountOf(r, account); const name = requireText(r, packageName, 'packageName'); ownerOnly(r, a, 'set visibility of'); const stored = known(r, a); if (!stored) return 0; stored.visibility.set(name, visibility | 0); accounts().saved(a.type); changed(r); return 1; });
   def(ACCOUNT_MANAGER, 'getAccountVisibility', `(${ACCOUNT}${STRING})I`, (r, _m, [, account, packageName]) => {
     const a = accountOf(r, account), name = requireText(r, packageName, 'packageName'), entry = callerEntry(r);
     if (entry.name !== name) ownerOnly(r, a, 'get visibility of');
@@ -619,6 +624,10 @@ export function createSystemManagersHost(platform) {
     if (at < 0) { r.record?.('LOG W AccountManager: Listener was not previously added'); return; }
     list.splice(at, 1); gcListeners.delete(listener);
   });
+
+  // what AccountManagerService's sessions (src/account-sessions.js: the calls that go through an account authenticator) share with the calls above
+  platform.accountManagerService = { callerEntry, callerOptions, newAccount, changed,
+    visibleAccounts: (r, type, entry) => accounts().accounts.filter(a => (type === null || a.type === type) && accounts().visibleTo(a, entry.name, callerOptions(r, entry))) };
 
   // ---- SystemHealthManager: a snapshot of this uid only, with no recorded measurements
   const HEALTH = service('systemhealth', 'Landroid/os/health/SystemHealthManager;'), HEALTH_STATS = 'Landroid/os/health/HealthStats;';

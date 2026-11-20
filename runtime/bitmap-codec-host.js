@@ -1,10 +1,10 @@
-import { gcRoot } from './heap-gc.js?v=230d3f53d504';
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { createHostRegistry } from './host-contract.js?v=230d3f53d504';
-import { getVectorGraphics } from './vector-native.js?v=230d3f53d504';
-import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=230d3f53d504';
-import { createBitmapOps } from './bitmap-ops-host.js?v=230d3f53d504';
-import { encodeOpaqueStoredPng } from './png-store.js?v=230d3f53d504';
+import { gcRoot } from './heap-gc.js?v=2fd1aecf5813';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { createHostRegistry } from './host-contract.js?v=2fd1aecf5813';
+import { getVectorGraphics } from './vector-native.js?v=2fd1aecf5813';
+import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=2fd1aecf5813';
+import { createBitmapOps } from './bitmap-ops-host.js?v=2fd1aecf5813';
+import { encodeOpaqueStoredPng } from './png-store.js?v=2fd1aecf5813';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -213,16 +213,18 @@ export function createBitmapCodecHost(platform) {
   const DPI = { ldpi: 120, mdpi: 160, tvdpi: 213, hdpi: 240, xhdpi: 320, xxhdpi: 480, xxxhdpi: 640 };
   const densityOfPath = path => { const dir = path.split('/').slice(-2, -1)[0] ?? ''; for (const q of dir.split('-')) if (q === 'nodpi') return DENSITY_NONE; else if (DPI[q]) return DPI[q]; return 0; };
   /** The file entry a resource id selects on this device: { path, density } -- density from the selected variant's ResTable_config (u16 at byte 14: 0 = unqualified = mdpi, 0xffff = nodpi), else from the directory qualifier. */
+  // the file of the package whose resources are in scope: the app's APK, or a companion package's (its resources environment names it: src/package-registry.js resourcesEnvironment)
   const resourceFile = (r, id) => {
     let value = platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
-    if (value.kind === 'unresolved' || typeof value.value !== 'string' || !r.apkEntries.has(value.value)) return null;
+    const entry = platform.resources?.packageEntry ?? null, path = value.value;
+    if (value.kind === 'unresolved' || typeof path !== 'string' || !(entry ? entry.entries?.has(path) : r.apkEntries.has(path))) return null;
     const bytes = value.config?.bytes, qualified = bytes && bytes.length >= 16 ? bytes[14] | (bytes[15] << 8) : 0;
-    return { path: value.value, density: qualified || densityOfPath(value.value) };
+    return { path, density: qualified || densityOfPath(path), read: () => (entry ? entry.reader(path) : r.apkReader(path)) };
   };
   const densityDefaults = density => ({ inDensity: density === 0 ? DENSITY_DEFAULT : density === DENSITY_NONE ? 0 : density, inTargetDensity: DENSITY_DEFAULT });
   const decodeResource = (r, resourceId, options) => {
     const file = resourceFile(r, resourceId); if (file === null) return null;
-    return decode(r, Uint8Array.from(r.apkReader(file.path)), options, null, densityDefaults(file.density));
+    return decode(r, Uint8Array.from(file.read()), options, null, densityDefaults(file.density));
   };
   def(FACTORY, 'decodeResource', `(${RESOURCES}I${OPTIONS})${BITMAP}`, (r, _m, [, id, options]) => decodeResource(r, id, options), { static: true });
   def(FACTORY, 'decodeResource', `(${RESOURCES}I)${BITMAP}`, (r, _m, [, id]) => decodeResource(r, id, null), { static: true });

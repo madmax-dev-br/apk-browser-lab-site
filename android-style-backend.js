@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=230d3f53d504';
-import { APKError } from './apk-runtime.js?v=230d3f53d504';
-import { ephemeronMap } from './heap-gc.js?v=230d3f53d504';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=230d3f53d504';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=230d3f53d504';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=2fd1aecf5813';
+import { APKError } from './apk-runtime.js?v=2fd1aecf5813';
+import { ephemeronMap } from './heap-gc.js?v=2fd1aecf5813';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=2fd1aecf5813';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=2fd1aecf5813';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -304,7 +304,7 @@ export class AndroidStyleBackend {
   loadFileDrawable(runtime, id) {
     const codec = this.platform.bitmapCodec, file = id >>> 0 ? codec?.resourceFile(runtime, id) : null;
     if (!file || !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.path)) return null;
-    const bytes = Uint8Array.from(runtime.apkReader(file.path)), defaults = codec.densityDefaults(file.density), scale = defaults.inDensity && defaults.inDensity !== defaults.inTargetDensity ? defaults.inTargetDensity / defaults.inDensity : 1;
+    const bytes = Uint8Array.from(file.read ? file.read() : runtime.apkReader(file.path)), defaults = codec.densityDefaults(file.density), scale = defaults.inDensity && defaults.inDensity !== defaults.inTargetDensity ? defaults.inTargetDensity / defaults.inDensity : 1;
     if (hasNinePatchChunk(bytes)) {
       const drawable = this.platform.drawableViewHost.createNinePatchDrawable(runtime, bytes, scale);
       runtime.record(`RESOURCE drawable ${id >>> 0} NinePatchDrawable [${file.path}: compiled npTc chunk, density ${file.density || 160} -> 160]`); return drawable;

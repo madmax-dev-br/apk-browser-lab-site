@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { gcRoot } from './heap-gc.js?v=230d3f53d504';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=230d3f53d504';
-import { AndroidResources } from './android-resources.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { gcRoot } from './heap-gc.js?v=2fd1aecf5813';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=2fd1aecf5813';
+import { AndroidResources } from './android-resources.js?v=2fd1aecf5813';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -43,6 +43,9 @@ export function createPackageRegistry(platform) {
     signingCertificates: runtime => runtime?.apkSigningCertificates?.() ?? [],
   };
 
+  // system_server (uid 1000): the caller of a transaction the device's own services make into a package (AccountManagerService binding an account authenticator, src/account-sessions.js).
+  // It is not an installed package (no code, no Context); it holds every permission, as ActivityManager.checkComponentPermission grants SYSTEM_UID.
+  const system = Object.freeze({ main: false, system: true, systemServer: true, name: 'android', uid: 1000, pid: 900, manifest: Object.freeze({ usesPermissions: [], declaredPermissions: [], componentDetails: [] }), signingCertificates: () => [] });
   const entries = () => [main, ...companions.values()];
   const byName = name => name === main.name ? main : companions.get(name) ?? null;
   const byUid = uid => entries().find(entry => entry.uid === uid) ?? null;
@@ -77,6 +80,17 @@ export function createPackageRegistry(platform) {
     for (const method of runtime.captureStack?.() ?? []) { const owner = method?.owner; if (!owner) continue; const entry = entryOfClass(runtime, owner); if (entry) return entry; }
     return main;
   };
+  /** The package whose code is running on this thread (the nearest package frame), or null when only framework/host code is on the stack (a device event, a test's own call). */
+  const codeEntry = runtime => {
+    if (!companions.size) return (runtime.captureStack?.() ?? []).length ? main : null;
+    for (const method of runtime.captureStack?.() ?? []) { const owner = method?.owner; if (!owner) continue; const entry = entryOfClass(runtime, owner); if (entry) return entry; }
+    return null;
+  };
+  /**
+   * The process that makes a call to a system service (the uid a system service sees as Binder.getCallingUid): the package whose code runs; with no package code on the stack, the
+   * caller of the transaction this thread serves, else the app.
+   */
+  const serviceCaller = runtime => codeEntry(runtime) ?? (inTransaction(runtime) ? callingIdentity(runtime).entry : main);
   /** The package a Context belongs to: the ContextImpl at the end of its baseContext chain records it; the app's contexts record none. */
   const contextEntry = (runtime, context) => {
     if (!companions.size) return main;
@@ -92,6 +106,9 @@ export function createPackageRegistry(platform) {
     const stack = stackOf(runtime), frame = { caller, override: null }; stack.push(frame);
     try { return fn(); } finally { const at = stack.lastIndexOf(frame); if (at >= 0) stack.splice(at, 1); if (!stack.length) identities.delete(threadKey(runtime)); }
   };
+  /** The two halves of withCaller, for a transaction whose callee runs as frames of the calling thread (a continuation): enter before, leave when it returns or throws. */
+  const enterCaller = (runtime, caller) => { const frame = { caller, override: null }; stackOf(runtime).push(frame); return frame; };
+  const leaveCaller = (runtime, frame) => { const key = threadKey(runtime), stack = identities.get(key); if (!stack) return; const at = stack.lastIndexOf(frame); if (at >= 0) stack.splice(at, 1); if (!stack.length) identities.delete(key); };
   /** Makes `thread` a Binder thread serving a transaction from package `caller` (null: back to none); for a thread whose whole run is one transaction (system-services-host.js: oneway calls). */
   const bindThreadCaller = (thread, caller) => { if (caller) identities.set(thread, [{ caller, override: null }]); else identities.delete(thread); };
   const callingIdentity = runtime => {
@@ -99,6 +116,10 @@ export function createPackageRegistry(platform) {
     if (top) return top.override ?? { uid: top.caller.uid, pid: top.caller.pid, entry: top.caller };
     const self = api.callerEntry(runtime); return { uid: self.uid, pid: self.pid, entry: self };
   };
+  /** Whether this thread is serving a transaction (a package's or the system's): Binder.getCallingUid then answers the caller even on a device with the app alone. */
+  const inTransaction = runtime => (identities.get(threadKey(runtime))?.length ?? 0) > 0;
+  /** A registry entry by package name, or system_server for "android" (the caller recorded for a oneway transaction the system made). */
+  const callerByName = name => byName(name) ?? (name === system.name ? system : null);
   /** The package of the transaction this thread is serving, or null outside one (ContentProvider.getCallingPackage). */
   const callingPackage = runtime => { const top = identities.get(threadKey(runtime))?.at(-1); return top ? (top.override?.entry ?? top.caller).name : null; };
   /** Binder.clearCallingIdentity: the token encodes the identity ((long) uid << 32) | pid; the thread's calling identity becomes its own. */
@@ -268,6 +289,7 @@ export function createPackageRegistry(platform) {
    */
   const holds = (runtime, entry, permission) => {
     if (entry.main) return platform.holdsPermission(runtime, permission);
+    if (entry.systemServer) return true;
     const sdk = runtime.apiLevel ?? 33, requested = (entry.manifest.usesPermissions ?? []).some(p => p.name === permission && (p.maxSdkVersion === null || Number(p.maxSdkVersion) >= sdk));
     if (!requested) return false;
     if (api.defaultGrants.get(entry.name)?.has(permission) && !api.refusedPermissions.has(permission)) return true;   // granted by the device's default grants (a device option's preinstalled package)
@@ -335,7 +357,8 @@ export function createPackageRegistry(platform) {
     NOT_HANDLED,
     get multi() { return companions.size > 0; },
     main, entries, companions: () => [...companions.values()], byName, byUid, install, refs,
-    callerEntry, contextEntry, entryOfClass, withCaller, bindThreadCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
+    system, callerByName, inTransaction, codeEntry, serviceCaller,
+    callerEntry, contextEntry, entryOfClass, withCaller, enterCaller, leaveCaller, bindThreadCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
     loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, hasResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
     detailsOf, exported, providerFor, providerInstance, providerOwner, providerOwners,
     holds, levelFor, declaredPermission, sameSigners, securityException, visible, grant, targetSdk,

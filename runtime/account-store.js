@@ -3,15 +3,18 @@
 //
 //  * Authenticators: a service of an installed package (the app or a companion such as microG) with the intent filter android.accounts.AccountAuthenticator and the meta-data
 //    android.accounts.AccountAuthenticator naming an <account-authenticator> XML (accountType, customTokens), as RegisteredServicesCache reads them.
-//  * Accounts live in memory for the device's lifetime (accounts_ce.db is not modelled: nothing is written to the VM's disk). Only the authenticator's own package (or a package signed
-//    with the same certificate) adds, removes, reads secrets of, or sets the visibility of an account of its type; anyone else gets the service's SecurityException.
+//  * Accounts live in memory for the device's lifetime. The accounts whose authenticator is a companion package (a device component such as microG, docs/MICROG.md) are also kept in
+//    the VM's disk, as AccountManagerService keeps them in /data/system_ce/0/accounts_ce.db: one JSON file per authenticator package, ACCOUNTS_DIR/<package>.json, rewritten
+//    synchronously on every change of one of its accounts (store.saved) and read when the store is created, so the device data persistence (src/app-data-store.js
+//    attachDeviceData) carries them across loads with the rest of that package's data. The app's own authenticator keeps its accounts in memory only, as before.
+//    Only the authenticator's own package (or a package signed with the same certificate) adds, removes, reads secrets of, or sets the visibility of an account of its type;
+//    anyone else gets the service's SecurityException.
 //  * Visibility (AccountManagerService.resolveAccountVisibility): the authenticator's packages see every account of their type; another package sees an account if its visibility for that
 //    package is VISIBLE or USER_MANAGED_VISIBLE, else, for targetSdk 26+, by the value of PACKAGE_NAME_KEY_LEGACY_NOT_VISIBLE (not visible by default), and below 26 with GET_ACCOUNTS by
 //    PACKAGE_NAME_KEY_LEGACY_VISIBLE (visible by default).
 //  * Auth tokens: getAuthToken answers the token the authenticator cached with setAuthToken when the caller may use it (the authenticator's own packages) and the authenticator does not
-//    declare customTokens, as the service does before it would bind the authenticator. Calling an authenticator (its IAccountAuthenticator) is NOT implemented: the framework classes
-//    behind it (AbstractAccountAuthenticator, AccountAuthenticatorResponse, IAccountAuthenticator) are not in the lab's framework, so such a request fails with an AuthenticatorException
-//    that says so, and the trace records it.
+//    declare customTokens, as the service does before it binds the authenticator; every other request goes to the authenticator itself (src/account-sessions.js: AccountManagerService's
+//    Session over the original IAccountAuthenticator of framework-aosp/profiles/accounts).
 
 export const VISIBILITY = Object.freeze({ UNDEFINED: 0, VISIBLE: 1, USER_MANAGED_VISIBLE: 2, NOT_VISIBLE: 3, USER_MANAGED_NOT_VISIBLE: 4 });
 export const LEGACY_VISIBLE = 'android:accounts:key_legacy_visible', LEGACY_NOT_VISIBLE = 'android:accounts:key_legacy_not_visible';
@@ -35,10 +38,39 @@ export function declaredAuthenticators(entry, environment) {
   return out;
 }
 
-export function createAccountStore({ packages, sameSigners = (a, b) => a === b, record = () => {} }) {
+/** Where the accounts of authenticator package `packageName` are kept when it is a companion package (the device's accounts_ce, one file per authenticator). */
+export const ACCOUNTS_DIR = '/data/system_ce/0/accounts_ce';
+export const accountsFile = packageName => `${ACCOUNTS_DIR}/${packageName}.json`;
+const toObject = map => Object.fromEntries([...map].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+/** The file form of one account: { name, type, password, userData: {..}, tokens: {..}, visibility: {..} }. */
+export const accountRecord = a => ({ name: a.name, type: a.type, password: a.password ?? null, userData: toObject(a.userData), tokens: toObject(a.tokens), visibility: toObject(a.visibility) });
+
+/**
+ * `files` (optional): { fs, persisted(packageName) } -- the VM's VirtualFileSystem and which authenticator packages keep their accounts on disk (companion packages). Without it every
+ * account lives in memory only.
+ */
+export function createAccountStore({ packages, sameSigners = (a, b) => a === b, record = () => {}, files = null }) {
   const accounts = [];   // { name, type, password, userData: Map, tokens: Map, visibility: Map }
   let authenticators = null;
   const listeners = [];
+  const encoder = new TextEncoder(), decoder = new TextDecoder();
+  /** Accounts of the files of the persisted packages, read when the store is created (a malformed file is reported and ignored, never half-read). */
+  const readFiles = () => {
+    if (!files?.fs) return;
+    for (const { entry } of packages()) {
+      if (!entry?.name || !files.persisted(entry.name)) continue;
+      const bytes = files.fs.bytes(accountsFile(entry.name)); if (!bytes) continue;
+      let rows; try { rows = JSON.parse(decoder.decode(bytes)); if (!Array.isArray(rows)) throw new Error('not a list'); } catch (error) { record(`ACCOUNTS ${accountsFile(entry.name)} could not be read (${error?.message ?? error}): its accounts are not restored`); continue; }
+      let restored = 0;
+      for (const row of rows) {
+        if (typeof row?.name !== 'string' || typeof row?.type !== 'string' || accounts.some(a => a.name === row.name && a.type === row.type)) continue;
+        const map = value => new Map(Object.entries(value && typeof value === 'object' ? value : {}));
+        accounts.push({ name: row.name, type: row.type, password: typeof row.password === 'string' ? row.password : null, userData: map(row.userData), tokens: map(row.tokens), visibility: new Map([...map(row.visibility)].map(([k, v]) => [k, Number(v) | 0])) });
+        restored++;
+      }
+      if (restored) record(`ACCOUNTS restored ${restored} account(s) of ${entry.name} from ${accountsFile(entry.name)}`);
+    }
+  };
   const store = {
     accounts,
     listeners,
@@ -54,6 +86,23 @@ export function createAccountStore({ packages, sameSigners = (a, b) => a === b, 
       return true;
     },
     remove(name, type) { const at = accounts.findIndex(a => a.name === name && a.type === type); if (at < 0) return false; accounts.splice(at, 1); return true; },
+    /**
+     * An account of `type` changed (added, removed, its password, user data, tokens or visibility): when the type's authenticator is a persisted (companion) package, its file is
+     * rewritten now with every account of the types that package authenticates (removed when none is left). Returns the path written, or null.
+     */
+    saved(type) {
+      if (!files?.fs) return null;
+      const owner = store.authenticatorFor(type)?.packageName; if (!owner || !files.persisted(owner)) return null;
+      const types = new Set(store.authenticators().filter(a => a.packageName === owner).map(a => a.type));
+      const rows = accounts.filter(a => types.has(a.type)).map(accountRecord), path = accountsFile(owner), fs = files.fs;
+      if (!rows.length) { if (fs.node(path)) fs.delete(path); return path; }
+      fs.mkdirs(ACCOUNTS_DIR);
+      const result = fs.setBytes(path, encoder.encode(JSON.stringify(rows)));
+      if (result !== 'ok') record(`ACCOUNTS ${path} could not be written (${result}): the accounts of ${owner} are kept in memory only`);
+      return path;
+    },
+    /** Forgets the accounts in memory and reads the files again (after the device data was restored into the VFS). */
+    reload() { accounts.length = 0; readFiles(); },
     /** resolveAccountVisibility for package `caller` (its targetSdk and whether it holds GET_ACCOUNTS / GET_ACCOUNTS_PRIVILEGED). */
     visibleTo(account, caller, { targetSdk = 33, getAccounts = false, privileged = false } = {}) {
       if (store.owns(caller, account.type)) return true;
@@ -64,5 +113,6 @@ export function createAccountStore({ packages, sameSigners = (a, b) => a === b, 
       return isVisible(account.visibility.get(LEGACY_NOT_VISIBLE) ?? VISIBILITY.NOT_VISIBLE);
     },
   };
+  readFiles();
   return store;
 }

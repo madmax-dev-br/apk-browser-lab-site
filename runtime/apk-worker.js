@@ -1,91 +1,92 @@
-import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=230d3f53d504';
-import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=230d3f53d504';
-import { launcherInfo } from './launcher-info.js?v=230d3f53d504';
-import { buildScreenState } from './screen-state.js?v=230d3f53d504';
-import { createLogcat } from './logcat.js?v=230d3f53d504';
-import { createNetlog } from './netlog.js?v=230d3f53d504';
-import { reportSummary } from './report-summary.js?v=230d3f53d504';
-import { nameSilentError } from './error-naming.js?v=230d3f53d504';
-import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=230d3f53d504';
-import { installMethodHook, removeMethodHook, removeMethodHooksOf, listMethodHooks, drainHookCalls, setHookCallBudget } from './method-hooks.js?v=230d3f53d504';
-import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=230d3f53d504';
-import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=230d3f53d504';
-import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=230d3f53d504';
-import { applyMicrogMocks, applyMicrogServices } from './microg-device.js?v=230d3f53d504';
-import { describeRedirects } from './host-map.js?v=230d3f53d504';
-import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=230d3f53d504';
-import { InflatePool } from './zip-inflate-pool.js?v=230d3f53d504';
-import { warmCrc32 } from './zip-entry.js?v=230d3f53d504';
-import { createAppStorage } from './app-storage.js?v=230d3f53d504';
-import { listMethods, invokeAppMethod } from './app-invoke.js?v=230d3f53d504';
-import { createMessageSink } from './audio-native.js?v=230d3f53d504';
-import { loadAPK } from './apk-loader.js?v=230d3f53d504';
-import { AndroidPlatform } from './android-platform.js?v=230d3f53d504';
-import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=230d3f53d504';
-import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=230d3f53d504';
-import { firstUseProfile, PrepareAhead } from './prepare-ahead.js?v=230d3f53d504';
-import { createWebViewBackend } from './webview-backend.js?v=230d3f53d504';
-import { FrameworkProvider } from './framework-provider.js?v=230d3f53d504';
-import { createRasterSender } from './raster-cache.js?v=230d3f53d504';
-import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=230d3f53d504';
-import { dispatchPointer, pressView } from './pointer-input-host.js?v=230d3f53d504';
-import { resolveDevice } from './device-profile.js?v=230d3f53d504';
-import { FrameworkResourceProvider } from './framework-resource-provider.js?v=230d3f53d504';
-import { ResourceConfigProvider } from './resource-config-provider.js?v=230d3f53d504';
-import { SkiaProvider } from './skia-provider.js?v=230d3f53d504';
-import { inspectCompose } from './compose-inspector.js?v=230d3f53d504';
-import { DEFAULT_POWER, sanitizePower, powerParams, planPluginServe, withScanDefaults, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=230d3f53d504';
-import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=230d3f53d504';
-import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=230d3f53d504';
-import { readScrollInfo } from './scroll-info.js?v=230d3f53d504';
-import { SemanticsPacer } from './semantics-pacing.js?v=230d3f53d504';
-import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=230d3f53d504';
-import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=230d3f53d504';
-import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=230d3f53d504';
-import { WarmupTracker, firstTimeWork } from './warmup.js?v=230d3f53d504';
-import { WorkerTaskLog, rasterMs } from './worker-task-log.js?v=230d3f53d504';
-import { holdDelay } from './frame-flow.js?v=230d3f53d504';
-import { disposeTextLayout } from './text-layout-native.js?v=230d3f53d504';
-import { IcuBreakProvider } from './icu-break-provider.js?v=230d3f53d504';
-import { SqliteProvider } from './sqlite-native.js?v=230d3f53d504';
-import { SqlcipherProvider } from './sqlcipher-native.js?v=230d3f53d504';
-import { TzdataProvider } from './java-time-native.js?v=230d3f53d504';
-import { ZlibProvider } from './zip-native.js?v=230d3f53d504';
-import { IcuConverterProvider } from './icu-converter-native.js?v=230d3f53d504';
-import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=230d3f53d504';
-import { JavacryptoProvider } from './javacrypto-native.js?v=230d3f53d504';
-import { disposeColorFilters } from './color-filter-native.js?v=230d3f53d504';
-import { disposeRegex } from './regex-native.js?v=230d3f53d504';
-import { disposeRenderNodes } from './rendernode-native.js?v=230d3f53d504';
-import { startDeepLink } from './deep-link-host.js?v=230d3f53d504';
-import { attachAppData, defaultBackend, appKeyFor } from './app-data-store.js?v=230d3f53d504';
-import { renderVariant, RenderVariantError } from './render-variant.js?v=230d3f53d504';
-import { probeWebCodecs } from './media-codec-backend.js?v=230d3f53d504';
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { MICROG_VERSION, microgFiles } from './microg-device.js?v=230d3f53d504';
-import { FrameProbe } from './frame-meter.js?v=230d3f53d504';
-import { encodeAddress } from './telephony-sms.js?v=230d3f53d504';
-import { composeLayoutBounds } from './compose-layout-bounds.js?v=230d3f53d504';
-import { ioYieldDue, ioYieldBudget } from './pump-yield.js?v=230d3f53d504';
+import { installWasmMemoryMeter, wasmMemoryUsage } from './wasm-memory-meter.js?v=2fd1aecf5813';
+import { checkCoreMemory, sanitizeCoreMemory, coreStartMessage } from './core-memory.js?v=2fd1aecf5813';
+import { launcherInfo } from './launcher-info.js?v=2fd1aecf5813';
+import { buildScreenState } from './screen-state.js?v=2fd1aecf5813';
+import { createLogcat } from './logcat.js?v=2fd1aecf5813';
+import { createNetlog } from './netlog.js?v=2fd1aecf5813';
+import { reportSummary } from './report-summary.js?v=2fd1aecf5813';
+import { nameSilentError } from './error-naming.js?v=2fd1aecf5813';
+import { applyMethodOverrides, describeMethodOverrides, searchMethods, returnTypesOf } from './method-overrides.js?v=2fd1aecf5813';
+import { installMethodHook, removeMethodHook, removeMethodHooksOf, listMethodHooks, drainHookCalls, setHookCallBudget } from './method-hooks.js?v=2fd1aecf5813';
+import { applyIgnoredActivities, describeIgnoredActivities } from './ignored-activities.js?v=2fd1aecf5813';
+import { applyTimeLimits, timeLimitsFor } from './time-limits.js?v=2fd1aecf5813';
+import { applyEndpointMocks, describeEndpointMocks } from './endpoint-mocks.js?v=2fd1aecf5813';
+import { applyMicrogMocks, applyMicrogServices } from './microg-device.js?v=2fd1aecf5813';
+import { describeRedirects } from './host-map.js?v=2fd1aecf5813';
+import { TimeBreakdown, createLoadTiming } from './time-breakdown.js?v=2fd1aecf5813';
+import { InflatePool } from './zip-inflate-pool.js?v=2fd1aecf5813';
+import { warmCrc32 } from './zip-entry.js?v=2fd1aecf5813';
+import { createAppStorage } from './app-storage.js?v=2fd1aecf5813';
+import { listMethods, invokeAppMethod } from './app-invoke.js?v=2fd1aecf5813';
+import { createMessageSink } from './audio-native.js?v=2fd1aecf5813';
+import { loadAPK } from './apk-loader.js?v=2fd1aecf5813';
+import { AndroidPlatform } from './android-platform.js?v=2fd1aecf5813';
+import { heapLimitFor, BYTES_PER_OBJECT } from './memory-budget.js?v=2fd1aecf5813';
+import { scanApiGaps, compactApiGapReport } from './api-gap-scan.js?v=2fd1aecf5813';
+import { firstUseProfile, PrepareAhead } from './prepare-ahead.js?v=2fd1aecf5813';
+import { createWebViewBackend } from './webview-backend.js?v=2fd1aecf5813';
+import { FrameworkProvider } from './framework-provider.js?v=2fd1aecf5813';
+import { createRasterSender } from './raster-cache.js?v=2fd1aecf5813';
+import { isFreedId, collectGarbage, createMarker } from './heap-gc.js?v=2fd1aecf5813';
+import { dispatchPointer, pressView } from './pointer-input-host.js?v=2fd1aecf5813';
+import { resolveDevice } from './device-profile.js?v=2fd1aecf5813';
+import { FrameworkResourceProvider } from './framework-resource-provider.js?v=2fd1aecf5813';
+import { ResourceConfigProvider } from './resource-config-provider.js?v=2fd1aecf5813';
+import { SkiaProvider } from './skia-provider.js?v=2fd1aecf5813';
+import { inspectCompose } from './compose-inspector.js?v=2fd1aecf5813';
+import { DEFAULT_POWER, sanitizePower, powerParams, planPluginServe, withScanDefaults, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=2fd1aecf5813';
+import { runPluginQuery, compactComposeTree, attachCompositionLocals, PluginQueryError, handleOf } from './plugin-queries.js?v=2fd1aecf5813';
+import { createComposeSemanticsDriver, STALE_NODE_KIND } from './compose-semantics.js?v=2fd1aecf5813';
+import { readScrollInfo } from './scroll-info.js?v=2fd1aecf5813';
+import { SemanticsPacer } from './semantics-pacing.js?v=2fd1aecf5813';
+import { MOTION_SCALE_STEPS, SETTLED_SCALE_STEPS, MotionRasterPolicy, GESTURE_STALE_MS } from './motion-raster.js?v=2fd1aecf5813';
+import { GpuRasterController, sanitizeRenderer } from './gpu-raster.js?v=2fd1aecf5813';
+import { readinessProbe, ScreenReadyTracker } from './screen-ready.js?v=2fd1aecf5813';
+import { WarmupTracker, firstTimeWork } from './warmup.js?v=2fd1aecf5813';
+import { WorkerTaskLog, rasterMs } from './worker-task-log.js?v=2fd1aecf5813';
+import { holdDelay } from './frame-flow.js?v=2fd1aecf5813';
+import { disposeTextLayout } from './text-layout-native.js?v=2fd1aecf5813';
+import { IcuBreakProvider } from './icu-break-provider.js?v=2fd1aecf5813';
+import { SqliteProvider } from './sqlite-native.js?v=2fd1aecf5813';
+import { SqlcipherProvider } from './sqlcipher-native.js?v=2fd1aecf5813';
+import { TzdataProvider } from './java-time-native.js?v=2fd1aecf5813';
+import { ZlibProvider } from './zip-native.js?v=2fd1aecf5813';
+import { IcuConverterProvider } from './icu-converter-native.js?v=2fd1aecf5813';
+import { LazyNativeLibraryProvider } from './native-library-fetch.js?v=2fd1aecf5813';
+import { JavacryptoProvider } from './javacrypto-native.js?v=2fd1aecf5813';
+import { disposeColorFilters } from './color-filter-native.js?v=2fd1aecf5813';
+import { disposeRegex } from './regex-native.js?v=2fd1aecf5813';
+import { disposeRenderNodes } from './rendernode-native.js?v=2fd1aecf5813';
+import { startDeepLink } from './deep-link-host.js?v=2fd1aecf5813';
+import { attachAppData, attachDeviceData, clearDeviceData, defaultBackend, appKeyFor } from './app-data-store.js?v=2fd1aecf5813';
+import { renderVariant, RenderVariantError } from './render-variant.js?v=2fd1aecf5813';
+import { probeWebCodecs } from './media-codec-backend.js?v=2fd1aecf5813';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { MICROG_VERSION, microgFiles } from './microg-device.js?v=2fd1aecf5813';
+import { FrameProbe } from './frame-meter.js?v=2fd1aecf5813';
+import { encodeAddress } from './telephony-sms.js?v=2fd1aecf5813';
+import { composeLayoutBounds } from './compose-layout-bounds.js?v=2fd1aecf5813';
+import { ioYieldDue, ioYieldBudget } from './pump-yield.js?v=2fd1aecf5813';
 installWasmMemoryMeter();   // before anything is instantiated: every WebAssembly memory of this Worker is counted for the page's memory line (src/wasm-memory-meter.js)
 const hostCodecs = probeWebCodecs(self).catch(() => null);   // the device's video codecs are this Worker's WebCodecs (null: none); asked once, when the Worker starts
-const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=230d3f53d504';
-const SPEECH_PROFILE_URL = '../framework-aosp/profiles/speech/framework.dex?v=230d3f53d504';
-const TELEPHONY_PROFILE_URL = '../framework-aosp/profiles/telephony/framework.dex?v=230d3f53d504';
-const SERVICES_PROFILE_URL = '../framework-aosp/profiles/services/framework.dex?v=230d3f53d504';
-const APACHE_HTTP_PROFILE_URL = '../framework-aosp/profiles/apache-http/framework.dex?v=230d3f53d504';
-const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=230d3f53d504';
+const CONFIGURATION_PROFILE_URL = '../framework-aosp/profiles/configuration/framework.dex?v=2fd1aecf5813';
+const SPEECH_PROFILE_URL = '../framework-aosp/profiles/speech/framework.dex?v=2fd1aecf5813';
+const TELEPHONY_PROFILE_URL = '../framework-aosp/profiles/telephony/framework.dex?v=2fd1aecf5813';
+const SERVICES_PROFILE_URL = '../framework-aosp/profiles/services/framework.dex?v=2fd1aecf5813';
+const APACHE_HTTP_PROFILE_URL = '../framework-aosp/profiles/apache-http/framework.dex?v=2fd1aecf5813';
+const ACCOUNTS_PROFILE_URL = '../framework-aosp/profiles/accounts/framework.dex?v=2fd1aecf5813';
+const LAYOUT_PROFILE_URL = '../framework-aosp/profiles/layouts/framework.dex?v=2fd1aecf5813';
 const SKIA_ASSET_URL = '../vendor/canvaskit/0.42.0/';
-const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=230d3f53d504';
-const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=230d3f53d504';
-const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=230d3f53d504';
-const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '230d3f53d504';
+const RESOURCE_CONFIG_URL = '../framework-aosp/native-config/resource-config.wasm?v=2fd1aecf5813';
+const FRAMEWORK_RESOURCE_URL = '../framework-resources/framework-resources.json.gz?v=2fd1aecf5813';
+const FRAMEWORK_ASSET_URL = '../framework-aosp/framework.dex?v=2fd1aecf5813';
+const NATIVE_LIBS_URL = '../vendor/native-libs/wasm32/', NATIVE_LIBS_REVISION = '2fd1aecf5813';
 
 let sharedSkiaProvider = null;
 let sharedSqlcipherProvider = null, sharedICUBreakProvider = null, sharedSqliteProvider = null, sharedTzdataProvider = null, sharedZlibProvider = null, sharedIcuConverterProvider = null;
 let sharedLayoutProvider = null, sharedNativeLibraryProvider = null, sharedJavacryptoProvider = null;
 let sharedConfigurationProvider = null;
-let sharedSpeechProvider = null; let sharedTelephonyProvider = null; let sharedServicesProvider = null; let sharedApacheHttpProvider = null;
+let sharedSpeechProvider = null; let sharedTelephonyProvider = null; let sharedServicesProvider = null; let sharedApacheHttpProvider = null; let sharedAccountsProvider = null;
 let lastLoadTiming = null;   // the phases of the last load (src/time-breakdown.js createLoadTiming)
 const operationSpans = {};   // measurement aid (debug-exec, scripts/validation/profile-launch.mjs): wall-clock start/end (epoch ms) of the last load and launch requests, to cut a profile by operation
 const epochNow = () => (self.performance?.timeOrigin ?? 0) + performance.now();
@@ -93,6 +94,7 @@ const netlog = createNetlog({ post: message => self.postMessage(message) });   /
 const logcat = createLogcat({ post: message => self.postMessage(message), streaming: false });   // the app's logcat (src/logcat.js): batches go to the page on a 100 ms timer and at the end of every event batch / request, but only while the page's Logcat panel is open (logcat-stream); closed, a counter once a second
 let runtime = null, reportedCensus = 0;   // reportedCensus: the OutOfMemoryError whose heap census already reached the page
 let appData = null, appDataInfo = null;   // per-app private data persistence (src/app-data-store.js): the live persistence object (null when disabled) and the last status
+let deviceData = [];   // the device option's packages' data (microG's, src/app-data-store.js attachDeviceData): their live persistences (empty when off or not kept)
 let composeSemantics = null;
 let inspectNativeLibraries = null;
 let inventory = null, archive = null;
@@ -165,7 +167,7 @@ const motionSignal = (request = null) => ({ navigation: motionRaster.navigating(
  * refresh the pacer owes. `request`: the page request this snapshot answers, for the motion signal. */
 function currentSnapshot({ paced = false, pacedSemantics = paced, request = null } = {}) {
   lastSnapshotAt = performance.now();   // the page gets this one now (an event's or a reply's): src/frame-flow.js spaces the next event snapshot from it
-  appData?.touch(); const snapshotStarted = performance.now();
+  appData?.touch(); for (const persistence of deviceData) persistence.touch(); const snapshotStarted = performance.now();
   const rasterAtStart = frameProbe.enabled ? rasterMs(runtime) : 0;   // "Show frame rate": the raster time of this snapshot is what the runtime adds while it is built
   if (!paced) snapshotOwed = false;   // a reply to a page request carries the newest state: nothing is owed to the page anymore
   runtime.steps = 0; // A bounded inspection event, separate from the APK callback that just finished.
@@ -579,6 +581,7 @@ async function createAssetProviders() {
     speech: SPEECH_PROFILE_URL ? (sharedSpeechProvider ??= new FrameworkProvider({ url: at(SPEECH_PROFILE_URL), filename: 'framework-aosp/profiles/speech/framework.dex', provenanceURL: at(SPEECH_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,   // fetched only by a load that selects it (not warmed)
     'apache-http': APACHE_HTTP_PROFILE_URL ? (sharedApacheHttpProvider ??= new FrameworkProvider({ url: at(APACHE_HTTP_PROFILE_URL), filename: 'framework-aosp/profiles/apache-http/framework.dex', provenanceURL: at(APACHE_HTTP_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,   // fetched only by a load that selects it
     services: SERVICES_PROFILE_URL ? (sharedServicesProvider ??= new FrameworkProvider({ url: at(SERVICES_PROFILE_URL), filename: 'framework-aosp/profiles/services/framework.dex', provenanceURL: at(SERVICES_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,   // android.app.IntentService (framework-aosp/profiles/services): fetched only by a load that selects it
+    accounts: ACCOUNTS_PROFILE_URL ? (sharedAccountsProvider ??= new FrameworkProvider({ url: at(ACCOUNTS_PROFILE_URL), filename: 'framework-aosp/profiles/accounts/framework.dex', provenanceURL: at(ACCOUNTS_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,   // the account authenticator originals (framework-aosp/profiles/accounts): fetched only by a load that selects it
     telephony: TELEPHONY_PROFILE_URL ? (sharedTelephonyProvider ??= new FrameworkProvider({ url: at(TELEPHONY_PROFILE_URL), filename: 'framework-aosp/profiles/telephony/framework.dex', provenanceURL: at(TELEPHONY_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,   // fetched only by a load that selects it (not warmed)
     configuration: CONFIGURATION_PROFILE_URL ? (sharedConfigurationProvider ??= new FrameworkProvider({ url: at(CONFIGURATION_PROFILE_URL), filename: 'framework-aosp/profiles/configuration/framework.dex', provenanceURL: at(CONFIGURATION_PROFILE_URL.replace('framework.dex', 'framework-provenance.json')) })) : null,
     icuBreak: sharedICUBreakProvider ??= new IcuBreakProvider(), sqlite: sharedSqliteProvider ??= new SqliteProvider(), tzdata: sharedTzdataProvider ??= new TzdataProvider(),
@@ -597,7 +600,7 @@ async function warmAssets(wanted = {}) {   // wanted: { framework: false, ... } 
   const providers = await urlAssetProviders();
   for (const name of ['framework', 'layouts', 'configuration', 'skia', 'frameworkResources', 'resourceConfig', 'icuBreak', 'sqlite', 'tzdata', 'zlib', 'icuConverter']) if (wanted[name] !== false) providers[name]?.load?.()?.catch?.(() => {});
   providers.javacrypto?.prefetch(providers.nativeLibraries).catch(() => {});   // every launch links javacrypto (src/javacrypto-native.js prefetch): fetched, verified and compiled ahead, not inside the interpreter
-  import('../vmcore/js/attach.js?v=230d3f53d504').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
+  import('../vmcore/js/attach.js?v=2fd1aecf5813').then(core => core.prepareCore?.()).catch(() => {});   // the core's modules, and core.wasm fetched and compiled
   try { providers.skia?.prefetch?.(); } catch { /* the load reads them itself */ }   // image codec modules and the font fallback manifest: bytes only, checked where they are used
   sharedAppDataBackend()?.warm?.();   // the app-data database opened (attachAppData reads it before the launch)
   warmLoadCode();
@@ -629,7 +632,7 @@ async function handleMessage({ data }) {
   const { requestId, type } = data;
   const send = (message) => { logcat.flush(); netlog.flush(); self.postMessage({ requestId, ...message }, rasterSender.takeTransfers()); };   // log lines first, so the page has them when the reply arrives; raw pixel rasters first seen by the page travel as transferred buffers
   if (type === 'webview-event') { try { runtime?.platform?.webViewBackend?.handleEvent(runtime, data); } finally { scheduleEvents(); } return; }   // an iframe finished or failed: only queues VM tasks
-  if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
+  if (type === 'app-data-flush') { runtime?.fileMappings?.flushAll(); appData?.syncPoint('page-hide'); for (const persistence of deviceData) persistence.syncPoint('page-hide'); return; }   // shared native file mappings reach their files before the data is stored   // the page is being hidden/closed: store now, even while the VM is busy (no reply)
   if (type === 'screen-state') {   // read-only picture of the screen for "Copy screen state"; answered even while the VM is between operations, always with whatever could be read
     try {
       if (!runtime) { send({ type: 'result', screenState: { text: 'Screen state\nNo APK loaded.', blank: false, reasons: [] } }); return; }
@@ -718,6 +721,20 @@ async function handleMessage({ data }) {
   }
   if (type === 'microg-services') {   // "microG services" (src/microg-services.js): the user's switches; a running microG gets them between two VM events (platform.queueTask), as its own settings screen would set them
     try { send({ type: 'result', services: runtime?.platform?.microg ? applyMicrogServices(runtime, data.services) : null }); } catch (error) { send({ type: 'error', error: errorData(error) }); }
+    return;
+  }
+  if (type === 'microg-add-account') {   // "Add Google account (microG)" (Device panel): Settings > Accounts > Add for a Google account, done by the device (src/account-sessions.js); microG's login screen opens on the device and the answer comes later as a 'microg-account' message
+    try {
+      const microg = runtime?.platform?.microg;
+      if (!microg) { send({ type: 'result', started: false, reason: 'microg-off' }); return; }
+      if (microg.services?.checkin !== true && microg.settings?.checkin_enable_service !== true) { send({ type: 'result', started: false, reason: 'checkin-off' }); return; }
+      runtime.platform.queueTask(() => {
+        runtime.record('DEVICE microG Add Google account (Device panel): Settings > Accounts > Add account for com.google; the user types their own credentials in Google\'s page, which reaches Google through the relay');
+        const started = runtime.platform.addAccountFromSettings(runtime, 'com.google', outcome => self.postMessage({ type: 'microg-account', outcome }));
+        if (!started) self.postMessage({ type: 'microg-account', outcome: { ok: false, error: 'no package of the device authenticates Google accounts' } });
+      }, 0);
+      send({ type: 'result', started: true }); scheduleEvents();
+    } catch (error) { send({ type: 'error', error: errorData(error) }); }
     return;
   }
   if (type === 'incoming-sms') {   // the "Incoming SMS" control (Permissions section): the device's radio receives an SMS (src/telephony-sms.js); delivered by the pump, never inside this message
@@ -848,6 +865,7 @@ async function handleMessage({ data }) {
       rasterSender.reset();
       runtime?.fileMappings?.flushAll();   // the VM stops: nothing else writes a mapping back
       if (appData) { await appData.close().catch(() => {}); } appData = null; appDataInfo = null;
+      for (const persistence of deviceData) await persistence.close().catch(() => {}); deviceData = [];
       if (runtime) { disposeRegex(runtime); disposeRenderNodes(runtime); disposeTextLayout(runtime); disposeColorFilters(runtime); } runtime?.skiaHost?.dispose?.(); runtime?.gpuRaster?.dispose(); runtime = null; rendererNote = null; reportedCensus = 0; composeSemantics = null; lastComposeSemantics = null; semanticsPacer.stale = false; layoutExportKey = null; lastLayoutExport = null;
       if (!(data.buffer instanceof ArrayBuffer)) throw new TypeError('The Worker needs to receive an APK ArrayBuffer.');
       // data.companionPackages: APK ArrayBuffers installed as further packages of the virtual device (src/package-registry.js, docs/MULTI-PACKAGE.md); absent = the app alone.
@@ -858,8 +876,8 @@ async function handleMessage({ data }) {
       const frameworkProvider = data.frameworkDex ? new FrameworkProvider({ bytes: data.frameworkDex }) : shared.framework;
       const frameworkResourceProvider = data.frameworkResources ? new FrameworkResourceProvider({ data: data.frameworkResources }) : shared.frameworkResources;
       const resourceConfigProvider = data.resourceConfigBytes ? new ResourceConfigProvider({ bytes: data.resourceConfigBytes, metadata: data.resourceConfigMetadata }) : shared.resourceConfig;
-      const skiaProvider = shared.skia, layouts = data.layoutProfileDex ? new FrameworkProvider({ bytes: data.layoutProfileDex, filename: 'framework-aosp/profiles/layouts/framework.dex', metadata: data.layoutProfileMetadata }) : shared.layouts, configuration = shared.configuration, speech = shared.speech, telephony = shared.telephony, services = shared.services, apacheHttp = shared['apache-http'];
-      const frameworkProfileProviders = { ...(layouts ? { layouts } : {}), ...(configuration ? { configuration } : {}), ...(speech ? { speech } : {}), ...(telephony ? { telephony } : {}), ...(services ? { services } : {}), ...(apacheHttp ? { 'apache-http': apacheHttp } : {}) };
+      const skiaProvider = shared.skia, layouts = data.layoutProfileDex ? new FrameworkProvider({ bytes: data.layoutProfileDex, filename: 'framework-aosp/profiles/layouts/framework.dex', metadata: data.layoutProfileMetadata }) : shared.layouts, configuration = shared.configuration, speech = shared.speech, telephony = shared.telephony, services = shared.services, accounts = shared.accounts, apacheHttp = shared['apache-http'];
+      const frameworkProfileProviders = { ...(layouts ? { layouts } : {}), ...(configuration ? { configuration } : {}), ...(speech ? { speech } : {}), ...(telephony ? { telephony } : {}), ...(services ? { services } : {}), ...(apacheHttp ? { 'apache-http': apacheHttp } : {}), ...(accounts ? { accounts } : {}) };
       const icuBreakProvider = shared.icuBreak, sqliteProvider = shared.sqlite, tzdataProvider = shared.tzdata, zlibProvider = shared.zlib, icuConverterProvider = shared.icuConverter;
       // The browser product lays every APK's Views out in the VM (original AOSP LinearLayout/FrameLayout/ScrollView + Skia text), never with page CSS.
       // Lab-built wasm32 native libraries (libreactnative, Hermes, ...): provenance now, each module only when the app's SoLoader links it (javacrypto's, which every launch links, prefetched)
@@ -871,7 +889,7 @@ async function handleMessage({ data }) {
       runtime.platform.glPresent = frame => self.postMessage({ type: 'gl-frame', frame }, frame.bitmap ? [frame.bitmap] : []);   // eglSwapBuffers of a window surface (src/gles-native.js): the picture goes to the page as it is, transferred
       loadTiming.mark('core'); runtime.platform.camera?.attachCodecs(await hostCodecs);
       if (runtime.engine === 'wasm') {   // the WebAssembly core (docs/WASM-CORE-PLANO.md), before anything runs. A core that cannot start fails the load naming the other engine; the JavaScript VM is never substituted silently
-        try { await (await import('../vmcore/js/attach.js?v=230d3f53d504')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
+        try { await (await import('../vmcore/js/attach.js?v=2fd1aecf5813')).attachCore(runtime, { memory: checkCoreMemory(data.coreMemory).error ? null : sanitizeCoreMemory(data.coreMemory) }); }
         catch (error) { error.message = `${coreStartMessage(error)}`; throw error; }
       }
       if (Array.isArray(data.methodOverrides) && data.methodOverrides.length) applyMethodOverrides(result.runtime, data.methodOverrides); if (Array.isArray(data.ignoredActivities) && data.ignoredActivities.length) applyIgnoredActivities(result.runtime, data.ignoredActivities); if (Array.isArray(data.endpointMocks) && data.endpointMocks.length) applyEndpointMocks(result.runtime, data.endpointMocks); /* before any app code runs */
@@ -900,14 +918,26 @@ async function handleMessage({ data }) {
       // written over what is stored, and the trace and the App data panel say so.
       const attached = await attachAppData(runtime, { backend: sharedAppDataBackend(), keep: data.keepData !== false, clear: data.clearData === true, onStatus: status => self.postMessage({ type: 'app-data', status }) })
         .catch(error => { const message = String(error?.message ?? error); runtime.record(`APPDATA the stored app data could not be read (${message}): the app starts without it and nothing is stored in this run`); return { persistence: null, status: { enabled: false, reason: 'storage-error', error: message, bytes: 0, files: 0 } }; });
-      appData = attached.persistence; appDataInfo = attached.status; lastLoadTiming = loadTiming.finish(); runtime.loadTiming = lastLoadTiming;
-      send({ type: 'result', inventory: result.inventory, appData: appDataInfo, renderer: rendererStatus(), loadTiming: lastLoadTiming });
+      appData = attached.persistence; appDataInfo = attached.status;
+      // The device option's packages (microG) keep their data as DEVICE data (shared by every app run on the device), restored before launch (their processes start lazily) and stored
+      // at the same sync points; the same "Keep app data" choice. A storage failure is reported and the device starts without it.
+      const device = attached.persistence || data.keepData === false ? await attachDeviceData(runtime, { backend: sharedAppDataBackend(), keep: data.keepData !== false, onStatus: status => self.postMessage({ type: 'microg-data', status }) })
+        .catch(error => { const message = String(error?.message ?? error); runtime.record(`DEVICE microG DATA the stored device data could not be read (${message}): microG starts without it and nothing is stored in this run`); return { persistences: [], status: [] }; }) : { persistences: [], status: [] };
+      deviceData = device.persistences;
+      lastLoadTiming = loadTiming.finish(); runtime.loadTiming = lastLoadTiming;
+      send({ type: 'result', inventory: result.inventory, appData: appDataInfo, microgData: device.status, renderer: rendererStatus(), loadTiming: lastLoadTiming });
     } else if (type === 'app-data-clear') {
       // Settings > Apps > Clear storage: the stored data is wiped and this process stops persisting; the page restarts the app.
       if (!runtime) throw new Error('Open an APK before clearing the app data.');
       if (appData) appDataInfo = await appData.clear();
       else { const backend = sharedAppDataBackend(); if (backend) { const { key } = await appKeyFor(runtime.platform.packageName, runtime.apkSigningCertificates?.() ?? []); await backend.clear(key); } appDataInfo = { ...(appDataInfo ?? {}), bytes: 0, files: 0 }; }
       send({ type: 'result', appData: appDataInfo });
+    } else if (type === 'microg-data-clear') {
+      // "Clear microG data" (the Device panel's "With microG" box): the device option's stored data is wiped and this run stops storing it; the running device keeps what it has
+      // in memory until the APK is reopened (as Settings > Apps > Clear storage of a running process).
+      if (!runtime) throw new Error('Open an APK before clearing the microG data.');
+      const status = await clearDeviceData(runtime, { backend: sharedAppDataBackend(), persistences: deviceData });
+      send({ type: 'result', microgData: status });
     } else if (type === 'device') {
       // Virtual-device settings changed while an APK runs: Configuration/resources/lifecycle exactly like ActivityThread.handleConfigurationChanged.
       if (!runtime) { send({ type: 'result', outcome: { changed: 0, applied: false } }); }

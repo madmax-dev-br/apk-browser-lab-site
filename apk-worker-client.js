@@ -1,8 +1,8 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=230d3f53d504';
-import { createRasterReceiver } from './raster-cache.js?v=230d3f53d504';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=230d3f53d504';
+import { createWebAudioPlayer } from './web-audio-player.js?v=2fd1aecf5813';
+import { createRasterReceiver } from './raster-cache.js?v=2fd1aecf5813';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=2fd1aecf5813';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=230d3f53d504', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=2fd1aecf5813', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -36,6 +36,8 @@ export class APKWorkerClient {
       const side = this.sideRequests?.get(data?.requestId);
       if (side && (data.type === 'result' || data.type === 'error')) { clearTimeout(side.timer); this.sideRequests.delete(data.requestId); side.resolve(data.type === 'result' ? data.screenState : this.cachedScreenState()); return; }
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
+      if (data?.type === 'microg-data') { this.microgData = data.status; this.onMicrogData?.(data.status); return; }
+      if (data?.type === 'microg-account') { this.onMicrogAccount?.(data.outcome); return; }   // the answer of "Add Google account (microG)": { ok, accountName, accountType, error }   // the stored microG (device) data, per package (src/app-data-store.js attachDeviceData)
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
       if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
@@ -108,11 +110,13 @@ export class APKWorkerClient {
   async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false, microgServices = null, textScale = 1 } = {}) {
     this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.apiGapWaiters = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
     const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true, microgServices: microgServices && typeof microgServices === 'object' ? { ...microgServices } : null, textScale: [1, 2, 3, 4].includes(textScale) ? textScale : 1 }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
-    this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
-    return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
+    this.appData = response.appData ?? null; this.microgData = response.microgData ?? null; this.renderer = response.renderer ?? null;
+    return { inventory: response.inventory, appData: this.appData, microgData: this.microgData, renderer: this.renderer };
   }
   /** Settings > Apps > Clear storage for the loaded app: wipes its stored data; the caller restarts the app. Resolves with the new usage status. */
   async clearAppData() { const response = await this.request('app-data-clear', {}, { timeoutMs: this.eventTimeoutMs }); this.appData = response.appData ?? null; return this.appData; }
+  /** "Clear microG data": wipes the stored data of the device option's packages (device data, shared by every app); the running device keeps what it has until the APK is reopened. Resolves with the statuses per package. */
+  async clearMicrogData() { const response = await this.request('microg-data-clear', {}, { timeoutMs: this.eventTimeoutMs }); this.microgData = response.microgData ?? null; return this.microgData; }
   /** Fire-and-forget: ask the Worker to store the app data now (page hidden or closing). Works while the VM is busy. */
   /** An event from a WebView iframe (loaded, failed) for the Worker's backend; fire and forget. */
   webViewEvent(event) { try { this.worker?.postMessage({ ...event, requestId: ++this.sequence }); } catch { /* worker already gone */ } }
@@ -147,6 +151,8 @@ export class APKWorkerClient {
   /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
   /** The device's radio receives an SMS from `from` with text `body` (src/telephony-sms.js): SMS_RECEIVED goes to the holders of RECEIVE_SMS. */
   async receiveSms(from, body) { return this.sideCall('incoming-sms', { from, body }); }
+  /** "Add Google account (microG)": the device opens microG's sign-in screen (Settings > Accounts > Add); resolves { started, reason }, the outcome arrives through onMicrogAccount. */
+  async addMicrogAccount() { return this.sideCall('microg-add-account', {}); }
   async setMethodOverrides(overrides) { return (await this.sideCall('method-overrides', { overrides })).statuses; }
   /** "Resolução no movimento" (1 = always full density, or 0.75 / 0.5 / 0.35 / 0.25) and "Tela nova em baixa resolução", applied live. */
   /** "Renderização" (src/gpu-raster.js): 'cpu' (default) or 'gpu' (experimental), applied live; resolves the renderer status (requested, active, fallback reason). */

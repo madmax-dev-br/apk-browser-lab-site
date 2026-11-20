@@ -34252,6 +34252,66 @@
   {
     "project": "platform/frameworks/base",
     "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/AbstractAccountAuthenticator.java",
+    "localPath": "framework-aosp/upstream/android/accounts/AbstractAccountAuthenticator.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AbstractAccountAuthenticator.java?format=TEXT",
+    "sha256": "b8d8a26d437604085a4f98251890280edb78b769f586d83d395436d70f5417c9",
+    "bytes": 48319,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/AccountAuthenticatorResponse.java",
+    "localPath": "framework-aosp/upstream/android/accounts/AccountAuthenticatorResponse.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AccountAuthenticatorResponse.java?format=TEXT",
+    "sha256": "ae2cf7eee958ea5b1d899834c6ba7e50ef792cfe98a4242d6b9993093af958eb",
+    "bytes": 3367,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/AccountAuthenticatorActivity.java",
+    "localPath": "framework-aosp/upstream/android/accounts/AccountAuthenticatorActivity.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AccountAuthenticatorActivity.java?format=TEXT",
+    "sha256": "1be0e63fe92eab252b6cdbad84d0f4790566f2b981765beb317a8a1a8ef95b5f",
+    "bytes": 3528,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/IAccountAuthenticator.aidl",
+    "localPath": "framework-aosp/upstream/android/accounts/IAccountAuthenticator.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/IAccountAuthenticator.aidl?format=TEXT",
+    "sha256": "a3125cc10b146bcb877ad0bbb00d89552eb550f00b157a33c182ba01085b57cb",
+    "bytes": 4532,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/IAccountAuthenticatorResponse.aidl",
+    "localPath": "framework-aosp/upstream/android/accounts/IAccountAuthenticatorResponse.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/IAccountAuthenticatorResponse.aidl?format=TEXT",
+    "sha256": "157fb8e615298a558dc2ace54b0e6f9e83625afa295a96841a4ccd547406d251",
+    "bytes": 1018,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/Account.aidl",
+    "localPath": "framework-aosp/upstream/android/accounts/Account.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/Account.aidl?format=TEXT",
+    "sha256": "cab0b158383c75608e09cb8ed917df1dbce8f38cbbcf219a803ecad2198400ba",
+    "bytes": 668,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
     "path": "opengl/java/android/opengl/GLES10.java",
     "localPath": "framework-aosp/upstream/android/opengl/GLES10.java",
     "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLES10.java?format=TEXT",

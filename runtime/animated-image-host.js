@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=230d3f53d504';
-import { createHostRegistry, bitsFloat } from './host-contract.js?v=230d3f53d504';
-import { AnimatedFrames, parseGifStructure, declaredFrameCount } from './animated-image.js?v=230d3f53d504';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=230d3f53d504';
-import { getSolidPaint } from './paint-host.js?v=230d3f53d504';
+import { APKError } from './apk-error.js?v=2fd1aecf5813';
+import { createHostRegistry, bitsFloat } from './host-contract.js?v=2fd1aecf5813';
+import { AnimatedFrames, parseGifStructure, declaredFrameCount } from './animated-image.js?v=2fd1aecf5813';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=2fd1aecf5813';
+import { getSolidPaint } from './paint-host.js?v=2fd1aecf5813';
 
 // android.graphics.drawable.AnimatedImageDrawable (API 28) and android.graphics.Movie (API 1, deprecated in 28) over src/animated-image.js.
 //
@@ -174,8 +174,8 @@ export function createAnimatedImageHost(platform) {
     if (!src || src.kind !== 'reference') { if (!st.ready) xmlError('<animated-image> requires a valid \'src\' attribute'); }
     else {
       const file = platform.bitmapCodec?.resourceFile(r, src.reference >>> 0);
-      if (!file || !r.apkEntries?.has(file.path)) xmlError('<animated-image> requires a valid \'src\' attribute');
-      const bytes = Uint8Array.from(r.apkReader(file.path));
+      if (!file) xmlError('<animated-image> requires a valid \'src\' attribute');
+      const bytes = Uint8Array.from(file.read());
       if (declaredFrameCount(bytes) <= 1) iae(r, 'image is not animated');
       const density = file.density === 0xffff ? 0 : file.density || DISPLAY_DENSITY, repeat = st.repeatCount;
       Object.assign(st, blank(), { repeatCount: repeat, autoMirrored: st.autoMirrored }); load(r, self, bytes, { srcDensity: density, dstDensity: DISPLAY_DENSITY });

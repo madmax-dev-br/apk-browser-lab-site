@@ -1,0 +1,132 @@
+{
+  "schemaVersion": 1,
+  "profile": "accounts",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "be33bae0641de76b64be7a470e76d191978e603f12b999527fbe03a45d827b34",
+  "bytes": 24880,
+  "methods": 223,
+  "classes": [
+    "Landroid/accounts/AbstractAccountAuthenticator$1;",
+    "Landroid/accounts/AbstractAccountAuthenticator$2;",
+    "Landroid/accounts/AbstractAccountAuthenticator$3;",
+    "Landroid/accounts/AbstractAccountAuthenticator$4;",
+    "Landroid/accounts/IAccountAuthenticator;",
+    "Landroid/accounts/IAccountAuthenticator$Stub;",
+    "Landroid/accounts/AbstractAccountAuthenticator$Transport;",
+    "Landroid/accounts/AbstractAccountAuthenticator;",
+    "Landroid/accounts/AccountAuthenticatorActivity;",
+    "Landroid/accounts/AccountAuthenticatorResponse$1;",
+    "Landroid/accounts/AccountAuthenticatorResponse;",
+    "Landroid/accounts/IAccountAuthenticator$Default;",
+    "Landroid/accounts/IAccountAuthenticator$Stub$Proxy;",
+    "Landroid/accounts/IAccountAuthenticator$_Parcel;",
+    "Landroid/accounts/IAccountAuthenticatorResponse;",
+    "Landroid/accounts/IAccountAuthenticatorResponse$Default;",
+    "Landroid/accounts/IAccountAuthenticatorResponse$Stub$Proxy;",
+    "Landroid/accounts/IAccountAuthenticatorResponse$Stub;",
+    "Landroid/accounts/IAccountAuthenticatorResponse$_Parcel;"
+  ],
+  "classCount": 19,
+  "algorithmPatches": [],
+  "sourceTransforms": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Bundle.aidl",
+      "localPath": "framework-aosp/upstream/android/os/Bundle.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
+      "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
+      "bytes": 712,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/AbstractAccountAuthenticator.java",
+      "localPath": "framework-aosp/upstream/android/accounts/AbstractAccountAuthenticator.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AbstractAccountAuthenticator.java?format=TEXT",
+      "sha256": "b8d8a26d437604085a4f98251890280edb78b769f586d83d395436d70f5417c9",
+      "bytes": 48319,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/AccountAuthenticatorResponse.java",
+      "localPath": "framework-aosp/upstream/android/accounts/AccountAuthenticatorResponse.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AccountAuthenticatorResponse.java?format=TEXT",
+      "sha256": "ae2cf7eee958ea5b1d899834c6ba7e50ef792cfe98a4242d6b9993093af958eb",
+      "bytes": 3367,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/AccountAuthenticatorActivity.java",
+      "localPath": "framework-aosp/upstream/android/accounts/AccountAuthenticatorActivity.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AccountAuthenticatorActivity.java?format=TEXT",
+      "sha256": "1be0e63fe92eab252b6cdbad84d0f4790566f2b981765beb317a8a1a8ef95b5f",
+      "bytes": 3528,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/IAccountAuthenticator.aidl",
+      "localPath": "framework-aosp/upstream/android/accounts/IAccountAuthenticator.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/IAccountAuthenticator.aidl?format=TEXT",
+      "sha256": "a3125cc10b146bcb877ad0bbb00d89552eb550f00b157a33c182ba01085b57cb",
+      "bytes": 4532,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/IAccountAuthenticatorResponse.aidl",
+      "localPath": "framework-aosp/upstream/android/accounts/IAccountAuthenticatorResponse.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/IAccountAuthenticatorResponse.aidl?format=TEXT",
+      "sha256": "157fb8e615298a558dc2ace54b0e6f9e83625afa295a96841a4ccd547406d251",
+      "bytes": 1018,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/Account.aidl",
+      "localPath": "framework-aosp/upstream/android/accounts/Account.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/Account.aidl?format=TEXT",
+      "sha256": "cab0b158383c75608e09cb8ed917df1dbce8f38cbbcf219a803ecad2198400ba",
+      "bytes": 668,
+      "license": "Apache-2.0"
+    }
+  ],
+  "generatedSources": {
+    "tool": "Android SDK build-tools 36.1.0 aidl --lang=java",
+    "interfaces": [
+      "android/accounts/IAccountAuthenticator.aidl",
+      "android/accounts/IAccountAuthenticatorResponse.aidl"
+    ],
+    "files": [
+      {
+        "localPath": "framework-aosp/profiles/accounts/generated/android/accounts/IAccountAuthenticator.java",
+        "sha256": "88060fc887d8de006021bd8a0b0db35099d0ce50bae6cea3914164dbfb87864c"
+      },
+      {
+        "localPath": "framework-aosp/profiles/accounts/generated/android/accounts/IAccountAuthenticatorResponse.java",
+        "sha256": "6fe6d22237d9afdca8afa863cc3ae4b1562f6125ac2f5fb2f5955fea5e780cbf"
+      }
+    ]
+  },
+  "requiresDefaultFrameworkSha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original account authenticator classes (the authenticator side of IAccountAuthenticator); AccountManagerService is the lab's (src/account-sessions.js): it binds the authenticator's service as the system and calls it through the generated Proxy",
+  "activationPolicy": "an installed package DEX references android.accounts.AbstractAccountAuthenticator, AccountAuthenticatorResponse or AccountAuthenticatorActivity (or a companion package is installed, or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}
