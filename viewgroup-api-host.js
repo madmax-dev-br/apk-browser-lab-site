@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
 
 // android.view.ViewGroup public API (API 33) that the platform ViewGroup model (child array, add/remove, clip flags, focus, nested scrolling) did not carry, with the semantics of
 // android-13.0.0_r1 ViewGroup.java: the group flags (states from children, drawing-cache flags, motion-event splitting, children drawing order, static transformations,
@@ -50,7 +50,7 @@ export function createViewGroupApiHost(platform) {
     const states = kids.map(child => call(r, child, VIEW, 'getDrawableState', [], '[I')).filter(s => !nullish(s));
     const need = states.reduce((sum, s) => sum + r.array(s).elements.length, 0);
     let state = direct(r, self, VIEW, 'onCreateDrawableState', ['I'], '[I', [extra + need]);
-    for (const child of states) state = call(r, self, VIEW, 'mergeDrawableStates', ['[I', '[I'], '[I', [state, child]);
+    for (const child of states) state = callStatic(r, VIEW, 'mergeDrawableStates', ['[I', '[I'], '[I', [state, child]);   // View.mergeDrawableStates is static
     return state;
   });
   def(GROUP, 'childDrawableStateChanged', `(${VIEW})V`, (r, _m, [self]) => { if (st(r, self).addStates) call(r, self, VIEW, 'refreshDrawableState'); });

@@ -26,7 +26,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "29dfc98aa8cc443ca39453e333fb8456899b65a1e197aa455b1e312684b21def",
+  "requiresDefaultFrameworkSha256": "fcd770648ba7fe37e69b9f8b57f8691d122121c3ddec1f54e74ab430e9e717df",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original android.app.IntentService over the lab's android.app.Service host class: onHandleIntent runs on its own HandlerThread, stopSelf(startId) after each Intent",
   "activationPolicy": "an installed package DEX references android.app.IntentService (or explicit loader option)",

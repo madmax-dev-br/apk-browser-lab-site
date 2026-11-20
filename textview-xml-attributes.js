@@ -1,4 +1,4 @@
-import { floatBits, bitsFloat } from './host-contract.js?v=3e71109809bc';
+import { floatBits, bitsFloat } from './host-contract.js?v=c582f7a02eb3';
 
 // The attribute pass of the android.widget.TextView and android.widget.CompoundButton constructors, as android-13.0.0_r1 runs it (TextView.java TextView(Context, AttributeSet,
 // int, int), readTextAppearance, applyTextAppearance; CompoundButton.java CompoundButton(Context, AttributeSet, int, int)). EditText, Button and CheckBox read nothing of their
@@ -463,7 +463,9 @@ export function installTextViewXmlAttributes(platform) {
       else if (node.attributes.some(attribute => attribute.namespace === ANDROID_NAMESPACE && attribute.name === 'button')) attempt(r, view, 'button', () => call(r, 'virtual', COMPOUND, 'setButtonDrawable', '(I)V', [self, 0]));
       if (a.has('buttonTintMode')) attempt(r, view, 'buttonTintMode', () => call(r, 'virtual', COMPOUND, 'setButtonTintBlendMode', `(${BLEND})V`, [self, parseBlendMode(r, a.int('buttonTintMode', -1))]));
       if (a.has('buttonTint')) attempt(r, view, 'buttonTint', () => call(r, 'virtual', COMPOUND, 'setButtonTintList', `(${TINT})V`, [self, a.colors('buttonTint')]));
-      if (a.has('checked')) attempt(r, view, 'checked', () => { view.checked = a.bool('checked', false); });   // setChecked before any listener exists: the state alone
+      // CompoundButton's constructor calls setChecked(android:checked), a virtual call: a subclass that keeps the value for later (Chip defers it until its ChipDrawable exists,
+      // and sets it again at the end of its own constructor) must see it, or it later sets the default back
+      if (a.has('checked')) attempt(r, view, 'checked', () => call(r, 'virtual', COMPOUND, 'setChecked', '(Z)V', [self, a.bool('checked', false) ? 1 : 0]));
     } finally { a.recycle(); }
     return list.handled;
   };

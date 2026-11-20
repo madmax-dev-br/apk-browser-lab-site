@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=3e71109809bc';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=3e71109809bc';
+import { Blocked } from './scheduler.js?v=c582f7a02eb3';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=c582f7a02eb3';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md). These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
@@ -20,7 +20,7 @@ import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=3e711098
 // Not available, failing explicitly with UnsupportedOperationException naming the call: ES 1.x contexts and the GL10 fixed-function calls of GLImpl, glMapBufferRange /
 // glGetBufferPointerv / glUnmapBuffer (no mapped memory), program and shader binaries, pixmap surfaces, EGLImage and external textures. Without WebGL2 in the Worker (some browsers,
 // Node without a backend) eglInitialize refuses with the reason. No process.*.
-const GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', EGL14 = 'Landroid/opengl/EGL14;', EGLIMPL = 'Lcom/google/android/gles_jni/EGLImpl;', GLIMPL = 'Lcom/google/android/gles_jni/GLImpl;';
+const GLES10 = 'Landroid/opengl/GLES10;', GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', EGL14 = 'Landroid/opengl/EGL14;', EGLIMPL = 'Lcom/google/android/gles_jni/EGLImpl;', GLIMPL = 'Lcom/google/android/gles_jni/GLImpl;';
 const H = 'Landroid/opengl/EGLObjectHandle;->mHandle:J';
 const E14 = { display: 'Landroid/opengl/EGLDisplay;', config: 'Landroid/opengl/EGLConfig;', context: 'Landroid/opengl/EGLContext;', surface: 'Landroid/opengl/EGLSurface;' };
 const E10 = { display: 'Lcom/google/android/gles_jni/EGLDisplayImpl;', config: 'Lcom/google/android/gles_jni/EGLConfigImpl;', context: 'Lcom/google/android/gles_jni/EGLContextImpl;', surface: 'Lcom/google/android/gles_jni/EGLSurfaceImpl;' };
@@ -617,7 +617,8 @@ function glesBindings(add) {
   });
   S30('glReadPixels', '(IIIIIII)V', (r, c, gl, args) => { gl.readPixels(...args); });   // into a bound PIXEL_PACK_BUFFER at an offset
   // ---- getters ----
-  for (const [name, kind, convert, S] of [['glGetIntegerv', 'I', 'int', S20], ['glGetFloatv', 'F', 'float', S20], ['glGetBooleanv', 'Z', 'int', S20], ['glGetInteger64v', 'J', 'long', S30]]) {
+  const S10 = (name, signature, body, fallback = 0) => add(GLES10, name, signature, body, fallback);
+  for (const [name, kind, convert, S] of [['glGetIntegerv', 'I', 'int', S10], ['glGetIntegerv', 'I', 'int', S20], ['glGetFloatv', 'F', 'float', S20], ['glGetBooleanv', 'Z', 'int', S20], ['glGetInteger64v', 'J', 'long', S30]]) {
     const signatures = kind === 'Z' ? ['(I[ZI)V', `(I${INT_BUFFER})V`] : [`(I[${kind}I)V`, `(I${kind === 'F' ? FLOAT_BUFFER : kind === 'J' ? LONG_BUFFER : INT_BUFFER})V`];
     both(S, name, signatures, (r, c, gl, args) => {
       const values = parameterValues(c, args[0]); if (values === null) return raise(c, GL.INVALID_ENUM);
@@ -629,6 +630,8 @@ function glesBindings(add) {
   both(S30, 'glGetIntegeri_v', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const v = gl.getIndexedParameter(args[0], args[1]); if (v === null || v === undefined) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'I', [typeof v === 'object' ? nameOf(c, 'buffer', v) : Number(v)]); });
   both(S30, 'glGetInteger64i_v', ['(II[JI)V', `(II${LONG_BUFFER})V`], (r, c, gl, args) => { const v = gl.getIndexedParameter(args[0], args[1]); if (v === null || v === undefined) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'J', [typeof v === 'object' ? nameOf(c, 'buffer', v) : Number(v)], 'long'); });
   S20('glGetString', `(I)${STRING}`, glGetString, null);
+  // GLES10 (the original class, all natives): glGetString / glGetIntegerv are the same GL entry points answered by the current context; the other GLES 1.x calls stay unbound and fail by name
+  add(GLES10, 'glGetString', `(I)${STRING}`, (r, c, gl, [name]) => { switch (name) { case GL.VERSION: return GL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab'; case GL.RENDERER: return c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2'; case GL.EXTENSIONS: return c.group.extensions.join(' '); default: raise(c, GL.INVALID_ENUM); return null; } }, null);
   S30('glGetStringi', `(II)${STRING}`, (r, c, gl, [name, index]) => { if (name !== GL.EXTENSIONS) { raise(c, GL.INVALID_ENUM); return null; } if (index < 0 || index >= c.group.extensions.length) { raise(c, GL.INVALID_VALUE); return null; } return c.group.extensions[index]; }, null);
   // ---- ES 3.0 draws, queries, transform feedback, uniform blocks, syncs ----
   S30('glDrawArraysInstanced', '(IIII)V', (r, c, gl, [mode, first, count, instances]) => { uploadClientArrays(r, c, first + count); gl.drawArraysInstanced(mode, first, count, instances); });
@@ -819,22 +822,12 @@ function platformOf(r) {
 }
 
 /** The bindings of every GL / EGL native of the original classes: Map 'owner->name(signature)' -> (runtime, args). */
-/**
- * android.opengl.GLES10 (not in the framework DEX): glGetString only, over the same context as GLES20 (a GL ES 1.x string query is answered by the device's one GL, here WebGL2 behind
- * ES 3.0). It is what code that reads the extension strings of a context it made current asks (device-configuration reports); any other GLES10 call fails naming it.
- */
-export function createGles10Host() {
-  const registry = createHostRegistry(), { def, type } = registry, GLES10 = 'Landroid/opengl/GLES10;';
-  type(GLES10, 'Ljava/lang/Object;');
-  def(GLES10, 'glGetString', `(I)${STRING}`, (r, _m, args) => { const c = glFor(r, 'glGetString'); return c ? glGetString(r, c, c.gl, args) : null; }, { static: true });
-  return registry;
-}
 export function createGlesNativeBindings() {
   const bindings = new Map();
   const glAdd = (owner, name, signature, body, fallback) => bindings.set(`${owner}->${name}${signature}`, (r, args) => { const c = glFor(r, name); return c ? body(r, c, c.gl, args) : fallback; });
   glesBindings(glAdd);
   const add = (owner, signature, body) => bindings.set(`${owner}->${signature}`, body);
-  for (const owner of [GLES20, GLES30, EGLIMPL, GLIMPL, EGL14]) add(owner, '_nativeClassInit()V', (r) => { if (owner === EGL14) initEgl14Statics(r); });
+  for (const owner of [GLES10, GLES20, GLES30, EGLIMPL, GLIMPL, EGL14]) add(owner, '_nativeClassInit()V', (r) => { if (owner === EGL14) initEgl14Statics(r); });
   const core = eglCore();
   const ints = (r, array, offset = 0) => array === null ? null : Array.from(r.array(array).elements).slice(offset);
   const setInt = (r, array, offset, value) => { if (array === null) return; const elements = r.array(array).elements; if (offset < 0 || offset >= elements.length) r.throwJava(IAE, 'offset out of range'); elements[offset] = value | 0; };

@@ -36,7 +36,7 @@ export const MICROG_ENTRY_POINTS = Object.freeze([
   { id: 'droidguard', pkg: GMS, label: 'DroidGuard (initWithRequest)',
     method: { owner: 'Lorg/microg/gms/droidguard/core/DroidGuardHandleImpl;', name: 'initWithRequest', signature: '(Ljava/lang/String;Lcom/google/android/gms/droidguard/internal/DroidGuardResultsRequest;)Lcom/google/android/gms/droidguard/internal/DroidGuardInitReply;' },
     returnType: 'com.google.android.gms.droidguard.internal.DroidGuardInitReply',
-    note: 'The method that would create the DroidGuard handle from the downloaded code and returns the DroidGuardInitReply. The downloaded code is never loaded (codeLoadGuard). Mock: a DroidGuardInitReply.' },
+    note: 'The method that would create the DroidGuard handle from the downloaded code and returns the DroidGuardInitReply. With the attestation settings of the device on, the body of microG runs from here: the VM is fetched, cached and loaded by microG (src/microg-droidguard.js). Mock: a DroidGuardInitReply.' },
   { id: 'licensing', pkg: VENDING, label: 'Play licensing (checkLicense)',
     method: { owner: 'Lcom/android/vending/licensing/LicensingService$mLicenseService$1;', name: 'checkLicenseCommon', signature: '(Ljava/lang/String;Lcoil/util/-Lifecycles;Lkotlin/coroutines/jvm/internal/ContinuationImpl;)Ljava/lang/Object;' },
     returnType: 'com.android.vending.licensing.LicenseResponse via coroutine (null = off)',

@@ -524,9 +524,9 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8834356,
-  "sha256": "29dfc98aa8cc443ca39453e333fb8456899b65a1e197aa455b1e312684b21def",
-  "classCount": 6792,
+  "bytes": 8838932,
+  "sha256": "fcd770648ba7fe37e69b9f8b57f8691d122121c3ddec1f54e74ab430e9e717df",
+  "classCount": 6793,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
     "Landroid/accessibilityservice/AccessibilityServiceInfo$1;",
@@ -1439,6 +1439,7 @@
     "Landroid/opengl/EGLContext;",
     "Landroid/opengl/EGLDisplay;",
     "Landroid/opengl/EGLSurface;",
+    "Landroid/opengl/GLES10;",
     "Landroid/opengl/GLES20;",
     "Landroid/opengl/GLES30;",
     "Landroid/opengl/GLSurfaceView$1;",
@@ -40981,6 +40982,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/SearchRecentSuggestions.java?format=TEXT",
       "sha256": "e5d679e2c5a45aa080bde408fcc99349171873edd57ebc688fb2cc46243777c6",
       "bytes": 10522,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "opengl/java/android/opengl/GLES10.java",
+      "localPath": "framework-aosp/upstream/android/opengl/GLES10.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLES10.java?format=TEXT",
+      "sha256": "1ace0410e89213ce4a2f82f15115f1bd5dbec6f8d9fa56b50f21fb511d567e7b",
+      "bytes": 45053,
       "license": "Apache-2.0"
     }
   ],

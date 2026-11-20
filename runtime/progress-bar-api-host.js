@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { HOST_STYLEABLES } from './host-styleables.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { HOST_STYLEABLES } from './host-styleables.js?v=c582f7a02eb3';
 
 // android.widget.ProgressBar public API (API 33) with the semantics of android-13.0.0_r1 ProgressBar.java: min / max / progress / secondary progress with their clamping rules, the
 // determinate <-> indeterminate switch (getProgress() is 0 while indeterminate and setProgress is ignored), progress and indeterminate drawables with the four tint sets applied to the
@@ -225,6 +225,8 @@ export function createProgressBarApiHost(platform) {
     }
     if (!nullish(p.progressDrawable)) call(r, p.progressDrawable, DRAWABLE, 'setBounds', ['I', 'I', 'I', 'I'], 'V', [0, 0, Math.max(0, right) | 0, Math.max(0, bottom) | 0]);
   };
+  // ProgressBar.onSizeChanged: updateDrawableBounds(w, h). A subclass that draws its drawables itself (a Material progress indicator's onDraw draws getCurrentDrawable()) relies on it.
+  def(BAR, 'onSizeChanged', '(IIII)V', (r, _m, [self, w, h]) => updateDrawableBounds(r, self, w, h));
   /** ProgressBar.drawTrack: the current drawable inside the padding (mirrored for a right-to-left layout when the style asks for it). A plain ProgressBar has no size callback in the lab, so
    *  its drawables get their bounds here (updateDrawableBounds); a class that overrides drawTrack (AbsSeekBar) places the track itself in updateThumbAndTrackPos.
    *  The indeterminate animation is the original's: an Animatable drawable (the Material animated vectors) is started at the first draw, any other drawable gets its level from

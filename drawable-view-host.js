@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=3e71109809bc';
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
-import { getVectorGraphics } from './vector-native.js?v=3e71109809bc';
-import { deferRaster } from './deferred-raster.js?v=3e71109809bc';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=3e71109809bc';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=3e71109809bc';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=c582f7a02eb3';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
+import { getVectorGraphics } from './vector-native.js?v=c582f7a02eb3';
+import { deferRaster } from './deferred-raster.js?v=c582f7a02eb3';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=c582f7a02eb3';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=c582f7a02eb3';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -338,7 +338,12 @@ export function createDrawableViewHost(platform) {
       // View.invalidate does nothing for a View that is not VISIBLE (skipInvalidate) or was detached from its window (no AttachInfo to damage): its drawable is not drawn, so an
       // animated drawable that reschedules itself from draw() stops there, and goes on from the next draw when the View is shown or attached again.
       if (name === 'invalidateDrawable' && ((view.visibility ?? 0) !== 0 || view.attached === false)) return;
-      if (name === 'invalidateDrawable') { if (same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable)||same(args[1],view.buttonDrawable)||(runtime.isSubtype(view.type,TEXT)&&platform.textViewApi.compoundList(runtime,args[0]).some(d=>same(args[1],d)))){if(view.drawingDrawable){view.needsDrawableDraw=true;platform.requestDraw(runtime,args[0],1000/60);}else{render(runtime,args[0]);platform.requestDraw(runtime,args[0]);}} return; }
+      if (name === 'invalidateDrawable') { if (same(args[1], view.imageDrawable) || same(args[1], view.backgroundDrawable) || same(args[1], view.foregroundDrawable)||same(args[1],view.buttonDrawable)||(runtime.isSubtype(view.type,TEXT)&&platform.textViewApi.compoundList(runtime,args[0]).some(d=>same(args[1],d)))){if(view.drawingDrawable){view.needsDrawableDraw=true;platform.requestDraw(runtime,args[0],1000/60);}else{render(runtime,args[0]);platform.requestDraw(runtime,args[0]);}return;}
+        // View.invalidateDrawable: invalidate() for any drawable verifyDrawable accepts -- a ProgressBar's progress and indeterminate drawables (ProgressBar.verifyDrawable), or
+        // whatever a subclass's own verifyDrawable claims: the View draws again (a Material progress indicator's spring-smoothed progress, a custom View's drawable)
+        const pb=view.pb,own=r=>r.objectOverride(view.type,'verifyDrawable(Landroid/graphics/drawable/Drawable;)Z');
+        if(pb&&(same(args[1],pb.current)||same(args[1],pb.progressDrawable)||same(args[1],pb.indeterminateDrawable))||own(runtime)&&dispatch(runtime,VIEW,'verifyDrawable',['Landroid/graphics/drawable/Drawable;'],'Z',args[0],[args[1]]))platform.requestDraw(runtime,args[0]);
+        return; }
       fail('Unknown Drawable View method ' + name);
     },
   };

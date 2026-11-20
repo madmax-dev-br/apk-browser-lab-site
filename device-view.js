@@ -1,8 +1,8 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=3e71109809bc';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=3e71109809bc';
-import { isTrustedRasterURL } from './raster-cache.js?v=3e71109809bc';
+import { updateWebViewSlot } from './webview-slot.js?v=c582f7a02eb3';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=c582f7a02eb3';
+import { isTrustedRasterURL } from './raster-cache.js?v=c582f7a02eb3';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -305,16 +305,30 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   // Own-properties pass (attributes/style/rasters of this View): skipped when nothing the VM reported for this View, its render context or its DOM focus changed.
   const focused = document.activeElement === element, signature = viewSignature(view, parentKind, parentLaidOut, clipOwnBounds, renderChildren, focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id));
   if (element._signature !== signature) {
-  if (kind === 'button' || kind === 'text') element.textContent = view.displayText ?? view.text ?? '';
-  // A case-only TransformationMethod (android:textAllCaps): the element shows what Android draws; TextView.getText() is still the original text, kept for tools that look a control up by it.
-  if (kind === 'button' || kind === 'text') { const shown = String(view.displayText ?? view.text ?? ''), source = String(view.text ?? ''); if (source !== shown && source.toLowerCase() === shown.toLowerCase()) element.dataset.sourceText = source; else delete element.dataset.sourceText; }
+  if (kind === 'button' || kind === 'text') element.textContent = view.ellipsizedText ?? view.displayText ?? view.text ?? '';
+  // A case-only TransformationMethod (android:textAllCaps) or a line TextUtils.ellipsize cut: the element shows what Android draws; TextView.getText() is still the original text,
+  // kept for tools that look a control up by it.
+  if (kind === 'button' || kind === 'text') { const shown = String(view.ellipsizedText ?? view.displayText ?? view.text ?? ''), source = String(view.text ?? ''), cased = String(view.displayText ?? view.text ?? ''); if (source !== shown && (source.toLowerCase() === cased.toLowerCase())) element.dataset.sourceText = source; else delete element.dataset.sourceText; }
   if (view.textInContent) element.dataset.textInContent = 'true'; else delete element.dataset.textInContent;   // the glyphs are in the content raster: the element keeps its text for accessibility and typing, transparent (styles.css)
   if (kind === 'button') element.disabled = view.clickable === false || view.enabled === false;
   if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
   if (kind === 'button' || view.clickable && ['text','view'].includes(kind)) element.setAttribute('aria-label', view.contentDescription || view.displayText || view.text || `Action ${view.androidId || view.id}`);
   if (kind === 'image') { element.setAttribute('role', view.clickable ? 'button' : 'img'); element.setAttribute('aria-label', view.contentDescription || 'APK image'); }
   if (kind === 'input') { if (!(focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id)) && element.value !== (view.text ?? '')) element.value = view.text ?? ''; element.readOnly = !!view.readOnly; element.placeholder = view.hint || ''; element.setAttribute('aria-label', view.contentDescription || view.hint || `Field ${view.androidId || view.id}`); element.disabled = view.enabled === false; element.inputMode = (view.inputType & 15) === 2 ? 'decimal' : 'text'; }
-  if (kind === 'check') { element._control.checked = !!view.checked; element._control.disabled = view.enabled === false; element._control.setAttribute('aria-label', view.text || 'Option'); element._label.textContent = view.text || ''; element.classList.toggle('android-switch', view.type?.includes('/Switch;') && !view.switchWidget); element.classList.toggle('android-switch-vm', !!view.switchWidget); }
+  // A compound button whose indicator the VM draws (its button drawable: view.buttonSVG at buttonBounds; a Switch's track and thumb), or that draws itself (SwitchCompat,
+  // MaterialSwitch, MaterialCheckBox: its onDraw is the content layer), or that has no indicator at all (a Chip): the page's own checkbox only takes the input, invisible.
+  const vmIndicator = kind === 'check' && (!!view.switchWidget || !!view.buttonSVG || !!view.textInContent || view.indicator === false);
+  if (kind === 'check') { element._control.checked = !!view.checked; element._control.disabled = view.enabled === false; element._control.setAttribute('aria-label', view.text || 'Option'); element._label.textContent = view.text || ''; element.classList.toggle('android-switch', view.type?.includes('/Switch;') && !vmIndicator); element.classList.toggle('android-switch-vm', vmIndicator); }
+  if (kind === 'check') {
+    const drawing = view.buttonSVG && view.buttonBounds ? view.buttonSVG : null;
+    if (drawing) {
+      const layer = element._buttonLayer ||= document.createElement('img'), b = view.buttonBounds;
+      if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL)) throw new Error('Invalid compound button indicator received from the VM.');
+      if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-button-indicator'; }
+      layer.style.cssText = `position:absolute;left:${b.left}px;top:${b.top}px;width:${b.right - b.left}px;height:${b.bottom - b.top}px;pointer-events:none;z-index:0`;
+      if (layer.parentNode !== element) element.insertBefore(layer, element._control);
+    } else { element._buttonLayer?.remove(); element._buttonLayer = null; }
+  }
   if (kind === 'webview') updateWebViewSlot(element, view.webview, { manager: webviews });
   if (kind === 'progress') { element.max = view.max ?? 100; if (view.indeterminate) element.removeAttribute('value'); else element.value = view.progress || 0; }
   element.style.cssText = '';
@@ -330,8 +344,22 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (kind === 'webview') { if (!element.style.position) element.style.position = 'relative'; element.style.overflow = 'hidden'; }   // the iframe fills the View's box and is clipped to it
   if (Number.isFinite(view.textSize) && view.textSize > 0) element.style.fontSize = `${Math.min(200, view.textSize)}px`;
   if (view.padding) element.style.padding = `${view.padding.top || 0}px ${view.padding.right || 0}px ${view.padding.bottom || 0}px ${view.padding.left || 0}px`;
+  // The text of a TextView / Button the page draws itself sits where TextView.onDraw puts it: inside the compound padding (the drawables' space), moved down by the vertical gravity's
+  // offset, its content box exactly the measured text block (a <button> would center it again in a taller box). The VM decided the lines: the element never wraps them again.
+  const textBox = (kind === 'text' || kind === 'button') && view.textPadding && Number.isFinite(view.textBlockHeight) && view.laidOut && view.bounds ? view.textPadding : null;
+  if (textBox) {
+    const top = (textBox.top || 0) + (view.textOffsetY || 0), height = view.bounds.bottom - view.bounds.top;
+    element.style.padding = `${top}px ${textBox.right || 0}px ${Math.max(0, height - top - view.textBlockHeight)}px ${textBox.left || 0}px`; element.style.whiteSpace = 'pre';
+  }
   // A VM-drawn Switch (thumb/track rasterized with the background) reserves its width through TextView compound padding; the native input only receives input.
   if (kind === 'check' && view.switchWidget && view.compoundPadding) element.style.padding = `${view.compoundPadding.top || 0}px ${view.compoundPadding.right || 0}px ${view.compoundPadding.bottom || 0}px ${view.compoundPadding.left || 0}px`;
+  // its label, like a TextView's text: inside the compound padding (the indicator's space), at the vertical gravity's offset
+  if (vmIndicator && view.textPadding && Number.isFinite(view.textBlockHeight) && view.laidOut && view.bounds) {
+    const box = view.textPadding, top = (box.top || 0) + (view.textOffsetY || 0), height = view.bounds.bottom - view.bounds.top;
+    element.style.display = 'block'; element.style.whiteSpace = 'pre'; element.style.padding = `${top}px ${box.right || 0}px ${Math.max(0, height - top - view.textBlockHeight)}px ${box.left || 0}px`;
+    if (Number.isFinite(view.textLineHeight) && view.textLineHeight > 0) element.style.lineHeight = `${view.textLineHeight}px`;
+    const gravity = view.gravity > 0 ? view.gravity & 7 : 0; element.style.textAlign = gravity === 1 ? 'center' : gravity === 5 ? 'right' : '';
+  }
   if (view.margin && !(view.laidOut && parentLaidOut)) element.style.margin = `${view.margin.top || 0}px ${view.margin.right || 0}px ${view.margin.bottom || 0}px ${view.margin.left || 0}px`;
   if (!view.laidOut && Number.isFinite(view.layoutWidth)) element.style.width = view.layoutWidth === -1 ? '100%' : view.layoutWidth === -2 ? 'max-content' : `${view.layoutWidth}px`;
   if (!view.laidOut && Number.isFinite(view.layoutHeight)) { if (view.layoutHeight >= 0) element.style.height = `${view.layoutHeight}px`; else if (view.layoutHeight === -1) element.style.height = '100%'; }
@@ -354,6 +382,9 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (kind === 'scroll') { element.style.overflow = 'auto'; element.style.overscrollBehavior = 'contain'; }
   if (kind === 'scroll' && view.fillViewport) element.dataset.fillViewport = 'true'; else delete element.dataset.fillViewport;
   if (view.textColor) element.style.color = cssColor(view.textColor);
+  if (kind === 'input') element.style.setProperty('--android-hint-color', view.hintColor ? cssColor(view.hintColor) : '');   // '' removes it (CSSOM setProperty)
+  // a password field shows its PasswordTransformationMethod's dots (TextView.getText is still the typed text: the element keeps it for typing and for tools)
+  if (kind === 'input') element.style.webkitTextSecurity = view.password ? 'disc' : '';
   if (view.background) element.style.background = cssColor(view.background);
   if (view.drawableSVG) {
     const drawing = view.drawableSVG; let url;
@@ -368,7 +399,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.textRaster && ['text', 'button'].includes(kind)) {
     const drawing = view.textRaster;
     if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('Invalid paragraph PNG received from the VM.');
-    const image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${(view.compoundPadding || view.padding)?.left || 0}px ${((view.compoundPadding || view.padding)?.top || 0) + (view.textParagraph?.padTop || 0)}px`;
+    const box = view.textPadding || view.compoundPadding || view.padding, image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${box?.left || 0}px ${(box?.top || 0) + (view.textOffsetY || 0) + (view.textParagraph?.padTop || 0)}px`;
     element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
     element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
     element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;
@@ -407,8 +438,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       // dispatchDraw clips only children, preserving the parent's background.
       const layer = element._childLayer ||= document.createElement('div');
       layer.className = 'android-child-layer'; layer.style.cssText = `position:absolute;inset:0;clip-path:inset(${padding.top || 0}px ${padding.right || 0}px ${padding.bottom || 0}px ${padding.left || 0}px)`;
-      reconcileChildren(layer, children); reconcileChildren(element, [element._contentLayer, layer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
-    } else reconcileChildren(element, [element._contentLayer, ...children, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+      reconcileChildren(layer, children); reconcileChildren(element, [element._contentLayer, layer, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+    } else reconcileChildren(element, [element._contentLayer, ...children, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
   }
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('The Canvas capture did not return a content image.');
   // The View's own Canvas content (its onDraw) goes under its children, as View.draw orders it (onDraw, then dispatchDraw, then the foreground): the content layer is the
@@ -430,6 +461,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     }
     const layer = element._contentLayer;
     if (replaced) {
+      if (kind === 'progress') { element.classList.add('android-progress-vm'); element.style.backgroundColor = 'transparent'; }   // the VM's drawing is the bar: the page's own track and value are not drawn over it
       const source = layer.tagName === 'CANVAS' ? layer._image : layer._url;
       if (element._backgroundSource !== source) { element._backgroundSource = source; element._backgroundURL = `url("${layer.tagName === 'CANVAS' ? layer.toDataURL('image/png') : layer._url}")`; }
       if (element.style.backgroundImage !== element._backgroundURL) { element.style.backgroundImage = element._backgroundURL; element.style.backgroundSize = '100% 100%'; element.style.backgroundRepeat = 'no-repeat'; }   // a `background` shorthand written by the styling above resets the image
@@ -437,7 +469,15 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       if (!element.style.position) element.style.position = 'relative';
       if (layer.parentNode !== element) element.insertBefore(layer, element.firstChild ?? element.children[0] ?? null);
     }
-  } else { element._contentLayer?.remove(); element._contentLayer = null; if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
+  } else { element._contentLayer?.remove(); element._contentLayer = null; if (kind === 'progress') element.classList.remove('android-progress-vm'); if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
+  // What a group's draw(Canvas) override drew after its children (a TextInputLayout's floating hint): a layer over the children, under the foreground.
+  if (view.overlaySVG && ['linear', 'frame', 'scroll', 'group'].includes(kind)) {
+    const drawing = view.overlaySVG, layer = element._overlayLayer ||= document.createElement('img');
+    if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL)) throw new Error('Invalid overlay PNG received from the VM.');
+    if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-overlay-layer'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1'; }
+    if (!element.style.position) element.style.position = 'relative';
+    if (layer.parentNode !== element) element.append(layer);
+  } else { element._overlayLayer?.remove(); element._overlayLayer = null; }
   if (view.foregroundSVG) {
     if (kind === 'input' || kind === 'progress') throw new Error('A foreground over this native HTML control requires a drawing container.');
     const drawing = view.foregroundSVG, layer = element._foregroundLayer ||= document.createElement('img');

@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=3e71109809bc';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=c582f7a02eb3';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', INSETS = 'Landroid/view/WindowInsets;', RECT = 'Landroid/graphics/Rect;';
 const LISTENER = 'Landroid/view/View$OnApplyWindowInsetsListener;';
@@ -153,7 +153,9 @@ export function createWindowInsetsHost(platform) {
       if (name === 'getRootWindowInsets') return attached(runtime, receiver) ? initial(runtime, rootOf(runtime, receiver)) : null;
       if (name === 'setFitsSystemWindows') { view.fitsSystemWindows = !!args[1]; return; }
       if (name === 'getFitsSystemWindows' || name === 'fitsSystemWindows') return view.fitsSystemWindows ? 1 : 0;
-      if (name === 'makeOptionalFitsSystemWindows') { view.optionalFitsSystemWindows = true; return; }
+      // View.makeOptionalFitsSystemWindows sets OPTIONAL_FITS_SYSTEM_WINDOWS; ViewGroup's override does the same for every child (AppCompat marks its whole sub-decor this way,
+      // and its action bar layout tells an edge-to-edge window from a fitting one by asking a child of its own: ActionBarOverlayLayout.decorFitsSystemWindows)
+      if (name === 'makeOptionalFitsSystemWindows') { view.optionalFitsSystemWindows = true; for (const child of [...(view.children ?? [])]) call(runtime, child, VIEW, 'makeOptionalFitsSystemWindows'); return; }
       if (name === 'makeFrameworkOptionalFitsSystemWindows') { view.frameworkOptionalFitsSystemWindows = true; return; }
       if (name === 'isFrameworkOptionalFitsSystemWindows') return view.frameworkOptionalFitsSystemWindows ? 1 : 0;
       if (name === 'computeSystemWindowInsets') return compute(runtime, receiver, args[1], args[2]);

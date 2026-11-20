@@ -1,8 +1,8 @@
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
-import { breakParagraphs } from './text-layout-native.js?v=3e71109809bc';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=3e71109809bc';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=3e71109809bc';
-import { getVectorGraphics } from './vector-native.js?v=3e71109809bc';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
+import { breakParagraphs } from './text-layout-native.js?v=c582f7a02eb3';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=c582f7a02eb3';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=c582f7a02eb3';
+import { getVectorGraphics } from './vector-native.js?v=c582f7a02eb3';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -177,7 +177,7 @@ export function createViewLayoutHost(platform) {
     // CompoundButton.onMeasure adds the button drawable's width (android:button of the widget's style). The lab's CheckBox and RadioButton load no button drawable from their style, so
     // their measured width is their text's: one without text (a check box or a radio button in a menu row or a list row) takes no room and shows nothing. Reported, once each.
     if (!text && !switchState && !view.buttonDrawable) for (const [name, mark] of [['CheckBox', 'check mark'], ['RadioButton', 'radio mark']]) if (runtime.isSubtype(view.type, `Landroid/widget/${name};`)) platform.noteFrameworkGap(runtime, `${name.toLowerCase()}-button-width`, `the button drawable of android.widget.${name} (android:button of its style, added to the width by CompoundButton.onMeasure): a ${name} without text measures 0 wide and shows no ${mark}`);
-    const typeface = call(runtime, receiver, 'Landroid/widget/TextView;', 'getTypeface', '()Landroid/graphics/Typeface;'), info = runtime.skiaHost.resolveTypeface(typeface); view.textFontWeight = info.weight; view.textFontItalic = info.italic; const styled = platform.textViewApi.paragraphStyle(runtime, receiver), font = { textSize: view.textSize || 14, flags: 1, typefaceRef: typeface, ...(styled?.letterSpacing ? { letterSpacing: styled.letterSpacingEm } : {}) }, runs = lines.map(line => { const run = runtime.skiaHost.measureText(line, font); return styled && (styled.letterSpacing || styled.shadow || lines.length > 1) || info.custom ? { ...run, width: runtime.skiaHost.measureText(line, { ...font, hinting: 0 }).width } : run; });   // a styled text, or one in an app or system font, is drawn by the paragraph, which shapes with unhinted advances: its width is measured the same way
+    const typeface = call(runtime, receiver, 'Landroid/widget/TextView;', 'getTypeface', '()Landroid/graphics/Typeface;'), info = runtime.skiaHost.resolveTypeface(typeface); view.textFontWeight = info.weight; view.textFontItalic = info.italic; const styled = platform.textViewApi.paragraphStyle(runtime, receiver), font = { textSize: view.textSize || 14, flags: 1, typefaceRef: typeface, ...(styled?.letterSpacing ? { letterSpacing: styled.letterSpacingEm } : {}) }, runs = lines.map(line => { const run = runtime.skiaHost.measureText(line, font); return { ...run, width: runtime.skiaHost.measureText(line, { ...font, hinting: 0 }).width }; });   // Minikin measures with the font's linear (unhinted) advances, at every size and density (measured on Android 16: hinted advances at 160 dpi come out about 1.5 % narrower, and the page's own glyphs, which are laid out unhinted, no longer fit the box); the paragraph shapes the same way
     const metrics = runs[0].metrics, padding = platform.drawableViewHost.compoundPadding?.(runtime,receiver) || view.padding || {}, includePadding = view.includeFontPadding !== false;
     let mode = algorithm(runtime, SPEC, 'getMode', '(I)I', [wSpec]), available = algorithm(runtime, SPEC, 'getSize', '(I)I', [wSpec]);
     // TextView.onMeasure: android:maxWidth / maxEms / width / ems cap the width the text may take before it wraps (unless the parent fixed the width), as an AT_MOST limit does.
@@ -255,7 +255,7 @@ export function createViewLayoutHost(platform) {
         const given = view.tv?.xmlBreakStrategy === strategy ? view.tv.xmlGiven?.get('breakStrategy') : null /* one set from code is not the constructor's */, tag = view.xmlTag ?? view.type.slice(1, -1).replaceAll('/', '.');
         const unavailable = reason => { if (given === 'default') platform.viewXmlAttributes.kit.noteNoEffect(runtime, 'breakStrategy', tag, `the default TextView style asks for optimal line breaking (${reason}); the text is broken greedily, the value is kept for the TextView API`); else platform.noteXmlAttributeNotApplied(runtime, 'breakStrategy', tag, reason); };
         if (given && typeof runtime.icuBreakBackend?.breaks !== 'function') unavailable('Optimal line breaking needs the original ICU line-break iterator');
-        else try { brokenText = breakParagraphs(runtime, text, { textSize: font.textSize, weight: info.weight, italic: info.italic, locale: 'en-US' }, contentWidth, strategy, platform.textViewApi.hyphenationFrequency(runtime, receiver)).join('\n'); }
+        else try { brokenText = breakParagraphs(runtime, text, { textSize: font.textSize, weight: info.weight, italic: info.italic, locale: 'en-US', letterSpacing: styled?.letterSpacingEm ?? 0, face: info.custom ? info : null }, contentWidth, strategy, platform.textViewApi.hyphenationFrequency(runtime, receiver)).join('\n'); }
         catch (error) {
           if (!given || error?.name !== 'APKError' || error.details?.kind !== 'text-layout-backend-unsupported') throw error;
           unavailable(String(error.message).replace(/\s+/g, ' ').slice(0, 200));
@@ -267,7 +267,10 @@ export function createViewLayoutHost(platform) {
       const box = info.custom ? metrics : runtime.skiaHost.measureText('', { textSize: font.textSize, flags: 1 }).metrics;
       const padTop = includePadding ? Math.max(0, Math.round(box.ascent) - Math.floor(box.bounds[1])) : 0, padBottom = includePadding ? Math.max(0, Math.ceil(box.bounds[3]) - Math.round(box.descent)) : 0;
       const extra = styled ? { letterSpacing: styled.letterSpacing, shadow: styled.shadow, lineSpacing: styled.lineSpacing && { ...styled.lineSpacing, firstTop: padTop } } : {};
-      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: contentWidth, textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, nativeTypeface: info.custom ? info.face : null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: paragraphColor(runtime, receiver), alignment: paragraphAlignment(runtime, receiver), raster: true, ...extra });
+      // TextView.onMeasure builds its Layout at the width the view ends up with (want = width - compound padding), not at the text's: a text narrower than android:minWidth or
+      // than a fixed / match_parent width is aligned (gravity center, end) inside that width. Line breaks were decided at contentWidth; a wider box only moves the lines.
+      const finalInner = (algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [Math.max(paragraphWidth, minWidth), wSpec, 0]) & SIZE) - (padding.left || 0) - (padding.right || 0);
+      paragraph = measureSkiaParagraph(runtime.skia, brokenText ?? text, { width: Math.max(contentWidth, finalInner), textSize: font.textSize, weight: info.weight, italic: info.italic, families: info.families ?? null, fontVariations: info.fontVariations ?? null, nativeTypeface: info.custom ? info.face : null, direction: view.layoutDirection || 0, maxLines: view.maxLines ?? null, ellipsis: where === 'END' && view.maxLines != null ? '\u2026' : null, color: paragraphColor(runtime, receiver), alignment: paragraphAlignment(runtime, receiver), raster: true, rasterScale: runtime.textRasterScale ?? 1, ...extra });
       width = paragraphWidth;
       blockHeight = Math.ceil(paragraph.height) + padTop + padBottom;
       height = blockHeight + (padding.top || 0) + (padding.bottom || 0);
@@ -287,6 +290,9 @@ export function createViewLayoutHost(platform) {
     measured(runtime, receiver, algorithm(runtime, ALGORITHMS, 'resolveSizeAndState', '(III)I', [Math.max(width, minWidth), wSpec, 0]), resolvedHeight);
     view.textBaseline = (padding.top || 0) - top; view.textLineHeight = Math.max(lineHeight, bottom - top); view.textMetrics = { width, height, baseline: view.textBaseline, lineHeight: view.textLineHeight, fontSize: font.textSize, glyphCount: runs.reduce((sum, run) => sum + run.glyphCount, 0), source: runs[0].source, scope: 'simple Latin; no paragraph shaping/fallback' };
     view.textBlockHeight = blockHeight; view.textBoxPadding = (padding.top || 0) + (padding.bottom || 0);   // what TextView.getVerticalOffset needs: the height of the laid-out text and the padding around its box
+    // TextView.onDraw translates to (getCompoundPaddingLeft, getExtendedPaddingTop + getVerticalOffset): the page places the text there (a Layout drawn by itself below already
+    // applies the vertical gravity inside its box)
+    view.textPadding = { left: padding.left || 0, top: padding.top || 0, right: padding.right || 0, bottom: padding.bottom || 0 }; view.textOffsetY = textVerticalOffset(runtime, receiver);
     if (textLayout) {
       // The text raster the page shows for this view (the DOM has neither the font features nor the scale, the justification or the fonts of the Layout): the Layout drawn into
       // the box inside the padding, at the place the vertical gravity gives it. On a Canvas the Layout draws itself (compose-canvas-host.js drawNativeText).
@@ -302,7 +308,7 @@ export function createViewLayoutHost(platform) {
             view.textLayoutRaster = getVectorGraphics(runtime).snapshotCanvas(canvas, boxWidth, boxHeight); view.textLayoutRasterKey = key;
           } finally { call(runtime, bitmap, BITMAP, 'recycle', '()V'); }
         }
-        view.textRaster = view.textLayoutRaster; view.textParagraph = { layoutDrawn: true, padTop: 0, padBottom: 0, height: boxHeight, layoutWidth: boxWidth, lineCount: textLayout.lineCount };
+        view.textRaster = view.textLayoutRaster; view.textParagraph = { layoutDrawn: true, padTop: 0, padBottom: 0, height: boxHeight, layoutWidth: boxWidth, lineCount: textLayout.lineCount }; view.textOffsetY = 0;
       }
     }
     // TextView.startMarquee: the scroll of a marquee is an animation the native text path does not run. One that Android would run now (the view is focused or selected and

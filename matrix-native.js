@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
 const MATRIX = 'Landroid/graphics/Matrix;', RECT = 'Landroid/graphics/RectF;';
 const REGISTRY = 'Llibcore/util/NativeAllocationRegistry;', CLEANER = 'Lapkweb/bridge/MatrixCleaner;';
 const FINALIZER = 0x4d415452n;
@@ -11,7 +11,7 @@ const backend = runtime => runtime.skia?.CanvasKit || fail('Matrix requires the 
 const get = (runtime, handle) => stateFor(runtime).handles.get(handle) || fail('Invalid or released native Matrix handle');
 const put = (runtime, handle, values) => {
   get(runtime, handle);
-  if (values.length !== 9 || values.some(value => !Number.isFinite(value))) fail('Non-finite Matrix values are not supported by this backend');
+  if (values.length !== 9 || values.some(value => typeof value !== 'number')) fail('A Matrix needs nine values');   // SkMatrix keeps non-finite values (a rotation by NaN degrees): a canvas then draws nothing through it
   stateFor(runtime).handles.set(handle, values.map(Math.fround));
 };
 // Transform composition and rotation run through the actual C++ Skia canvas.
@@ -78,8 +78,9 @@ export function createMatrixNativeBindings() {
     ['Skew', 2, (canvas, [x, y]) => canvas.skew(x, y)],
     ['Skew', 4, (canvas, [x, y, px, py]) => { canvas.translate(px, py); canvas.skew(x, y); canvas.translate(-px, -py); }],
   ]) for (const mode of ['Set', 'Pre', 'Post']) add('n' + mode + suffix, ['J', ...Array(count).fill('F')], 'V', (runtime, [handle, ...values]) => {
-    if (values.some(value => !Number.isFinite(value))) fail('Non-finite Matrix transform');
     const current = get(runtime, handle);
+    // SkMatrix::setRotate / setScale / setTranslate with a non-finite argument give a non-finite matrix, and pre/post concatenation with it a non-finite product (its affine part)
+    if (values.some(value => !Number.isFinite(value))) { put(runtime, handle, [NaN, NaN, NaN, NaN, NaN, NaN, ...(mode === 'Set' ? [0, 0, 1] : current.slice(6))]); return; }
     const transformed = compose(runtime, mode === 'Pre' ? [current] : [], canvas => transform(canvas, values));
     put(runtime, handle, mode === 'Post' ? compose(runtime, [transformed, current]) : transformed);
   });

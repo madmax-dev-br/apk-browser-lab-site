@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=3e71109809bc';
-import { colorLongToArgb } from './color-long.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=c582f7a02eb3';
+import { colorLongToArgb } from './color-long.js?v=c582f7a02eb3';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -30,7 +30,7 @@ const keys = new Set([
   'clearShadowLayer()V', 'setShadowLayer(FFFI)V', 'hasShadowLayer()Z',
   'getHinting()I', 'setHinting(I)V', 'getStartHyphenEdit()I', 'getEndHyphenEdit()I', 'setStartHyphenEdit(I)V', 'setEndHyphenEdit(I)V',
   'getTextBounds(Ljava/lang/String;IILandroid/graphics/Rect;)V', 'getTextBounds([CIILandroid/graphics/Rect;)V', 'getTextBounds(Ljava/lang/CharSequence;IILandroid/graphics/Rect;)V',
-  'getRunAdvance([CIIIIZI)F', 'getRunAdvance(Ljava/lang/CharSequence;IIIIZI)F',
+  'getRunAdvance([CIIIIZI)F', 'getRunAdvance(Ljava/lang/CharSequence;IIIIZI)F', 'getTextRunAdvances([CIIIIZ[FI)F',
   'getTextRunCursor([CIIZII)I', 'getTextRunCursor(Ljava/lang/CharSequence;IIZII)I', 'getTextRunCursor(Ljava/lang/String;IIZII)I',
   'getStrokeWidth()F', 'setStrokeWidth(F)V', 'getStrokeMiter()F', 'setStrokeMiter(F)V',
   `getColorFilter()${FILTER}`, `setColorFilter(${FILTER})${FILTER}`,
@@ -230,6 +230,27 @@ export function createPaintHost() {
         }
         runtime.record('HOST Paint.getTextRunCursor [original ICU4C grapheme boundaries]');
         return result===-1?-1:result+contextStart;
+      }
+      if(name==='getTextRunAdvances'){
+        // Paint.getTextRunAdvances (android-13.0.0_r1 Paint.java: the argument checks, then nGetTextAdvances): the advance of [index, index + count) inside its context, and in
+        // advances[advancesIndex..] the advance of every UTF-16 unit (a cluster's advance on its first unit, 0 on the others). MeasuredParagraph measures a left-to-right text
+        // without bidi this way (TextUtils.ellipsize of a TextInputLayout hint, buildForMeasurement).
+        const [, chars, index, count, contextIndex, contextCount, rtl, advances, advancesIndex] = args;
+        if (nullish(chars)) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'text cannot be null');
+        const source = runtime.array(chars), out = nullish(advances) ? null : runtime.array(advances);
+        if (source.type !== '[C') runtime.throwJava('Ljava/lang/ClassCastException;', 'Paint run requires char[]');
+        if ((index | count | contextIndex | contextCount | advancesIndex | (index - contextIndex) | (contextCount - count) | ((contextIndex + contextCount) - (index + count)) | (source.elements.length - (contextIndex + contextCount)) | (out === null ? 0 : out.elements.length - (advancesIndex + count))) < 0) runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;', null);
+        if (source.elements.length === 0 || count === 0) return rawFloat(0);
+        if (contextCount > 65536) fail('Run context exceeds65536UTF16units');
+        pull(runtime, paint, args[0]); if (paint.hyphenEdit) fail('Run advances with Android hyphen editing require an implemented Minikin backend');
+        if (!runtime.skiaHost?.measureRunAdvances) fail('Paint run advances require the verified Skia shaping backend');
+        let content = ''; const context = source.elements.slice(contextIndex, contextIndex + contextCount); for (let from = 0; from < context.length; from += 16384) content += String.fromCharCode(...context.slice(from, from + 16384));
+        // as getRunAdvance: a Latin left-to-right item inside a larger context is shaped as its own run (Minikin's itemization; the context matters to contextual scripts and bidi only)
+        const latinItem = !rtl && (index !== contextIndex || count !== contextCount) && /^[\u0020-\u024f]*$/.test(content);
+        if (!latinItem && (index !== contextIndex || count !== contextCount)) fail('Run advances require a complete shaping run; partial non-Latin context/bidi items need the Android Minikin boundary');
+        const item = latinItem ? content.slice(index - contextIndex, index - contextIndex + count) : content, result = runtime.skiaHost.measureRunAdvances(item, { start: latinItem ? 0 : index - contextIndex, end: latinItem ? count : index - contextIndex + count, isRtl: !!rtl }, paint);
+        if (out) for (let i = 0; i < count; i++) out.elements[advancesIndex + i] = rawFloat(result.advances[i]);   // a float[] holds the float bits
+        runtime.record('HOST Paint.getTextRunAdvances [original SkParagraph/SkShaper cluster advances]'); return rawFloat(result.total);
       }
       if(name==='getRunAdvance'){
         if(nullish(args[1]))runtime.throwJava('Ljava/lang/IllegalArgumentException;','text cannot be null');

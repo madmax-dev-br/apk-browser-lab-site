@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { gcRoot } from './heap-gc.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { parseFontFeatureSettings } from './skia-paragraph.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { parseFontFeatureSettings } from './skia-paragraph.js?v=c582f7a02eb3';
 
 // Public android.widget.TextView API (API 33) beyond what the platform's native text model carries, with the semantics of android-13.0.0_r1 TextView.java.
 // The lab renders TextView / Button / EditText text through its native SkParagraph path (view-layout-host measure, compose-canvas-host draw), which honours the text, size, colour, typeface,
@@ -820,6 +820,34 @@ export function createTextViewApiHost(platform) {
    * letter-spacing in em), the shadow layer (text-shadow), the OpenType feature settings (font-feature-settings) and the generic family of a serif or monospace system font.
    * null for every other View and for an EditText that sets none of them.
    */
+  /**
+   * The colour the page draws a TextView's own text (or its hint) in: TextView.getCurrentTextColor / getCurrentHintTextColor of the View's drawable state, from its own
+   * ColorStateList or the one its constructor read from the style and theme (android:textColor="?android:attr/textColorPrimary", a text appearance, a selector with
+   * android:alpha). '#aarrggbb', or null when the View keeps a plain colour of its own (exported as it is) or has none. The theme's list is looked up once per View.
+   */
+  registry.currentTextColor = (r, self, hint = false) => {
+    const view = r.object(self), s = tv(r, self);
+    if (!hint && view.textColor != null) return null;
+    // the framework code run here is the host's lookup for the page, not the app's: it must not evict APK-visible trace entries
+    const muted = r.traceMuted; r.traceMuted = true; let list, failure = null;
+    try {
+      try {
+        if (hint) list = s.hintTextColors ?? (s.themeHintTextColors !== undefined ? s.themeHintTextColors : (s.themeHintTextColors = platform.composeCanvasHost?.themeHintTextColors?.(r, self) ?? null));
+        else list = s.textColors ?? (s.themeTextColors !== undefined ? s.themeTextColors : (s.themeTextColors = platform.composeCanvasHost?.themeTextColors?.(r, self) ?? null));
+      } catch (error) {   // a theme the style lookup cannot read: the page keeps its default colour, and the trace says why
+        if (error?.name !== 'APKError' && error?.name !== 'JavaException') throw error;
+        if (hint) s.themeHintTextColors = null; else s.themeTextColors = null; failure = String(error.message).slice(0, 200); list = null;
+      }
+      if (nullish(list)) return null;
+      const state = call(r, self, VIEW, 'getDrawableState', [], '[I'), key = `${list.ref}|${state?.ref ?? 0}`, memo = hint ? 'hintColorMemo' : 'textColorMemo';
+      if (s[memo]?.key === key) return s[memo].value;
+      const value = argb(call(r, list, TINT, 'getColorForState', ['[I', 'I'], 'I', [state, call(r, list, TINT, 'getDefaultColor', [], 'I')]));
+      s[memo] = { key, value }; return value;
+    } finally {
+      r.traceMuted = muted;
+      if (failure !== null) { const seen = r.textColorFailures ??= new Set(); if (!seen.has(failure) && seen.size < 64) { seen.add(failure); r.record(`TEXT colour not resolved for the page (the page keeps its default): ${failure}`); } }   // once per cause
+    }
+  };
   registry.pageTextStyle = (r, self) => {
     const view = r.object(self), s = view.tv; if (!s || !pageDrawn(r, self)) return null;
     const features = nullish(s.fontFeatureSettings) ? [] : parseFontFeatureSettings(csString(r, s.fontFeatureSettings)).filter(feature => /^[A-Za-z0-9 ]{4}$/.test(feature.name));

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { gcRoot } from './heap-gc.js?v=3e71109809bc';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=3e71109809bc';
-import { JavaException } from './apk-runtime.js?v=3e71109809bc';
-import { bestDateTimePattern } from './date-skeleton.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=c582f7a02eb3';
+import { JavaException } from './apk-runtime.js?v=c582f7a02eb3';
+import { bestDateTimePattern } from './date-skeleton.js?v=c582f7a02eb3';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -114,6 +114,11 @@ export function createDateTimeHost(platform) {
   def(ZONE, 'setDefault', `(${ZONE})V`, (r, _m, [z]) => { overrideDefault = z === null ? null : zid(r, z); }, { static: true });
   def(ZONE, 'toZoneId', `()${ZONE_ID}`, (r, _m, [self]) => call(r, ZONE_ID, 'of', `(${STRING}Ljava/util/Map;)${ZONE_ID}`, [zid(r, self), r.readStatic({ owner: ZONE_ID, name: 'SHORT_IDS', type: 'Ljava/util/Map;' })]));
   def(ZONE, 'getID', `()${STRING}`, (r, _m, [self]) => zid(r, self));
+  // createGmtOffsetString(includeGmt, includeMinuteSeparator, offsetMillis) (hidden, libcore): "GMT" + sign + two-digit hours [+ ':'] + two-digit minutes, minutes truncated toward zero
+  def(ZONE, 'createGmtOffsetString', '(ZZI)Ljava/lang/String;', (_r, _m, [includeGmt, separator, millis]) => {
+    let minutes = Math.trunc(millis / 60000); const sign = minutes < 0 ? '-' : '+'; minutes = Math.abs(minutes);
+    return `${includeGmt ? 'GMT' : ''}${sign}${String(Math.trunc(minutes / 60)).padStart(2, '0')}${separator ? ':' : ''}${String(minutes % 60).padStart(2, '0')}`;
+  }, { static: true });
   def(ZONE, 'getRawOffset', '()I', (r, _m, [self]) => { const id = zid(r, self), year = new Date().getUTCFullYear(); return Math.min(offsetOf(id, Date.UTC(year, 0, 1)), offsetOf(id, Date.UTC(year, 6, 1))); });
   def(ZONE, 'getOffset', '(J)I', (r, _m, [self, t]) => offsetOf(zid(r, self), Number(t)));
   def(ZONE, 'useDaylightTime', '()Z', (r, _m, [self]) => { const id = zid(r, self), y = new Date().getUTCFullYear(); return offsetOf(id, Date.UTC(y, 0, 1)) !== offsetOf(id, Date.UTC(y, 6, 1)) ? 1 : 0; });

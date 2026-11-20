@@ -1,34 +1,34 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=3e71109809bc';
-import { VMClock } from './vm-clock.js?v=3e71109809bc';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=3e71109809bc';
-import { OperationMonitor } from './operation-monitor.js?v=3e71109809bc';
-import { ExecutionProfile } from './execution-profile.js?v=3e71109809bc';
-import { SamplingProfiler } from './sampling-profiler.js?v=3e71109809bc';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=3e71109809bc';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=3e71109809bc';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=3e71109809bc';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=3e71109809bc';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=3e71109809bc';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=3e71109809bc';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=3e71109809bc';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=3e71109809bc';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=3e71109809bc';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=3e71109809bc';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=3e71109809bc';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=3e71109809bc';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=3e71109809bc';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=3e71109809bc';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=3e71109809bc';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=3e71109809bc';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=3e71109809bc';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=3e71109809bc';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=3e71109809bc';
+import STATIC_SHIMS from './shim-static-methods.js?v=c582f7a02eb3';
+import { VMClock } from './vm-clock.js?v=c582f7a02eb3';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=c582f7a02eb3';
+import { OperationMonitor } from './operation-monitor.js?v=c582f7a02eb3';
+import { ExecutionProfile } from './execution-profile.js?v=c582f7a02eb3';
+import { SamplingProfiler } from './sampling-profiler.js?v=c582f7a02eb3';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c582f7a02eb3';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c582f7a02eb3';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c582f7a02eb3';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c582f7a02eb3';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c582f7a02eb3';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=c582f7a02eb3';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c582f7a02eb3';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c582f7a02eb3';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c582f7a02eb3';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c582f7a02eb3';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=c582f7a02eb3';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c582f7a02eb3';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=c582f7a02eb3';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=c582f7a02eb3';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c582f7a02eb3';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c582f7a02eb3';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c582f7a02eb3';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c582f7a02eb3';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=c582f7a02eb3';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=3e71109809bc';
-import { bootClassLacksMember } from './boot-class-members.js?v=3e71109809bc';
-export { APKError } from './apk-error.js?v=3e71109809bc';
+import { Scheduler, Blocked } from './scheduler.js?v=c582f7a02eb3';
+import { bootClassLacksMember } from './boot-class-members.js?v=c582f7a02eb3';
+export { APKError } from './apk-error.js?v=c582f7a02eb3';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1166,7 +1166,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
-  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal',
+  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal', 'textColorFailures', 'avdRtState', 'textRasterScale',
 ]);
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
@@ -1936,20 +1936,24 @@ export class APKRuntime {
         textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;') ? { touchInput: true } : {}) /* an original list: the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
         padding: v.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }, layoutWidth: v.layoutWidth ?? null,
         clipChildren: v.clipChildren !== false, clipToPadding: v.clipToPadding !== false,
-        layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? null,
+        layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? (['text', 'button', 'input', 'check'].includes(kind) && this.isSubtype(v.type, 'Landroid/widget/TextView;') ? this.platform?.textViewApi?.currentTextColor?.(this, value) ?? null : null),
+        // android:button resolved to nothing (setButtonDrawable(null), or no style of the widget names one: a Chip): no indicator
+        ...(kind === 'check' && !v.buttonDrawable && (v.buttonDrawableSet || this.platform?.composeCanvasHost?.styledButton?.(this, value) === 0) ? { indicator: false } : {}),
+        ...(kind === 'input' && this.isSubtype(v.type, 'Landroid/widget/TextView;') ? { hintColor: this.platform?.textViewApi?.currentTextColor?.(this, value, true) ?? null, ...(v.text && v.displayText !== v.text && /^\u2022+$/.test(v.displayText ?? '') ? { password: true } : {}) } : {}),
         hint: v.hint ?? '', inputType: v.inputType ?? 1, checked: !!v.checked, progress: v.progress ?? 0,
         max: v.max ?? 100, indeterminate: !!v.indeterminate, visibility: v.visibility ?? 0,
         margin: v.margin ?? { top: 0, right: 0, bottom: 0, left: 0 }, gravity: v.gravity ?? null,
-        layoutGravity: v.layoutGravity ?? null, weight: v.weight ?? 0, background: v.background ?? null,
+        layoutGravity: v.layoutGravity ?? null, weight: v.weight ?? 0, background: v.backgroundInContent ? null : v.background ?? null,
         textStyle: v.textStyle ?? 0, textAllCaps: !!v.textAllCaps, singleLine: !!v.singleLine,
         switchWidget: this.platform?.drawableViewHost?.switchWidget?.(this, value)?.bounds ?? null, progressTint: v.progressTint ?? null, fillViewport: !!(v.fields.get('Landroid/widget/ScrollView;->mFillViewport:Z') ?? v.fillViewport), progressStyle: v.progressStyle ?? null,
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
-        drawableSVG: v.drawableSVG ?? null,
+        drawableSVG: v.backgroundInContent && v.contentRaster ? null : v.drawableSVG ?? null,   // a View with a layer draws its background in its content layer (compose-canvas-host leafDraw)
         webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
         cameraSurface: this.platform?.camera?.nodeState?.(this, v),
         glSurface: this.platform?.gles?.nodeState?.(this, v),   // a SurfaceView an EGL window surface draws into (src/gles-native.js): the page draws its frames in the box   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
         foregroundSVG: v.foregroundSVG ?? null,
+        ...(v.overlaySVG ? { overlaySVG: v.overlaySVG } : {}),   // what a group's own draw(Canvas) drew after its children (compose-canvas-host renderTree), drawn over them
         foregroundBounds: v.foregroundBounds ?? null,
         contentRaster: v.contentRaster ? { ...v.contentRaster } : null,   // a copy: the transport (src/raster-cache.js) rewrites the raster object of the message, not the View's
          canvasChildrenCaptured: !!v.canvasChildrenCaptured,
@@ -1961,6 +1965,9 @@ export class APKRuntime {
         textFontWeight: v.textFontWeight ?? null, textFontItalic: !!v.textFontItalic,
         textCss: kind === 'input' || kind === 'check' ? this.platform?.textViewApi?.pageTextStyle?.(this, value) ?? null : null,   // the letter spacing, shadow layer and font features of an EditText or a compound button's label, for the page's own element
         bounds: v.bounds ?? null, laidOut: !!v.laidOut, textLineHeight: v.textLineHeight ?? null, textMetrics: v.textMetrics ?? null, textRaster: v.textRaster ?? null, textParagraph: v.textParagraph ?? null,
+        // where TextView.onDraw puts the text: inside the compound padding, moved down by the vertical gravity (textOffsetY) in a box taller than the text (textBlockHeight);
+        // ellipsizedText: the single line TextUtils.ellipsize cut, the one Android draws (text keeps the whole one)
+        ...(v.textPadding ? { textPadding: v.textPadding, textOffsetY: v.textOffsetY ?? 0, textBlockHeight: v.textBlockHeight ?? null } : {}), ...(v.ellipsizedText != null ? { ellipsizedText: v.ellipsizedText } : {}),
         // after the children: a group's disappearing children (removed, still animated) and the Views of the View's overlay (View.getOverlay(): the list fast scroller's
         // thumb, track and preview), in the View's coordinates
         children: (v.overlay || v.vg?.disappearing?.length ? [...v.children, ...(this.platform?.extraChildren?.(this, value) ?? [])] : v.children).map(child => build(child, depth + 1)) };
@@ -2434,8 +2441,8 @@ export class APKRuntime {
   nativeRequired(method, requestedLibrary = null) {
     const libraries = this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown');
     const basenames = [...new Set(libraries.map(path => path.split('/').pop()))];
-    if (requestedLibrary) this.platform?.onNativeLibraryUnavailable?.(this, requestedLibrary, null);   // a device component may need to make a swallowed failure visible (src/microg-device.js)
-    const message = `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
+    const custom = requestedLibrary ? this.platform?.onNativeLibraryUnavailable?.(this, requestedLibrary, null) : undefined;   // a device component may need to make a swallowed failure visible (src/microg-device.js); a string answer is the error's message
+    const message = typeof custom === 'string' ? custom : `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
     this.throwJava('Ljava/lang/UnsatisfiedLinkError;', message, { kind: 'jni-required', method, requestedLibrary, nativeLibraries: libraries });
   }
   /** The Java frames of the current thread, innermost first: the methods Throwable.getStackTrace reports (constructors of the exception itself are not part of the trace). */
@@ -2822,7 +2829,8 @@ export class APKRuntime {
   }
   reflectionAccess(member, accessible, receiver = null) {
     if (accessible) return;
-    const owner = member.field?.owner ?? member.method.owner, caller = this.currentMethod?.owner, flags = member.flags;
+    // the calling method: the interpreter's top frame; the WebAssembly core keeps its frames in its own memory, so there it is the top of its stack walk
+    const owner = member.field?.owner ?? member.method.owner, caller = (this.currentMethod ?? (this.engine === 'wasm' ? this.captureStack?.()?.[0] : null))?.owner, flags = member.flags;
     const ownerPublic = (this.classNesting(owner).modifiers ?? this.classes.get(owner)?.flags ?? 1) & 1;
     const packageOf = type => type.lastIndexOf('/') < 0 ? '' : type.slice(1, type.lastIndexOf('/'));   // a class of the unnamed package ("Lfoo;") is in package "", like every other class there
     const samePackage = caller && packageOf(caller) === packageOf(owner);
@@ -3357,7 +3365,7 @@ export class APKRuntime {
       // A companion package's code (src/package-registry.js) never links the app's libraries, and its own are not offered to JNI.
       // The class that calls System.loadLibrary decides whose library it is: framework code (Conscrypt's javacrypto, media_jni ...) loads the platform's own libraries for any package.
       const directOwner = this.currentMethod?.owner, frameworkCaller = !!directOwner && this.platform?.packages?.multi && this.platform.packages.entryOfClass(this, directOwner) === null;
-      if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); } if (!caller.main) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); }
+      if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { const custom = this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); this.throwJava('Ljava/lang/UnsatisfiedLinkError;', typeof custom === 'string' ? custom : `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); } }
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
       if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)

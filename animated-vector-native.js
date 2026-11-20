@@ -1,10 +1,9 @@
-import {APKError} from './apk-error.js?v=3e71109809bc';
-import {getVectorGraphics} from './vector-native.js?v=3e71109809bc';
+import {APKError} from './apk-error.js?v=c582f7a02eb3';
+import {getVectorGraphics} from './vector-native.js?v=c582f7a02eb3';
 const AVD='Landroid/graphics/drawable/AnimatedVectorDrawable;';
 /** Original AVD constructs an RT set before choosing its CPU fallback. The set
- * has real, bounded VM allocation/refcount ownership, but no RT executor. None
- * of nStart/nReverse/nAddAnimator is bound here. Java/UI animation is selected
- * explicitly through the original Java method after resource inflation. */
+ * has real, bounded VM allocation/refcount ownership, but no RT executor (rtAnimatorBindings). Java/UI animation is selected
+ * explicitly through the original Java method after resource inflation, or by the original software-Canvas fallback at the first draw. */
 const PVH='Landroid/animation/PropertyValuesHolder;';
 /** Real JNI GetMethodID/Call<Void>Method semantics for PropertyValuesHolder's
  * single-argument int/float setters: the id names a looked-up setter, and the call
@@ -27,8 +26,29 @@ function pvhJniBindings(){
  }
  return bindings;
 }
+/** VectorDrawableAnimatorRT.init builds its RenderThread animators before anything is drawn: one property holder per animated property (nCreate*PropertyHolder, with
+ * keyframe data from nSetPropertyHolderData), one native animator per child (nAddAnimator) and the tree they drive (nSetVectorDrawableTarget). Here they are bounded
+ * records of the set with no executor: a start with no RenderNode seen yet is a pending action of the original Java, and the first draw on the software Canvas of this
+ * device takes AnimatedVectorDrawable.fallbackOntoUI(), which re-runs the same animators on the UI thread (what Android does for a software layer). What would really
+ * run them on the RenderThread (nStart/nReverse/nEnd/nReset: only reached with a RenderNode target, which a software window never records) is not bound and fails by
+ * name as every missing native does. */
+function rtAnimatorBindings(){
+ const graphics=runtime=>getVectorGraphics(runtime),holder=(runtime,fields)=>{const g=graphics(runtime),state=runtime.avdRtState??={holders:0};if(++state.holders>65536)throw new APKError('AnimatedVectorDrawable RenderThread property holders exceed 65536',{kind:'animated-vector-backend'});return g.create('animatedVectorPropertyHolder',{...fields,data:null});};
+ const set=(runtime,handle)=>graphics(runtime).get(handle,'animatedVectorAnimatorSet');
+ return [
+  [`${AVD}->nCreateGroupPropertyHolder(JIFF)J`,(runtime,[tree,property,start,end])=>holder(runtime,{holderKind:'group',tree,property,start,end})],
+  [`${AVD}->nCreatePathDataPropertyHolder(JJJ)J`,(runtime,[path,start,end])=>holder(runtime,{holderKind:'pathData',path,start,end})],
+  [`${AVD}->nCreatePathColorPropertyHolder(JIII)J`,(runtime,[path,property,start,end])=>holder(runtime,{holderKind:'pathColor',path,property,start,end})],
+  [`${AVD}->nCreatePathPropertyHolder(JIFF)J`,(runtime,[path,property,start,end])=>holder(runtime,{holderKind:'path',path,property,start,end})],
+  [`${AVD}->nCreateRootAlphaPropertyHolder(JFF)J`,(runtime,[tree,start,end])=>holder(runtime,{holderKind:'rootAlpha',tree,start,end})],
+  [`${AVD}->nSetPropertyHolderData(J[FI)V`,(runtime,[handle,data,length])=>{const array=runtime.array(data);if(length<0||length>array.elements.length||length>65536)runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',null);graphics(runtime).get(handle,'animatedVectorPropertyHolder').data=array.elements.slice(0,length);}],
+  [`${AVD}->nSetPropertyHolderData(J[II)V`,(runtime,[handle,data,length])=>{const array=runtime.array(data);if(length<0||length>array.elements.length||length>65536)runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',null);graphics(runtime).get(handle,'animatedVectorPropertyHolder').data=array.elements.slice(0,length);}],
+  [`${AVD}->nAddAnimator(JJJJJII)V`,(runtime,[setHandle,holderHandle,interpolator,startDelay,duration,repeatCount,repeatMode])=>{const value=set(runtime,setHandle);graphics(runtime).get(holderHandle,'animatedVectorPropertyHolder');if(value.animators.length>=4096)throw new APKError('AnimatedVectorDrawable RenderThread animators exceed 4096 per set',{kind:'animated-vector-backend'});value.animators.push({holder:holderHandle,interpolator,startDelay,duration,repeatCount,repeatMode});}],
+  [`${AVD}->nSetVectorDrawableTarget(JJ)V`,(runtime,[setHandle,tree])=>{set(runtime,setHandle).target=tree;}],
+ ];
+}
 export function createAnimatedVectorNativeBindings(){
- return new Map([...pvhJniBindings(),[`${AVD}->nCreateAnimatorSet()J`,runtime=>{
+ return new Map([...pvhJniBindings(),...rtAnimatorBindings(),[`${AVD}->nCreateAnimatorSet()J`,runtime=>{
   const value=getVectorGraphics(runtime).create('animatedVectorAnimatorSet',{animators:[],target:null,started:false,executionBackend:null});
   runtime.record('HOST AnimatedVectorDrawable native set allocation [opaque VM ownership; RenderThread executor unavailable]');return value;
  }]]);

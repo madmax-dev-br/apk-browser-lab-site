@@ -34248,5 +34248,15 @@
     "sha256": "932081ce333e5cdeff6ea390ee2441da3c99e81268ef8a36f9bebfbfb05e1c5b",
     "bytes": 6818,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "opengl/java/android/opengl/GLES10.java",
+    "localPath": "framework-aosp/upstream/android/opengl/GLES10.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/opengl/java/android/opengl/GLES10.java?format=TEXT",
+    "sha256": "1ace0410e89213ce4a2f82f15115f1bd5dbec6f8d9fa56b50f21fb511d567e7b",
+    "bytes": 45053,
+    "license": "Apache-2.0"
   }
 ]

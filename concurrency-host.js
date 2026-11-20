@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { Blocked, VMThread } from './scheduler.js?v=3e71109809bc';
-import { Invoke } from './interpreter.js?v=3e71109809bc';
-import { GC_ROOTS } from './heap-gc.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { Blocked, VMThread } from './scheduler.js?v=c582f7a02eb3';
+import { Invoke } from './interpreter.js?v=c582f7a02eb3';
+import { GC_ROOTS } from './heap-gc.js?v=c582f7a02eb3';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -515,10 +515,20 @@ export function createConcurrencyHost(platform) {
   type(TPE, OBJECT, ['Ljava/util/concurrent/ExecutorService;', 'Ljava/util/concurrent/Executor;', 'Ljava/util/concurrent/AbstractExecutorService;'], { allocatable: true });
   type(STPE, TPE, ['Ljava/util/concurrent/ScheduledExecutorService;'], { allocatable: true });
   const pool = (r, ref) => r.object(ref).pool ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'executor used before construction');
+  // The pool's view of an app-defined BlockingQueue: length -> size(), push -> offer() (false when it is full), shift -> poll(), splice(0) -> poll() until empty, remove -> remove(Object)
+  const foreignQueue = (r, ref) => ({
+    get length() { return vcall(r, ref, COLLECTION, 'size', [], 'I'); },
+    push(task) { return vcall(r, ref, QUEUE, 'offer', [OBJECT], 'Z', [task]) !== 0; },
+    shift() { const task = vcall(r, ref, 'Ljava/util/Queue;', 'poll', [], OBJECT); return task === null ? undefined : task; },
+    splice(start) { if (start !== 0) throw new APKError('foreign queue: only splice(0) is used', { kind: 'internal' }); const out = []; for (let task; (task = vcall(r, ref, 'Ljava/util/Queue;', 'poll', [], OBJECT)) !== null;) out.push(task); return out; },
+    removeTask(task) { return vcall(r, ref, COLLECTION, 'remove', [OBJECT], 'Z', [task]) !== 0; },
+  });
   const configure = (r, self, core, max, keepAlive, unit, queue, factory, handler) => {
     if (core < 0 || max <= 0 || max < core || keepAlive < 0n) throwNew(r, 'Ljava/lang/IllegalArgumentException;');
     if (queue === null) throwNew(r, 'Ljava/lang/NullPointerException;');
-    r.object(self).pool = { core, max, queue: q(r, queue).items, queueRef: queue, capacity: q(r, queue).capacity, factory: factory ?? defaultFactory(r), handler: handler ?? newObject(r, 'Ljava/util/concurrent/ThreadPoolExecutor$AbortPolicy;', [], []), workers: [], shutdown: false, completed: 0, allowCoreTimeout: false, keepAlive: Number(keepAlive), keepAliveMs: unit === null ? Number(keepAlive) : Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [keepAlive])), submitted: 0 };
+    // A queue the app implements itself (any BlockingQueue that is not one of the lab's): the pool calls its own offer / poll / size / remove, as ThreadPoolExecutor does.
+    const own = r.object(queue).bqueue, items = own ? own.items : foreignQueue(r, queue);
+    r.object(self).pool = { core, max, queue: items, queueRef: queue, capacity: own ? own.capacity : Infinity, foreign: !own, factory: factory ?? defaultFactory(r), handler: handler ?? newObject(r, 'Ljava/util/concurrent/ThreadPoolExecutor$AbortPolicy;', [], []), workers: [], shutdown: false, completed: 0, allowCoreTimeout: false, keepAlive: Number(keepAlive), keepAliveMs: unit === null ? Number(keepAlive) : Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [keepAlive])), submitted: 0 };
   };
   const ctor = (extra) => (r, _m, args) => { const [self, core, max, keep, unit, queue] = args; configure(r, self, core, max, keep, unit, queue, extra.includes('F') ? args[6] : null, extra.includes('H') ? args[extra.startsWith('F') ? 7 : 6] : null); };
   def(TPE, '<init>', `(IIJ${UNIT}${QUEUE})V`, ctor('')); def(TPE, '<init>', `(IIJ${UNIT}${QUEUE}${FACTORY})V`, ctor('F')); def(TPE, '<init>', `(IIJ${UNIT}${QUEUE}${HANDLER})V`, ctor('H')); def(TPE, '<init>', `(IIJ${UNIT}${QUEUE}${FACTORY}${HANDLER})V`, ctor('FH'));
@@ -597,8 +607,7 @@ export function createConcurrencyHost(platform) {
       const st = state(r, idle.thread), list = r.scheduler.threads, at = list.indexOf(st); if (at >= 0 && at !== list.length - 1) { list.splice(at, 1); list.push(st); if (r.scheduler.cursor > at) r.scheduler.cursor--; }
       return;
     } }
-    if (p.queue.length < p.capacity) {
-      p.queue.push(task);
+    if (p.foreign ? p.queue.push(task) : p.queue.length < p.capacity && (p.queue.push(task), true)) {
       if (live(p) === 0) addWorker(r, self, null);   // idle workers see the new task through their wait condition
       return;
     }
@@ -654,7 +663,7 @@ export function createConcurrencyHost(platform) {
   def(TPE, 'allowCoreThreadTimeOut', '(Z)V', (r, _m, [self, v]) => { pool(r, self).allowCoreTimeout = !!v; }); def(TPE, 'allowsCoreThreadTimeOut', '()Z', (r, _m, [self]) => pool(r, self).allowCoreTimeout ? 1 : 0);
   def(TPE, 'setKeepAliveTime', `(J${UNIT})V`, (r, _m, [self, t, unit]) => { const p = pool(r, self); p.keepAlive = Number(t); p.keepAliveMs = Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t])); });
   def(TPE, 'prestartAllCoreThreads', '()I', (r, _m, [self]) => { const p = pool(r, self); let n = 0; while (live(p) < p.core && addWorker(r, self, null)) n++; return n; });
-  def(TPE, 'remove', `(${RUNNABLE})Z`, (r, _m, [self, t]) => { const p = pool(r, self), i = p.queue.findIndex(x => sameRef(x, t)); if (i < 0) return 0; p.queue.splice(i, 1); return 1; });
+  def(TPE, 'remove', `(${RUNNABLE})Z`, (r, _m, [self, t]) => { const p = pool(r, self); if (p.foreign) return p.queue.removeTask(t) ? 1 : 0; const i = p.queue.findIndex(x => sameRef(x, t)); if (i < 0) return 0; p.queue.splice(i, 1); return 1; });
   def(TPE, 'purge', '()V', () => {});
   def(TPE, 'toString', `()${STRING}`, (r, _m, [self]) => { const p = pool(r, self); return `${jtype(r, self).slice(1, -1).replaceAll('/', '.')}@${self.ref.toString(16)}[${p.shutdown ? (terminated(p) ? 'Terminated' : 'Shutting down') : 'Running'}, pool size = ${live(p)}, active threads = ${p.workers.filter(w => !w.idle).length}, queued tasks = ${p.queue.length}, completed tasks = ${p.completed}]`; });
 

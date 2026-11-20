@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { bestDateTimePattern, defaultHourCycle } from './date-skeleton.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { bestDateTimePattern, defaultHourCycle } from './date-skeleton.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
@@ -203,6 +203,59 @@ export function createIcuTextHost(platform) {
     if (r.isSubtype(r.typeOf(object), 'Ljava/util/Collection;')) return formatMeasureList(r, self, r.array(call(r, object, 'Ljava/util/Collection;', 'toArray', [], `[${OBJECT}`)).elements);
     r.throwJava('Ljava/lang/IllegalArgumentException;', `Cannot format ${r.typeOf(object).slice(1, -1).replaceAll('/', '.')}`);
   });
+
+  // ---- android.icu.text.TimeZoneNames (what java.time's zone text uses: DateTimeFormatterBuilder.ZoneTextPrinterParser, ZoneName) --------------------------------------
+  // Names come from Intl.DateTimeFormat's timeZoneName (V8's ICU and CLDR data): STANDARD / DAYLIGHT are the long or short name at a date of the year on that side of the
+  // zone's DST rule (a zone without DST has no daylight name: null), GENERIC is longGeneric / shortGeneric, EXEMPLAR_LOCATION is ICU's default exemplar (the last ID segment,
+  // underscores as spaces). A name that is only a GMT offset is no zone name for ICU: null, and java.time then formats "GMT+hh:mm" itself, as on a device.
+  // Metazone IDs are not exposed by Intl: getAvailableMetaZoneIDs is an empty set (recorded once), which the java.time callers only test region IDs against.
+  const TZN = 'Landroid/icu/text/TimeZoneNames;', NAME_TYPE = 'Landroid/icu/text/TimeZoneNames$NameType;';
+  type(TZN, OBJECT, ['Ljava/io/Serializable;'], { allocatable: true }); type(NAME_TYPE, 'Ljava/lang/Enum;', [], { allocatable: true });
+  const NAME_TYPES = ['LONG_GENERIC', 'LONG_STANDARD', 'LONG_DAYLIGHT', 'SHORT_GENERIC', 'SHORT_STANDARD', 'SHORT_DAYLIGHT', 'EXEMPLAR_LOCATION'];
+  NAME_TYPES.forEach((name, ordinal) => staticField(NAME_TYPE, name, NAME_TYPE, r => { const o = r.allocate(NAME_TYPE); Object.assign(r.object(o), { enumName: name, enumOrdinal: ordinal }); return o; }));
+  def(NAME_TYPE, 'values', `()[${NAME_TYPE}`, r => { const a = r.newArray(`[${NAME_TYPE}`, NAME_TYPES.length); r.array(a).elements = NAME_TYPES.map(name => r.readStatic({ owner: NAME_TYPE, name, type: NAME_TYPE })); return a; }, { static: true });
+  def(NAME_TYPE, 'ordinal', '()I', (r, _m, [self]) => r.object(self).enumOrdinal); def(NAME_TYPE, 'name', `()${STRING}`, (r, _m, [self]) => r.object(self).enumName);
+  const tzNamesFor = (r, locale) => { const o = r.allocate(TZN); r.object(o).tzTag = text(r, callV(r, localeOf(r, locale) ?? defaultLocale(r), LOCALE, 'toLanguageTag', [], STRING)); return o; };
+  for (const localeType of [LOCALE, ULOCALE]) def(TZN, 'getInstance', `(${localeType})${TZN}`, (r, _m, [locale]) => { if (nullish(locale)) npe(r); return tzNamesFor(r, locale); }, { static: true });
+  const zoneName = (tag, id, date, style) => { try { return new Intl.DateTimeFormat(tag, { timeZone: id, timeZoneName: style }).formatToParts(date).find(p => p.type === 'timeZoneName')?.value ?? null; } catch { return null; } };
+  const offsetAt = (id, date) => zoneName('en-US', id, date, 'longOffset');
+  const onlyOffset = name => name === null || /^(GMT|UTC)([+\-−]|$)/.test(name);
+  const displayName = (tag, id, typeName, dateMs) => {
+    if (id === null) return null;
+    if (typeName === 'EXEMPLAR_LOCATION') { if (!id.includes('/') || id.startsWith('Etc/')) return null; return id.slice(id.lastIndexOf('/') + 1).replaceAll('_', ' '); }
+    const date = new Date(Number(dateMs)), long = typeName.startsWith('LONG'), kind = typeName.slice(typeName.indexOf('_') + 1);
+    let name;
+    if (kind === 'GENERIC') name = zoneName(tag, id, date, long ? 'longGeneric' : 'shortGeneric');
+    else {
+      const year = date.getUTCFullYear(), january = new Date(Date.UTC(year, 0, 15)), july = new Date(Date.UTC(year, 6, 15));
+      const a = offsetAt(id, january), b = offsetAt(id, july); if (a === null) return null;
+      const minutes = o => { const m = /([+\-−])(\d+)(?::(\d+))?/.exec(o); return m ? (m[1] === '+' ? 1 : -1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) : 0; };
+      if (a === b) name = kind === 'STANDARD' ? zoneName(tag, id, date, long ? 'long' : 'short') : null;
+      else { const standardDate = minutes(a) < minutes(b) ? january : july, daylightDate = standardDate === january ? july : january; name = zoneName(tag, id, kind === 'STANDARD' ? standardDate : daylightDate, long ? 'long' : 'short'); }
+    }
+    return onlyOffset(name) ? null : name;
+  };
+  def(TZN, 'getDisplayName', `(${STRING}${NAME_TYPE}J)${STRING}`, (r, _m, [self, id, type, date]) => { if (nullish(type)) npe(r); return displayName(r.object(self).tzTag, text(r, id), r.object(type).enumName, date); });
+  const getDisplayNames = (r, self, id, types, date, dest, offset) => {
+    if (nullish(types) || nullish(dest)) npe(r);
+    const names = r.array(types).elements, out = r.array(dest).elements, zone = text(r, id), tag = r.object(self).tzTag;
+    if (offset < 0 || offset + names.length > out.length) r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', null);
+    names.forEach((type, i) => { out[offset + i] = nullish(type) ? null : displayName(tag, zone, r.object(type).enumName, date); });
+  };
+  def(TZN, 'getDisplayNames', `(${STRING}[${NAME_TYPE}J[${STRING}I)V`, (r, _m, [self, id, types, date, dest, offset]) => getDisplayNames(r, self, id, types, date, dest, offset));
+  def('Llibcore/icu/TimeZoneNames;', 'getDisplayNames', `(${TZN}${STRING}[${NAME_TYPE}J[${STRING}I)V`, (r, _m, [names, id, types, date, dest, offset]) => { if (nullish(names)) npe(r); getDisplayNames(r, names, id, types, date, dest, offset); }, { static: true });
+  type('Llibcore/icu/TimeZoneNames;', OBJECT, [], { allocatable: false });
+  def(TZN, 'getAvailableMetaZoneIDs', '()Ljava/util/Set;', r => { if (!r.metaZoneNoticeRecorded) { r.metaZoneNoticeRecorded = true; r.record('ICU TimeZoneNames.getAvailableMetaZoneIDs: metazone IDs are not exposed by the browser\'s Intl data; empty set'); } return callStatic(r, 'Ljava/util/Collections;', 'emptySet', [], 'Ljava/util/Set;'); });
+  def(TZN, 'getMetaZoneID', `(${STRING}J)${STRING}`, () => null);
+  // android.icu.util.TimeZone.getCanonicalID(id, isSystemID[]) and UNKNOWN_ZONE_ID: Intl's canonical IANA/CLDR ID; "GMT+hh:mm" custom IDs are returned as given with isSystemID false
+  staticField(I_TZ, 'UNKNOWN_ZONE_ID', STRING, () => 'Etc/Unknown');
+  const canonicalZone = id => { try { return new Intl.DateTimeFormat('en', { timeZone: id }).resolvedOptions().timeZone; } catch { return null; } };
+  def(I_TZ, 'getCanonicalID', `(${STRING}[Z)${STRING}`, (r, _m, [id, isSystem]) => {
+    if (nullish(id)) npe(r); const zone = text(r, id), custom = /^GMT[+-]\d{1,2}(:?\d{2})?$/.test(zone), canonical = custom ? null : canonicalZone(zone);
+    if (!nullish(isSystem) && r.array(isSystem).elements.length) r.array(isSystem).elements[0] = canonical !== null ? 1 : 0;
+    return canonical ?? (custom ? zone : null);
+  }, { static: true });
+  def(I_TZ, 'getCanonicalID', `(${STRING})${STRING}`, (r, _m, [id]) => { if (nullish(id)) npe(r); const zone = text(r, id); return canonicalZone(zone) ?? (/^GMT[+-]\d{1,2}(:?\d{2})?$/.test(zone) ? zone : null); }, { static: true });
 
   // ---- android.icu.number (API 30): NumberFormatter.with() / withLocale(), the immutable settings chain, LocalizedNumberFormatter.format -> FormattedNumber --------------------------
   // Modelled settings: unit (an Intl-mapped MeasureUnit), unitWidth (NARROW / SHORT / FULL_NAME / HIDDEN), precision (integer, unlimited, fixed/min/max/minMax fraction), roundingMode;

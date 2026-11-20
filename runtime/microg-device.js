@@ -1,9 +1,10 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=3e71109809bc';
-import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=3e71109809bc';
-import { parseReturnValue } from './method-overrides.js?v=3e71109809bc';
-import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=3e71109809bc';
-import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=c582f7a02eb3';
+import { MICROG_ENTRY_POINTS, microgEntryMethodSmali } from './microg-entry-points.js?v=c582f7a02eb3';
+import { parseReturnValue } from './method-overrides.js?v=c582f7a02eb3';
+import { MICROG_STUBS, microgStubMethodSmali, MICROG_STUB_ANSWERS } from './microg-stubs.js?v=c582f7a02eb3';
+import { MICROG_ROM_DEFAULTS, MICROG_NO_TELEMETRY_KEYS, MICROG_SERVICES, sanitizeMicrogServices, microgSettingRefusal, serviceOfKey } from './microg-services.js?v=c582f7a02eb3';
+import { installDroidGuard, droidGuardNativeUnavailable } from './microg-droidguard.js?v=c582f7a02eb3';
 
 const DEALIAS = /\$\$ldr\d+;/g;   // a companion package's classes are defined under a loader alias (Lfoo/Bar$$ldrN;): the de-aliased form matches the table's plain descriptors
 const dealias = text => String(text).replace(DEALIAS, ';');
@@ -18,7 +19,9 @@ const dealias = text => String(text).replace(DEALIAS, ';');
 //  * org.microg.gms.PROVISION keeps its protection level (signature|privileged): only a package signed with microG's build key that requests it holds it, never the app;
 //  * microG's Activities (its screens: SMS User Consent, permission prompts, location settings resolution, its settings) start as the Activities of any installed package do
 //    (android-platform.js activityTarget / createInstance); each one opened is named in the trace (what it is for);
-//  * DroidGuard's downloaded code is refused by construction (codeLoadGuard below, class-loader-host.js).
+//  * DroidGuard's downloaded VM is not refused by construction any more (2026-11-20): with the attestation switch on, microG's own code fetches it and loads it with a
+//    DexClassLoader; what the VM needs that the device cannot run (its ARM native library) fails explicitly (src/microg-droidguard.js, docs/MICROG.md section 6); its network
+//    mode (a remote DroidGuard server, which would attest another device) stays refused.
 
 export const MICROG_VERSION = '0.3.18.252432';
 export const MICROG_GMS = 'com.google.android.gms', MICROG_VENDING = 'com.android.vending';
@@ -47,7 +50,7 @@ export function microgSettingsXml(settings = MICROG_ROM_DEFAULTS) {
 const MICROG_ACTIVITIES = [
   [/\.auth\.phone\.UserConsentPromptActivity$/, 'SMS User Consent prompt'], [/\.auth\.phone\.AskPermissionActivity$/, 'SMS Retriever permission prompt'],
   [/\.location\.manager\.AskPermissionActivity$/, 'location permission prompt'], [/\.location\.settings\./, 'location settings resolution'],
-  [/\.ui\.SettingsActivity$|\.ui\.MainSettingsActivity$|\.ui\.SettingsDashboardActivity$/, 'microG settings'], [/LoginActivity$|\.auth\.login\./, 'Google account login'],
+  [/\.ui\.SettingsActivity$|\.ui\.MainSettingsActivity$|\.ui\.SettingsDashboardActivity$/, 'microG settings'], [/LoginActivity$|\.auth\.login\./, 'Google account login'], [/\.safetynet\.ReCaptchaActivity$/, 'reCAPTCHA (SafetyNet: a Google WebView challenge and a DroidGuard flow)'],
 ];
 /**
  * Permissions no package of the device ever holds while the option is on. Empty since 2026-11-20: org.microg.gms.PROVISION keeps its own protection level (signature|privileged:
@@ -102,6 +105,8 @@ export function enableMicrog(runtime, { version, services = null }) {
   // app's ProviderInstaller.installIfNeeded returns as if the provider were installed. The native library it needs cannot run on this device (it is ARM code, and protected
   // natives are never substituted): the device records the failure explicitly, in the trace and in deviceOptions.microg.failures, naming what is missing.
   platform.onNativeLibraryUnavailable = (r, library) => {
+    const droidGuard = droidGuardNativeUnavailable(r, platform.microg, library);   // the downloaded DroidGuard VM asks for a library: the error's message names it (src/microg-droidguard.js)
+    if (droidGuard !== undefined) return droidGuard;
     if (library !== 'conscrypt_gmscore_jni') return;
     const failure = { api: 'ProviderInstaller', library: `lib${library}.so`, reason: 'the Conscrypt security provider of microG needs its native library, which is ARM code the virtual device cannot run; microG catches the UnsatisfiedLinkError, so ProviderInstaller.installIfNeeded returns without installing a provider' };
     if (!platform.microg.failures.some(item => item.api === failure.api)) platform.microg.failures.push(failure);
@@ -113,14 +118,6 @@ export function enableMicrog(runtime, { version, services = null }) {
     if (entry?.deviceOption !== 'microg') return;
     const api = MICROG_ACTIVITIES.find(([pattern]) => pattern.test(className ?? ''))?.[1] ?? 'a microG screen';
     r.record(`DEVICE microG screen ${api}: ${entry.name}/${className}`);
-  };
-  // DroidGuard, by construction: its VM is code Google's server sends (stored as <dataDir>/app_cache_dg/<vmKey>/the.apk, Context.getDir("cache_dg"), then loaded with a
-  // DexClassLoader, play-services-droidguard HandleProxyFactory). The settings above keep microG from asking for it, the device has no real network, and even so the device
-  // refuses to load any code from that directory: the attempt is an explicit lab error naming DroidGuard.
-  platform.codeLoadGuard = (r, path) => {
-    if (!/\/app_cache_dg(\/|$)/.test(String(path))) return;
-    r.record(`DEVICE microG REFUSED DroidGuard code load: ${path}`);
-    throw new APKError(`DroidGuard: the virtual device never loads DroidGuard's downloaded code (${path}); DroidGuard, SafetyNet and Play Integrity attestation are not available with the microG option`, { kind: 'microg-droidguard-refused' });
   };
   // microG's push channel (MCS: TLS over TCP to mtalk.google.com:5228, McsService) is not HTTP. A browser has no TCP: through the APK Lab Relay it is a TCP tunnel (src/tcp-tunnel.js);
   // without one the conversation cannot be served. It is microG's connection, not the app's, so the device records the failure explicitly (trace, deviceOptions.microg.failures)
@@ -142,6 +139,7 @@ export function enableMicrog(runtime, { version, services = null }) {
   const microg = platform.microg = { version, packages: names, failures: [], refusedPermissions: [...MICROG_REFUSED_PERMISSIONS], defaultGrants: [...MICROG_DEFAULT_GRANTS], settings, fixed: { ...MICROG_ROM_DEFAULTS },
     services: sanitizeMicrogServices(services), refusedWrites: [], writer: null, mocks: new Map(), entries: new Map(), stubs: new Map() };
   installMicrogEntryPoints(runtime, microg, registry);
+  installDroidGuard(runtime, microg, registry);
   installSettingsGuard(platform, microg, registry);
   // The user's choices of the Device panel ("microG services") are applied when microG's process starts, before anything else in it asks for them, the way microG's settings screen
   // applies a switch (its preference helpers: SettingsContract.setSettings, and what the screen does next, e.g. the check-in trigger). A process that never starts asks nothing.

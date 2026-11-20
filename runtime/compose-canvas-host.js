@@ -1,7 +1,7 @@
-import {APKError} from './apk-runtime.js?v=3e71109809bc';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=3e71109809bc';
-import {getVectorGraphics} from './vector-native.js?v=3e71109809bc';
-import {deferRaster} from './deferred-raster.js?v=3e71109809bc';
+import {APKError} from './apk-runtime.js?v=c582f7a02eb3';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=c582f7a02eb3';
+import {getVectorGraphics} from './vector-native.js?v=c582f7a02eb3';
+import {deferRaster} from './deferred-raster.js?v=c582f7a02eb3';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
 const OWNER='Landroidx/compose/ui/platform/AndroidComposeView;';
@@ -51,13 +51,16 @@ export function createComposeCanvasHost(platform){
     finally{view.updatingDisplayList=false;call(r,node,NODE,'endRecording',[],'V',[]);r.storeField(view.fields,`${VIEW}->mRecreateDisplayList:Z`,view.displayListDirty?1:0);}
     view.displayListGeneration=(view.displayListGeneration??0)+1;r.record(`HOST View.updateDisplayListIfDirty [original RenderNode/RecordingCanvas DEX; generation${view.displayListGeneration}]`);return node;
   };
+  /** A lookup the host makes for itself (what the page shows, which path draws): the framework code it runs is not the app's and must not evict APK-visible trace entries. */
+  const quietly=(r,body)=>{const muted=r.traceMuted;r.traceMuted=true;try{return body();}finally{r.traceMuted=muted;}};
+  const styledButtonOf=(r,receiver)=>{const view=r.object(receiver);return view.styledButtonId??=quietly(r,()=>textStyleValue(r,receiver,'button','getResourceId','I',0))>>>0;};
   const textStyleValue=(r,receiver,attribute,method,result,fallback)=>{
     const view=r.object(receiver),table=platform.resources?.frameworkTable;
     if(!table||!view.context)return fallback;const id=table.findId('attr/'+attribute);if(!id)return fallback;
     const ids=r.newArray('[I',1);r.array(ids).elements=[id];let attrs=null;if(view.appliedNode){attrs=r.makeObject('Lapkweb/bridge/AttributeSet;');r.object(attrs).node=view.appliedNode;}
     const defStyle=view.defStyleAttr||table.findId(platform.drawableViewHost.defaultStyleName(r,view.type));
     const array=platform.styleBackend.obtain(r,platform.styleBackend.theme(r,view.context),attrs,ids,defStyle);
-    const TA='Landroid/content/res/TypedArray;',read=(typed,index)=>call(r,typed,TA,method,method==='getInt'?['I','I']:['I'],result,method==='getInt'?[index,fallback]:[index]);
+    const TA='Landroid/content/res/TypedArray;',read=(typed,index)=>call(r,typed,TA,method,method==='getInt'||method==='getResourceId'?['I','I']:['I'],result,method==='getInt'||method==='getResourceId'?[index,fallback]:[index]);
     try{if(call(r,array,TA,'hasValue',['I'],'Z',[0]))return read(array,0);}
     finally{call(r,array,TA,'recycle');}
     // TextView constructor: android:textAppearance (explicit, from the style or from the default style) supplies what the view's own attributes do not
@@ -95,7 +98,14 @@ export function createComposeCanvasHost(platform){
     finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
   };
   const drawNativeText=(r,receiver,target)=>{
-    const view=r.object(receiver);if(r.isSubtype(view.type,'Landroid/widget/CompoundButton;')&&!view.buttonDrawable&&!view.buttonDrawableSet)fail('CompoundButton Canvas needs its real indicator drawable and geometry');
+    const view=r.object(receiver);
+    // CompoundButton(Context, AttributeSet, int, int) reads android:button from the tag, its style and the default style: a widget whose styles give none (SwitchCompat, which draws
+    // its own track and thumb; Chip) has no indicator, and CompoundButton.onDraw draws the text alone. One whose style names an indicator the lab did not load still stops here.
+    if(r.isSubtype(view.type,'Landroid/widget/CompoundButton;')&&!view.buttonDrawable&&!view.buttonDrawableSet){
+      const button=styledButtonOf(r,receiver);
+      if(button)fail(`CompoundButton Canvas needs its indicator drawable (android:button 0x${(button>>>0).toString(16)} of its style), which was not loaded`);
+      view.buttonDrawableSet=true;
+    }
     if(view.marquee||view.ellipsize)fail('Native TextView Canvas marquee/ellipsis layout is not connected');
     if(!view.textMetrics)fail('Native TextView Canvas requires completed actual font measurement');
     {const [cw,ch]=dimensions(view);for(const {drawable:d,x,y} of platform.textViewApi.compoundPlacements(r,receiver,cw,ch)){const save=canvas(r,target,'save',[],'I');try{canvas(r,target,'translate',['F','F'],'V',[raw(x),raw(y)]);call(r,d,DRAWABLE,'draw',[CANVAS],'V',[target]);}finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}}}   // TextView.onDraw: compound drawables first, then the text
@@ -134,19 +144,27 @@ export function createComposeCanvasHost(platform){
       view.nativeCanvasText={source:'official-Skia/actual measured system-widget text',textLength:text.length,hint,gravity,color:color>>>0};r.record('DRAW system TextView/EditText: actual measured text + themed color -> Skia glyph/paragraph Canvas');
     }finally{canvas(r,target,'restoreToCount',['I'],'V',[save]);}
   };
-  const sourceDraw=(r,receiver,target)=>{
+  const contentDraw=(r,receiver,target)=>{
     const view=r.object(receiver);
     if(!view.willNotDraw)call(r,receiver,VIEW,'onDraw',[CANVAS],'V',[target]);
+    // a group whose own draw(Canvas) override is being captured (renderTree): its children are the page's elements; what the override draws after super.draw returns is drawn over them
+    if(view.groupDrawCapture){view.groupDrawSplit=getVectorGraphics(r).get(r.object(target).nativeCanvasHandle,'canvas').draws.length;return;}
     call(r,receiver,r.isSubtype(view.type,GROUP)?GROUP:VIEW,'dispatchDraw',[CANVAS],'V',[target]);
+  };
+  // What a parent calls is View.draw(Canvas): a class that overrides it runs its override (SwitchCompat sets the bounds of its track and thumb there, then calls super.draw), and
+  // View.draw then draws the content only (onDraw, the children): the page draws the background and the foreground as layers of their own.
+  const sourceDraw=(r,receiver,target)=>{
+    const view=r.object(receiver);
+    if(!view.contentOnlyDraw&&r.objectOverride(view.type,'draw(Landroid/graphics/Canvas;)V')){view.contentOnlyDraw=true;try{call(r,receiver,VIEW,'draw',[CANVAS],'V',[target]);}finally{view.contentOnlyDraw=false;}return;}
+    contentDraw(r,receiver,target);
   };
   const drawable=(r,ref,target,w,h)=>{
     if(!ref)return;
     call(r,ref,DRAWABLE,'setBounds',['I','I','I','I'],'V',[0,0,w,h]);
     call(r,ref,DRAWABLE,'draw',[CANVAS],'V',[target]);
   };
-  const drawView=(r,receiver,target)=>{
+  const drawBackground=(r,receiver,target)=>{
     const view=r.object(receiver),[w,h]=dimensions(view);
-    if(view.visibility===4||view.visibility===8)return;
     if(view.backgroundDrawable)drawable(r,view.backgroundDrawable,target,w,h);
     else if(view.background){
       const color=typeof view.background==='string'?Number.parseInt(view.background.slice(1),16)|0:view.background|0;
@@ -154,6 +172,18 @@ export function createComposeCanvasHost(platform){
       if(!r.object(paint).webPaint)call(r,paint,PAINT,'<init>',[],'V',[],'direct');
       call(r,paint,PAINT,'setColor',['I'],'V',[color]);canvas(r,target,'drawRect',['F','F','F','F',PAINT],'V',[raw(0),raw(0),raw(w),raw(h),paint]);
     }
+  };
+  // A View with a layer (setLayerType SOFTWARE or HARDWARE) draws into its own offscreen layer, background included, and its onDraw may cut that layer (ShapeableImageView
+  // clears its corners with a DST_OUT path): its background is drawn in its content layer, which the page then shows instead of a background of its own.
+  const leafDraw=(r,receiver,target)=>{
+    const view=r.object(receiver);view.backgroundInContent=(view.layerType??0)>0&&!!(view.backgroundDrawable||view.background);
+    if(view.backgroundInContent)drawBackground(r,receiver,target);
+    sourceDraw(r,receiver,target);
+  };
+  const drawView=(r,receiver,target)=>{
+    const view=r.object(receiver),[w,h]=dimensions(view);
+    if(view.visibility===4||view.visibility===8)return;
+    drawBackground(r,receiver,target);
     sourceDraw(r,receiver,target);
     // View.draw step 5: "if (mOverlay != null && !mOverlay.isEmpty()) mOverlay.getOverlayView().dispatchDraw(canvas)", after the children and before the foreground
     if(view.overlay){const OVERLAY='Landroid/view/ViewOverlay;',group=platform.viewApi.overlayView(r,receiver);if(group&&!call(r,view.overlay,OVERLAY,'isEmpty',[],'Z'))call(r,group,GROUP,'dispatchDraw',[CANVAS],'V',[target]);}
@@ -202,6 +232,9 @@ export function createComposeCanvasHost(platform){
     drawTextLayout,
     /** The ColorStateList the TextView constructor would have read: android:textColor of the view, its style or its text appearance (null when the theme gives none). */
     themeTextColors:(r,receiver)=>textStyleValue(r,receiver,'textColor','getColorStateList','Landroid/content/res/ColorStateList;',null),
+    themeHintTextColors:(r,receiver)=>quietly(r,()=>textStyleValue(r,receiver,'textColorHint','getColorStateList','Landroid/content/res/ColorStateList;',null)),
+    /** The android:button resource the CompoundButton constructor read from the tag, its style and the default style (0: none, the widget has no indicator: a Chip). Cached. */
+    styledButton:styledButtonOf,
     /** TextView.getGravity as the constructor leaves it: the view's own gravity, or android:gravity of its style / default style (a Button's is center). */
     textGravity:(r,receiver)=>{const view=r.object(receiver);if(view.gravity!=null)return view.gravity;return view.styledGravity??=textStyleValue(r,receiver,'gravity','getInt','I',0x800033);},
     reflectionDefinition(owner,kind,name,parameters,publicOnly){
@@ -227,7 +260,11 @@ export function createComposeCanvasHost(platform){
         // The same holds for an original framework class that draws itself in onDraw (the thumb of the seek bars, NumberPicker's wheel, the month and clock faces of the pickers,
         // CheckedTextView's check mark, the dividers of the original LinearLayout): the page has no element for that drawing, so it is the View's content layer. What such a
         // class cannot draw in this VM (an explicit failure of the lab, never a Java exception) leaves the View as the page shows it without the layer, and is said once.
-        const isGroup=r.isSubtype(view.type,GROUP),onDraw=r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V'),ownDraw=!!onDraw&&r.dex.classes.has(view.type),frameworkDraw=!!onDraw&&!ownDraw&&!view.frameworkDrawFailed&&r.skiaHost&&frameworkDraws(r,view,onDraw);
+        const isGroup=r.isSubtype(view.type,GROUP),onDraw=r.objectOverride(view.type,'onDraw(Landroid/graphics/Canvas;)V'),ownDraw=!!onDraw&&r.dex.classes.has(view.type);
+        // A determinate ProgressBar (the lab's ProgressBar: ProgressBar.onDraw is drawTrack, its progress drawable at the current level) is drawn as Android draws it, with the
+        // theme's tints, instead of the page's own progress bar; an indeterminate one, an animation of every frame, stays the page's.
+        const hostBar=!onDraw&&!isGroup&&r.isSubtype(view.type,'Landroid/widget/ProgressBar;')&&!view.indeterminate&&!!view.pb?.current&&!view.frameworkDrawFailed&&!!r.skiaHost;
+        const frameworkDraw=hostBar||!!onDraw&&!ownDraw&&!view.frameworkDrawFailed&&r.skiaHost&&frameworkDraws(r,view,onDraw);
         const overridesDraw=ownDraw||frameworkDraw;
         const guarded=draw=>{
           if(!frameworkDraw)return draw();
@@ -238,7 +275,26 @@ export function createComposeCanvasHost(platform){
             return false;
           }
         };
-        const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!r.isSubtype(view.type,OWNER);
+        // A group of the app whose class overrides draw(Canvas) (TextInputLayout draws its floating hint and the box's underline there, after super.draw has drawn the children):
+        // the override runs as a parent would call it; what it draws before its children (onDraw) is the content layer, what it draws after them is a layer over them (overlaySVG).
+        const drawOverride=isGroup&&!r.isSubtype(view.type,OWNER)?r.objectOverride(view.type,'draw(Landroid/graphics/Canvas;)V'):null,appGroupDraw=!!drawOverride&&!r.dex.bootClasses?.has(drawOverride.owner);
+        const customLeaf=overridesDraw&&!isGroup,customGroup=overridesDraw&&isGroup&&!view.willNotDraw&&!r.isSubtype(view.type,OWNER)&&!appGroupDraw;
+        if(appGroupDraw){
+          const [gw,gh]=dimensions(view);
+          if(view.laidOut&&gw&&gh&&r.skiaHost){
+            const graphics=getVectorGraphics(r),target=view.contentCanvas??=r.allocate(CANVAS),overlay=view.overlayCanvas??=r.allocate(CANVAS);
+            if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
+            if(!view.overlayCanvasInitialized){call(r,overlay,CANVAS,'<init>',[],'V',[],'direct');view.overlayCanvasInitialized=true;}
+            graphics.resetCanvas(target,gw,gh);graphics.resetCanvas(overlay,gw,gh);
+            view.contentOnlyDraw=true;view.groupDrawCapture=true;view.groupDrawSplit=null;
+            try{call(r,receiver,VIEW,'draw',[CANVAS],'V',[target]);}finally{view.contentOnlyDraw=false;view.groupDrawCapture=false;}
+            const draws=graphics.get(r.object(target).nativeCanvasHandle,'canvas').draws,after=draws.splice(view.groupDrawSplit??draws.length);
+            graphics.get(r.object(overlay).nativeCanvasHandle,'canvas').draws.push(...after);
+            if(draws.length)setContentRaster(r,view,graphics,target,gw,gh);else view.contentRaster=null;
+            if(after.length){deferRaster(r,view,'overlaySVG',scale=>graphics.snapshotCanvas(overlay,gw,gh,scale<1?{...r.layerRasterOptions,scale}:r.layerRasterOptions));}else view.overlaySVG=null;
+            r.record(`DRAW ViewGroup draw override: original ${view.type} -> Skia CPU (${draws.length} under, ${after.length} over its children)`);
+          }
+        }
         if(customGroup){
           const [gw,gh]=dimensions(view);
           if(view.laidOut&&gw&&gh&&r.skiaHost)guarded(()=>{
@@ -255,7 +311,7 @@ export function createComposeCanvasHost(platform){
             const target=view.contentCanvas??=r.allocate(CANVAS);
             if(!view.contentCanvasInitialized){call(r,target,CANVAS,'<init>',[],'V',[],'direct');view.contentCanvasInitialized=true;}
             const graphics=getVectorGraphics(r);graphics.resetCanvas(target,width,height);
-            sourceDraw(r,receiver,target);
+            leafDraw(r,receiver,target);
             setContentRaster(r,view,graphics,target,width,height);view.canvasChildrenCaptured=true;
             r.record(`DRAW framework View: original ${view.type} onDraw -> Skia CPU`);
           })!==false)return;
@@ -271,7 +327,7 @@ export function createComposeCanvasHost(platform){
             const node=updateDisplayList(r,receiver),handle=[...r.object(node).fields.entries()].find(([key])=>key.endsWith('->mNativeRenderNode:J'))?.[1];
             if(handle===undefined)fail('Compose owner RenderNode has no native handle');
             r.skiaHost.recordNative(r.object(target).nativeCanvasHandle,{op:'renderNode',node:handle});
-          }else sourceDraw(r,receiver,target);
+          }else leafDraw(r,receiver,target);
           setContentRaster(r,view,graphics,target,width,height);view.canvasChildrenCaptured=true;
           r.record(`DRAW custom View: original ${view.type} Canvas callbacks DEX -> Skia CPU`);
           return;
@@ -291,7 +347,7 @@ export function createComposeCanvasHost(platform){
       if(method.name==='updateDisplayListIfDirty')return updateDisplayList(r,receiver);
       if(method.name==='getDrawingTime')return BigInt(drawingTime);
       if(method.name==='drawChild')return drawChild(r,receiver,target,args[2]);
-      if(method.name==='draw')return drawView(r,receiver,target);
+      if(method.name==='draw')return view.contentOnlyDraw?contentDraw(r,receiver,target):drawView(r,receiver,target);
       if(method.name==='onDraw'){
         // View.onDraw is empty in AOSP. Native widgets have their own paint
         // implementations and must never inherit that empty implementation.

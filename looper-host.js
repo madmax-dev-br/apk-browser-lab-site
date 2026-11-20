@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { GC_ROOTS } from './heap-gc.js?v=3e71109809bc';
-import { LooperYield } from './message-queue-native.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { GC_ROOTS } from './heap-gc.js?v=c582f7a02eb3';
+import { LooperYield } from './message-queue-native.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -49,6 +49,26 @@ export function createLooperHost(platform) {
     runtime.argumentWords(parameters, args, receiver === undefined ? {} : { receiver }), receiver === undefined ? 'static' : 'virtual');
   const uptime = now => Math.floor(now);   // SystemClock.uptimeMillis()
 
+  // The lab has one main Looper for every installed package, where a device has one per process. While the main thread is parked (a Java wait inside the message it dispatches) the
+  // messages that a companion package's own code posted to it -- that package's main thread, as in a process of its own -- may run: a Handler message whose Runnable (or Handler) is
+  // code of a companion package other than the one that owns the message being dispatched. A callee that waits for an answer that its own main Looper delivers (Volley's
+  // ExecutorDelivery) across a Binder call from another package would otherwise wait for the main thread that is blocked in that very call. Single-package apps are not affected
+  // (no companions: the predicate is false), and the app's own messages never run this way.
+  const messageOwner = (runtime, message) => {
+    const registry = platform.packages;
+    if (!registry?.multi || isNull(message)) return null;
+    const callback = host.callbackOf(runtime, message), receiver = callback !== null ? callback : get(runtime, message, K.target);
+    return isNull(receiver) ? null : registry.entryOfClass(runtime, runtime.typeOf(receiver));
+  };
+  let dispatching = null;   // the package that owns the message the main thread is dispatching now (null: the app's or the platform's own)
+  const otherProcess = runtime => {
+    if (!platform.packages?.multi) return () => false;
+    return candidate => {
+      if (candidate.platformTask || candidate.message === undefined || isNull(candidate.message)) return false;
+      const owner = messageOwner(runtime, candidate.message);
+      return !!owner && !owner.main && owner !== dispatching;
+    };
+  };
   const host = {
     ...registry, interfaces: registry.interfacesOf,
     armed: true,
@@ -168,29 +188,40 @@ export function createLooperHost(platform) {
      * the thread main waits for may need one; app work queued for the main thread is not among them.
      */
     nextDueWhileParked(runtime, now) {
-      const limit = uptime(now);
-      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (hostOnly(candidate)) return { event: candidate, direct: true }; }
+      const limit = uptime(now), other = otherProcess(runtime);
+      for (const candidate of host.snapshot(runtime)) { const when = candidate.messageWhen ?? candidate.when; if (when > limit) break; if (hostOnly(candidate) || other(candidate)) return { event: candidate, direct: true }; }
       return null;
     },
     /** Milliseconds until the first host task that may run while main is parked (see nextDueWhileParked): 0 when one is due, null when none is queued. */
     nextDelayWhileParked(runtime, now) {
       const limit = uptime(now);
-      for (const candidate of host.snapshot(runtime)) { if (!hostOnly(candidate)) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
+      const other = otherProcess(runtime);
+      for (const candidate of host.snapshot(runtime)) { if (!hostOnly(candidate) && !other(candidate)) continue; const when = candidate.messageWhen ?? candidate.when; return when <= limit ? 0 : when - now; }
       return null;
     },
     // ---- running ----
     /** One iteration of Looper.loop(): MessageQueue.next() (which runs the IdleHandlers and, with nothing due, ends the call with a LooperYield), dispatchMessage, recycleUnchecked. */
     loopOnce(runtime) {
-      const { looper, ident } = main;
+      const { looper, ident } = main, outer = dispatching;
+      dispatching = platform.packages?.multi ? messageOwner(runtime, host.peek(runtime)) : null;
       try { const more = call(runtime, LOOPER, 'loopOnce', [LOOPER, 'J', 'I'], 'Z', [looper, ident, 0]); host.armed = true; return more; }
       catch (error) {
         if (error?.looperYield !== true) throw error;
         runtime.hostCall = null; host.armed = false;   // the thread is blocked in the poll: next() is only entered again for a message that is due
         return false;
-      }
+      } finally { dispatching = outer; }
     },
     /** Runs a queued host event ahead of the queue order (see nextDue): it is taken out of the queue and its Runnable called, as dispatchMessage would. */
     runDirect(runtime, event) {
+      if (event.task === undefined && event.message !== undefined) {   // an ordinary Handler message of another process's main thread (otherProcess): its Runnable runs, as dispatchMessage would
+        const callback = host.callbackOf(runtime, event.message), outer = dispatching;
+        dispatching = messageOwner(runtime, event.message);
+        try {
+          call(runtime, HANDLER, 'removeCallbacks', [RUNNABLE], 'V', [callback], event.handler);
+          call(runtime, RUNNABLE, 'run', [], 'V', [], callback);
+        } finally { dispatching = outer; }
+        return;
+      }
       call(runtime, HANDLER, 'removeCallbacks', [RUNNABLE], 'V', [event.task], main.handler);
       call(runtime, RUNNABLE, 'run', [], 'V', [], event.task);
     },

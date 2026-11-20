@@ -1,9 +1,9 @@
-import { unsignedBytes } from './java-arrays.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { APKArchive } from './apk-loader.js?v=3e71109809bc';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=3e71109809bc';
-import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
-import { normalizePath } from './virtual-fs.js?v=3e71109809bc';
+import { unsignedBytes } from './java-arrays.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { APKArchive } from './apk-loader.js?v=c582f7a02eb3';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=c582f7a02eb3';
+import { createHostRegistry } from './host-contract.js?v=c582f7a02eb3';
+import { normalizePath } from './virtual-fs.js?v=c582f7a02eb3';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -227,12 +227,12 @@ export function createClassLoaderHost(platform) {
   def(IN_MEMORY, '<init>', `(${BYTE_BUFFER}${LOADER})V`, (r, _m, [self, buffer, parent]) => construct(r, self, parent, 'memory-dex', () => [defineDex(r, self, bufferBytes(r, buffer), `memory-dex-${counter}`)]));
   def(IN_MEMORY, '<init>', `(${BYTE_BUFFER}${STRING}${LOADER})V`, (r, _m, [self, buffer, _library, parent]) => construct(r, self, parent, 'memory-dex', () => [defineDex(r, self, bufferBytes(r, buffer), `memory-dex-${counter}`)]));
   def(IN_MEMORY, '<init>', `([${BYTE_BUFFER}${LOADER})V`, (r, _m, [self, buffers, parent]) => construct(r, self, parent, 'memory-dex', () => r.array(buffers).elements.map((b, i) => defineDex(r, self, bufferBytes(r, b), `memory-dex-${counter}-${i}`))));
-  // platform.codeLoadGuard(runtime, path): a device option may refuse code it never runs (src/microg-device.js: DroidGuard's downloaded VM); it throws, never substitutes.
-  const pathUnits = (r, self, dexPath) => r.stringCharacters(dexPath).split(':').filter(Boolean).map(p => { platform.codeLoadGuard?.(r, p); return loadPath(r, self, p); });
+  const pathUnits = (r, self, dexPath) => r.stringCharacters(dexPath).split(':').filter(Boolean).map(p => loadPath(r, self, p));
   def(DEX_CLASS_LOADER, '<init>', `(${STRING}${STRING}${STRING}${LOADER})V`, (r, _m, [self, dexPath, optimized, _library, parent]) => {
     if (dexPath === null) r.throwJava('Ljava/lang/NullPointerException;', 'dexPath == null');
     if (optimized !== null) { const st = platform.javaIo.fs().stat(r.stringCharacters(optimized)); if (!st || st.type !== 'dir') r.throwJava('Ljava/lang/IllegalArgumentException;', `optimizedDirectory not a directory: ${r.stringCharacters(optimized)}`); }
     construct(r, self, parent, 'dex', () => pathUnits(r, self, dexPath));
+    platform.onDexClassLoader?.(r, self, r.stringCharacters(dexPath));   // a device option may observe code loaded at run time (src/microg-droidguard.js: the DroidGuard VM)
   });
   def(PATH, '<init>', `(${STRING}${LOADER})V`, (r, _m, [self, dexPath, parent]) => { if (dexPath === null) r.throwJava('Ljava/lang/NullPointerException;', 'dexPath == null'); construct(r, self, parent, 'path', () => pathUnits(r, self, dexPath)); });
   def(PATH, '<init>', `(${STRING}${STRING}${LOADER})V`, (r, _m, [self, dexPath, _library, parent]) => construct(r, self, parent, 'path', () => pathUnits(r, self, dexPath)));

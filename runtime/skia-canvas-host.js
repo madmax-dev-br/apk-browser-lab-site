@@ -1,22 +1,24 @@
-import {APKError} from './apk-runtime.js?v=3e71109809bc';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=3e71109809bc';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=3e71109809bc';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=3e71109809bc';
-import {measureSkiaRun,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=3e71109809bc';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=3e71109809bc';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=3e71109809bc';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=3e71109809bc';
-import {createBitmapHost} from './bitmap-host.js?v=3e71109809bc';
-import { gcRoot } from './heap-gc.js?v=3e71109809bc';
-import {sha256Hex} from './sha256-sync.js?v=3e71109809bc';
-import {colorLongToArgb} from './color-long.js?v=3e71109809bc';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=3e71109809bc';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=3e71109809bc';
+import {APKError} from './apk-runtime.js?v=c582f7a02eb3';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=c582f7a02eb3';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=c582f7a02eb3';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=c582f7a02eb3';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=c582f7a02eb3';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=c582f7a02eb3';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=c582f7a02eb3';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=c582f7a02eb3';
+import {createBitmapHost} from './bitmap-host.js?v=c582f7a02eb3';
+import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
+import {sha256Hex} from './sha256-sync.js?v=c582f7a02eb3';
+import {colorLongToArgb} from './color-long.js?v=c582f7a02eb3';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=c582f7a02eb3';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=c582f7a02eb3';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
 const matrix=m=>[m[0],m[2],m[4],m[1],m[3],m[5],m[6]??0,m[7]??0,m[8]??1];   // the canvas matrix [a,b,c,d,e,f] with its perspective row as a tail when it has one (vector-native.js preConcatCanvasMatrix)
 const finite=values=>{if(values.some(v=>!Number.isFinite(v)))fail('Non-finite Skia geometry');return values;};
+const MATRIX_OPS=new Set(['concat','translate','scale','rotate','skew','setMatrix']),CLIP_OPS=new Set(['clipRect','clipPath','clipOutRect','clipOutPath']);
+const NON_FINITE_PATH_OPS=new Set(['moveTo','lineTo','quadTo','cubicTo','rMoveTo','rLineTo','rQuadTo','rCubicTo','arcTo','addArc','addRect','addOval','addCircle','addRoundRect','offset','setLastPoint']);
 const argb=(CK,color,alpha=1)=>{const c=color>>>0;return CK.Color((c>>>16)&255,(c>>>8)&255,c&255,(c>>>24)/255*alpha);};
 /** Android BitmapShader over a snapshot raster. ALPHA_8 bitmaps are coverage only: Skia exposes them as (0,0,0,a), later tinted by the Paint's color filter. */
 function buildBitmapShader(CK,shader){
@@ -675,6 +677,7 @@ export function createSkiaCanvasHost(runtime,backend){
   recordNative(handle,command){const graphics=getVectorGraphics(runtime),state=graphics.get(handle,'canvas');bitmaps.flattenFullCanvas(handle);let rasterBytes=(command.raster?.dataURL?.length??0)+(command.pixelData?.base64?.length??0);if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES){runtime.collectForNativeHandles?.('recorded Canvas rasters');if(rasterBytes+recordedRasterBytes(graphics)>RECORDED_RASTER_BYTES)fail(`Recorded Canvas rasters of the live canvases exceed ${RECORDED_RASTER_BYTES/1048576} MiB`);}/* a collection first: canvases the app dropped release theirs (vector-native releaseWithOwner) */getVectorGraphics(runtime).reserveDrawStorage((command.commands?.length??0)*4+(command.text?.length??0));if(state.draws.length>=1024)fail('Skia command limit exceeded');state.draws.push({kind:'skia',...command,matrix:state.matrix.slice(),clips:(state.clips??[]).slice()});},
   textBounds(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaTextBounds(backend,text,{...state,...faceState(face)});},
   measureRun(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRun(backend,text,{...state,...options,...faceState(face)});},
+  measureRunAdvances(text,options={},state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaRunAdvances(backend,text,{...state,...options,...faceState(face)});},
   /** Paint.hasGlyph: the paint's typeface (else Roboto of its weight/style) has a glyph for every character, the Android fallback chain included. */
   hasGlyph(text,state={}){if(!text.length)return false;const face=resolveTypeface(state.typefaceRef),CK=backend.CanvasKit,font=new CK.Font(face.face??backend.typeface,12);
    try{const ids=font.getGlyphIDs(text);if(ids.length&&ids.every(id=>id!==0))return true;}finally{font.delete();}
@@ -682,7 +685,23 @@ export function createSkiaCanvasHost(runtime,backend){
   measureText(text,state={}){const face=resolveTypeface(state.typefaceRef);return measureSkiaText(backend,text,{...state,...faceState(face)});},
   readStatic(vm,field){const bitmapStatic=bitmaps.readStatic(field);if(bitmapStatic)return bitmapStatic;if(field.owner===OP&&OPS.includes(field.name))return{handled:true,value:bitmaps.enumValue(OP,OPS,field.name)};if(field.owner===TYPEFACE&&['DEFAULT','DEFAULT_BOLD','SANS_SERIF','SERIF','MONOSPACE'].includes(field.name))return{handled:true,value:makeTypeface(field.name==='SERIF'?'serif':field.name==='MONOSPACE'?'monospace':'sans-serif',field.name==='DEFAULT_BOLD'?1:0)};return null;},
   dispose(){runtime.rasterCache?.clear();runtime.rasterCacheBytes=0;disposeStretchLayers(runtime);disposeDecodedImages(CK);disposeShapedRuns(CK);disposeClipShapes(CK);for(const surface of scratchSurfaces.values())surface.dispose();scratchSurfaces.clear();for(const f of fontFiles.values())f.ck.delete();fontFiles.clear();for(const m of measures.values())releaseMeasure(m);measures.clear();for(const p of paths.values())p.builder.delete();paths.clear();pathHandles.clear();},
-  invoke(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
+  // A Canvas draw with a non-finite coordinate (an arc of NaN degrees, a rectangle of an Infinity scale) is dropped by Skia (SkCanvas quick-rejects it, a non-finite path
+  // is not drawn): the same draws nothing here, said once in the trace, instead of ending the frame.
+  // A transform that makes the matrix non-finite (a rotation by NaN degrees, a scale by Infinity) leaves the canvas drawing nothing until the restore that undoes it, as every draw
+  // through a non-finite SkMatrix is rejected.
+  invoke(vm,method,args){
+   const canvasOp=vm.isSubtype?.(method.owner,CANVAS)&&args[0]&&vm.object(args[0]).nativeCanvasHandle!==undefined,state=canvasOp?canvasState(args[0]):null;
+   if(state?.nonFinite&&(method.name.startsWith('draw')||MATRIX_OPS.has(method.name)))return method.result==='Z'?0:undefined;
+   if(state?.nonFinite&&CLIP_OPS.has(method.name))return 0;
+   try{return host.invokeChecked(vm,method,args);}
+   catch(error){
+    if(error?.name!=='APKError'||error.message!=='Non-finite Skia geometry'||!canvasOp||!(method.name.startsWith('draw')||MATRIX_OPS.has(method.name)))throw error;
+    if(MATRIX_OPS.has(method.name))state.nonFinite=true;
+    if(!vm.nonFiniteDrawNoted){vm.nonFiniteDrawNoted=true;vm.record(`HOST Canvas.${method.name} with a non-finite coordinate: nothing is drawn (SkCanvas rejects it)`);}
+    return method.result==='Z'?0:undefined;
+   }
+  },
+  invokeChecked(vm,method,args){if(bitmaps.supports(method.owner+'->'+method.name+method.signature))return bitmaps.invoke(vm,method,args);if(matrixHost.supports(method.owner+'->'+method.name+method.signature))return matrixHost.invoke(vm,method,args);const name=method.name,receiver=args[0];
    if(method.owner===CANVAS&&name==='setCompatibilityVersion'){vm.canvasCompatibilityVersion=args[0]|0;vm.record(`CANVAS compatibility target=${vm.canvasCompatibilityVersion} [actual process graphics policy]`);return;}
    if(method.owner===TYPEFACE){
     if(name==='create'){
@@ -787,6 +806,15 @@ export function createSkiaCanvasHost(runtime,backend){
    if(method.owner===PATH){
     if(name==='<init>'){if(paths.size>=4096)runtime.collectForNativeHandles?.('android.graphics.Path');if(paths.size>=4096)fail('Skia Path limit exceeded');let builder;if(args[1]){const source=path(args[1]).builder.snapshot();builder=new CK.PathBuilder(source);source.delete();}else builder=new CK.PathBuilder();if(overPathLimit(builder.countPoints())){builder.delete();fail('Aggregate Skia Path point limit exceeded');}pathCells+=builder.countPoints();const pathHandle=nextPathHandle++;paths.set(receiver.ref,{builder,handle:pathHandle});pathHandles.set(pathHandle,receiver);releasePathWithOwner(receiver);vm.storeField(vm.object(receiver).fields,`${PATH}->mNativePath:J`,pathHandle);vm.storeField(vm.object(receiver).fields,`${PATH}->isSimplePath:Z`,0);return;}
     const state=path(receiver),builder=state.builder;
+    // SkPath takes non-finite coordinates without complaint and becomes a non-finite path, which SkCanvas then refuses to draw (onDrawPath: !path.isFinite() -> nothing):
+    // a shape computed from a zero-sized box (a corner shadow of an empty arc, a ratio of a 0 width) draws nothing on Android and nothing here. reset / rewind make it finite again.
+    if(name==='reset'||name==='rewind')state.nonFinite=false;
+    if(name==='set'&&args[1])state.nonFinite=!!path(args[1]).nonFinite;
+    if(name==='addPath'&&args[1]&&path(args[1]).nonFinite)state.nonFinite=true;
+    if(NON_FINITE_PATH_OPS.has(name)){
+     const numbers=method.parameters.flatMap((type,index)=>type==='F'?[number(args[index+1])]:type===RF&&args[index+1]?['left','top','right','bottom'].map(field=>number(vm.object(args[index+1]).fields.get(`${RF}->${field}:F`)??0)):type==='[F'&&args[index+1]?vm.array(args[index+1]).elements.slice(0,8).map(number):[]);
+     if(numbers.some(value=>!Number.isFinite(value))){if(!state.nonFinite)vm.record(`HOST Path.${name} with a non-finite coordinate: the path is not finite and draws nothing (SkPath/SkCanvas)`);state.nonFinite=true;return;}
+    }
     if(name==='op'){   // Path.op(Path, Op) / Path.op(Path, Path, Op): SkPathOps over the two snapshots; false when Skia cannot build a result
       const two=method.parameters.length===3,left=two?args[1]:receiver,right=two?args[2]:args[1],ordinal=vm.object(args.at(-1)).enumOrdinal;
       if(!Number.isInteger(ordinal)||ordinal<0||ordinal>=CK_OPS.length)fail('Path.op requires the Path.Op enum');
@@ -902,11 +930,11 @@ export function createSkiaCanvasHost(runtime,backend){
      record(receiver,{op:'layerBegin',paint,bounds});
     }
     const flags=name==='save'&&method.parameters.length?args[1]:layerFlags;
-    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name!=='save'});return count;
+    state.stack.push({matrix:state.matrix.slice(),clips:(state.clips??[]).slice(),saveMatrix:!!(flags&1),saveClips:!!(flags&2),layer:name!=='save',nonFinite:!!state.nonFinite});return count;
    }
    if(name==='restore'||name==='restoreToCount'){
     const count=name==='restore'?state.stack.length:args[1];if(count<1||count>state.stack.length+1)vm.throwJava('Ljava/lang/IllegalStateException;','Underflow in restore');
-    while(state.stack.length+1>count){const previous=state.stack.pop();if(previous.layer)record(receiver,{op:'layerEnd'});if(previous.saveMatrix!==false)state.matrix=previous.matrix??previous;if(previous.saveClips!==false)state.clips=previous.clips??[];}return;
+    while(state.stack.length+1>count){const previous=state.stack.pop();if(previous.layer)record(receiver,{op:'layerEnd'});if(previous.saveMatrix!==false){state.matrix=previous.matrix??previous;state.nonFinite=!!previous.nonFinite;}if(previous.saveClips!==false)state.clips=previous.clips??[];}return;
    }
    if(['clipRect','clipPath','clipOutRect','clipOutPath'].includes(name)){
     let operation=name.startsWith('clipOut')?0:1;const hasOp=method.parameters.at(-1)==='Landroid/graphics/Region$Op;';
@@ -931,7 +959,7 @@ export function createSkiaCanvasHost(runtime,backend){
     finite(outer);finite(inner);record(receiver,{op:'doubleRoundRect',outer,inner,pair:byPair,paint});return;
    }
    const paintFace=resolveTypeface(getPaintState(vm,args.at(-1)).typefaceRef),paint={...getSolidPaint(vm,args.at(-1)),...faceState(paintFace)};
-   if(name==='drawPath'){record(receiver,{op:'path',...snapshot(args[1]),paint});return;}
+   if(name==='drawPath'){if(path(args[1]).nonFinite)return;record(receiver,{op:'path',...snapshot(args[1]),paint});return;}
    if(name==='drawArc'){const rect=method.parameters[0]==='Landroid/graphics/RectF;'?rectF(args[1]):finite(values.slice(0,4)),angles=method.parameters[0]==='Landroid/graphics/RectF;'?[number(args[2]),number(args[3])]:values.slice(4,6),useCenter=!!args[method.parameters[0]==='Landroid/graphics/RectF;'?4:7];record(receiver,{op:'arc',args:finite([...rect,...angles]),useCenter,paint});return;}
    if(method.parameters[0]==='Landroid/graphics/RectF;'){
     const bounds=rectF(args[1]),op={drawRect:'rect',drawRoundRect:'roundRect',drawOval:'oval'}[name];if(!op)fail('Unsupported RectF drawing operation '+name);

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { gcRoot } from './heap-gc.js?v=3e71109809bc';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=3e71109809bc';
-import { AndroidResources } from './android-resources.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=c582f7a02eb3';
+import { AndroidResources } from './android-resources.js?v=c582f7a02eb3';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -92,6 +92,8 @@ export function createPackageRegistry(platform) {
     const stack = stackOf(runtime), frame = { caller, override: null }; stack.push(frame);
     try { return fn(); } finally { const at = stack.lastIndexOf(frame); if (at >= 0) stack.splice(at, 1); if (!stack.length) identities.delete(threadKey(runtime)); }
   };
+  /** Makes `thread` a Binder thread serving a transaction from package `caller` (null: back to none); for a thread whose whole run is one transaction (system-services-host.js: oneway calls). */
+  const bindThreadCaller = (thread, caller) => { if (caller) identities.set(thread, [{ caller, override: null }]); else identities.delete(thread); };
   const callingIdentity = runtime => {
     const top = identities.get(threadKey(runtime))?.at(-1);
     if (top) return top.override ?? { uid: top.caller.uid, pid: top.caller.pid, entry: top.caller };
@@ -333,7 +335,7 @@ export function createPackageRegistry(platform) {
     NOT_HANDLED,
     get multi() { return companions.size > 0; },
     main, entries, companions: () => [...companions.values()], byName, byUid, install, refs,
-    callerEntry, contextEntry, entryOfClass, withCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
+    callerEntry, contextEntry, entryOfClass, withCaller, bindThreadCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
     loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, hasResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
     detailsOf, exported, providerFor, providerInstance, providerOwner, providerOwners,
     holds, levelFor, declaredPermission, sameSigners, securityException, visible, grant, targetSdk,

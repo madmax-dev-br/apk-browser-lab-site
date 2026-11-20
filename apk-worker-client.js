@@ -1,8 +1,8 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=3e71109809bc';
-import { createRasterReceiver } from './raster-cache.js?v=3e71109809bc';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=3e71109809bc';
+import { createWebAudioPlayer } from './web-audio-player.js?v=c582f7a02eb3';
+import { createRasterReceiver } from './raster-cache.js?v=c582f7a02eb3';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=c582f7a02eb3';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=3e71109809bc', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=c582f7a02eb3', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -105,9 +105,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false, microgServices = null } = {}) {
+  async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false, microgServices = null, textScale = 1 } = {}) {
     this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.apiGapWaiters = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
-    const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true, microgServices: microgServices && typeof microgServices === 'object' ? { ...microgServices } : null }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true, microgServices: microgServices && typeof microgServices === 'object' ? { ...microgServices } : null, textScale: [1, 2, 3, 4].includes(textScale) ? textScale : 1 }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
   }

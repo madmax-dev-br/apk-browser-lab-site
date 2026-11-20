@@ -1,11 +1,14 @@
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=3e71109809bc';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=c582f7a02eb3';
 // android.graphics.drawable.NinePatchDrawable for compiled 9-patch PNGs (aapt2 npTc chunk).
 // Layout contract (intrinsic size, getPadding) comes from the real compiled chunk; pixels are stretched with the
 // official Skia rasterizer (CanvasKit) exactly along the chunk's stretch regions. No platform-drawable look-alikes.
 const TYPE = 'Landroid/graphics/drawable/NinePatchDrawable;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', RECT = 'Landroid/graphics/Rect;', CANVAS = 'Landroid/graphics/Canvas;', FILTER = 'Landroid/graphics/ColorFilter;', COLOR_LIST = 'Landroid/content/res/ColorStateList;';
-const keys = new Set(['<init>()V', 'inflate(Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;Landroid/content/res/Resources$Theme;)V', `getPadding(${RECT})Z`, 'getIntrinsicWidth()I', 'getIntrinsicHeight()I', `draw(${CANVAS})V`, 'setAlpha(I)V', `setColorFilter(${FILTER})V`, 'getOpacity()I', 'isStateful()Z', 'onStateChange([I)Z', 'getConstantState()Landroid/graphics/drawable/Drawable$ConstantState;', 'getOpticalInsets()Landroid/graphics/Insets;'].map(signature => TYPE + '->' + signature));
+const keys = new Set(['<init>()V', 'inflate(Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;Landroid/content/res/Resources$Theme;)V', `getPadding(${RECT})Z`, 'getIntrinsicWidth()I', 'getIntrinsicHeight()I', `draw(${CANVAS})V`, 'setAlpha(I)V', `setColorFilter(${FILTER})V`, 'getOpacity()I', 'isStateful()Z', 'onStateChange([I)Z', 'getConstantState()Landroid/graphics/drawable/Drawable$ConstantState;', 'getOpticalInsets()Landroid/graphics/Insets;', `setTintList(${'Landroid/content/res/ColorStateList;'})V`, 'setTintBlendMode(Landroid/graphics/BlendMode;)V'].map(signature => TYPE + '->' + signature));
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'ninepatch-drawable-unsupported', ...details }); };
+const nullish = value => value === null || value === undefined || value === 0;
+/** android.graphics.BlendMode name -> the CanvasKit BlendMode key (SRC_ATOP -> SrcATop, MODULATE -> Modulate). */
+const blendModeName = name => name.split('_').map(part => part === 'ATOP' ? 'ATop' : part[0] + part.slice(1).toLowerCase()).join('');
 const u32 = (bytes, at) => ((bytes[at] << 24) | (bytes[at + 1] << 16) | (bytes[at + 2] << 8) | bytes[at + 3]) >>> 0;
 const bits = new DataView(new ArrayBuffer(4)), bitsFloat = value => { bits.setInt32(0, value | 0, true); return bits.getFloat32(0, true); };
 const base64 = bytes => { let binary = ''; for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384)); return btoa(binary); };
@@ -65,7 +68,7 @@ export function createNinePatchDrawableHost(platform) {
     return st.drawState ? call(r, list, COLOR_LIST, 'getColorForState', ['[I', 'I'], 'I', [st.drawState, fallback]) >>> 0 : fallback >>> 0;
   };
   const render = (r, st, width, height) => {
-    const tint = tintColor(r, st), key = `${width}x${height}:${tint}:${st.alpha}`;
+    const tint = tintColor(r, st), key = `${width}x${height}:${tint}:${st.alpha}:${st.blendMode ?? 'SrcIn'}`;
     if (st.cache?.key === key) return st.cache.raster;
     const CK = r.skia?.CanvasKit; if (!CK?.MakeImageFromEncoded) fail('9-patch drawing requires the verified Skia CanvasKit backend');
     if (!(width > 0 && height > 0) || width > 4096 || height > 4096 || width * height > 4 * 1024 * 1024) fail('9-patch extent exceeds 4096px/4Mpixel VM limit');
@@ -73,13 +76,17 @@ export function createNinePatchDrawableHost(platform) {
     const surface = CK.MakeSurface(width, height), paint = new CK.Paint(); let filter = null;
     try {
       if (!surface) fail('Skia 9-patch raster allocation failed');
-      if (tint !== null) { filter = CK.ColorFilter.MakeBlend(CK.Color((tint >>> 16) & 255, (tint >>> 8) & 255, tint & 255, (tint >>> 24) / 255), CK.BlendMode.SrcIn); paint.setColorFilter(filter); }
+      if (tint !== null) { filter = CK.ColorFilter.MakeBlend(CK.Color((tint >>> 16) & 255, (tint >>> 8) & 255, tint & 255, (tint >>> 24) / 255), CK.BlendMode[st.blendMode ?? 'SrcIn']); paint.setColorFilter(filter); }
       paint.setAlphaf(st.alpha / 255);
       const canvas = surface.getCanvas(); canvas.clear(CK.TRANSPARENT);
       const columns = latticeSpans(st.patch.width, st.patch.xDivs, width), rows = latticeSpans(st.patch.height, st.patch.yDivs, height), colors = st.patch.colors ?? [];
+      // The chunk's cell colors count the regions the divs make, less the empty first one when the first div is at 0 and the empty last one when the last div is at the edge
+      // (aapt's Images.cpp numCols / numRows): the span index is shifted by them (a pill whose stretch rows start at 0, like a switch track, otherwise reads the transparent row).
+      const xs = st.patch.xDivs ?? [], ys = st.patch.yDivs ?? [], columnShift = xs[0] === 0 ? 1 : 0, rowShift = ys[0] === 0 ? 1 : 0;
+      const colorColumns = columns.length - columnShift - (xs.length && xs[xs.length - 1] === st.patch.width ? 1 : 0);
       rows.forEach((row, rowIndex) => columns.forEach((column, columnIndex) => {
         if (!(column[3] > column[2] && row[3] > row[2] && column[1] > column[0] && row[1] > row[0])) return;
-        const color = colors[rowIndex * columns.length + columnIndex] ?? 1;   // Res_png_9patch cell colors: 1 = the bitmap, 0 = transparent, else a solid fill
+        const color = colors[(rowIndex - rowShift) * colorColumns + columnIndex - columnShift] ?? 1;   // Res_png_9patch cell colors: 1 = the bitmap, 0 = transparent, else a solid fill
         if (color === 1) canvas.drawImageRect(image, CK.LTRBRect(column[0], row[0], column[1], row[1]), CK.LTRBRect(column[2], row[2], column[3], row[3]), paint);
         else if (color !== 0) {
           const fill = new CK.Paint(); fill.setColor(CK.Color((color >>> 16) & 255, (color >>> 8) & 255, color & 255, ((color >>> 24) / 255) * (st.alpha / 255)));
@@ -150,6 +157,14 @@ export function createNinePatchDrawableHost(platform) {
       if (name === 'getIntrinsicHeight') return st.patch.height;
       if (name === 'setAlpha') { st.alpha = args[1] & 255; st.cache = null; return; }
       if (name === 'setColorFilter') { st.filter = args[1]; return; }
+      // NinePatchDrawable.setTintList / setTintBlendMode (DrawableCompat.setTintList of an AppCompat switch's track and thumb, a tinted 9-patch button): the stretched raster is
+      // drawn through the tint, SRC_IN by default, for the current state (onStateChange keeps it in step)
+      if (name === 'setTintList') { st.tint = nullish(args[1]) ? null : args[1]; st.cache = null; call(r, receiver, DRAWABLE, 'invalidateSelf'); return; }
+      if (name === 'setTintBlendMode') {
+        const mode = nullish(args[1]) ? 'SRC_IN' : r.object(args[1]).enumName, CK = r.skia?.CanvasKit, skia = typeof mode === 'string' ? blendModeName(mode) : null;
+        if (!skia || !CK?.BlendMode?.[skia]) fail(`NinePatchDrawable tint blend mode ${mode} has no Skia blend mode`);
+        st.blendMode = skia; st.cache = null; call(r, receiver, DRAWABLE, 'invalidateSelf'); return;
+      }
       if (name === 'getOpacity') return -3;
       if (name === 'getConstantState') return null;
       if (name === 'isStateful') return st.tint && call(r, st.tint, COLOR_LIST, 'isStateful', [], 'Z') ? 1 : 0;

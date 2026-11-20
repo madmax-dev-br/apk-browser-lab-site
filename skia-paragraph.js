@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
 
 const fail = message => { throw new APKError(message, { kind: 'skia-paragraph-unsupported' }); };
 const fontWeightOf = (CK, weight) => { if(!Number.isInteger(weight)||weight<0||weight>1000)fail('Font weight must be in [0,1000]'); return Object.values(CK.FontWeight).find(value=>value?.value===weight)??{value:weight}; };
@@ -60,7 +60,7 @@ const base64 = bytes => { let binary = ''; for (let offset = 0; offset < bytes.l
  * This is an explicit web text backend, not Android StaticLayout/Minikin. No OS
  * fonts, character-width estimates, or silently substituted glyphs are used.
  */
-export function measureSkiaParagraph(backend, text, { width, textSize = 14, weight = 400, italic = false, direction = 0, color = 0xff000000, maxLines = null, raster = false, alignment = 'start', ellipsis = null, families = null, fontVariations = null, nativeTypeface = null, letterSpacing = 0, shadow = null, lineSpacing = null } = {}) {
+export function measureSkiaParagraph(backend, text, { width, textSize = 14, weight = 400, italic = false, direction = 0, color = 0xff000000, maxLines = null, raster = false, alignment = 'start', ellipsis = null, families = null, fontVariations = null, nativeTypeface = null, letterSpacing = 0, shadow = null, lineSpacing = null, rasterScale = 1 } = {}) {
   // TextView text properties the paragraph carries (textViewApi.paragraphStyle): letterSpacing in pixels between the glyphs (Paint.setLetterSpacing is in ems), shadow as
   // Paint.setShadowLayer { radius, dx, dy, color }, lineSpacing { add, mult, firstTop } as StaticLayout applies android:lineSpacingExtra / lineSpacingMultiplier (below).
   if (!Number.isFinite(letterSpacing) || Math.abs(letterSpacing) > 512) fail('Paragraph letter spacing exceeds the web text backend limits');
@@ -111,11 +111,14 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
       const rasterWidth = Math.max(1, Math.ceil(width)), rasterHeight = Math.max(1, Math.ceil(height));
       // a genuine resource bound: the paragraph is drawn into one CPU surface and one PNG
       if (rasterHeight > 4096 || rasterWidth * rasterHeight > 4 * 1024 * 1024) fail(`Paragraph raster ${rasterWidth}x${rasterHeight}px exceeds the 4096px-high / 4-Mpixel web text raster limit`);
-      const surface = CK.MakeSurface(rasterWidth, rasterHeight);
+      // rasterScale: the page's device pixels per dp (the VM lays out at 1 px per dp): the same layout drawn that much larger, shown at its layout size (width / height stay the
+      // layout's; the PNG has scale times the pixels), so a text is as sharp as the page's own glyphs. 1 for a surface whose pixels are the layout's (a Canvas, a test).
+      const scale = [1, 2, 3, 4].includes(rasterScale) && rasterWidth * rasterHeight * rasterScale * rasterScale <= 4 * 1024 * 1024 ? rasterScale : 1;
+      const surface = CK.MakeSurface(rasterWidth * scale, rasterHeight * scale);
       if (!surface) fail('Skia paragraph raster allocation failed');
       let image;
       try {
-        const canvas = surface.getCanvas(); canvas.clear(CK.TRANSPARENT);
+        const canvas = surface.getCanvas(); canvas.clear(CK.TRANSPARENT); if (scale !== 1) canvas.scale(scale, scale);
         if (!extras) canvas.drawParagraph(paragraph, 0, 0);
         else {
           let shift = 0;
@@ -128,7 +131,7 @@ export function measureSkiaParagraph(backend, text, { width, textSize = 14, weig
         surface.flush();
         image = surface.makeImageSnapshot(); const bytes = image.encodeToBytes();
         if (!bytes || bytes.length > 8 * 1024 * 1024) fail('Invalid or excessive paragraph PNG');
-        result.raster = { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(bytes), width: rasterWidth, height: rasterHeight };
+        result.raster = { kind: 'raster', dataURL: 'data:image/png;base64,' + base64(bytes), width: rasterWidth, height: rasterHeight, ...(scale !== 1 ? { scale } : {}) };
       } finally { image?.delete(); surface.dispose(); }
     }
     return result;
@@ -168,6 +171,32 @@ export function measureSkiaRun(backend,text,{isRtl=false,start=0,offset=text.len
     let advance=0;for(const box of boxes)advance+=box.rect[2]-box.rect[0];
     if(!Number.isFinite(advance))fail('SkParagraph returned a non-finite run advance');
     return Math.fround(advance*textScaleX);
+  }finally{paragraph?.delete();builder?.delete();}
+}
+
+/** Paint.getTextRunAdvances: the run shaped once (as measureSkiaRun shapes it), and for every UTF-16 index of [start, end) the advance of the cluster that starts there (0 for the
+ *  other units of a cluster, as Minikin reports them), from the cumulative advance up to each index. Returns { total, advances }. */
+export function measureSkiaRunAdvances(backend,text,{isRtl=false,start=0,end=text.length,textSize=12,weight=400,italic=false,letterSpacing=0,wordSpacing=0,textScaleX=1,hinting=1,flags=0x503,textLocaleTag='en-US',families=null,fontVariations=null,fontFeatureSettings=null,nativeTypeface=null}={}){
+  if(typeof text==='string')text=oneLineRun(text);
+  if(typeof text!=='string'||text.length>65536||/[\u0000-\u001f]/.test(text))fail('Run advances currently require a complete single-line shaping run without control characters');
+  if(!Number.isInteger(start)||!Number.isInteger(end)||start<0||end<start||end>text.length)fail('Invalid UTF16 run range');
+  if(end-start>8192)fail('Run advances are limited to 8192 UTF-16 units per call');
+  if(![textSize,letterSpacing,wordSpacing,textScaleX].every(Number.isFinite)||textSize<0||textSize>512||textScaleX<0||textScaleX>16)fail('Run advance font state exceeds backend limits');
+  if(flags&0x20||flags&0x800)fail('Run advance requires a backend for synthetic bold/forced auto-hinting');
+  const advances=new Array(end-start).fill(0);if(!text.length||start===end||textSize===0||textScaleX===0)return {total:0,advances};
+  const CK=backend.CanvasKit;if(CK.ParagraphBuilder.RequiresClientICU())fail('Run shaping requires original ICU segmentation support');
+  backend.selectTypeface(weight,italic);
+  let builder,paragraph;
+  const state={weight,italic,letterSpacing,wordSpacing,textScaleX,flags,textLocaleTag,families,fontVariations,fontFeatureSettings,nativeTypeface},textStyle=runTextStyle(backend,CK,state,textSize),itemized=itemizeFonts(backend,text,weight,italic,state);
+  try{
+    builder=makeParagraphBuilder(backend,CK,new CK.ParagraphStyle({textDirection:isRtl?CK.TextDirection.RTL:CK.TextDirection.LTR,textAlign:CK.TextAlign.Left,disableHinting:hinting===0,textStyle}),itemized,registeredFace(backend,state));
+    if(itemized)addParagraphText(backend,builder,text,textStyle,itemized);else builder.addText(text);paragraph=builder.build();paragraph.layout(Math.max(4096,textSize*(text.length+1)*4+Math.abs(letterSpacing*textSize+wordSpacing)*(text.length+1)));
+    const missing=unresolved(paragraph);if(missing.length)fail('Run font lacks glyphs: '+missing.slice(0,8).map(code=>'U+'+code.toString(16)).join(','));
+    if(paragraph.getNumberOfLines()!==1)fail('Run shaping unexpectedly produced multiple lines');
+    const upTo=offset=>{let width=0;for(const box of paragraph.getRectsForRange(start,offset,CK.RectHeightStyle.Tight,CK.RectWidthStyle.Tight))width+=box.rect[2]-box.rect[0];return width;};
+    let previous=0;for(let index=start;index<end;index++){const next=upTo(index+1);advances[index-start]=Math.fround(Math.max(0,next-previous)*textScaleX);previous=Math.max(previous,next);}
+    if(!Number.isFinite(previous))fail('SkParagraph returned a non-finite run advance');
+    return {total:Math.fround(previous*textScaleX),advances};
   }finally{paragraph?.delete();builder?.delete();}
 }
 

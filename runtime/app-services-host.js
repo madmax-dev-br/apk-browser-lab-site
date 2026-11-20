@@ -1,10 +1,10 @@
-import { resolveIntentFields } from './intent-resolver.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { registerPackageValueFields } from './package-value-fields.js?v=3e71109809bc';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=3e71109809bc';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=3e71109809bc';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=3e71109809bc';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=3e71109809bc';
+import { resolveIntentFields } from './intent-resolver.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { registerPackageValueFields } from './package-value-fields.js?v=c582f7a02eb3';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=c582f7a02eb3';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=c582f7a02eb3';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=c582f7a02eb3';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=c582f7a02eb3';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -166,7 +166,9 @@ export function createAppServicesHost(platform) {
     const descriptor = P.typeIn(r, target.entry, target.className);
     if (!descriptor) throw new APKError(`Unable to instantiate service ${target.entry.name}/${target.className}: the class is not in the package`, { kind: 'package-service-class' });
     const ref = r.allocate(descriptor); call(r, descriptor, '<init>', [], 'V', [ref], 'direct');
-    const o = r.object(ref); o.baseContext = P.newContext(r, target.entry); o.serviceApplication = P.application(target.entry);
+    const o = r.object(ref); o.serviceApplication = P.application(target.entry);
+    // ActivityThread.handleCreateService: Service.attach -> attachBaseContext(context) before onCreate. A service that overrides it sees it (microG's ServiceProxy loads the actual service there).
+    call(r, 'Landroid/content/ContextWrapper;', 'attachBaseContext', ['Landroid/content/Context;'], 'V', [ref, P.newContext(r, target.entry)], 'virtual');
     r.record(`SERVICE create ${target.key} (uid ${target.entry.uid})`);
     call(r, descriptor, 'onCreate', [], 'V', [ref]);
     const service = { ref, binder: null, bound: false, started: false, startId: 0, intent: null, component: null, connections: new Set(), since: platform.clock.now() };

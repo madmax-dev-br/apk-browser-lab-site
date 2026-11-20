@@ -1,6 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=3e71109809bc';
-import { APKError } from './apk-error.js?v=3e71109809bc';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=3e71109809bc';
+import { gcRoot } from './heap-gc.js?v=c582f7a02eb3';
+import { Invoke } from './interpreter.js?v=c582f7a02eb3';
+import { APKError } from './apk-error.js?v=c582f7a02eb3';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=c582f7a02eb3';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -227,6 +228,38 @@ export function createSystemServicesHost(platform) {
     if (reply) vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [reply, 0]);
     return result ? 1 : 0;
   });
+  // A oneway transaction to another package is served on a Binder thread of the callee's process, never on the caller's thread and never on the main Looper: a callee that blocks
+  // (a network wait whose answer is delivered through the main Looper, as Volley does) would otherwise wait for the main thread it runs on. Oneway calls to the same binder run one
+  // after the other in the order they were made (Binder's per-node oneway queue), each with the caller's identity; one thread serves a node's queue until it is empty.
+  let binderThreads = 0;
+  const onewayQueues = gcRoot([]);
+  const enqueueOneway = (r, self, item) => {
+    let queue = onewayQueues.find(q => q.binderRef.ref === self.ref);
+    if (!queue) { queue = { binderRef: self, items: gcRoot([]), running: false }; onewayQueues.push(queue); }
+    queue.items.push(item);
+    if (!queue.running) { queue.running = true; startBinderThread(r, queue); }
+  };
+  const startBinderThread = (r, queue) => {
+    const THREAD_T = 'Ljava/lang/Thread;', thread = r.allocate(THREAD_T);
+    r.dispatch({ owner: THREAD_T, name: '<init>', parameters: [STRING_T], result: 'V', signature: `(${STRING_T})V` }, [thread, r.javaString(`Binder:${platform.virtualProcess.pid}_${++binderThreads}`)], 'direct');
+    const st = r.object(thread).thread; st.javaObject = thread; st.daemon = true;
+    const next = () => {
+      const item = queue.items.shift();
+      if (!item) { platform.packages.bindThreadCaller(st, null); queue.running = false; const at = onewayQueues.indexOf(queue); if (at >= 0) onewayQueues.splice(at, 1); return undefined; }
+      platform.packages.bindThreadCaller(st, platform.packages.byName(item.callerName));
+      const done = () => { vcall(r, PARCEL_T, 'recycle', [], 'V', [item.parcelRef]); return next(); };
+      vcall(r, PARCEL_T, 'setDataPosition', ['I'], 'V', [item.parcelRef, 0]);
+      const output = r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
+      const finish = () => { vcall(r, PARCEL_T, 'recycle', [], 'V', [output]); return done(); };
+      return new Invoke({ owner: r.typeOf(item.binderRef), name: 'onTransact', parameters: ['I', PARCEL_T, PARCEL_T, 'I'], result: 'Z', signature: `(I${PARCEL_T}${PARCEL_T}I)Z` }, [item.binderRef, item.code, item.parcelRef, output, item.flags], 'virtual', finish,
+        error => {
+          const value = error?.value; if (!value || !(r.isSubtype(r.typeOf(value), 'Ljava/lang/RuntimeException;') || r.isSubtype(r.typeOf(value), 'Landroid/os/RemoteException;'))) throw error;
+          let where = ''; try { where = traceLines(r, value).slice(0, 4).join(' | '); } catch { /* no trace */ }
+          r.record(`BINDER oneway call to ${item.ownerName} threw ${r.typeOf(value)}${where ? ': ' + where : ''}`); return finish();
+        });
+    };
+    r.scheduler.start(st, (_rt, running) => { if (running.began) { if (running.lastOutcome?.error) throw running.lastOutcome.error; return undefined; } running.began = true; return next(); });
+  };
   /** A transaction from another installed package: synchronous on the calling thread with the caller's identity; FLAG_ONEWAY (1) posts it to the main Looper over a copy of the data. */
   const crossTransact = (r, self, code, data, reply, flags, { caller, owner }) => {
     // Binder.execTransact in the callee's process always hands onTransact a reply Parcel (a oneway transaction's reply is discarded), so a Stub that writes a reply for a method
@@ -245,7 +278,7 @@ export function createSystemServicesHost(platform) {
     if (flags & 1) {
       const copy = r.dispatch({ owner: PARCEL_T, name: 'obtain', parameters: [], result: PARCEL_T, signature: `()${PARCEL_T}` }, [], 'static');
       if (data) vcall(r, PARCEL_T, 'appendFrom', [PARCEL_T, 'I', 'I'], 'V', [copy, data, 0, vcall(r, PARCEL_T, 'dataSize', [], 'I', [data])]);
-      platform.queueTask(() => { try { serve(copy, null); } finally { vcall(r, PARCEL_T, 'recycle', [], 'V', [copy]); } }, 0, [self, copy]);
+      enqueueOneway(r, self, { binderRef: self, parcelRef: copy, code, flags, callerName: caller.name, ownerName: owner.name });
       return 1;
     }
     const result = serve(data, reply);

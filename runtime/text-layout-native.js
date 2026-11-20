@@ -1,8 +1,8 @@
-import {APKError} from './apk-error.js?v=3e71109809bc';
-import {getPaintStateByHandle} from './paint-host.js?v=3e71109809bc';
-import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=3e71109809bc';
-import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=3e71109809bc';
-import { runTextStyle, shapingFace } from './skia-paragraph.js?v=3e71109809bc';
+import {APKError} from './apk-error.js?v=c582f7a02eb3';
+import {getPaintStateByHandle} from './paint-host.js?v=c582f7a02eb3';
+import {androidCharacterDirectionality} from './unicode-bidi-data.js?v=c582f7a02eb3';
+import { breakLineOptimal, lineWidthOf } from './minikin-line-breaker.js?v=c582f7a02eb3';
+import { runTextStyle, shapingFace } from './skia-paragraph.js?v=c582f7a02eb3';
 
 const MT='Landroid/graphics/text/MeasuredText;',BUILDER=MT.slice(0,-1)+'$Builder;',LB='Landroid/graphics/text/LineBreaker;';
 const REG='Llibcore/util/NativeAllocationRegistry;';
@@ -179,7 +179,8 @@ export function breakParagraphs(r,text,style,width,strategy,frequency){
  for(const paragraph of text.split('\n')){
   if(!paragraph){out.push('');continue;}
   validateText(paragraph);
-  const paint={textSize:style.textSize,weight:style.weight,italic:style.italic,letterSpacing:0,wordSpacing:0,flags:0x100,hinting:1,textLocaleTag:style.locale??'en-US',textScaleX:1};
+  // the TextView's own face (an app or system font: style.face, the typeface state) and letter spacing (em) are the paint's, as in Minikin; advances are linear (unhinted), as Minikin measures
+  const paint={textSize:style.textSize,weight:style.weight,italic:style.italic,letterSpacing:style.letterSpacing??0,wordSpacing:0,flags:0x100,hinting:0,textLocaleTag:style.locale??'en-US',textScaleX:1,...(style.face?r.skiaHost.faceState(style.face):{})};
   const m={text:paragraph,runs:[{start:0,end:paragraph.length,paint,rtl:false}],computeLayout:false};m.paragraph=nativeParagraph(r,m,1073741824);
   try{
    const breaker={strategy,hyphenation:frequency},lines=optimalLines(r,m,breaker,width,0,width);

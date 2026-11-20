@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=3e71109809bc';
-import { APKError } from './apk-runtime.js?v=3e71109809bc';
-import { ephemeronMap } from './heap-gc.js?v=3e71109809bc';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=3e71109809bc';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=3e71109809bc';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=c582f7a02eb3';
+import { APKError } from './apk-runtime.js?v=c582f7a02eb3';
+import { ephemeronMap } from './heap-gc.js?v=c582f7a02eb3';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=c582f7a02eb3';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=c582f7a02eb3';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -206,6 +206,10 @@ export class AndroidStyleBackend {
   }
   obtain(runtime, themeRef, attrsRef, requestedRef, defStyleAttr = 0, defStyleRes = 0, styleId = 0, useTheme = true) {
     if (!runtime.classes.has(TYPED_ARRAY)) fail('Original AOSP TypedArray DEX is required; no JS getter substitute is installed');
+    // Theme.obtainStyledAttributes resolves with the Resources the Theme was created from: an Activity whose configuration AppCompat overrides (setDefaultNightMode, a
+    // per-Activity locale) reads @color/... and @drawable/... of its layouts in that configuration (values-night), as its theme already is
+    const scoped = themeRef ? this.platform.overrideResources?.(runtime, runtime.object(themeRef).resources) ?? null : null;
+    if (scoped !== (this.platform.activeResources ?? null) && this.platform.withResources) return this.platform.withResources(runtime, scoped, () => this.obtain(runtime, themeRef, attrsRef, requestedRef, defStyleAttr, defStyleRes, styleId, useTheme));
     const requested = runtime.array(requestedRef).elements;
     if (requested.length > 4096) fail('Styled attribute request exceeds 4096 IDs');
     const theme = themeRef ? runtime.object(themeRef).themeValues : new Map();
@@ -321,7 +325,10 @@ export class AndroidStyleBackend {
     let value = suppliedValue ? { dataType: this.get(runtime, suppliedValue, VALUE, 'type', 'I'), rawData: this.get(runtime, suppliedValue, VALUE, 'data', 'I') } : this.platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
     if (value.kind === 'unresolved') fail(value.reason, { resourceId: id });
     let type, parameters = [], values = [], tree;
-    if (!(value.dataType >= 28 && value.dataType <= 31) && (this.platform.resources.table.selectVariant(id >>> 0)?.resourceType ?? value.resourceType) === 'color') {
+    // the type of the resource itself, app or framework (?attr/colorControlNormal of an AppCompat theme is ?android:attr/textColorSecondary, a framework color list: a TypedValue
+    // supplied by TypedArray.getDrawable carries no type)
+    const resourceType = this.platform.resources.table.selectVariant(id >>> 0)?.resourceType ?? this.platform.resources.frameworkTable?.selectVariant?.(id >>> 0)?.resourceType ?? value.resourceType ?? this.platform.resources.resolve(id >>> 0)?.resourceType;
+    if (!(value.dataType >= 28 && value.dataType <= 31) && resourceType === 'color') {
       // ResourcesImpl.loadDrawableForCookie: an XML file of a color/ resource loads as a ColorStateListDrawable around the ColorStateList parsed from it (not through DrawableInflater).
       const csl = this.loadColor(runtime, id >>> 0, theme || null), type = 'Landroid/graphics/drawable/ColorStateListDrawable;';
       if (!runtime.classes.has(type)) fail('Original AOSP ColorStateListDrawable DEX is unavailable', { resourceId: id });
