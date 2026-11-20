@@ -1,7 +1,7 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=d509c7905654';
-import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=d509c7905654';
+import { mapUrl } from './host-map.js?v=3e71109809bc';
+import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=3e71109809bc';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -64,10 +64,10 @@ export async function openExchange(request, options = {}) {
     }
     throw Object.assign(new Error(response.headers.get('x-apkweb-relay-error') ?? relayCode), { code: relayCode, relayed: true, ...(channelInfo ? { relayChannel: channel } : {}) });
   }
-  const out = []; let encoded = false;
+  const out = []; let encoded = false, coding = '';
   response.headers.forEach((value, name) => {
     const lower = name.toLowerCase();
-    if (lower === 'content-encoding' && ENCODED.test(value.trim())) { encoded = true; return; }
+    if (lower === 'content-encoding' && ENCODED.test(value.trim())) { encoded = true; coding = value.trim().toLowerCase(); return; }
     if (lower === 'x-apkweb-set-cookie') { for (const cookie of relayCookies(value)) out.push(['Set-Cookie', cookie]); return; }
     if (lower.startsWith('x-apkweb-relay-')) return;
     out.push([name, value]);
@@ -75,8 +75,20 @@ export async function openExchange(request, options = {}) {
   const kept = encoded ? out.filter(([name]) => name.toLowerCase() !== 'content-length') : out;   // the transport already decoded the body (OkHttp's transparent gzip drops both too)
   let url = !proxyUrl && response.redirected && response.url ? response.url : request.url;         // only a followed redirect changes the URL
   if (mapped && url !== request.url) url = unmapOrigin(url, mapped.url, request.url);              // a redirect the target followed on its own origin stays on the app's origin
-  return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept, ...channelInfo }, reader: response.body ? response.body.getReader() : null };
+  // HttpURLConnection on Android (OkHttp inside) decompresses transparently only when it added "Accept-Encoding: gzip" itself. An app that set Accept-Encoding: gzip on the connection
+  // gets the compressed body and the Content-Encoding header, and decompresses it itself (GZIPInputStream). The browser (or the relay) always hands the decoded body, so for that
+  // app the body is gzip-encoded again (the same content; not the server's exact bytes) and the header kept. The virtual HTTP socket's own clients (OkHttp) are left as they are.
+  let body = response.body ?? null;
+  if (body && encoded && (coding === 'gzip' || coding === 'x-gzip') && appAskedGzip(request) && typeof CompressionStream === 'function') { body = asStream(body).pipeThrough(new CompressionStream('gzip')); kept.push(['Content-Encoding', 'gzip']); }
+  return { head: { version: 'HTTP/1.1', status: response.status, reason: response.statusText ?? '', url, headers: kept, ...channelInfo }, reader: body ? body.getReader() : null };
 }
+/** A ReadableStream over a body that only offers getReader() (the relay channel's responses, src/relay-mux.js): read on demand, so its flow control still follows the app's reads. */
+const asStream = body => typeof body.pipeThrough === 'function' ? body : (reader => new ReadableStream({
+  async pull(controller) { const { done, value } = await reader.read(); if (done) controller.close(); else controller.enqueue(value); },
+  cancel(reason) { return reader.cancel?.(reason); },
+}))(body.getReader());
+/** An HttpURLConnection request (not the virtual HTTP socket's) whose app set Accept-Encoding with gzip itself (the lab's HttpURLConnection never adds the header). */
+const appAskedGzip = request => (request.api ?? 'java.net') === 'java.net' && (request.headers ?? []).some(([name, value]) => String(name).toLowerCase() === 'accept-encoding' && /(^|[\s,])(x-)?gzip(\s*;|\s*,|\s*$)/i.test(String(value)));
 
 /** `url` on the origin of `mappedUrl` -> the same path on the origin of `originalUrl` (any other URL is returned as is). */
 function unmapOrigin(url, mappedUrl, originalUrl) {

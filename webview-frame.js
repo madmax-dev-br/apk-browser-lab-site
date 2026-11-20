@@ -7,11 +7,17 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=d509c7905654';
-import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=d509c7905654';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=3e71109809bc';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=3e71109809bc';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
+/**
+ * A frame whose document the relay serves (docs/NETWORK.md "WebView documents through the relay") is loaded from the relay on this computer (http://<label>.localhost:<port>). The only
+ * permissions policy feature it gets is Chrome's Local Network Access ("local-network-access"; later Chromes split it into "loopback-network"), delegated so that a lab page served from
+ * the internet may frame the relay at all; its own requests are confined to the relay by the CSP the relay sends (src/webview-bridge.js relayCsp).
+ */
+export const RELAY_FRAME_ALLOW = 'local-network-access; loopback-network';
 const GRACE_MS = 1500;
 const FORBIDDEN_TOKENS = ['allow-same-origin', 'allow-top-navigation', 'allow-top-navigation-by-user-activation', 'allow-popups', 'allow-popups-to-escape-sandbox', 'allow-modals', 'allow-downloads', 'allow-pointer-lock', 'allow-presentation', 'allow-orientation-lock', 'allow-storage-access-by-user-activation'];
 
@@ -103,12 +109,12 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     if (!element) { (queued.get(id) ?? queued.set(id, []).get(id)).push(message); return; }
     let frame = frames.get(id);
     if (!frame) frames.set(id, frame = { id, element, iframe: null, form: null, loadId: 0, timer: null });
-    dispose(frame); frame.element = element; frame.loadId = message.loadId;
+    dispose(frame); frame.element = element; frame.loadId = message.loadId; frame.relay = message.relay === true;
     const source = frameSource(message.request, { labOrigin });
     if (source.error) { fail(frame, source.error.code, source.error.description); return; }
     // A document of the lab's own origin is fetched here and handed to the frame as srcdoc with a <base>: the frame stays an opaque origin, the lab serves it once, and
     // (phase 2) the page bridge can be put in front of it. Anything that is not HTML is framed by URL.
-    if (source.src && labOrigin && sameOrigin(source.src, labOrigin) && fetchImpl) {
+    if (!frame.relay && source.src && labOrigin && sameOrigin(source.src, labOrigin) && fetchImpl) {
       frame.timer = timers.setTimeout(() => { if (frame.loadId === message.loadId) fail(frame, -8, 'net::ERR_TIMED_OUT (the lab document did not arrive)'); }, message.timeoutMs ?? 30000);
       const url = source.src, loadId = message.loadId;
       Promise.resolve().then(() => fetchImpl(url, { credentials: 'omit', cache: 'no-store', redirect: 'error' })).then(async response => {
@@ -161,26 +167,29 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     if (!sandboxIsSafe(sandbox)) throw new Error(`Unsafe WebView sandbox: ${sandbox}`);   // an internal invariant: sandboxFor can never produce one
     iframe.setAttribute('sandbox', sandbox);
     for (const [name, value] of Object.entries(FRAME_ATTRIBUTES)) iframe.setAttribute(name, value);
+    if (frame.relay) iframe.setAttribute('allow', RELAY_FRAME_ALLOW);
     if (supportsCredentialless()) iframe.setAttribute('credentialless', '');
     iframe.className = 'android-webview-frame'; iframe.title = 'WebView';
     iframe.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff';
     let armed = !source.form;
     iframe.addEventListener('load', () => {
-      if (frame.iframe !== iframe || frame.loadId !== message.loadId) return;
+      // a relay frame's document may navigate by itself (the Worker adopted the new load: `adopt`), so its current load is the frame's, not the message's
+      const loadId = frame.relay ? frame.loadId : message.loadId;
+      if (frame.iframe !== iframe || frame.loadId !== loadId) return;
       if (!armed) return;   // the empty document a frame without src shows before the posted form answers is not the page: its load event is not onPageFinished
-      if (frame.finished === message.loadId) return;   // the same document loading again after its frame moved in the DOM (attach) is not a second onPageFinished
-      frame.finished = message.loadId;
+      if (frame.finished === loadId) return;   // the same document loading again after its frame moved in the DOM (attach) is not a second onPageFinished
+      frame.finished = loadId;
       timers.clearTimeout(frame.timer); frame.timer = null;
-      const finished = () => send({ type: 'webview-event', id, loadId: message.loadId, event: 'finished' });
+      const finished = () => send({ type: 'webview-event', id, loadId, event: 'finished' });
       // a document without scripts tells nothing itself: what its markup declares (the title) is reported for it
-      if (frame.staticTitle !== null) { send({ type: 'webview-event', id, loadId: message.loadId, event: 'dom', title: str(frame.staticTitle, 1024) }); finished(); return; }
+      if (frame.staticTitle !== null) { send({ type: 'webview-event', id, loadId, event: 'dom', title: str(frame.staticTitle, 1024) }); finished(); return; }
       // A document that was given a bridge says when it is parsed ('dom', with its title): onPageFinished waits for that, so the app hears of the document before it hears that
       // it finished. The bridge usually connects before the load event; if it has not after a moment, the document will never say anything (bridge-failed).
       if (!frame.bridge || frame.domSeen) { finished(); return; }
       frame.finishPending = finished;
-      frame.grace = timers.setTimeout(() => { if (frame.iframe !== iframe || !frame.finishPending) return; frame.finishPending = null; if (!frame.port) send({ type: 'webview-event', id, loadId: message.loadId, event: 'bridge-failed' }); finished(); }, GRACE_MS);
+      frame.grace = timers.setTimeout(() => { if (frame.iframe !== iframe || !frame.finishPending) return; frame.finishPending = null; if (!frame.port) send({ type: 'webview-event', id, loadId, event: 'bridge-failed' }); finished(); }, GRACE_MS);
     });
-    if (message.bridge) listen();
+    if (message.bridge || (frame.relay && message.javascript)) listen();
     frame.iframe = iframe; frame.bridge = null; frame.domSeen = false; frame.finishPending = null; frame.staticTitle = null; frame.counts = {};
     if ('srcdoc' in source) {
       let document_ = source.srcdoc;
@@ -189,6 +198,8 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (message.bridge && !message.javascript) frame.staticTitle = staticTitle(source.srcdoc);
       iframe.setAttribute('srcdoc', document_);
     } else if ('src' in source) iframe.setAttribute('src', source.src);
+    // the relay puts the page bridge into the document itself (scripts/relay-webview.cjs): the frame says hello like any scriptable document
+    if (frame.relay && message.javascript) frame.bridge = { relay: true, loadId: message.loadId };
     // postUrl targets the frame by name: the name must be on the element before it is inserted, because the nested browsing context takes it when it is created
     // (set afterwards, the submission did not find the frame and navigated a top-level context instead).
     const formTarget = source.form ? `apkweb-webview-${id}-${message.loadId}` : null; if (formTarget) iframe.setAttribute('name', formTarget);
@@ -267,6 +278,14 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
     }
     frame.port.postMessage({ t: 'eval', evalId: message.evalId, script: message.script });
   }
+  /** A relay frame's document navigated by itself and the Worker made that a new load: the frame, its next document and its next load event belong to it. */
+  function adoptLoad(message) {
+    const frame = frames.get(message.id); if (!frame || !frame.relay || !Number.isSafeInteger(message.loadId)) return;
+    try { frame.port?.close?.(); } catch { /* already closed */ }
+    timers.clearTimeout(frame.grace); frame.grace = null; timers.clearTimeout(frame.timer);
+    Object.assign(frame, { loadId: message.loadId, port: null, domSeen: false, finishPending: null, counts: {}, bridge: frame.bridge ? { relay: true, loadId: message.loadId } : null });
+    frame.timer = timers.setTimeout(() => { if (frame.loadId === message.loadId && frame.finished !== message.loadId) fail(frame, -8, 'net::ERR_TIMED_OUT (no load event from the WebView frame)'); }, message.timeoutMs ?? 30000);
+  }
   /** The Worker's answer to a resource request: for a static reference of the document being prepared (negative rid) or for the bridge inside the frame (positive rid). */
   function resourceResult(message) {
     const frame = frames.get(message.id);
@@ -293,6 +312,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       else if (message.op === 'eval') evaluate(message);
       else if (message.op === 'resource-result') resourceResult(message);
       else if (message.op === 'bridge') { const frame = frames.get(message.id); if (frame?.port && frame.loadId === message.loadId && message.payload?.t === 'call') frame.port.postMessage(message.payload); }   // a command for the document's bridge (scroll, find, an answer)
+      else if (message.op === 'adopt') adoptLoad(message);
       else if (message.op === 'stop') { const frame = frames.get(message.id); if (frame) { dispose(frame); frame.loadId = -1; } queued.delete(message.id); }
       else if (message.op === 'destroy') { dispose(frames.get(message.id)); frames.delete(message.id); queued.delete(message.id); slots.delete(message.id); }
     },

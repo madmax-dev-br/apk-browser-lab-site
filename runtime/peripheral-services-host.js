@@ -1,7 +1,7 @@
-import { bitsFloat, floatBits } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=d509c7905654';
-import { installCameraManager } from './camera-host.js?v=d509c7905654';
+import { bitsFloat, floatBits } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createServiceKit, OBJECT, STRING, LIST, DEVICE_FEATURES } from './service-kit.js?v=3e71109809bc';
+import { installCameraManager } from './camera-host.js?v=3e71109809bc';
 
 // System services of the hardware a phone has (or lacks), answered the way an API 33 phone answers when that hardware or account is absent (android-13.0.0_r1 sources of each
 // manager, SystemServiceRegistry and the service implementations). The virtual device advertises only DEVICE_FEATURES (src/service-kit.js): Wi-Fi, no Bluetooth, NFC, camera, USB
@@ -177,6 +177,15 @@ export function createPeripheralServicesHost(platform) {
   def(DISPLAY_MANAGER, 'getDisplays', `(${STRING})[${DISPLAY}`, (r, _m, [, category]) => { const a = r.newArray(`[${DISPLAY}`, category === null ? 1 : 0); if (category === null) r.array(a).elements = [platform.displayHost.get(r)]; return a; });   // no presentation displays
   def(DISPLAY_MANAGER, 'registerDisplayListener', '(Landroid/hardware/display/DisplayManager$DisplayListener;Landroid/os/Handler;)V', (r, _m, [, listener]) => { if (nullish(listener)) iae(r, 'listener must not be null'); });
   def(DISPLAY_MANAGER, 'unregisterDisplayListener', '(Landroid/hardware/display/DisplayManager$DisplayListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) iae(r, 'listener must not be null'); });
+  // getStableDisplaySize() (hidden; DisplayManagerService.getStableDisplaySize): the default display's size in its natural orientation (no config_stableDeviceDisplay* overlay on this device)
+  def(DISPLAY_MANAGER, 'getStableDisplaySize', '()Landroid/graphics/Point;', r => {
+    const display = platform.displayHost.get(r), point = r.allocate('Landroid/graphics/Point;');
+    r.dispatch({ owner: 'Landroid/graphics/Point;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [point], 'direct');
+    r.dispatch({ owner: DISPLAY, name: 'getRealSize', parameters: ['Landroid/graphics/Point;'], result: 'V', signature: '(Landroid/graphics/Point;)V' }, [display, point], 'virtual');
+    const rotation = r.dispatch({ owner: DISPLAY, name: 'getRotation', parameters: [], result: 'I', signature: '()I' }, [display], 'virtual');
+    if (rotation === 1 || rotation === 3) { const fields = r.object(point).fields, x = 'Landroid/graphics/Point;->x:I', y = 'Landroid/graphics/Point;->y:I', w = fields.get(x), h = fields.get(y); r.storeField(fields, x, h); r.storeField(fields, y, w); }
+    return point;
+  });
   def(DISPLAY_MANAGER, 'isNightModeActive', '()Z', () => (device().darkTheme ? 1 : 0));
 
   // ---- HardwarePropertiesManager: thermal data is for device owners and DEVICE_POWER holders only

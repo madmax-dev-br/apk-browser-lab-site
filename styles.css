@@ -631,12 +631,17 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .cp-microg-entry-meta{font:400 11px/1.4 var(--sans);color:var(--muted)}
 .cp-microg-entry-meta[data-state=error]{color:var(--warn)}
 .cp-microg-apis{margin-top:8px}
+.cp-microg-services{margin:12px 0 0;padding:0;border:0;min-width:0}
+.cp-microg-services>legend{padding:0;margin-bottom:4px}
+.cp-microg-service-list .cp-microg-service-note{grid-column:1/-1;margin:-4px 0 6px}
+#dev-microg-services-status[data-state="warn"]{color:var(--warn, #b45309)}
 .cp-microg-apis>.cp-subtitle{display:block}
 .cp-microg-apis .cp-list{list-style:none;margin:8px 0 0;padding:0;display:flex;flex-direction:column;gap:6px}
 .cp-microg-api{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:baseline;min-width:0;font-size:12px}
 .cp-microg-api-state{font-size:11px;font-weight:600;white-space:nowrap;padding:1px 6px;border-radius:999px;background:var(--surface-2);color:var(--muted)}
 .cp-microg-api[data-state=works] .cp-microg-api-state{background:var(--ok-soft);color:var(--ok)}
 .cp-microg-api[data-state=fails] .cp-microg-api-state{background:var(--warn-soft);color:var(--warn)}
+.cp-microg-api[data-state=online] .cp-microg-api-state{background:var(--surface-2);color:var(--text, inherit);outline:1px solid var(--border, currentColor)}
 .cp-microg-api-name{min-width:0;overflow-wrap:anywhere}
 .cp-microg-api-note{grid-column:2;color:var(--muted);font-size:11px;overflow-wrap:anywhere}
 
@@ -647,3 +652,9 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .launcher-menu-item:hover,.launcher-menu-item:focus-visible{background:rgba(198,40,40,.1);outline:none}
 @keyframes launcher-menu-in{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
 .launcher-app[data-problem]{position:relative}.launcher-app[data-problem] .launcher-icon{opacity:.6}.launcher-problem{position:absolute;right:6px;top:0;width:18px;height:18px;border-radius:50%;background:#d35b5b;color:#fff;font:700 12px/18px Inter,-apple-system,sans-serif;text-align:center;box-shadow:0 1px 3px #0007}
+/* "App modified" (src/method-hooks-panel.js): the chip in the preview bar and the list of method changes under it */
+.app-modified-chip{border:0;cursor:pointer;color:var(--warn,#b3261e);background:var(--warn-soft,#fcebe9)}.app-modified-chip:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app-modified-panel{position:absolute;right:12px;top:52px;z-index:30;width:min(560px,calc(100% - 24px));max-height:320px;overflow:auto;background:var(--surface,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 10px 24px #20205022;padding:10px 12px}
+.am-note{margin:0 0 8px;font-size:9px;line-height:1.6;color:var(--muted,#8c92a1)}.am-list{list-style:none;margin:0;padding:0}.am-row{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;padding:7px 0;border-top:1px solid var(--line);font-size:10px}
+.am-method{flex-basis:100%;font:9px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}.am-kind{color:var(--warn,#b3261e)}.am-hits,.am-owner{color:var(--muted,#8c92a1);white-space:nowrap}.am-remove{margin-left:auto}.am-failed .am-kind{color:#9a7b2f}
+

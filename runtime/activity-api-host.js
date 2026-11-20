@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { gcRoot } from './heap-gc.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { gcRoot } from './heap-gc.js?v=3e71109809bc';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -588,10 +588,16 @@ export function createActivityApiHost(platform) {
     line(`Local Activity ${(r.object(self).id ?? '').toString(16)} State:`);
     line(`  mResumed=${frameOf(r, self).lifecycleStage === 4} mStopped=${frameOf(r, self).lifecycleStage === 2} mFinished=${!!frameOf(r, self).finishing}`);
   });
-  def(ACTIVITY, 'getCallingPackage', `()${STRING}`, (r, _m, [self]) => frameOf(r, self).resultReceiver ? platform.packageName : null);
-  def(ACTIVITY, 'getCallingActivity', `()${COMPONENT}`, (r, _m, [self]) => {
+  // The Activity that asked for this one's result (ActivityRecord.resultTo): its package and class, whichever installed package it belongs to (src/package-registry.js).
+  const callerOf = (r, self) => {
     const receiver = frameOf(r, self).resultReceiver; if (!receiver) return null;
-    const type = r.object(receiver).type; return construct(r, COMPONENT, [STRING, STRING], [platform.packageName, type.slice(1, -1).replaceAll('/', '.')]);
+    const type = r.object(receiver).type, entry = platform.activityPackage(r, type);
+    return { packageName: entry.main ? platform.packageName : entry.name, className: type.slice(1, -1).replace(/\$\$ldr\d+$/, '').replaceAll('/', '.') };
+  };
+  def(ACTIVITY, 'getCallingPackage', `()${STRING}`, (r, _m, [self]) => callerOf(r, self)?.packageName ?? null);
+  def(ACTIVITY, 'getCallingActivity', `()${COMPONENT}`, (r, _m, [self]) => {
+    const caller = callerOf(r, self); if (!caller) return null;
+    return construct(r, COMPONENT, [STRING, STRING], [caller.packageName, caller.className]);
   });
   def(ACTIVITY, 'onProvideReferrer', `()${URI}`, () => null);
   def(ACTIVITY, 'getReferrer', `()${URI}`, (r, _m, [self]) => {
@@ -600,7 +606,7 @@ export function createActivityApiHost(platform) {
       const uri = call(r, intent, INTENT, 'getParcelableExtra', [STRING], 'Landroid/os/Parcelable;', ['android.intent.extra.REFERRER']); if (!nullish(uri)) return uri;
       const name = call(r, intent, INTENT, 'getStringExtra', [STRING], STRING, ['android.intent.extra.REFERRER_NAME']); if (!nullish(name)) return callStatic(r, URI, 'parse', [STRING], URI, [r.stringCharacters(name)]);
     }
-    const frame = frameOf(r, self), caller = frame.resultReceiver || frame.sourceActivity ? platform.packageName : frame === platform.frames[0] ? 'com.android.launcher3' : platform.packageName;
+    const frame = frameOf(r, self), caller = frame.resultReceiver ? callerOf(r, self).packageName : frame.sourceActivity ? platform.packageName : frame === platform.frames[0] ? 'com.android.launcher3' : platform.packageName;
     return callStatic(r, URI, 'parse', [STRING], URI, [`android-app://${caller}`]);
   });
 
@@ -611,14 +617,14 @@ export function createActivityApiHost(platform) {
     if (nullish(permissions)) iae(r, 'permissions cannot be null or empty');
     const names = r.array(permissions).elements;
     if (names.length === 0) iae(r, 'permission cannot be null or empty');
-    const strings = names.map(n => text(r, n));
+    const strings = names.map(n => text(r, n)), entry = platform.packages?.multi ? platform.activityPackage(r, r.object(self).type) : null;   // an Activity of a second installed package asks for that package's permissions
     platform.runtimePermissions.request(r, strings, requestCode, [self, permissions], results => {
       platform.queueTask(() => {
         const empty = results.length === 0, outNames = intArray(r, '[Ljava/lang/String;', empty ? [] : strings), outResults = intArray(r, '[I', results);
         call(r, self, ACTIVITY, 'onRequestPermissionsResult', ['I', '[Ljava/lang/String;', '[I'], 'V', [requestCode, outNames, outResults]);
       }, 0, [self, permissions]);
       platform.onExternalActivity?.();
-    });
+    }, { entry });
   });
   def(ACTIVITY, 'shouldShowRequestPermissionRationale', `(${STRING})Z`, (r, _m, [, permission]) => {
     if (nullish(permission)) npe(r);
@@ -637,10 +643,16 @@ export function createActivityApiHost(platform) {
   def(ACTIVITY, 'startNextMatchingActivity', `(${INTENT})Z`, () => 0);   // no other Activity of the app matches the same Intent filters as a caller-chosen alternative
   def(ACTIVITY, 'startNextMatchingActivity', `(${INTENT}${BUNDLE})Z`, () => 0);
   def(ACTIVITY, 'createPendingResult', `(I${INTENT}I)${PENDING}`, (r, _m, [self, requestCode, data, flags]) => platform.pendingIntents.createResult(r, self, requestCode, data, flags));
-  const noSender = () => unsupported('IntentSender-based starts are not modelled: the virtual device has no system service to resolve the sender', 'intent-sender-unsupported');
-  for (const sig of [`(${SENDER}I${INTENT}III)V`, `(${SENDER}I${INTENT}III${BUNDLE})V`]) def(ACTIVITY, 'startIntentSenderForResult', sig, noSender);
-  for (const sig of [`(${ACTIVITY}${SENDER}I${INTENT}III)V`, `(${ACTIVITY}${SENDER}I${INTENT}III${BUNDLE})V`]) def(ACTIVITY, 'startIntentSenderFromChild', sig, noSender);
-  for (const owner of [CONTEXT, WRAPPER, IMPL]) { for (const sig of [`(${SENDER}${INTENT}III)V`, `(${SENDER}${INTENT}III${BUNDLE})V`]) def(owner, 'startIntentSender', sig, noSender); }
+  // IntentSender starts (ActivityTaskManagerService.startActivityIntentSender -> PendingIntentRecord.sendInner): the PendingIntent's stored Intent is started as the package that created
+  // it, from the calling Activity (its task, and its onActivityResult for a request code >= 0); a PendingIntent of another kind is sent. An IntentSender the device did not create
+  // (none exists without a PendingIntent) fails explicitly.
+  const startSender = (r, self, sender, requestCode, fillIn, flagsMask, flagsValues, fromActivity) => {
+    if (nullish(sender)) npe(r);
+    platform.pendingIntents.startIntentSender(r, sender, { caller: self, requestCode: fromActivity ? requestCode | 0 : -1, fillIn: nullish(fillIn) ? null : fillIn, flagsMask: flagsMask | 0, flagsValues: flagsValues | 0, fromActivity });
+  };
+  for (const sig of [`(${SENDER}I${INTENT}III)V`, `(${SENDER}I${INTENT}III${BUNDLE})V`]) def(ACTIVITY, 'startIntentSenderForResult', sig, (r, _m, [self, sender, requestCode, fillIn, flagsMask, flagsValues]) => startSender(r, self, sender, requestCode, fillIn, flagsMask, flagsValues, true));
+  for (const sig of [`(${ACTIVITY}${SENDER}I${INTENT}III)V`, `(${ACTIVITY}${SENDER}I${INTENT}III${BUNDLE})V`]) def(ACTIVITY, 'startIntentSenderFromChild', sig, (r, _m, [self, , sender, requestCode, fillIn, flagsMask, flagsValues]) => startSender(r, self, sender, requestCode, fillIn, flagsMask, flagsValues, true));
+  for (const owner of [CONTEXT, WRAPPER, IMPL]) { for (const sig of [`(${SENDER}${INTENT}III)V`, `(${SENDER}${INTENT}III${BUNDLE})V`]) def(owner, 'startIntentSender', sig, (r, _m, [self, sender, fillIn, flagsMask, flagsValues]) => startSender(r, self, sender, -1, fillIn, flagsMask, flagsValues, platform.isActivityContext(r, self))); }
 
   // ---- Context methods an Activity inherits ---------------------------------------------------------------------------------------------------------------------------------------------------
   const defContext = (name, signature, fn, options) => { for (const owner of [CONTEXT, WRAPPER, IMPL]) def(owner, name, signature, fn, options); };

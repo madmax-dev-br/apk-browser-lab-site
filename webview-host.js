@@ -1,7 +1,8 @@
-import { gcRoot } from './heap-gc.js?v=d509c7905654';
-import { createHostRegistry, floatBits, doubleBits } from './host-contract.js?v=d509c7905654';
-import { isInterfaceName } from './webview-bridge.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { gcRoot } from './heap-gc.js?v=3e71109809bc';
+import { createHostRegistry, floatBits, doubleBits, bitsFloat, bitsDouble } from './host-contract.js?v=3e71109809bc';
+import { isInterfaceName } from './webview-bridge.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { Invoke } from './interpreter.js?v=3e71109809bc';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -115,6 +116,8 @@ export function createWebViewHost(platform) {
     const [self] = args, o = r.object(self);
     r.dispatch({ owner: VIEW_GROUP, name: '<init>', parameters, result: 'V', signature: `(${parameters.join('')})V` }, [self, ...args.slice(1, 1 + parameters.length)], 'direct');   // View state, context, attributes
     o.webview = newState(); o.webview.id = nextId++;
+    // the package whose process this WebView lives in (its Context's package): its cookie jar and its JavaBridge thread are that package's
+    o.webview.packageName = (platform.packages?.multi ? platform.packages.contextEntry(r, args[1])?.name : null) ?? platform.packageName ?? '';
     o.background = '#ffffffff';   // a WebView paints its page; before one loads it is the default white
     o.clickable ??= false;
   };
@@ -536,9 +539,59 @@ export function createWebViewHost(platform) {
     const candidates = interfaceMethods(r, object).filter(m => m.name === method && m.parameters.length === args.length);
     if (!candidates.length) return { called: false };
     const target = candidates[0];
-    try { r.dispatch(target, r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(r, p, args[i])), { receiver: object }), 'virtual'); }
+    let value;
+    try { value = r.dispatch(target, r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(r, p, args[i])), { receiver: object }), 'virtual'); }
     catch (error) { if (error?.name === 'JavaException') return { called: true, result: target.result, error: r.object(error.value).type }; throw error; }
-    return { called: true, result: target.result };
+    return { called: true, result: target.result, value };
+  };
+  /**
+   * What a page receives for an interface method's return value (Chromium's Java bridge): primitives as numbers and booleans, a String as text, null as null; `void` is undefined.
+   * { value } or { object: true } for any other object (Chromium would hand the page a new injected object; the lab does not) -- the caller reports that and the page gets undefined.
+   */
+  const returnValue = (r, type, value) => {
+    switch (type) {
+      case 'V': return { undefined: true };
+      case 'Z': return { value: !!value };
+      case 'B': case 'S': case 'I': case 'C': return { value: Number(value) };
+      case 'J': return { value: Number(BigInt.asIntN(64, BigInt(value ?? 0))) };
+      case 'F': return { value: bitsFloat(Number(value ?? 0)) };
+      case 'D': return { value: bitsDouble(value ?? 0n) };
+      case STRING: return { value: isNull(value) ? null : typeof value === 'string' ? value : r.stringCharacters(value) };
+      default: return isNull(value) ? { value: null } : { object: true };
+    }
+  };
+  // ---- the JavaBridge thread: @JavascriptInterface methods run off the UI thread, one call at a time, on a thread named "JavaBridge" (Chromium's JavaBridgeThread) ---------------------
+  // The method is entered as an ordinary frame of that thread (the host Runnable hands the call to the interpreter), so a method that blocks (network, a lock, a latch) parks the
+  // thread as it would on Android, while the page waits for it.
+  const BRIDGE_CALL = 'Llab/webkit/LabJavaBridgeCall;';
+  type(BRIDGE_CALL, OBJECT, ['Ljava/lang/Runnable;'], { allocatable: true });
+  def(BRIDGE_CALL, 'run', '()V', (r, _m, [self]) => {
+    const o = r.object(self), job = o.job; o.job = null;
+    const finish = outcome => { o.held = null; const release = o.release; o.release = null; try { job?.done?.(outcome); } finally { release?.(); } };
+    if (!job) { finish(null); return undefined; }
+    const target = job.object === undefined ? null : interfaceMethods(r, job.object).find(m => m.name === job.method && m.parameters.length === job.args.length);
+    if (job.object !== undefined && !target) { finish({ called: false }); return undefined; }
+    if (!target) { finish(null); return undefined; }
+    const words = r.argumentWords(target.parameters, target.parameters.map((p, i) => coerce(r, p, job.args[i])), { receiver: job.object });
+    return new Invoke(target, words, 'virtual', value => { finish({ called: true, result: target.result, value }); return undefined; }, error => {
+      if (error?.name === 'JavaException') { finish({ called: true, result: target.result, error: r.object(error.value).type }); return undefined; }
+      finish({ called: true, result: target.result, error: 'Ljava/lang/Error;' }); throw error;
+    });
+  });
+  const bridgeCalls = gcRoot([]); let bridgeBusy = false;   // calls waiting for the thread keep their Java values alive
+  /** Calls `job.method(job.args)` of interface `job.object` on a "JavaBridge" thread after the calls queued before it; `job.done(outcome)` gets { called, result, value } or { error }. */
+  const javaBridge = (r, job, roots = []) => { bridgeCalls.push({ job, roots: roots.filter(ref => !isNull(ref)) }); pumpBridge(r); };
+  const pumpBridge = r => {
+    if (bridgeBusy || !bridgeCalls.length) return;
+    bridgeBusy = true; const { job, roots } = bridgeCalls.shift();
+    postMain(r, () => {
+      if (job.skip?.()) { bridgeBusy = false; pumpBridge(r); return; }
+      const runnable = r.allocate(BRIDGE_CALL), o = r.object(runnable);
+      o.job = job; o.held = roots; o.release = () => { bridgeBusy = false; pumpBridge(r); platform.onExternalActivity?.(); };
+      const thread = r.allocate('Ljava/lang/Thread;');
+      r.dispatch({ owner: 'Ljava/lang/Thread;', name: '<init>', parameters: ['Ljava/lang/Runnable;', STRING], result: 'V', signature: '(Ljava/lang/Runnable;Ljava/lang/String;)V' }, [thread, runnable, 'JavaBridge'], 'direct');
+      call(r, thread, 'Ljava/lang/Thread;', 'start', [], 'V', []);
+    }, roots);
   };
   const consoleMessage = (r, text, source, line, name) => {
     const ref = r.allocate(CONSOLE);
@@ -637,6 +690,6 @@ export function createWebViewHost(platform) {
         document: !s.bridge || s.bridge.blank ? 'blank' : s.bridge.scriptable ? 'scriptable' : 'opaque' };
     },
     /** For the backend (phase 1): state access and the Android callbacks it triggers. */
-    internals: { geolocationPrompt, permissionRequest, fileChooser, unsupported, interfaceDescriptors, interfaceMethods, invokeInterface, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call, overridesIntercept, intercept },
+    internals: { geolocationPrompt, permissionRequest, fileChooser, unsupported, interfaceDescriptors, interfaceMethods, invokeInterface, returnValue, javaBridge, consoleMessage, jsResult, stateOf, postMain, clientCall, chromeCall, requestObject, errorObject, pushHistory, failLoad, settingsOf, setting, levelValue, uriOf, historyItem, unavailable, staticCall, call, overridesIntercept, intercept },
   };
 }

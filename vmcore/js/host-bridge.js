@@ -62,22 +62,22 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=d509c7905654';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=d509c7905654';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=d509c7905654';
-import { HandleTable } from './handles.js?v=d509c7905654';
-import { Exceptions } from './exceptions.js?v=d509c7905654';
-import { coreImports } from './boundary-imports.js?v=d509c7905654';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=d509c7905654';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=d509c7905654';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=d509c7905654';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=d509c7905654';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=d509c7905654';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d509c7905654';
-import { Blocked } from '../../runtime/scheduler.js?v=d509c7905654';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=d509c7905654';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=d509c7905654';
-import { PaintRecords } from './paint-record.js?v=d509c7905654';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=3e71109809bc';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=3e71109809bc';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=3e71109809bc';
+import { HandleTable } from './handles.js?v=3e71109809bc';
+import { Exceptions } from './exceptions.js?v=3e71109809bc';
+import { coreImports } from './boundary-imports.js?v=3e71109809bc';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=3e71109809bc';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=3e71109809bc';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=3e71109809bc';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=3e71109809bc';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=3e71109809bc';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=3e71109809bc';
+import { Blocked } from '../../runtime/scheduler.js?v=3e71109809bc';
+import { CoreThreads, CORE_STATUS } from './core-threads.js?v=3e71109809bc';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=3e71109809bc';
+import { PaintRecords } from './paint-record.js?v=3e71109809bc';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -194,9 +194,24 @@ export class WasmEngine {
   }
   /** The record whose body runs for `method`: its own, or the twin of a routed one (same DEX code, its own copy linked on first call; not in its class's method table). */
   bodyInfo(method) {
+    const hookBody = method.dex?.hookBody;   // a smali body a plugin wrote (src/method-hooks.js): a record of its own over the hook's DEX
+    if (hookBody !== undefined) return this.hookBodyInfo(method, hookBody);
     const mi = this.methodInfo(method);
     if (mi === null || mi.routed !== true) return mi;
     return mi.routedBody ??= this.linker.newMethod(mi.owner, mi.name, mi.nameSig.slice(mi.name.length), { def: mi.def, accessFlags: mi.accessFlags, kind: METHOD_KIND_UNLINKED, flags: mi.flags, registers: mi.registers, ins: mi.ins, vtableIndex: this.r32(mi.address + METHOD.vtableIndex) });
+  }
+  /**
+   * The record of a smali body (lab.hook { smali }): a twin of the hooked method's record whose definition is the hook's (`body.def`: the hook DEX's method id and code item), linked
+   * on its first call like any DEX method (the linker reads the code and resolves its constants through that DEX). The hooked method's own record stays routed to the host, whose
+   * dispatch hands this body back (HOST_FRAME); removing the hook unroutes it, and the original code runs again. One twin per hook body.
+   */
+  hookBodyInfo(method, body) {
+    const known = (this.hookBodies ??= new WeakMap()).get(body); if (known !== undefined) return known;
+    const original = this.methodInfo(method); if (original === null) return null;
+    const code = body.def.code;
+    const mi = this.linker.newMethod(original.owner, original.name, original.nameSig.slice(original.name.length), { def: body.def, accessFlags: original.accessFlags, kind: METHOD_KIND_UNLINKED, flags: original.flags,
+      registers: code.registers, ins: code.incoming, vtableIndex: this.r32(original.address + METHOD.vtableIndex) });
+    this.hookBodies.set(body, mi); return mi;
   }
 
   async instantiate(module) {

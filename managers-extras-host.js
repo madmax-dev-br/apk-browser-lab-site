@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -197,12 +197,36 @@ export function createManagersExtrasHost(platform) {
   ];
   const resultFor = { addAccount: B, getAuthToken: B, getAuthTokenByFeatures: B, confirmCredentials: B, updateCredentials: B, editProperties: B, hasFeatures: 'Ljava/lang/Boolean;', getAuthTokenLabel: STRING, isCredentialsUpdateSuggested: 'Ljava/lang/Boolean;' };
   void resultFor;
+  // With an authenticator installed for the type (src/account-store.js), getAuthToken answers the token it cached (setAuthToken) to its own packages when it does not declare
+  // customTokens, as AccountManagerService does before binding it; every request that would have to call the authenticator fails by name: the framework classes behind
+  // IAccountAuthenticator are not part of the lab, so the device cannot call one.
+  const accountField = (r, account, field) => { const value = r.readInstanceField?.(account, `${ACCOUNT}->${field}:Ljava/lang/String;`) ?? r.object(account).fields?.get(`${ACCOUNT}->${field}:Ljava/lang/String;`); return nullish(value) ? null : r.stringCharacters(value); };
+  const cannotCall = (r, auth, what) => {
+    r.record(`ACCOUNTS ${what}: the account authenticator ${auth.packageName}/${auth.service} would have to be called, which the device cannot do (android.accounts.AbstractAccountAuthenticator, AccountAuthenticatorResponse and IAccountAuthenticator are not in the lab's framework)`);
+    return { error: `the account authenticator ${auth.packageName}/${auth.service} cannot be called on this device: android.accounts.AbstractAccountAuthenticator and IAccountAuthenticator are not in the lab's framework` };
+  };
+  const outcomeOf = (r, name, args) => {
+    const store = platform.accountStore?.(); if (!store) return bindFailure;
+    const type = name === 'addAccount' || name === 'editProperties' || name === 'getAuthTokenLabel' || name === 'getAuthTokenByFeatures' ? r.stringCharacters(args[0]) : accountField(r, args[0], 'type');
+    const auth = store.authenticatorFor(type); if (!auth) return bindFailure;
+    if (name === 'getAuthToken') {
+      const accountName = accountField(r, args[0], 'name'), tokenType = r.stringCharacters(args[1]), stored = store.find(accountName, type);
+      const caller = (platform.packages?.multi ? platform.packages.callingIdentity(r).entry : null) ?? platform.packages?.main ?? { name: platform.packageName };
+      if (stored && !auth.customTokens && store.owns(caller.name, type) && stored.tokens.has(tokenType)) {
+        const bundle = emptyBundle(r);
+        for (const [key, value] of [['authAccount', accountName], ['accountType', type], ['authtoken', stored.tokens.get(tokenType)]]) call(r, bundle, 'Landroid/os/Bundle;', 'putString', ['Ljava/lang/String;', 'Ljava/lang/String;'], 'V', [key, value]);
+        return { value: bundle };
+      }
+      return cannotCall(r, auth, `getAuthToken for an account of type ${type}${stored ? '' : ' that does not exist'}`);
+    }
+    return cannotCall(r, auth, `${name} for type ${type}`);
+  };
   for (const [name, parameters, checks] of request) {
     const shape = parameters.match(/\[?L[^;]+;|[ZIJ]/g);
     def(ACCOUNTS, name, `(${parameters})${FUTURE_I}`, (r, _m, [, ...args]) => {
       for (const [index, message] of checks) if (nullish(args[index])) iae(r, message);
       if (name === 'isCredentialsUpdateSuggested' && r.stringCharacters(args[1]) === '') iae(r, 'status token is empty');
-      return newFuture(r, args[shape.length - 2], args[shape.length - 1], bindFailure);
+      return newFuture(r, args[shape.length - 2], args[shape.length - 1], outcomeOf(r, name, args));
     });
   }
   const accountTypeOf = (r, account) => r.stringCharacters(r.object(account).fields.get(`${ACCOUNT}->type:${STRING}`));

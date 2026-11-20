@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=d509c7905654") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=d509c7905654">
-  <link rel="stylesheet" href="./lab-theme.css?v=d509c7905654">
-  <meta name="apk-browser-build" content="d509c7905654">
+  <style>@import url("./styles.css?v=3e71109809bc") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=3e71109809bc">
+  <link rel="stylesheet" href="./lab-theme.css?v=3e71109809bc">
+  <meta name="apk-browser-build" content="3e71109809bc">
 </head>
 <body>
   <header class="topbar">
@@ -82,10 +82,16 @@
               <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
               <p id="dev-client-cert-status" class="cp-note" role="status"></p>
               <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay over its token-protected channel, only for these hosts, and live there in memory only. Other hosts never see them.</p>
-              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs a Google server, native code or a microG screen, ends in an explicit error. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+              <fieldset id="dev-microg-services" class="cp-microg-services">
+                <legend class="cp-subtitle">microG services</legend>
+                <p class="cp-note">Each switch is microG's own (the one its settings screen has) and is off by default. Turning one on lets microG's code talk to that service's servers, as on a phone with microG: the requests show in Network, the change is recorded in the trace and saved with these settings. Nothing is faked: a token, a registration or a license only comes from the real server. Contribution of location data and microG's other data-donation switches stay off and are not offered.</p>
+                <div id="dev-microg-service-list" class="cp-grid cp-microg-service-list"></div>
+                <p id="dev-microg-services-status" class="cp-note" role="status"></p>
+              </fieldset>
               <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
               <div id="dev-microg-entries" class="cp-microg-entries" hidden>
-                <p class="cp-note">Entry points of the functions the lab does not run (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). Without a mock, each call logs a "not implemented" failure and microG's locked body runs. To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
+                <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
                 <ul id="dev-microg-entry-list" class="cp-list"></ul>
               </div>
               <p id="dev-hosts-note" class="cp-note">With "Allow all hosts" on (default) any name can be reached, still subject to CORS on the server (or to a proxy of your own). Off, only the hosts in the list are reachable and, with no hosts in the list, every name fails as on an offline phone.</p>
@@ -228,7 +234,8 @@
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Execution)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Device; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Execution)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Device; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Method changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code> and Controls › Method returns). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
@@ -289,7 +296,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=d509c7905654"></script>
+  <script type="module" src="./app.js?v=3e71109809bc"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

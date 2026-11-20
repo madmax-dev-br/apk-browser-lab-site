@@ -2,7 +2,8 @@
 // (fixtures/play-services-probe.apk, tests/microg-option.test.mjs) checks on both engines. The page lists these rows in the Device section; the docs table follows the same list.
 //   works  : microG answers locally, as on a phone with this microG
 //   stub   : microG answers but does not implement it (or never answers); the device records it (DEVICE microG UNIMPLEMENTED, deviceOptions.microg.failures)
-//   fails  : ends in an explicit failure naming what is missing (a locked server feature, native code the device cannot run, or a microG screen the device does not open)
+//   fails  : ends in an explicit failure naming what is missing (native code the device cannot run, or a microG screen the device does not open)
+//   online : microG talks to a server for it once the user turns it on ("microG services", docs/MICROG.md section 10); off by microG's default it refuses explicitly
 export const MICROG_APIS = Object.freeze([
   { api: 'Availability (GoogleApiAvailability, makeGooglePlayServicesAvailable)', state: 'works', note: 'SUCCESS: microG and its Play Store with the fake-signature certificate' },
   { api: 'App Set ID', state: 'works', note: 'a local UUID, scope app' },
@@ -20,9 +21,10 @@ export const MICROG_APIS = Object.freeze([
   { api: 'Geofencing', state: 'stub', note: 'microG never answers addGeofences: the Task stays pending' },
   { api: 'Activity recognition, Sleep API, mock location, flushLocations', state: 'stub', note: 'microG answers SUCCESS and delivers nothing (flush never answers)' },
   { api: 'ProviderInstaller (security provider)', state: 'fails', note: 'returns without installing: microG\'s Conscrypt needs its ARM native library' },
-  { api: 'Push (FCM token), device registration (check-in)', state: 'fails', note: 'locked off: SERVICE_NOT_AVAILABLE ("Checkin disabled")' },
-  { api: 'SafetyNet, Play Integrity, DroidGuard', state: 'fails', note: 'locked off: explicit errors; DroidGuard code is never loaded' },
-  { api: 'Google account sign-in, licensing, billing', state: 'fails', note: 'locked off; microG\'s login and settings screens never open' },
+  { api: 'Push (FCM token, topics, incoming messages), device registration (check-in)', state: 'online', note: 'off by default: SERVICE_NOT_AVAILABLE ("Checkin disabled"); with Device registration and Cloud messaging on, microG registers with Google and the token reaches the app; incoming messages need the APK Lab Relay as the Proxy' },
+  { api: 'SafetyNet, Play Integrity, DroidGuard', state: 'online', note: 'off by default: explicit errors; Device attestation turns microG\'s switches on; DroidGuard\'s downloaded code is not loaded by the device' },
+  { api: 'Licensing, billing', state: 'online', note: 'off by default (no license answer; billing unavailable); turned on, they need a Google account, which cannot sign in yet ("No Google account found.")' },
+  { api: 'Google account sign-in', state: 'fails', note: 'microG\'s login screen does not open (Activities of a second package)' },
   { api: 'Face detection, document scanner, maps, Cronet', state: 'fails', note: 'need native code (OpenCV, VTM, Cronet) the device cannot run' },
 ]);
-export const MICROG_API_STATE_LABELS = Object.freeze({ works: 'works', stub: 'microG stub', fails: 'explicit failure' });
+export const MICROG_API_STATE_LABELS = Object.freeze({ works: 'works', stub: 'microG stub', fails: 'explicit failure', online: 'needs a server (off by default)' });

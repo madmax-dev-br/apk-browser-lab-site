@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
 
 // android.content.ContentResolver (android-13.0.0_r1 ContentResolver.java) and the default bodies of android.content.ContentProvider for the virtual device. The device has one package, so a
 // content authority resolves to a provider this app declares and installed at start (ActivityThread.installContentProviders); the ContentResolver calls it directly on the calling thread, which is what
@@ -55,6 +55,9 @@ export function createContentResolverApiHost(platform) {
     }
     return P.withCaller(r, caller, () => call(r, provider, PROVIDER, name, parameters, result, args));
   };
+  // A device policy over the values written to one provider (platform.providerWriteFilter(r, authority, uri, values) -> the values to write; src/microg-device.js guards microG's
+  // fixed settings this way, recording what it takes out). Without one, the values pass as they are.
+  const filterWrite = (r, uri, values) => platform.providerWriteFilter ? platform.providerWriteFilter(r, authorityOf(r, uri), uri, values) : values;
   const providerOf = (r, uri) => { if (nullish(uri)) npe(r, 'uri'); const authority = authorityOf(r, uri); return authority === null ? null : byAuthority(r, authority); };
   const unknown = (r, uri) => r.throwJava('Ljava/lang/IllegalArgumentException;', `Unknown URL ${uriText(r, uri)}`);
   const noProvider = (r, uri) => r.throwJava('Ljava/io/FileNotFoundException;', `No content provider: ${uriText(r, uri)}`);
@@ -76,7 +79,7 @@ export function createContentResolverApiHost(platform) {
   def(RESOLVER, 'getType', `(${URI})${STRING}`, (r, _m, [, uri]) => { const provider = providerOf(r, uri); return provider === null ? null : pcall(r, provider, 'getType', [URI], STRING, [uri]); });
   def(RESOLVER, 'getStreamTypes', `(${URI}${STRING})${STRINGS}`, (r, _m, [, uri, filter]) => { if (nullish(filter)) npe(r, 'mimeTypeFilter'); const p = providerOf(r, uri); return p === null ? null : pcall(r, p, 'getStreamTypes', [URI, STRING], STRINGS, [uri, filter]); });
   def(RESOLVER, 'insert', `(${URI}${VALUES})${URI}`, (r, _m, [self, uri, values]) => call(r, self, RESOLVER, 'insert', [URI, VALUES, BUNDLE], URI, [uri, values, null]));
-  def(RESOLVER, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'insert', [URI, VALUES, BUNDLE], URI, [uri, values, extras]); });
+  def(RESOLVER, 'insert', `(${URI}${VALUES}${BUNDLE})${URI}`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'insert', [URI, VALUES, BUNDLE], URI, [uri, filterWrite(r, uri, values), extras]); });
   def(RESOLVER, 'bulkInsert', `(${URI}[${VALUES})I`, (r, _m, [, uri, values]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'bulkInsert', [URI, `[${VALUES}`], 'I', [uri, values]); });
   def(RESOLVER, 'delete', `(${URI}${STRING}${STRINGS})I`, (r, _m, [self, uri, where, args]) => {
     const bundle = construct(r, BUNDLE, [], []); if (!nullish(where)) call(r, bundle, BUNDLE, 'putString', [STRING, STRING], 'V', ['android:query-arg-sql-selection', where]); if (!nullish(args)) call(r, bundle, BUNDLE, 'putStringArray', [STRING, STRINGS], 'V', ['android:query-arg-sql-selection-args', args]);
@@ -87,7 +90,7 @@ export function createContentResolverApiHost(platform) {
     const bundle = construct(r, BUNDLE, [], []); if (!nullish(where)) call(r, bundle, BUNDLE, 'putString', [STRING, STRING], 'V', ['android:query-arg-sql-selection', where]); if (!nullish(args)) call(r, bundle, BUNDLE, 'putStringArray', [STRING, STRINGS], 'V', ['android:query-arg-sql-selection-args', args]);
     return call(r, self, RESOLVER, 'update', [URI, VALUES, BUNDLE], 'I', [uri, values, bundle]);
   });
-  def(RESOLVER, 'update', `(${URI}${VALUES}${BUNDLE})I`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'update', [URI, VALUES, BUNDLE], 'I', [uri, values, extras]); });
+  def(RESOLVER, 'update', `(${URI}${VALUES}${BUNDLE})I`, (r, _m, [, uri, values, extras]) => { const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'update', [URI, VALUES, BUNDLE], 'I', [uri, filterWrite(r, uri, values), extras]); });
   def(RESOLVER, 'call', `(${URI}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, uri, method, arg, extras]) => { if (nullish(method)) npe(r, 'method'); const p = providerOf(r, uri); if (p === null) unknown(r, uri); return pcall(r, p, 'call', [STRING, STRING, STRING, BUNDLE], BUNDLE, [authorityOf(r, uri), method, arg, extras]); });
   def(RESOLVER, 'call', `(${STRING}${STRING}${STRING}${BUNDLE})${BUNDLE}`, (r, _m, [, authority, method, arg, extras]) => {
     if (nullish(authority)) npe(r, 'authority'); if (nullish(method)) npe(r, 'method');

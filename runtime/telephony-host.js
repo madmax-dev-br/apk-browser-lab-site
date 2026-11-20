@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
 
 // The rest of android.telephony for an offline phone with the emulator's SIM that device-state-host.js already declares (SIM ready, 310260, "Android", no radio cells):
 //   PhoneStateListener / TelephonyManager.listen              (TelephonyManager.listen -> TelephonyRegistry.listenWithEventList, android-13.0.0_r1)
@@ -163,6 +163,19 @@ export function createTelephonyHost(platform) {
   def(TM, 'getAllCellInfo', `()${LIST}`, r => {
     if (!holds(r, FINE) && !(targetSdk() < Q && holds(r, COARSE))) securityException(r, 'Not allowed to access cell info');
     return emptyList(r);
+  });
+  // TelephonyManager.requestCellInfoUpdate (API 29) and its abstract CellInfoCallback: PhoneInterfaceManager.requestCellInfoUpdate checks the caller's fine location (LocationAccessPolicy:
+  // a hard denial is the SecurityException below) and answers, later, through the caller's Executor: this phone has no radio cells, so onCellInfo gets an empty list. The permission is
+  // the calling package's (a second installed package asks with its own grants).
+  const CELL_INFO_CALLBACK = 'Landroid/telephony/TelephonyManager$CellInfoCallback;';
+  type(CELL_INFO_CALLBACK, OBJECT, [], { allocatable: true });
+  def(CELL_INFO_CALLBACK, '<init>', '()V', () => {}); def(CELL_INFO_CALLBACK, 'onError', '(ILjava/lang/Throwable;)V', () => {});
+  const callerHolds = (r, permission) => { const P = platform.packages, entry = P?.multi ? P.callerEntry(r) : null; return entry && !entry.main ? P.holds(r, entry, permission) : holds(r, permission); };
+  def(TM, 'requestCellInfoUpdate', `(${EXECUTOR}${CELL_INFO_CALLBACK})V`, (r, _m, [, executor, callback]) => {
+    if (!callerHolds(r, FINE)) securityException(r, 'Not allowed to access cell info');
+    if (executor === null || executor === 0 || callback === null || callback === 0) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const runnable = r.allocate(DELIVERY); r.object(runnable).task = () => call(r, callback, CELL_INFO_CALLBACK, 'onCellInfo', [LIST], 'V', [emptyList(r)]);
+    platform.queueTask(() => call(r, executor, EXECUTOR, 'execute', [RUNNABLE], 'V', [runnable]), 0, [executor, runnable, callback]);
   });
   // Device identifiers: TelephonyPermissions.checkCallingOrSelfReadDeviceIdentifiers. An ordinary app is refused from Q on; before Q READ_PHONE_STATE suffices and the value is null
   // because this phone has no radio identifiers to report.

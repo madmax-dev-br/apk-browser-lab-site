@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=d509c7905654';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=d509c7905654';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=3e71109809bc';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=3e71109809bc';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 export const PERMISSION_ICONS = {
@@ -100,6 +100,11 @@ export function createPermissionsPanel({ $, vm, location }) {
   function finish(item, choice) {
     const { request, index } = item;
     if (choice === null) { S.queue.shift(); vm.permissionResponse(request.id, null); showNext(); return; }   // dismissed: the VM treats it as a denial
+    if (item.ownConfig) {   // a second installed package asked from its own screen (the "With microG" option's packages): its own grants, never the app's panel state
+      item.ownConfig = answerDialog(item.ownConfig, request.manifest, request.dialogs[index], choice);
+      if (index + 1 < request.dialogs.length) item.index = index + 1; else { S.queue.shift(); vm.permissionResponse(request.id, item.ownConfig); }
+      showNext(); return;
+    }
     S.config = answerDialog(S.config, S.manifest, request.dialogs[index], choice);
     if (index + 1 < request.dialogs.length) item.index = index + 1;
     else { S.queue.shift(); vm.permissionResponse(request.id, S.config); }
@@ -107,6 +112,7 @@ export function createPermissionsPanel({ $, vm, location }) {
   }
   vm.onPermissionRequest = request => {
     if (!S.pkg) { vm.permissionResponse(request.id, null); return; }
+    if (request.package && request.package !== S.pkg && request.manifest) { S.queue.push({ request, index: 0, ownConfig: sanitizeConfig(request.config) }); showNext(); return; }   // another installed package's request: the dialog names it
     S.config = sanitizeConfig(request.config ?? S.config);   // the VM's copy is the newest (it may have counted a denial)
     S.queue.push({ request, index: 0 }); showNext();
   };

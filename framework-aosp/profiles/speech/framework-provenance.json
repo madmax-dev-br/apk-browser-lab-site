@@ -225,7 +225,7 @@
       }
     ]
   },
-  "requiresDefaultFrameworkSha256": "730bd9490c3ac5506afa53a97c22eaffb10036a57550321b2099ea0a4bd65218",
+  "requiresDefaultFrameworkSha256": "29dfc98aa8cc443ca39453e333fb8456899b65a1e197aa455b1e312684b21def",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original android.speech.tts client classes; the virtual device has no text-to-speech engine, so the original code finds none and reports ERROR as on such a device",
   "activationPolicy": "APK DEX references a type of android.speech.tts (or explicit loader option)",

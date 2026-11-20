@@ -1,6 +1,7 @@
-import { floatBits } from './host-contract.js?v=d509c7905654';
-import { gcRoot } from './heap-gc.js?v=d509c7905654';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=d509c7905654';
+import { floatBits } from './host-contract.js?v=3e71109809bc';
+import { gcRoot } from './heap-gc.js?v=3e71109809bc';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=3e71109809bc';
+import { createAccountStore } from './account-store.js?v=3e71109809bc';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -225,6 +226,9 @@ export function createSystemManagersHost(platform) {
   const adminCheck = (r, admin) => { if (!nullish(admin)) notAdmin(r, admin); };
   def(DPM, 'isAdminActive', `(${COMPONENT})Z`, (r, _m, [, admin]) => { if (nullish(admin)) npe(r); return 0; });
   def(DPM, 'getActiveAdmins', `()${LIST}`, () => null);
+  def(DPM, 'isOrganizationOwnedDeviceWithManagedProfile', '()Z', () => 0);
+  // getDeviceOwnerComponentOnAnyUser (@SystemApi): DevicePolicyManagerService.getDeviceOwnerComponent(false) checks canManageUsers or MANAGE_PROFILE_AND_DEVICE_OWNERS, which an installed app does not hold
+  def(DPM, 'getDeviceOwnerComponentOnAnyUser', '()Landroid/content/ComponentName;', r => r.throwJava('Ljava/lang/SecurityException;', 'Calling identity is not authorized'));   // API 30: no device or profile owner on this device
   def(DPM, 'isDeviceOwnerApp', `(${STRING})Z`, () => 0); def(DPM, 'isProfileOwnerApp', `(${STRING})Z`, () => 0);
   def(DPM, 'isDeviceManaged', '()Z', () => 0); def(DPM, 'isManagedProfile', `(${COMPONENT})Z`, (r, _m, [, admin]) => { adminCheck(r, admin); return 0; });
   def(DPM, 'isUsingUnifiedPassword', `(${COMPONENT})Z`, (r, _m, [, admin]) => { if (nullish(admin)) npe(r); notAdmin(r, admin); });
@@ -276,6 +280,12 @@ export function createSystemManagersHost(platform) {
   def(SUBSCRIPTION, 'isValidSubscriptionId', '(I)Z', (r, _m, [id]) => (id > -1 ? 1 : 0), { static: true });
   def(SUBSCRIPTION, 'getSlotIndex', '(I)I', () => -1, { static: true });
   def(SUBSCRIPTION, 'isNetworkRoaming', '(I)Z', () => 0);
+  // OnSubscriptionsChangedListener (a class the app extends): the constructor binds it to the caller's Looper and onSubscriptionsChanged() is an empty callback the app overrides.
+  // This device has no SIM, so the subscription list never changes and the service never calls it.
+  const SUB_LISTENER = 'Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;';
+  type(SUB_LISTENER, OBJECT, [], { allocatable: true });
+  def(SUB_LISTENER, '<init>', '()V', () => {});
+  def(SUB_LISTENER, 'onSubscriptionsChanged', '()V', () => {});
   def(SUBSCRIPTION, 'addOnSubscriptionsChangedListener', '(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   def(SUBSCRIPTION, 'removeOnSubscriptionsChangedListener', '(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) npe(r); });
   const CARRIER = service('carrier_config', 'Landroid/telephony/CarrierConfigManager;');
@@ -416,9 +426,35 @@ export function createSystemManagersHost(platform) {
   def(TELECOM, 'isInManagedCall', '()Z', r => { PHONE_STATE(r); return 0; });
   def(TELECOM, 'getDefaultDialerPackage', `()${STRING}`, () => null);
   def(TELECOM, 'getSystemDialerPackage', `()${STRING}`, () => null);
-  for (const name of ['getCallCapablePhoneAccounts', 'getSelfManagedPhoneAccounts', 'getAllPhoneAccounts']) def(TELECOM, name, '()Ljava/util/List;', r => { PHONE_STATE(r); return emptyList(r); });
+  // Phone accounts this app registers (TelecomServiceImpl.registerPhoneAccount + PhoneAccountRegistrar): the handle's ConnectionService must be this package's, declared with
+  // android:permission="android.permission.BIND_TELECOM_CONNECTION_SERVICE"; a self-managed account needs MANAGE_OWN_CALLS; SIM-subscription, connection-manager and multi-user
+  // accounts need MODIFY_PHONE_STATE, which an installed app never holds. A registered account is returned by getPhoneAccount to its owner and, when self-managed, listed by
+  // getSelfManagedPhoneAccounts; nothing else changes on the device (no SIM, no calls). Accounts that are not self-managed would also need the user to enable them: they are not call-capable.
+  const PHONE_ACCOUNT = 'Landroid/telecom/PhoneAccount;', PHONE_HANDLE = 'Landroid/telecom/PhoneAccountHandle;';
+  const phoneAccounts = new WeakMap(), accountsOf = r => phoneAccounts.get(r) ?? phoneAccounts.set(r, gcRoot(new Map())).get(r);
+  const handleKey = (r, handle) => { const component = call(r, handle, PHONE_HANDLE, 'getComponentName', [], COMPONENT); return { component, key: `${text(r, call(r, component, COMPONENT, 'flattenToString', [], STRING))}\u0000${text(r, call(r, handle, PHONE_HANDLE, 'getId', [], STRING))}` }; };
+  const ownHandle = (r, handle) => {
+    if (nullish(handle)) npe(r);
+    const { component, key } = handleKey(r, handle), pkg = text(r, call(r, component, COMPONENT, 'getPackageName', [], STRING));
+    if (pkg !== platform.packageName) r.throwJava('Ljava/lang/SecurityException;', `PhoneAccountHandle's ComponentName package ${pkg} does not belong to uid ${uid()}`);
+    return { component, key };
+  };
+  def(TELECOM, 'registerPhoneAccount', `(${PHONE_ACCOUNT})V`, (r, _m, [, account]) => {
+    if (nullish(account)) npe(r);
+    const handle = call(r, account, PHONE_ACCOUNT, 'getAccountHandle', [], PHONE_HANDLE), { component, key } = ownHandle(r, handle);
+    const capable = flag => call(r, account, PHONE_ACCOUNT, 'hasCapabilities', ['I'], 'Z', [flag]) !== 0, selfManaged = capable(0x800);
+    if (selfManaged && !holds(r, 'android.permission.MANAGE_OWN_CALLS')) r.throwJava('Ljava/lang/SecurityException;', 'Self-managed ConnectionServices require MANAGE_OWN_CALLS permission.');
+    if (capable(0x4) || capable(0x1) || capable(0x20)) r.throwJava('Ljava/lang/SecurityException;', 'Caller does not have android.permission.MODIFY_PHONE_STATE.');
+    const className = text(r, call(r, component, COMPONENT, 'getClassName', [], STRING));
+    const declared = (platform.manifest?.componentDetails ?? []).find(d => d.kind === 'service' && d.name === className);
+    if (declared?.permission !== 'android.permission.BIND_TELECOM_CONNECTION_SERVICE') r.throwJava('Ljava/lang/IllegalArgumentException;', 'PhoneAccount connection service requires BIND_TELECOM_CONNECTION_SERVICE permission.');
+    accountsOf(r).set(key, { handle, account, selfManaged }); r.record(`TELECOM registerPhoneAccount ${key.replace('\u0000', ' id=')}${selfManaged ? ' (self-managed)' : ''}`);
+  });
+  def(TELECOM, 'unregisterPhoneAccount', `(${PHONE_HANDLE})V`, (r, _m, [, handle]) => { const { key } = ownHandle(r, handle); accountsOf(r).delete(key); });
+  def(TELECOM, 'getSelfManagedPhoneAccounts', '()Ljava/util/List;', r => { PHONE_STATE(r); return listOf(r, [...accountsOf(r).values()].filter(a => a.selfManaged).map(a => a.handle)); });
+  for (const name of ['getCallCapablePhoneAccounts', 'getAllPhoneAccounts']) def(TELECOM, name, '()Ljava/util/List;', r => { PHONE_STATE(r); return emptyList(r); });
   def(TELECOM, 'getCallCapablePhoneAccounts', '(Z)Ljava/util/List;', r => { PHONE_STATE(r); return emptyList(r); });
-  def(TELECOM, 'getPhoneAccount', '(Landroid/telecom/PhoneAccountHandle;)Landroid/telecom/PhoneAccount;', (r, _m, [, handle]) => { if (nullish(handle)) npe(r); return null; });
+  def(TELECOM, 'getPhoneAccount', '(Landroid/telecom/PhoneAccountHandle;)Landroid/telecom/PhoneAccount;', (r, _m, [, handle]) => { if (nullish(handle)) npe(r); return accountsOf(r).get(handleKey(r, handle).key)?.account ?? null; });
   def(TELECOM, 'getDefaultOutgoingPhoneAccount', `(${STRING})Landroid/telecom/PhoneAccountHandle;`, () => null);
   def(TELECOM, 'getUserSelectedOutgoingPhoneAccount', '()Landroid/telecom/PhoneAccountHandle;', () => null);
   def(TELECOM, 'getSimCallManager', '()Landroid/telecom/PhoneAccountHandle;', () => null);
@@ -428,6 +464,33 @@ export function createSystemManagersHost(platform) {
   def(TELECOM, 'getVoiceMailNumber', `(Landroid/telecom/PhoneAccountHandle;)${STRING}`, r => { PHONE_STATE(r); return null; });
   def(TELECOM, 'isOutgoingCallPermitted', '(Landroid/telecom/PhoneAccountHandle;)Z', () => 0);
   def(TELECOM, 'isIncomingCallPermitted', '(Landroid/telecom/PhoneAccountHandle;)Z', () => 0);
+
+  // android.app.backup.BackupManager on a device without the backup service (ServiceManager.getService("backup") is null): checkServiceBinder() finds no service, so dataChanged()
+  // reaches nothing, as BackupManager does there; the call is recorded in the trace. Restore and transport APIs are not modelled and fail by name.
+  const BACKUP = 'Landroid/app/backup/BackupManager;';
+  type(BACKUP, OBJECT, [], { allocatable: true });
+  def(BACKUP, '<init>', '(Landroid/content/Context;)V', (r, _m, [self, context]) => { r.object(self).backupContext = context; });
+  def(BACKUP, 'dataChanged', '()V', r => { r.record(`BACKUP dataChanged ${platform.packageName} (no backup service on this device)`); });
+  def(BACKUP, 'dataChanged', `(${STRING})V`, (r, _m, [pkg]) => { r.record(`BACKUP dataChanged ${nullish(pkg) ? 'null' : text(r, pkg)} (no backup service on this device)`); }, { static: true });
+
+  // ---- android.media.metrics.MediaMetricsManager (API 31, service "media_metrics") -------------------------------------------------------------------
+  // createPlaybackSession / createRecordingSession return a session whose LogSessionId is a fresh id made as MediaMetricsManagerService.getSessionIdInternal does (12 random
+  // bytes, URL-safe Base64 without padding or wrap). The events a session reports (PlaybackMetrics, PlaybackStateEvent, PlaybackErrorEvent, NetworkEvent, TrackChangeEvent:
+  // original classes) go to the media metrics service of the device, which keeps them on the device; here each one is recorded in the trace and nothing leaves the lab.
+  const MEDIA_METRICS = service('media_metrics', 'Landroid/media/metrics/MediaMetricsManager;'), LOG_SESSION_ID = 'Landroid/media/metrics/LogSessionId;';
+  const newSessionId = r => {
+    const bytes = crypto.getRandomValues(new Uint8Array(12)), id = btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+    const logId = r.allocate(LOG_SESSION_ID); r.dispatch({ owner: LOG_SESSION_ID, name: '<init>', parameters: [STRING], result: 'V', signature: `(${STRING})V` }, [logId, id], 'direct'); return { id, logId };
+  };
+  for (const [kind, sessionType, reports] of [['Playback', 'Landroid/media/metrics/PlaybackSession;', ['PlaybackMetrics', 'PlaybackErrorEvent', 'NetworkEvent', 'PlaybackStateEvent', 'TrackChangeEvent']], ['Recording', 'Landroid/media/metrics/RecordingSession;', []]]) {
+    type(sessionType, OBJECT, ['Ljava/lang/AutoCloseable;'], { allocatable: true });
+    def(MEDIA_METRICS, `create${kind}Session`, `()${sessionType}`, r => { const session = r.allocate(sessionType), { id, logId } = newSessionId(r); Object.assign(r.object(session), { metricsSessionId: logId, metricsId: id, metricsClosed: false }); r.record(`MEDIA_METRICS create${kind}Session ${id}`); return session; });
+    def(sessionType, 'getSessionId', `()${LOG_SESSION_ID}`, (r, _m, [self]) => r.object(self).metricsSessionId);
+    def(sessionType, 'close', '()V', (r, _m, [self]) => { r.object(self).metricsClosed = true; });
+    def(sessionType, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => (other !== null && r.typeOf(other) === sessionType && r.object(other).metricsId === r.object(self).metricsId) ? 1 : 0);
+    def(sessionType, 'hashCode', '()I', (r, _m, [self]) => [...r.object(self).metricsId].reduce((h, c) => (Math.imul(h, 31) + c.charCodeAt(0)) | 0, 0));
+    for (const report of reports) def(sessionType, `report${report}`, `(Landroid/media/metrics/${report};)V`, (r, _m, [self, event]) => { if (nullish(event)) npe(r); r.record(`MEDIA_METRICS ${r.object(self).metricsId} report${report} (kept on the device)`); });
+  }
 
   const PERF_HINT = service('performance_hint', 'Landroid/os/PerformanceHintManager;');
   def(PERF_HINT, 'getPreferredUpdateRateNanos', '()J', () => -1n);
@@ -469,7 +532,7 @@ export function createSystemManagersHost(platform) {
     return null;   // PrintManager.print: "null on failure" -- the print service component is not available
   });
 
-  // ---- AccountManager: no authenticators, no accounts
+  // ---- AccountManager: the device's accounts and the authenticators its packages declare (src/account-store.js)
   const ACCOUNT_MANAGER = service('account', 'Landroid/accounts/AccountManager;'), AUTHENTICATOR = 'Landroid/accounts/AuthenticatorDescription;';
   strings(ACCOUNT_MANAGER, { KEY_ACCOUNT_NAME: 'authAccount', KEY_ACCOUNT_TYPE: 'accountType', KEY_AUTHTOKEN: 'authtoken', KEY_INTENT: 'intent', KEY_PASSWORD: 'password', KEY_ACCOUNTS: 'accounts', KEY_ERROR_CODE: 'errorCode', KEY_ERROR_MESSAGE: 'errorMessage',
     KEY_ANDROID_PACKAGE_NAME: 'androidPackageName', KEY_ACCOUNT_ACCESS_ID: 'accountAccessId', KEY_CALLER_UID: 'callerUid', KEY_CALLER_PID: 'callerPid', KEY_USERDATA: 'userdata', KEY_BOOLEAN_RESULT: 'booleanResult', KEY_LAST_AUTHENTICATED_TIME: 'lastAuthenticatedTime',
@@ -477,30 +540,85 @@ export function createSystemManagersHost(platform) {
   consts(ACCOUNT_MANAGER, { ERROR_CODE_REMOTE_EXCEPTION: 1, ERROR_CODE_NETWORK_ERROR: 3, ERROR_CODE_CANCELED: 4, ERROR_CODE_INVALID_RESPONSE: 5, ERROR_CODE_UNSUPPORTED_OPERATION: 6, ERROR_CODE_BAD_ARGUMENTS: 7, ERROR_CODE_BAD_REQUEST: 8, ERROR_CODE_BAD_AUTHENTICATION: 9,
     ERROR_CODE_USER_RESTRICTED: 100, ERROR_CODE_MANAGEMENT_DISABLED_FOR_ACCOUNT_TYPE: 101, VISIBILITY_UNDEFINED: 0, VISIBILITY_VISIBLE: 1, VISIBILITY_USER_MANAGED_VISIBLE: 2, VISIBILITY_NOT_VISIBLE: 3, VISIBILITY_USER_MANAGED_NOT_VISIBLE: 4 });
   def(ACCOUNT_MANAGER, 'get', `(${CONTEXT_T})Landroid/accounts/AccountManager;`, (r, _m, [context]) => { if (nullish(context)) npe(r, 'context is null'); return call(r, context, CONTEXT_T, 'getSystemService', [STRING], OBJECT, ['account']); }, { static: true });
-  def(ACCOUNT_MANAGER, 'getAccounts', `()[${ACCOUNT}`, r => array(r, ACCOUNT, []));
-  def(ACCOUNT_MANAGER, 'getAccountsByType', `(${STRING})[${ACCOUNT}`, r => array(r, ACCOUNT, []));
-  def(ACCOUNT_MANAGER, 'getAccountsByTypeForPackage', `(${STRING}${STRING})[${ACCOUNT}`, (r, _m, [, , packageName]) => { requireText(r, packageName, 'packageName'); return array(r, ACCOUNT, []); });
+  const LISTENER = 'Landroid/accounts/OnAccountsUpdateListener;';
+  /** The package a call comes from (Binder.getCallingUid of AccountManagerService): a companion's code on the stack (or its transaction) is that companion, else the app. */
+  let lastRuntime = null;
+  const callerEntry = r => (lastRuntime = r, platform.packages?.multi ? platform.packages.callingIdentity(r).entry : null) ?? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true };
+  const gcListeners = gcRoot(new Set());   // the registered listeners stay alive while registered, as the service holds them
+  const accounts = () => platform.accounts ??= createAccountStore({
+    packages: () => [{ entry: platform.packages?.main ?? { name: pkg(), manifest: platform.manifest }, environment: () => platform.resources },
+      ...(platform.packages?.companions?.() ?? []).map(entry => ({ entry, environment: () => platform.packages.resourcesEnvironment(entry) }))],
+    sameSigners: (a, b) => { const registry = platform.packages, x = registry?.byName?.(a), y = registry?.byName?.(b); try { return !!(x && y && registry.sameSigners?.(lastRuntime, x, y)); } catch { return false; } },
+    record: line => lastRuntime?.record?.(line) });
+  platform.accountStore = accounts;
+  const field = (r, account, name) => { const value = r.readInstanceField?.(account, `${ACCOUNT}->${name}:${STRING}`) ?? r.object(account).fields?.get(`${ACCOUNT}->${name}:${STRING}`); return nullish(value) ? null : text(r, value); };
+  const accountOf = (r, account) => { if (nullish(account)) iae(r, 'account is null'); return { name: field(r, account, 'name'), type: field(r, account, 'type') }; };
+  const newAccount = (r, a) => construct(r, ACCOUNT, [STRING, STRING], [a.name, a.type]);
+  const callerOptions = (r, entry) => ({ targetSdk: Number(entry.manifest?.usesSdk?.targetSdkVersion ?? platform.targetSdk ?? 33), getAccounts: entry.main !== false && holds(r, 'android.permission.GET_ACCOUNTS'), privileged: entry.main !== false && holds(r, 'android.permission.GET_ACCOUNTS_PRIVILEGED') });
+  const visibleAccounts = (r, type = null, packageName = null) => {
+    const entry = packageName ? (platform.packages?.byName?.(packageName) ?? callerEntry(r)) : callerEntry(r);
+    return accounts().accounts.filter(a => (type === null || a.type === type) && accounts().visibleTo(a, entry.name, callerOptions(r, entry)));
+  };
+  /** The authenticator's packages only: "uid N cannot <verb> accounts of type: T", the service's SecurityException. */
+  const ownerOnly = (r, a, verb) => { const entry = callerEntry(r); if (!accounts().owns(entry.name, a.type)) denied(r, `uid ${entry.uid ?? uid()} cannot ${verb} accounts of type: ${a.type ?? ''}`); return entry; };
+  const changed = r => {   // LOGIN_ACCOUNTS_CHANGED: the registered OnAccountsUpdateListeners hear the accounts they may see, on the main Looper
+    for (const { listener, type, owner } of accounts().listeners) {
+      platform.queueTask(() => { const list = accounts().accounts.filter(a => (type === null || type.includes(a.type)) && accounts().visibleTo(a, owner.name, callerOptions(r, owner))); call(r, listener, LISTENER, 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, list.map(a => newAccount(r, a)))]); }, 0, [listener]);
+    }
+  };
+  def(ACCOUNT_MANAGER, 'getAccounts', `()[${ACCOUNT}`, r => array(r, ACCOUNT, visibleAccounts(r).map(a => newAccount(r, a))));
+  def(ACCOUNT_MANAGER, 'getAccountsByType', `(${STRING})[${ACCOUNT}`, (r, _m, [, type]) => array(r, ACCOUNT, visibleAccounts(r, nullish(type) ? null : text(r, type)).map(a => newAccount(r, a))));
+  def(ACCOUNT_MANAGER, 'getAccountsByTypeForPackage', `(${STRING}${STRING})[${ACCOUNT}`, (r, _m, [, type, packageName]) => { const name = requireText(r, packageName, 'packageName'); return array(r, ACCOUNT, visibleAccounts(r, nullish(type) ? null : text(r, type), name).map(a => newAccount(r, a))); });
   def(ACCOUNT_MANAGER, 'getAuthenticatorTypes', `()[${AUTHENTICATOR}`, r => array(r, AUTHENTICATOR, []));
-  const accountType = (r, account) => { if (nullish(account)) npe(r, 'account is null'); return text(r, call(r, account, ACCOUNT, 'toString', [], STRING)); };
-  const notManaged = (r, account, verb) => denied(r, `uid ${uid()} cannot ${verb} accounts of type: ${text(r, r.dispatch({ owner: ACCOUNT, name: 'hashCode', parameters: [], result: 'I', signature: '()I' }, [account], 'virtual') === 0 ? '' : accountTypeOf(r, account))}`);
-  const accountTypeOf = (r, account) => text(r, r.readInstanceField?.(account, `${ACCOUNT}->type:${STRING}`) ?? r.object(account).fields.get(`${ACCOUNT}->type:${STRING}`));
-  def(ACCOUNT_MANAGER, 'addAccountExplicitly', `(${ACCOUNT}${STRING}${BUNDLE})Z`, (r, _m, [, account]) => { accountType(r, account); notManaged(r, account, 'explicitly add'); });
-  def(ACCOUNT_MANAGER, 'removeAccountExplicitly', `(${ACCOUNT})Z`, (r, _m, [, account]) => { accountType(r, account); notManaged(r, account, 'explicitly remove'); });
-  def(ACCOUNT_MANAGER, 'getPassword', `(${ACCOUNT})${STRING}`, (r, _m, [, account]) => { accountType(r, account); notManaged(r, account, 'get secrets for'); });
-  def(ACCOUNT_MANAGER, 'getUserData', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, key]) => { accountType(r, account); if (nullish(key)) npe(r, 'key is null'); notManaged(r, account, 'get user data for'); });
-  def(ACCOUNT_MANAGER, 'setPassword', `(${ACCOUNT}${STRING})V`, (r, _m, [, account]) => { accountType(r, account); notManaged(r, account, 'set secrets for'); });
-  def(ACCOUNT_MANAGER, 'setUserData', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, key]) => { accountType(r, account); if (nullish(key)) npe(r, 'key is null'); notManaged(r, account, 'set user data for'); });
-  def(ACCOUNT_MANAGER, 'peekAuthToken', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, tokenType]) => { accountType(r, account); if (nullish(tokenType)) npe(r, 'authTokenType is null'); notManaged(r, account, 'get secrets for'); });
-  def(ACCOUNT_MANAGER, 'invalidateAuthToken', `(${STRING}${STRING})V`, (r, _m, [, type]) => { if (nullish(type)) npe(r, 'accountType is null'); });
-  def(ACCOUNT_MANAGER, 'addOnAccountsUpdatedListener', `(Landroid/accounts/OnAccountsUpdateListener;${HANDLER}Z)V`, (r, _m, [, listener, , immediately]) => {
-    if (nullish(listener)) iae(r, 'the listener is null');
-    if (immediately === 1) platform.queueTask(() => call(r, listener, 'Landroid/accounts/OnAccountsUpdateListener;', 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, [])]), 0, [listener]);
+  const known = (r, a) => accounts().find(a.name, a.type);
+  def(ACCOUNT_MANAGER, 'addAccountExplicitly', `(${ACCOUNT}${STRING}${BUNDLE})Z`, (r, _m, [, account, password, extras]) => {
+    const a = accountOf(r, account); ownerOnly(r, a, 'explicitly add');
+    const data = new Map();
+    if (!nullish(extras)) { const keys = call(r, call(r, extras, BUNDLE, 'keySet', [], 'Ljava/util/Set;'), 'Ljava/util/Set;', 'toArray', [], `[${OBJECT}`); for (const key of r.array(keys).elements) { const value = call(r, extras, BUNDLE, 'getString', [STRING], STRING, [key]); data.set(text(r, key), nullish(value) ? null : text(r, value)); } }
+    if (!a.name || !a.type || !accounts().add(a.name, a.type, nullish(password) ? null : text(r, password), data)) return 0;
+    r.record(`ACCOUNTS added an account of type ${a.type} (authenticator ${accounts().authenticatorFor(a.type)?.packageName})`);
+    changed(r); return 1;
   });
-  def(ACCOUNT_MANAGER, 'addOnAccountsUpdatedListener', `(Landroid/accounts/OnAccountsUpdateListener;${HANDLER}Z[${STRING})V`, (r, _m, [, listener, , immediately]) => {
-    if (nullish(listener)) iae(r, 'the listener is null');
-    if (immediately === 1) platform.queueTask(() => call(r, listener, 'Landroid/accounts/OnAccountsUpdateListener;', 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, [])]), 0, [listener]);
+  def(ACCOUNT_MANAGER, 'removeAccountExplicitly', `(${ACCOUNT})Z`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'explicitly remove'); const removed = accounts().remove(a.name, a.type); if (removed) changed(r); return removed ? 1 : 0; });
+  def(ACCOUNT_MANAGER, 'getPassword', `(${ACCOUNT})${STRING}`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'get secrets for'); return known(r, a)?.password ?? null; });
+  def(ACCOUNT_MANAGER, 'setPassword', `(${ACCOUNT}${STRING})V`, (r, _m, [, account, password]) => { const a = accountOf(r, account); ownerOnly(r, a, 'set secrets for'); const stored = known(r, a); if (stored) { stored.password = nullish(password) ? null : text(r, password); stored.tokens.clear(); } });
+  def(ACCOUNT_MANAGER, 'clearPassword', `(${ACCOUNT})V`, (r, _m, [, account]) => { const a = accountOf(r, account); ownerOnly(r, a, 'clear passwords for'); const stored = known(r, a); if (stored) { stored.password = null; stored.tokens.clear(); } });
+  def(ACCOUNT_MANAGER, 'getUserData', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, key]) => { const a = accountOf(r, account); if (nullish(key)) iae(r, 'key is null'); ownerOnly(r, a, 'get user data for'); return known(r, a)?.userData.get(text(r, key)) ?? null; });
+  def(ACCOUNT_MANAGER, 'setUserData', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, key, value]) => { const a = accountOf(r, account); if (nullish(key)) iae(r, 'key is null'); ownerOnly(r, a, 'set user data for'); const stored = known(r, a); if (stored) { if (nullish(value)) stored.userData.delete(text(r, key)); else stored.userData.set(text(r, key), text(r, value)); } });
+  def(ACCOUNT_MANAGER, 'peekAuthToken', `(${ACCOUNT}${STRING})${STRING}`, (r, _m, [, account, tokenType]) => { const a = accountOf(r, account); if (nullish(tokenType)) iae(r, 'authTokenType is null'); ownerOnly(r, a, 'peek authtokens of'); return known(r, a)?.tokens.get(text(r, tokenType)) ?? null; });
+  def(ACCOUNT_MANAGER, 'setAuthToken', `(${ACCOUNT}${STRING}${STRING})V`, (r, _m, [, account, tokenType, token]) => { const a = accountOf(r, account); if (nullish(tokenType)) iae(r, 'authTokenType is null'); ownerOnly(r, a, 'set authtokens for'); const stored = known(r, a); if (stored) { if (nullish(token)) stored.tokens.delete(text(r, tokenType)); else stored.tokens.set(text(r, tokenType), text(r, token)); } });
+  def(ACCOUNT_MANAGER, 'invalidateAuthToken', `(${STRING}${STRING})V`, (r, _m, [, type, token]) => {
+    if (nullish(type)) iae(r, 'accountType is null');
+    if (nullish(token)) return;
+    const kind = text(r, type), value = text(r, token);
+    for (const stored of accounts().accounts) if (stored.type === kind) for (const [name, cached] of [...stored.tokens]) if (cached === value) stored.tokens.delete(name);
   });
-  def(ACCOUNT_MANAGER, 'removeOnAccountsUpdatedListener', '(Landroid/accounts/OnAccountsUpdateListener;)V', (r, _m, [, listener]) => { if (nullish(listener)) iae(r, 'listener is null'); });
+  def(ACCOUNT_MANAGER, 'setAccountVisibility', `(${ACCOUNT}${STRING}I)Z`, (r, _m, [, account, packageName, visibility]) => { const a = accountOf(r, account); const name = requireText(r, packageName, 'packageName'); ownerOnly(r, a, 'set visibility of'); const stored = known(r, a); if (!stored) return 0; stored.visibility.set(name, visibility | 0); changed(r); return 1; });
+  def(ACCOUNT_MANAGER, 'getAccountVisibility', `(${ACCOUNT}${STRING})I`, (r, _m, [, account, packageName]) => {
+    const a = accountOf(r, account), name = requireText(r, packageName, 'packageName'), entry = callerEntry(r);
+    if (entry.name !== name) ownerOnly(r, a, 'get visibility of');
+    const stored = known(r, a); if (!stored) return 0;
+    if (name.startsWith('android:accounts:')) return stored.visibility.get(name) ?? 0;
+    const target = platform.packages?.byName?.(name) ?? entry;
+    return accounts().visibleTo(stored, name, callerOptions(r, target)) ? (stored.visibility.get(name) === 2 ? 2 : 1) : (stored.visibility.get(name) === 4 ? 4 : 3);
+  });
+  def(ACCOUNT_MANAGER, 'addOnAccountsUpdatedListener', `(${LISTENER}${HANDLER}Z)V`, (r, _m, [, listener, , immediately]) => {
+    if (nullish(listener)) iae(r, 'the listener is null');
+    const owner = callerEntry(r); accounts().listeners.push({ listener, type: null, owner }); gcListeners.add(listener);
+    if (immediately === 1) platform.queueTask(() => call(r, listener, LISTENER, 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, visibleAccounts(r).map(a => newAccount(r, a)))]), 0, [listener]);
+  });
+  def(ACCOUNT_MANAGER, 'addOnAccountsUpdatedListener', `(${LISTENER}${HANDLER}Z[${STRING})V`, (r, _m, [, listener, , immediately, types]) => {
+    if (nullish(listener)) iae(r, 'the listener is null');
+    const owner = callerEntry(r), wanted = nullish(types) ? null : r.array(types).elements.map(t => text(r, t));
+    accounts().listeners.push({ listener, type: wanted, owner }); gcListeners.add(listener);
+    if (immediately === 1) platform.queueTask(() => call(r, listener, LISTENER, 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, visibleAccounts(r).filter(a => wanted === null || wanted.includes(a.type)).map(a => newAccount(r, a)))]), 0, [listener]);
+  });
+  def(ACCOUNT_MANAGER, 'removeOnAccountsUpdatedListener', `(${LISTENER})V`, (r, _m, [, listener]) => {
+    if (nullish(listener)) iae(r, 'listener is null');
+    const list = accounts().listeners, at = list.findIndex(item => item.listener === listener || (item.listener?.ref !== undefined && item.listener?.ref === listener?.ref));
+    if (at < 0) { r.record?.('LOG W AccountManager: Listener was not previously added'); return; }
+    list.splice(at, 1); gcListeners.delete(listener);
+  });
 
   // ---- SystemHealthManager: a snapshot of this uid only, with no recorded measurements
   const HEALTH = service('systemhealth', 'Landroid/os/health/SystemHealthManager;'), HEALTH_STATS = 'Landroid/os/health/HealthStats;';

@@ -1,7 +1,7 @@
 // "Screen state": a plain-text picture of what the VM shows and why it may be blank, for "Copy diagnostics" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=d509c7905654';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=d509c7905654';
+import { reportSummary, collapseThreads } from './report-summary.js?v=3e71109809bc';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=3e71109809bc';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destroyed', 1: 'created', 2: 'stopped', 3: 'started/paused', 4: 'resumed (foreground)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
@@ -51,7 +51,11 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   const tasks = platform.tasks ?? [], frames = platform.allFrames?.() ?? [];
   const top = frames.length ? frames[frames.length - 1] : null;
   out.push('Screen state');
-  if (runtime.methodOverrides) out.push(`ATTENTION: replaced method returns ACTIVE (${runtime.methodOverrides.size} methods): their original code did not run; debugging tool.`);
+  if (runtime.methodOverrides) {   // src/method-overrides.js: the page's Method returns rows and the plugins' method changes (one registry)
+    const active = [...runtime.methodOverrides.values()], page = active.filter(hook => hook.owner?.kind === 'page').length, plugins = active.length - page;
+    if (page) out.push(`ATTENTION: replaced method returns ACTIVE (${page} methods): their original code did not run; debugging tool.`);
+    if (plugins) out.push(`ATTENTION: app modified by plugins (${plugins} method change${plugins === 1 ? '' : 's'}: ${[...new Set(active.filter(hook => hook.owner?.kind !== 'page').map(hook => hook.kind))].join(', ')}): chosen by the user, listed on the page.`);
+  }
   if (runtime.platform?.ignoredActivities?.size) out.push(`ATTENTION: ${ignoredActivitiesLine(runtime)}; those launches did not happen (debugging tool).`);
   const summaryAt = out.length;
   // ---- activity stack

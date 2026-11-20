@@ -7,20 +7,22 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=d509c7905654';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d509c7905654';
-import { encodeVariantImages } from './render-variant-image.js?v=d509c7905654';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=d509c7905654';
-import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=d509c7905654';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=d509c7905654';
+import { pluginWorkerSource } from './plugin-runtime.js?v=3e71109809bc';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=3e71109809bc';
+import { encodeVariantImages } from './render-variant-image.js?v=3e71109809bc';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=3e71109809bc';
+import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=3e71109809bc';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=3e71109809bc';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
 for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
 for (const method of ['frame', 'invoke', 'adb']) ACTION_METHODS.add(method);   // where the device is on the page (src/lab-overlays.js) and a call of one of the app's methods (src/app-invoke.js), a page operation like a click
-/** The events a plugin can listen to ('frame': the device moved or resized; 'modal' / 'tab' / 'overlay' / 'track': the runtime's own, for the handles of lab.modal, lab.tab, lab.overlay, lab.track). */
-export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track']);
+for (const method of ['hook', 'unhook', 'hooks']) ACTION_METHODS.add(method);   // the plugin's method changes (src/method-hooks.js through src/method-hooks-panel.js: listed on the page as "App modified")
+/** The events a plugin can listen to ('frame': the device moved or resized; 'modal' / 'tab' / 'overlay' / 'track': the runtime's own, for the handles of lab.modal, lab.tab, lab.overlay, lab.track;
+ *  'call': the batches of observed calls of the plugin's own method changes, src/method-hooks.js). */
+export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call']);   // 'call': calls of the methods the plugin observes (lab.hook { observe })
 const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
 const VM_METHODS = new Set(['batch', 'methods', 'scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
@@ -123,7 +125,7 @@ function defaultCreateWorker(name) {
  */
 const FRESHEN_MIN_MS = 150;   // a reader of the screen's components forces a fresh semantics walk at most this often (a plugin polling every frame must not undo the pacing)
 export function createPluginHost({ vm = null, createWorker = defaultCreateWorker, now = () => performance.now(), setTimer = (fn, ms) => setTimeout(fn, ms), clearTimer = id => clearTimeout(id),
-  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, getPackage = () => null, captureImage = null, actions = null, freshen = null, power = 'normal' } = {}) {
+  onLogStreaming = () => {}, onFrameWatch = () => {}, onChange = () => {}, onStopped = () => {}, getPackage = () => null, captureImage = null, actions = null, freshen = null, power = 'normal' } = {}) {
   let powerLevel = sanitizePower(power), P = powerParams(powerLevel);   // "Plugin power" (src/plugin-power.js): the page's pacing numbers (vmGapMs, composeTreeMs, watchMinMs)
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
   let lastFreshenAt = -Infinity, lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
@@ -334,7 +336,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
         const id = data.id; if (!Number.isSafeInteger(id)) return;
         if (plugin.pendingCalls >= MAX_PENDING_CALLS) { send(plugin, { t: 'reply', id, ok: false, error: { code: 'busy', message: `More than ${MAX_PENDING_CALLS} pending queries in this plugin; wait for the replies.` } }); return; }
         plugin.pendingCalls++;
-        serve(plugin, String(data.method), data.args).then(value => send(plugin, { t: 'reply', id, ok: true, value }), error => send(plugin, { t: 'reply', id, ok: false, error: { code: error?.code ?? 'failed', message: clipText(error?.message ?? error, 400), ...(error?.exception && typeof error.exception === 'object' ? { exception: { type: clipText(error.exception.type, 200), message: clipText(error.exception.message, 1000), stack: (Array.isArray(error.exception.stack) ? error.exception.stack : []).slice(0, 12).map(line => clipText(line, 200)), cause: error.exception.cause ? clipText(error.exception.cause, 400) : null } } : {}) } }))
+        serve(plugin, String(data.method), data.args).then(value => send(plugin, { t: 'reply', id, ok: true, value }), error => send(plugin, { t: 'reply', id, ok: false, error: { code: error?.code ?? 'failed', message: clipText(error?.message ?? error, 400), ...(Array.isArray(error?.errors) ? { errors: error.errors.slice(0, 50).map(item => ({ line: Number(item?.line) || 0, message: clipText(item?.message, 400) })) } : {}), ...(error?.exception && typeof error.exception === 'object' ? { exception: { type: clipText(error.exception.type, 200), message: clipText(error.exception.message, 1000), stack: (Array.isArray(error.exception.stack) ? error.exception.stack : []).slice(0, 12).map(line => clipText(line, 200)), cause: error.exception.cause ? clipText(error.exception.cause, 400) : null } } : {}) } }))
           .finally(() => { plugin.pendingCalls--; });
         return;
       }
@@ -355,7 +357,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   }
   function stopWorker(plugin, status = 'parado') {
     const worker = plugin.worker;
-    if (worker) { plugin.worker = null; try { worker.terminate(); } catch { /* already gone */ } plugin.release?.(); plugin.release = null; }
+    if (worker) { plugin.worker = null; try { worker.terminate(); } catch { /* already gone */ } plugin.release?.(); plugin.release = null; try { onStopped(plugin.id); } catch { /* the page's problem */ } }   // its session ended: the page removes what it changed (lab.hook)
     plugin.subs = new Set(); plugin.pendingCalls = 0; plugin.status = status;
     plugin.buttons = []; plugin.clickStarted = new Map(); finishClicks(plugin, null, { ok: false, reason: 'stopped' });   // a stopped plugin offers no button
     updateLogWanted(); updateFrameWanted(); changed(plugin);
@@ -445,6 +447,15 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
       }
       if (logBuffer.length > MAX_LOG_BATCH) { logDropped += logBuffer.length - MAX_LOG_BATCH; logBuffer = logBuffer.slice(logBuffer.length - MAX_LOG_BATCH); }
       if (logBuffer.length) scheduleEvents();
+    },
+    /** Observed calls from the Worker (lab.hook { observe }, src/method-hooks.js drainHookCalls: { batches: [{ owner, calls }], dropped }): each batch goes to the plugin that owns the
+     *  hooks, if it listens to 'call'. The Worker already batches (one message every 250 ms at most) and bounds them (Plugin power); nothing is kept here. */
+    hookCalls(message) {
+      if (!plugins.size || !Array.isArray(message?.batches)) return;
+      for (const batch of message.batches) {
+        const plugin = plugins.get(String(batch?.owner ?? '')); if (!plugin?.worker || !plugin.subs.has('call') || !Array.isArray(batch.calls) || !batch.calls.length) continue;
+        plugin.stats.calls = (plugin.stats.calls ?? 0) + batch.calls.length; send(plugin, { t: 'event', name: 'call', data: batch.calls }); stats.events++;
+      }
     },
     /** A network-log batch from the Worker (src/netlog.js): new and updated entries, merged by seq until the next flush. */
     netlog(message) {

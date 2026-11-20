@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
 
 // More of android.content.res.Resources over the app's resource table (frameworks/base/core/java/android/content/res/Resources.java + ResourcesImpl.java, android-13.0.0_r1):
 //  getQuantityText / getQuantityString (plurals: the CLDR rule for the configuration's locale picks the item, "other" is the fallback, NotFoundException when neither exists),
@@ -7,7 +7,12 @@ const RESOURCES = 'Landroid/content/res/Resources;', STRING = 'Ljava/lang/String
 const ATTR = { other: 0x01000004, zero: 0x01000005, one: 0x01000006, two: 0x01000007, few: 0x01000008, many: 0x01000009 };   // ResourceTypes.h ATTR_OTHER ... ATTR_MANY
 
 export function createResourcesExtrasHost(platform) {
-  const registry = createHostRegistry(), { def } = registry;
+  const registry = createHostRegistry(), { def: defHost } = registry;
+  // The Resources of a second installed package's Context read that package's own table (src/package-registry.js), as AndroidPlatform.invoke does for the others.
+  const def = (owner, name, signature, body, options) => defHost(owner, name, signature, (r, m, args) => {
+    const entry = owner === RESOURCES && platform.packages?.multi && args[0] && typeof args[0] === 'object' ? r.object(args[0])?.packageEntry : null;
+    return entry && !entry.main && platform.resources !== entry.resourcesEnvironment ? platform.withPackageResources(r, entry, () => body(r, m, args)) : body(r, m, args);
+  }, options);
   const hex = id => (id >>> 0).toString(16);
   const resolve = id => { try { return platform.resources?.resolve(id) ?? { kind: 'unresolved' }; } catch { return { kind: 'unresolved' }; } };
   const text = (value) => (value.kind === 'string' ? value.value : null);

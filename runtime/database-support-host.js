@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { fieldOffset } from './unsafe-native.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { fieldOffset } from './unsafe-native.js?v=3e71109809bc';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -78,6 +78,8 @@ export function createDatabaseSupportHost(platform) {
   type(CALLBACKS, OBJECT, [], { allocatable: true }); def(CALLBACKS, '<init>', '()V', () => {});
   for (const [name, extra] of [['onFragmentPreAttached', [CTX]], ['onFragmentAttached', [CTX]], ['onFragmentPreCreated', [BUNDLE]], ['onFragmentCreated', [BUNDLE]], ['onFragmentActivityCreated', [BUNDLE]], ['onFragmentViewCreated', [VIEW, BUNDLE]], ['onFragmentStarted', []], ['onFragmentResumed', []], ['onFragmentPaused', []], ['onFragmentStopped', []], ['onFragmentSaveInstanceState', [BUNDLE]], ['onFragmentViewDestroyed', []], ['onFragmentDestroyed', []], ['onFragmentDetached', []]]) def(CALLBACKS, name, `(${FM}${FR}${extra.join('')})V`, () => {});
   def(THREAD, 'getApplication', `()${APPLICATION}`, () => platform.applicationAttached ? platform.application : null);
+  // getProcessName(): mBoundApplication.processName, set by handleBindApplication before the Application exists: android:process of <application> (":name" is private to the package), else the package
+  def(THREAD, 'getProcessName', '()Ljava/lang/String;', () => { const process = platform.manifest?.application?.process; return process ? (process.startsWith(':') ? platform.packageName + process : process) : platform.packageName; });
 
   return registry;
 }

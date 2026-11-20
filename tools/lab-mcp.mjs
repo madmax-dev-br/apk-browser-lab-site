@@ -42,7 +42,7 @@ const obj = (properties = {}, required = []) => ({ type: 'object', properties, r
 const str = description => ({ type: 'string', description }), num = description => ({ type: 'number', description }), bool = description => ({ type: 'boolean', description });
 /** The tools; the page (src/mcp-tools.js) answers each one by name. */
 export const TOOLS = [
-  { name: 'lab_status', description: 'What the lab page shows now: loaded APK, Activity, windows, "Screen ready" and the reason it is not ready, running plugins.', inputSchema: obj() },
+  { name: 'lab_status', description: 'What the lab page shows now: loaded APK, Activity, windows, "Screen ready" and the reason it is not ready, running plugins, and the method changes in effect ("App modified": lab.hook changes and Method returns rows, with their call counts).', inputSchema: obj() },
   { name: 'screenshot', description: 'Image of the app screen, or of one component: by the layout_bounds key (element_key), by testTag, by a visible text, or by a rectangle (bounds, window coordinates). Optionally wait for the screen to be ready first.',
     inputSchema: obj({ element_key: str('key of a layout_bounds element'), test_tag: str('testTag of the Compose component'), text: str('visible text of the component (the first that contains it)'),
       bounds: obj({ left: num(''), top: num(''), right: num(''), bottom: num('') }, ['left', 'top', 'right', 'bottom']), max_width: num('maximum width of the image in px (default 1080)'), wait_ready: bool('wait for "Screen ready" first (default false)') }) },

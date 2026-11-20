@@ -10,6 +10,8 @@
  *   ({ activity, activityStack, windows: [{ id, kind, modal, visible, focused }], dialogs, canGoBack, closed, packageName, frame }). 'log': a batch (array) of Logcat
  *   entries { seq, uptime, wall, pid, tid, thread, level, tag, message }. 'network': a batch of network log entries (src/netlog.js), new or updated. Batches come at most
  *   every 250 ms, and Logcat lines reach the page only while some plugin listens to 'log' (or the Logcat panel is open). 'refresh': the user clicked Atualizar on the plugin's card.
+ *   'call': one call of a method the plugin observes (lab.hook(method, { observe: true })): { hook, method, receiver, args, returned | thrown, thread, ms, at, seq, dropped } in the
+ *   Values format; delivered in batches (at most every 250 ms), within the calls-per-second budget of Plugin power (`dropped`: calls of that hook not delivered before this one).
  * @property {(name: string, fn?: Function) => void} off
  * @property {() => Promise<object>} screen          The current screen (same shape as the 'screen' event); no VM work. `screen.ready` is "Screen ready" (src/screen-ready.js):
  *   { ready, activity, readySince, waitingFor: [motivos], fragments: [{ className, state, hidden, ready }] } — the Activity and its fragments loaded and the screen is still.
@@ -124,7 +126,22 @@ export function pluginWorkerMain(scope) {
     clear: () => pushUi({ op: 'clear' }),
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
-  const wrapError = error => Object.assign(new Error(error?.message ?? 'Query failed.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {});
+  const wrapError = error => Object.assign(new Error(error?.message ?? 'Query failed.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {}, Array.isArray(error?.errors) ? { errors: error.errors } : {});
+  // lab.hook: the method (smali 'Lpkg/C;->m(I)Z', Java 'pkg.C.m(int): boolean', or { className, name, signature }) and exactly one change: returns / throws (+ message) / observe / smali
+  const HOOK_KINDS = ['returns', 'throws', 'observe', 'smali'];
+  const hookSpec = (method, options) => {
+    const badArgs = message => Object.assign(new TypeError(message), { code: 'bad-args' });
+    const o = options && typeof options === 'object' ? options : {}, has = key => Object.prototype.hasOwnProperty.call(o, key) && (key !== 'observe' || o.observe === true);
+    const kinds = HOOK_KINDS.filter(has); if (kinds.length !== 1) throw badArgs(`lab.hook(method, options): give exactly one of { returns }, { throws, message }, { observe: true } or { smali } (got ${kinds.join(', ') || 'none'})`);
+    const target = typeof method === 'string' ? { method } : method && typeof method === 'object' ? { className: String(method.className ?? method.static ?? ''), name: String(method.name ?? ''), ...(method.signature !== undefined ? { signature: String(method.signature) } : {}) } : null;
+    if (!target || (!target.method && !target.className)) throw badArgs("lab.hook: name the method ('Lpkg/Class;->name(Params)Ret' or { className, name, signature })");
+    const kind = kinds[0], value = o.returns, spec = { ...target, kind, persist: o.persist === true };
+    if (kind === 'returns') spec.value = typeof value === 'bigint' ? { long: String(value) } : value === undefined ? null : value;
+    if (kind === 'throws') { spec.throws = String(o.throws ?? ''); if (o.message !== undefined && o.message !== null) spec.message = String(o.message); }
+    if (kind === 'observe') for (const key of ['depth', 'maxString', 'maxItems']) if (o[key] !== undefined) spec[key] = Number(o[key]);
+    if (kind === 'smali') { if (typeof o.smali !== 'string') throw badArgs('lab.hook: smali is the text of the body'); spec.smali = o.smali; }
+    return spec;
+  };
   let watchMinMs = 250;   // the shortest lab.watch interval: the page sends the "Plugin power" level's value ({ t: 'power' }) before the plugin starts and when the level changes
   const watches = new Set(), readyWrappers = new Map(), modals = new Map(); let modalSubscribed = false;
   const tabs = new Map(); let tabSubscribed = false;
@@ -184,7 +201,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track'].includes(name)) throw new TypeError(`Unknown event: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh' or 'frame')`);
+      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call'].includes(name)) throw new TypeError(`Unknown event: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh', 'frame' or 'call')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -346,6 +363,16 @@ export function pluginWorkerMain(scope) {
     invoke: (target, name, args = [], options = {}) => call('invoke', { ...(target && typeof target === 'object' && target.static ? { className: String(target.static) } : { handle: String(target?.handle ?? target ?? '') }),
       method: String(name ?? ''), args: (Array.isArray(args) ? args : [args]).map(invokeArg), signature: options?.signature === undefined ? undefined : String(options.signature) }),
     renderVariant: (options = {}) => call('renderVariant', options ?? {}),   // a background instance of the current screen with other endpoint mocks, as images and data (docs/RENDER-VARIANT.md)
+    // ---- changing the app's methods (src/method-hooks.js; listed on the page as "App modified", removed when the plugin stops) ----
+    /**
+     * Changes one of the app's methods: hook(method, { returns } | { throws, message } | { observe: true, depth, maxString, maxItems } | { smali }, persist?) -> { id, method, kind, hits, ... }.
+     * `method`: 'Lpkg/Class;->name(Params)Ret', 'pkg.Class.name(int): boolean' or { className, name, signature }. Observed calls arrive through lab.on('call', fn), one call per fn().
+     */
+    hook: async (method, options = {}) => call('hook', hookSpec(method, options)),
+    /** Removes one of the plugin's changes (the original method runs again). -> { removed } */
+    unhook: id => call('unhook', { id: String(id?.id ?? id ?? '') }),
+    /** The plugin's changes, with their live call counts: [{ id, method, kind, hits, dropped, state, ... }] ({ all: true }: every change of the VM). */
+    hooks: (options = {}) => call('hooks', { all: options?.all === true }),
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),
@@ -432,6 +459,10 @@ export function pluginWorkerMain(scope) {
     if (data.t === 'power') { const ms = Number(data.watchMinMs); if (Number.isFinite(ms)) watchMinMs = Math.max(10, Math.min(1000, ms)); return; }
     if (data.t === 'event') {
       const set = handlers.get(data.name); if (!set) return;
+      if (data.name === 'call' && Array.isArray(data.data)) {   // a batch of observed calls: each handler gets them one by one, in order
+        for (const item of data.data) for (const fn of [...set]) { try { const result = fn(item); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, "on('call')")); } catch (error) { reportError(error, "on('call')"); } }
+        return;
+      }
       for (const fn of [...set]) { try { const result = fn(data.data); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, `on('${data.name}')`)); } catch (error) { reportError(error, `on('${data.name}')`); } }
       return;
     }

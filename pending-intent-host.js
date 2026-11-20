@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=3e71109809bc';
 
 // android.app.PendingIntent (android-13.0.0_r1 PendingIntent.java + ActivityManagerService.getIntentSenderLocked): tokens are identified by (kind, package, requestCode, Intent.filterEquals),
 // FLAG_NO_CREATE / FLAG_CANCEL_CURRENT / FLAG_UPDATE_CURRENT / FLAG_ONE_SHOT behave as documented, and apps targeting API 31+ must say FLAG_IMMUTABLE or FLAG_MUTABLE.
@@ -135,6 +135,31 @@ export function createPendingIntentHost(platform) {
   def(PENDING, 'hashCode', '()I', (r, _m, [self]) => [...r.object(self).tokenKey].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
   def(PENDING, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => other && r.typeOf(other) === PENDING && r.object(other).tokenKey === r.object(self).tokenKey ? 1 : 0);
   def(PENDING, 'toString', `()${STRING}`, (r, _m, [self]) => `PendingIntent{${r.object(self).tokenKey ? 'live' : 'unknown'}}`);
+  /**
+   * Activity.startIntentSenderForResult / Context.startIntentSender (ActivityTaskManagerService.startActivityIntentSender -> PendingIntentRecord.sendInner): an Activity token is
+   * started as its creator (its uid decides what it may start: a package's own non-exported Activity included) with the calling Activity as the source and result target, so
+   * it joins the caller's task and its result comes back to the caller's onActivityResult; the fill-in Intent and flagsMask/flagsValues apply unless the token is immutable.
+   * A token of another kind is sent as PendingIntent.send would.
+   */
+  const startIntentSender = (r, sender, { caller = null, requestCode = -1, fillIn = null, flagsMask = 0, flagsValues = 0, fromActivity = true } = {}) => {
+    const pending = pendingOf(r, sender), token = pending ? tokenOf(r, pending) : null;
+    if (!pending) throw new APKError('IntentSender start: this IntentSender was not created from a PendingIntent of the virtual device', { kind: 'intent-sender-unsupported' });
+    if (!token || token.canceled) r.throwJava('Landroid/content/IntentSender$SendIntentException;', null);
+    if (token.kind !== KIND.activity || token.intents) { send(r, pending, 0, fillIn); return; }
+    if (token.flags & FLAG.ONE_SHOT) { token.canceled = true; tokens.delete(r.object(pending).tokenKey); }
+    const creator = token.creator ?? packages()?.main ?? null;
+    if (creator && !creator.main) packages().ensureProcess(r, creator);
+    let intent = token.intent;
+    if (!(token.flags & FLAG.IMMUTABLE)) {
+      if (fillIn !== null && packages() && packages().callerEntry(r) !== (creator ?? packages().main)) fillIn = platform.intentCrossCopy(r, fillIn, packages().loaderOf(r, creator ?? packages().main));
+      intent = r.allocate(INTENT); r.dispatch({ owner: INTENT, name: '<init>', parameters: [INTENT], result: 'V', signature: `(${INTENT})V` }, [intent, token.intent], 'direct');
+      if (fillIn !== null) call(r, INTENT, 'fillIn', [INTENT, 'I'], 'I', [intent, fillIn, 0]);
+      const mask = flagsMask & ~0xc3, values = flagsValues & mask;   // Intent.IMMUTABLE_FLAGS (the URI grant flags) are never changed by the sender
+      if (mask) r.object(intent).flags = ((r.object(intent).flags | 0) & ~mask) | values;
+    }
+    r.record(`PENDINGINTENT startIntentSender kind=${token.kind}${token.creator ? ` creator=${token.creator.name}` : ''} requestCode=${requestCode}`);
+    platform.startActivity(r, intent, requestCode >= 0 ? caller : null, requestCode, { fromActivity, caller, callerEntry: creator ?? undefined });
+  };
   /** Activity.createPendingResult(requestCode, data, flags): a token that, sent, delivers an activity result to `activity`. */
   const createResult = (r, activity, requestCode, data, flags) => {
     const key = `result|${activity.ref}|${requestCode}`, existing = tokens.get(key); flags |= 0;
@@ -142,5 +167,5 @@ export function createPendingIntentHost(platform) {
     if (flags & FLAG.NO_CREATE) return null;
     const object = r.makeObject(PENDING); r.object(object).tokenKey = key; tokens.set(key, { object, intent: data, flags, canceled: false, kind: KIND.result, activity, requestCode }); return object;
   };
-  return { ...registry, createResult, [GC_ROOTS](visit) { for (const token of tokens.values()) visit(token); } };
+  return { ...registry, createResult, startIntentSender, [GC_ROOTS](visit) { for (const token of tokens.values()) visit(token); } };
 }

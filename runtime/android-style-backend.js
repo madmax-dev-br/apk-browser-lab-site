@@ -1,8 +1,8 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=d509c7905654';
-import { APKError } from './apk-runtime.js?v=d509c7905654';
-import { ephemeronMap } from './heap-gc.js?v=d509c7905654';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=d509c7905654';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=d509c7905654';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=3e71109809bc';
+import { APKError } from './apk-runtime.js?v=3e71109809bc';
+import { ephemeronMap } from './heap-gc.js?v=3e71109809bc';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=3e71109809bc';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=3e71109809bc';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
@@ -85,7 +85,8 @@ export class AndroidStyleBackend {
   get(runtime, ref, owner, name, type) { const field = runtime.resolveField({ owner, name, type, key: `${owner}->${name}:${type}` }); return runtime.object(ref).fields.get(field.key); }
   /** The Resources being served: the scoped configuration Resources (platform.withResources), else the app's default one. */
   resourceObject(runtime) {
-    const resources = this.platform.activeResources ?? (this.platform.resourceObject ??= runtime.makeObject(RESOURCES));
+    const scope = this.platform.resourcePackage ?? null;   // a second installed package's resources in scope (android-platform.js withPackageResources): its own Resources object
+    const resources = this.platform.activeResources ?? (scope ? this.platform.packages.packageResources(runtime, scope) : (this.platform.resourceObject ??= runtime.makeObject(RESOURCES)));
     if (!this.get(runtime, resources, RESOURCES, 'mTypedArrayPool', 'Landroid/util/Pools$SynchronizedPool;')) {
       const type = 'Landroid/util/Pools$SynchronizedPool;';
       if (!runtime.classes.has(type)) fail('Original AOSP Pools DEX is required for the resource TypedArray pool');
@@ -104,7 +105,7 @@ export class AndroidStyleBackend {
     for(const {id,force} of object.appliedStyles)for(const [attribute,value]of table.resolveBag(id))if(force||!values.has(attribute))values.set(attribute,value);
     object.themeValues=values;runtime.record('RESOURCE Theme.rebase [real applied-style history and compiled resource bags]');
   }
-  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).resources = this.platform.activeResources ?? null; runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= ephemeronMap(runtime, new Map())).set(ref.ref, ref); return ref; }   // weakly held: a Theme nothing else references is collected
+  createTheme(runtime) { const ref = runtime.makeObject(THEME); runtime.object(ref).resources = this.platform.activeResources ?? null; if (this.platform.resourcePackage) runtime.object(ref).packageEntry = this.platform.resourcePackage;   /* a Theme of a second package resolves in its table */ runtime.object(ref).themeValues = new Map(); runtime.object(ref).appliedStyles = []; (this.themeRefs ??= ephemeronMap(runtime, new Map())).set(ref.ref, ref); return ref; }   // weakly held: a Theme nothing else references is collected
   /** Resources.updateConfiguration: every live Theme replays its applied styles against the new configuration (identity and key retained). */
   refreshThemes(runtime) { for (const ref of this.themeRefs?.values() ?? []) this.rebaseTheme(runtime, ref); }
   originalThemeMethod(runtime, context, startType, name, parameters, result, values = []) {
@@ -361,7 +362,7 @@ export class AndroidStyleBackend {
         const type='Landroid/graphics/drawable/DrawableInflater;',object=runtime.object(receiver);
         if(!object.sourceDrawableInflater){
           if(!runtime.classes.has(type))fail('Original AOSP DrawableInflater source DEX is unavailable');
-          const inflater=runtime.allocate(type),loader=runtime.applicationClassLoader??=this.platform.classLoaders.createApplicationLoader(runtime);   // Resources.getDrawableInflater: the Resources' class loader, the app's (a <drawable class=...> names an app class)
+          const own=runtime.object(receiver).packageEntry,inflater=runtime.allocate(type),loader=own&&!own.main?this.platform.packages.loaderOf(runtime,own):runtime.applicationClassLoader??=this.platform.classLoaders.createApplicationLoader(runtime);   // Resources.getDrawableInflater: the Resources' class loader, its package's (a <drawable class=...> names a class of that package)
           runtime.dispatch({owner:type,name:'<init>',parameters:[RESOURCES,'Ljava/lang/ClassLoader;'],result:'V',signature:`(${RESOURCES}Ljava/lang/ClassLoader;)V`},[inflater,receiver,loader],'direct');
           object.sourceDrawableInflater=inflater;
         }

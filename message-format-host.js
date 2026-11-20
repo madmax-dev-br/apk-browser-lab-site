@@ -1,4 +1,4 @@
-import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=d509c7905654';
+import { createHostRegistry, doubleBits, bitsDouble, bitsFloat } from './host-contract.js?v=3e71109809bc';
 
 // java.text.MessageFormat and java.text.ChoiceFormat, ported method by method from libcore's originals (ojluni, android-13.0.0_r1): applyPattern / makeFormat / subformat / parse /
 // toPattern / copyAndFixQuotes of MessageFormat; applyPattern / toPattern / format / parse / nextDouble of ChoiceFormat, with the originals' exception messages. They extend the platform's
@@ -357,6 +357,14 @@ export function createMessageFormatHost(platform) {
   });
   def(MF, 'hashCode', '()I', (r, _m, [self]) => javaHash(state(r, self).pattern));
   // Format.format(Object) / parseObject(String) for subclasses declared by apps (the platform's own formats define theirs)
+  def(FORMAT, '<init>', '()V', () => {});   // protected Format(): no state of its own
+  // parseObject(String): parseObject(source, new ParsePosition(0)); a parse that did not move the index is a ParseException("Format.parseObject(String) failed", errorIndex)
+  def(FORMAT, 'parseObject', `(${STRING})${OBJECT}`, (r, _m, [self, source]) => {
+    const PPOS = 'Ljava/text/ParsePosition;', position = construct(r, PPOS, ['I'], [0]);
+    const result = virtual(r, self, FORMAT, 'parseObject', [STRING, PPOS], OBJECT, [source, position]);
+    if (virtual(r, position, PPOS, 'getIndex', [], 'I') === 0) { const exception = construct(r, 'Ljava/text/ParseException;', [STRING, 'I'], ['Format.parseObject(String) failed', virtual(r, position, PPOS, 'getErrorIndex', [], 'I')]); r.throwJavaReference(exception, null); }
+    return result;
+  });
   def(FORMAT, 'format', `(${OBJECT})${STRING}`, (r, _m, [self, object]) => {
     const buffer = r.allocate(SB); r.dispatch({ owner: SB, name: '<init>', parameters: [], result: 'V', signature: '()V' }, [buffer], 'direct');
     const out = virtual(r, self, FORMAT, 'format', [OBJECT, SB, FP], SB, [object, buffer, construct(r, FP, ['I'], [0])]);

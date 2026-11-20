@@ -11,12 +11,13 @@ export const DEFAULT_POWER = 'normal';
 export const POWER_STORAGE_KEY = 'apkweb.plugin-power.v1';
 
 /** Every number a level sets. Worker: msPerSecond (query time per second), inputQuietMs (no query this long after input/operation), retryMs (poll while busy), waitMs (then 'busy'),
- * queueMax, scanBudgetMs / scanLimit (default page of a heap scan: lab.instances / lab.referrers / lab.findCompositionLocal), batchBudgetMs (time one lab.batch task may take).
+ * queueMax, scanBudgetMs / scanLimit (default page of a heap scan: lab.instances / lab.referrers / lab.findCompositionLocal), batchBudgetMs (time one lab.batch task may take),
+ * callsPerSecond (observed calls of lab.hook { observe } recorded and delivered per second, all hooks together; the rest are counted as not delivered: src/method-hooks.js).
  * Page: vmGapMs (pause between two VM queries), composeTreeMs (one composeTree per plugin this often), watchMinMs (shortest lab.watch interval). */
 export const POWER = Object.freeze({
-  normal: Object.freeze({ label: 'Normal', msPerSecond: 40, inputQuietMs: 120, retryMs: 16, waitMs: 6000, queueMax: 64, scanBudgetMs: 40, scanLimit: 50, batchBudgetMs: 25, vmGapMs: 25, composeTreeMs: 1000, watchMinMs: 250 }),
-  high: Object.freeze({ label: 'High', msPerSecond: 250, inputQuietMs: 120, retryMs: 8, waitMs: 15000, queueMax: 128, scanBudgetMs: 50, scanLimit: 100, batchBudgetMs: 30, vmGapMs: 5, composeTreeMs: 500, watchMinMs: 100 }),
-  max: Object.freeze({ label: 'Max', msPerSecond: 600, inputQuietMs: 60, retryMs: 4, waitMs: 30000, queueMax: 256, scanBudgetMs: 60, scanLimit: 200, batchBudgetMs: 40, vmGapMs: 0, composeTreeMs: 250, watchMinMs: 50 }),
+  normal: Object.freeze({ label: 'Normal', msPerSecond: 40, inputQuietMs: 120, retryMs: 16, waitMs: 6000, queueMax: 64, scanBudgetMs: 40, scanLimit: 50, batchBudgetMs: 25, vmGapMs: 25, composeTreeMs: 1000, watchMinMs: 250, callsPerSecond: 200 }),
+  high: Object.freeze({ label: 'High', msPerSecond: 250, inputQuietMs: 120, retryMs: 8, waitMs: 15000, queueMax: 128, scanBudgetMs: 50, scanLimit: 100, batchBudgetMs: 30, vmGapMs: 5, composeTreeMs: 500, watchMinMs: 100, callsPerSecond: 1000 }),
+  max: Object.freeze({ label: 'Max', msPerSecond: 600, inputQuietMs: 60, retryMs: 4, waitMs: 30000, queueMax: 256, scanBudgetMs: 60, scanLimit: 200, batchBudgetMs: 40, vmGapMs: 0, composeTreeMs: 250, watchMinMs: 50, callsPerSecond: 5000 }),
 });
 export const POWER_NOTES = Object.freeze({
   normal: 'Default: about 4 % of the VM thread, one query at a time.',

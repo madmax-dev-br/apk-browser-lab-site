@@ -1,12 +1,16 @@
-// Method return overrides: a debugging tool. The tester names a method (smali form `Lpkg/Class;->name(Params)Ret`) and a return value; while the override is enabled, every call whose
-// RESOLVED target definition is that method returns the value and the body does not run. Nothing is silent: each hit is counted, the first hit of an override and then every 100th is a
-// Logcat warning (tag APKWebLab), the report summary lists the active overrides with their call counts, and the page shows the live count per row.
+// Method changes chosen by the user (CLAUDE.md, "a third exception"): the page's "Method returns" rows (a debugging tool: a method's return value fixed) and the plugins' lab.hook
+// changes (src/method-hooks.js: a fixed return or exception, observed calls, a smali body), all in ONE registry per runtime (below). The tester names a method (smali form
+// `Lpkg/Class;->name(Params)Ret`); every call whose RESOLVED target definition is that method takes the change. Nothing is silent: each hit is counted, a change that alters
+// behavior writes a Logcat warning (tag APKWebLab) at its first hit and every 100th, each change is recorded in the trace when it is installed and removed, the report summary
+// lists the active changes with their call counts, and the page lists them ("App modified", with a remove button) with live counts.
 //
-// Hook: APKRuntime.dispatchCore asks `rt.methodOverrides` (null while no override is enabled -- the whole cost of the feature when idle is that one null test on the uncached call path) once the
-// target definition is resolved. Every call that is not served by an inline cache goes through dispatchCore (interpreted invoke-* of every kind, a call site that has not cached its callee yet,
-// reflection, host code calling `runtime.dispatch`). Call sites that DID cache the callee (interpreter site.callee / site.poly, read by compiled callers, frameless getters and shapes) are
-// reset by `applyMethodOverrides` for the methods whose override changed, so their next call goes through dispatchCore too; a call that dispatchCore answers with a value never fills a cache.
+// Hook: APKRuntime.dispatchCore asks `rt.methodOverrides` (null while no change is active -- the whole cost of the feature when idle is that one null test on the uncached call
+// path) once the target definition is resolved. Every call that is not served by an inline cache goes through dispatchCore (interpreted invoke-* of every kind, a call site that
+// has not cached its callee yet, reflection, host code calling `runtime.dispatch`). Call sites that DID cache the callee (interpreter site.callee / site.poly, read by compiled
+// callers, frameless getters and shapes) are reset by `updateHooks` for the methods whose change was added or removed, so their next call goes through dispatchCore too; a call
+// that dispatchCore answers through a hook never fills a cache. The WebAssembly core routes every hooked method's calls to dispatchCore (vmcore/js/host-bridge.js syncRouting).
 // Runs in the Worker and in Node tests: no DOM, no process.*.
+import { PendingCall, BodyInvoke } from './interpreter.js?v=3e71109809bc';
 
 const PRIMITIVES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 const JAVA_PRIMITIVES = Object.fromEntries(Object.entries(PRIMITIVES).map(([smali, name]) => [name, smali]));
@@ -122,14 +126,50 @@ export function parseReturnValue(result, input) {
   return { ok: false, error: 'Unknown return type.' };
 }
 
+// ---- the registry of method changes (CLAUDE.md: "method changes chosen by the user") ---------------------------------------------------------------------------------
+// One registry per runtime holds every active change: the page's "Method returns" rows (owner { kind: 'page' }) and the plugins' lab.hook changes (owner { kind: 'plugin', id,
+// name }, installed by src/method-hooks.js). Each change is a hook { id, key, kind, owner, hits, ... } on one resolved definition (smali key):
+//   returns   a fixed return value (the body does not run)          throws   a fixed exception (the body does not run)
+//   observe   the body runs unchanged; the call is recorded         smali    the body is replaced by code the user wrote (its own DEX, src/smali-assembler.js)
+// At most one change per method. `rt.methodOverrides` is the dispatch table (key -> hook) of the active ones, null when there is none (the idle cost of the feature).
+export const HOOK_KINDS = Object.freeze(['returns', 'throws', 'observe', 'smali']);
+export const PAGE_OWNER = Object.freeze({ kind: 'page', id: 'page', name: 'Method returns' });
+export function hookRegistry(rt) { return rt.methodHookRegistry ??= { seq: 0, hooks: new Map() }; }
+/** Adds hooks (and removes the ids in `remove`) in one step: the dispatch table is rebuilt, the call sites that cached an affected method forget it, the core reroutes. */
+export function updateHooks(rt, { add = [], remove = [] } = {}) {
+  const registry = hookRegistry(rt), changed = new Set();
+  for (const id of remove) { const hook = registry.hooks.get(id); if (hook) { registry.hooks.delete(id); changed.add(hook.key); } }
+  for (const hook of add) { registry.hooks.set(hook.id, hook); changed.add(hook.key); }
+  const table = new Map(); for (const hook of registry.hooks.values()) if (hook.active !== false) table.set(hook.key, hook);
+  rt.methodOverrides = table.size ? table : null;
+  rt.methodOverrideEpoch = (rt.methodOverrideEpoch ?? 0) + 1;
+  if (changed.size) { resetCachedSites(rt, changed); rt.onMethodHooksChanged?.(); }   // the WebAssembly core routes the calls of these methods to the host (vmcore/js/host-bridge.js syncRouting)
+  return changed;
+}
+/** The hook on `key`, if any. */
+export function hookOn(rt, key) { for (const hook of rt.methodHookRegistry?.hooks.values() ?? []) if (hook.key === key) return hook; return null; }
+const ownerText = owner => owner?.kind === 'plugin' ? `plugin "${owner.name}"` : 'the page (Method returns)';
+/** What a hook does, in a few words (trace, Logcat, summary). */
+export function hookDetail(hook) {
+  switch (hook.kind) {
+    case 'returns': return `= ${hook.display}`;
+    case 'throws': return `throws ${hook.throwType}${hook.message === null || hook.message === undefined ? '' : ` "${String(hook.message).slice(0, 80)}"`}`;
+    case 'observe': return 'observed';
+    case 'smali': return `smali body (${hook.body?.units ?? 0} code units)`;
+    default: return hook.kind;
+  }
+}
+
 /**
  * Installs the override set of `rt`. `specs`: [{ method: 'Lpkg/C;->m()I' | Java form with a return type, value: '42', enabled: true }]. Returns one status per spec (same order):
  * { key, state: 'active' | 'disabled' | 'invalid' | 'missing' | 'refused', error?, hits }. 'missing': no class of the VM defines that method, so nothing can be replaced (the override stays installed in
- * case a class loader defines it later); 'refused': native methods are not replaced (their body is the app's native code).
+ * case a class loader defines it later); 'refused': native methods are not replaced (their body is the app's native code). The rows are the page-owned hooks of the registry
+ * (kind 'returns'); a method a plugin changed already is refused ('invalid', the conflict named).
  * Hit counters survive an update that keeps the same method and value. Every inline call-site cache that entered an affected method is reset (see the header).
  */
 export function applyMethodOverrides(rt, specs) {
-  const previous = rt.methodOverrides ?? new Map(), previousAll = rt.methodOverridesAll ?? new Map(), next = new Map(), nextAll = new Map(), statuses = [];
+  const registry = hookRegistry(rt), previousAll = rt.methodOverridesAll ?? new Map(), nextAll = new Map(), statuses = [], add = [];
+  const previousPage = new Map(); for (const hook of registry.hooks.values()) if (hook.owner.kind === 'page') previousPage.set(hook.key, hook);
   for (const spec of Array.isArray(specs) ? specs : []) {
     const parsed = parseMethodSpec(spec?.method);
     if (!parsed.ok) { statuses.push({ key: String(spec?.method ?? ''), state: 'invalid', error: parsed.error, hits: 0 }); continue; }
@@ -139,20 +179,25 @@ export function applyMethodOverrides(rt, specs) {
     if (!value.ok) { statuses.push({ key: parsed.key, state: 'invalid', error: value.error, hits: 0 }); continue; }
     const definition = rt.classes.get(parsed.owner)?.methods.get(parsed.name + parsed.key.slice(parsed.key.indexOf('(')));
     const known = nextAll.get(parsed.key); if (known) { statuses.push({ key: parsed.key, state: 'invalid', error: 'Method repeated in the list.', hits: known.hits }); continue; }
+    const other = hookOn(rt, parsed.key); if (other && other.owner.kind !== 'page') { statuses.push({ key: parsed.key, state: 'invalid', error: `This method is already changed by ${ownerText(other.owner)} (${other.kind}); remove that change first.`, hits: 0 }); continue; }
     const old = previousAll.get(parsed.key), same = old && old.display === value.display && Object.is(old.value, value.value);
     const entry = { key: parsed.key, result: parsed.result, value: value.value, display: value.display, enabled: spec.enabled !== false, hits: same ? old.hits : 0, refusedNative: !!(definition && (definition.flags & 0x100)) };
     nextAll.set(parsed.key, entry);
     const state = entry.refusedNative ? 'refused' : !definition ? 'missing' : !entry.enabled ? 'disabled' : 'active';
-    if (entry.enabled && !entry.refusedNative) next.set(parsed.key, entry);
+    if (entry.enabled && !entry.refusedNative) {
+      const was = previousPage.get(parsed.key), keep = was && same;
+      const hook = keep ? was : { id: `page:${parsed.key}`, key: parsed.key, kind: 'returns', owner: PAGE_OWNER, result: parsed.result, value: value.value, display: value.display, hits: 0, createdAt: Date.now(), framework: false };
+      hook.entry = entry; entry.hook = hook; if (keep) entry.hits = hook.hits; else hook.hits = entry.hits;
+      add.push(hook);
+    }
     statuses.push({ key: parsed.key, state, hits: entry.hits, ...(state === 'refused' ? { error: 'Native methods are not replaced: the body is the app\'s native code.' } : state === 'missing' ? { error: 'No loaded class defines this method; nothing will be replaced until it exists.' } : {}) });
   }
-  const changed = new Set();
-  for (const [key, entry] of previous) { const now = next.get(key); if (!now || now.display !== entry.display || !Object.is(now.value, entry.value)) changed.add(key); }
-  for (const key of next.keys()) if (!previous.has(key)) changed.add(key);
+  const kept = new Set(add.filter(hook => previousPage.get(hook.key) === hook).map(hook => hook.id));
+  const remove = [...previousPage.values()].filter(hook => !kept.has(hook.id)).map(hook => hook.id);
+  for (const hook of add) if (!kept.has(hook.id)) rt.record(`HOOK ${hook.id} returns ${hook.key} ${hookDetail(hook)} by ${ownerText(hook.owner)}`);
+  for (const id of remove) { const hook = registry.hooks.get(id); if (hook && !add.some(other => other.id === id)) rt.record(`UNHOOK ${id} ${hook.key} (${hook.hits} calls)`); }
   rt.methodOverridesAll = nextAll;
-  rt.methodOverrides = next.size ? next : null;
-  rt.methodOverrideEpoch = (rt.methodOverrideEpoch ?? 0) + 1;
-  if (changed.size) { resetCachedSites(rt, changed); rt.onMethodHooksChanged?.(); }   // the WebAssembly core routes the calls of these methods to the host (vmcore/js/host-bridge.js syncRouting)
+  updateHooks(rt, { remove: remove.filter(id => !kept.has(id)), add: add.filter(hook => !kept.has(hook.id)) });
   return statuses;
 }
 
@@ -169,14 +214,14 @@ export function setMethodInterceptor(rt, key, fn) {
   rt.methodInterceptors = map.size ? map : null;
   resetCachedSites(rt, new Set([key])); rt.onMethodHooksChanged?.();
 }
-/** The keys whose calls the WebAssembly core must route through the host's dispatch: every enabled override and every interceptor. */
+/** The keys whose calls the WebAssembly core must route through the host's dispatch: every active method change and every interceptor. */
 export function hookedMethodKeys(rt) {
   const keys = new Set(rt.methodOverrides?.keys() ?? []);
   for (const key of rt.methodInterceptors?.keys() ?? []) keys.add(key);
   return keys;
 }
 
-/** Forgets every inline call-site cache entry that enters one of `keys`: the next call at those sites resolves again through dispatchCore (which answers the override, or fills the cache again). */
+/** Forgets every inline call-site cache entry that enters one of `keys`: the next call at those sites resolves again through dispatchCore (which answers the hook, or fills the cache again). */
 function resetCachedSites(rt, keys) {
   for (const prog of rt.allProgs ?? []) {
     prog.refs.forEach(site => {
@@ -188,25 +233,74 @@ function resetCachedSites(rt, keys) {
   }
 }
 
+/** A call that changes behavior: the first one, then every 100th, is a Logcat warning (tag APKWebLab). */
+function warnHit(rt, hook, hits) {
+  if (hits !== 1 && hits % 100 !== 0) return;
+  rt.record(hook.owner.kind === 'page' ? `LOG W APKWebLab: return replaced: ${hook.key} = ${hook.display} (${hits} calls)` : `LOG W APKWebLab: app modified by ${ownerText(hook.owner)}: ${hook.key} ${hookDetail(hook)} (${hits} calls)`);
+}
 /** Called by dispatchCore for an enabled override: counts the hit, writes the Logcat warning (first hit and every 100th) and returns the value. */
 export function overrideHit(rt, entry, definition, mode) {
   if (mode === 'static') rt.initialize(definition.method.owner);   // class initialization semantics stay exact: a static call initializes its class before returning
-  const hits = ++entry.hits;
-  if (hits === 1 || hits % 100 === 0) rt.record(`LOG W APKWebLab: return replaced: ${entry.key} = ${entry.display} (${hits} calls)`);
+  const hits = ++entry.hits; if (entry.entry) entry.entry.hits = hits;
+  warnHit(rt, entry, hits);
   return entry.value;
 }
-
-/** Current overrides for the page / the report: [{ key, display, enabled, hits }]. */
-export function describeMethodOverrides(rt) {
-  return [...(rt.methodOverridesAll?.values() ?? [])].map(entry => ({ key: entry.key, value: entry.display, enabled: entry.enabled, hits: entry.hits }));
+/**
+ * APKRuntime.dispatchCore found a hook on the resolved definition (`definition`, called with `args` in `mode`; `wantFrame`: an interpreter call site, which takes a PendingCall
+ * or an Invoke). What each kind answers:
+ *   returns  the value (overrideHit);   throws  the exception, thrown here;
+ *   observe  the original body, run as usual: a PendingCall (no call-site cache is filled), or a BodyInvoke whose continuation records the value or exception and passes it on
+ *            unchanged when the observer takes this call (src/method-hooks.js: the rate limit); from host code (no frame), the body runs nested and is recorded the same way;
+ *   smali    the hook's body (its own DEX method and code item): a PendingCall of it, or a nested run from host code.
+ * A static call initializes its class first, as the original call would.
+ */
+export function hookCall(rt, hook, definition, args, mode, wantFrame) {
+  const kind = hook.kind;
+  if (kind === 'returns') return overrideHit(rt, hook, definition, mode);
+  if (mode === 'static') rt.initialize(definition.method.owner);
+  const hits = ++hook.hits;
+  if (kind === 'observe') {
+    rt.recordMethod(definition.method);
+    const observer = rt.methodHookObserver, call = observer ? observer.begin(rt, hook, definition, args, mode) : null;
+    if (!wantFrame) {
+      let value; try { value = rt.execute(definition.method, definition.code, args); } catch (error) { if (call !== null) observer.end(rt, call, undefined, error); throw error; }
+      if (call !== null) observer.end(rt, call, value, null);
+      return value;
+    }
+    const body = new PendingCall(definition.method, definition.code, args, null);
+    if (call === null) return body;
+    return new BodyInvoke(body, value => { observer.end(rt, call, value, null); return value; }, error => { observer.end(rt, call, undefined, error); throw error; });
+  }
+  warnHit(rt, hook, hits);
+  if (kind === 'throws') return hook.raise(rt);
+  if (kind === 'smali') {
+    const body = hook.body; rt.recordMethod(body.method);
+    if (args.length !== body.code.incoming) throw new Error(`smali body of ${hook.key}: ${args.length} argument words, the body takes ${body.code.incoming}`);
+    return wantFrame ? new PendingCall(body.method, body.code, args, null) : rt.execute(body.method, body.code, args);
+  }
+  throw new Error(`Unknown method change kind: ${kind}`);
 }
-/** Lines for the Resumo: null when no override is installed and enabled. */
+
+/** Current page overrides for the page / the report: [{ key, display, enabled, hits }]. */
+export function describeMethodOverrides(rt) {
+  return [...(rt.methodOverridesAll?.values() ?? [])].map(entry => ({ key: entry.key, value: entry.display, enabled: entry.enabled, hits: entry.hook?.hits ?? entry.hits }));
+}
+/** Lines for the Resumo: null when no change is active. The page's rows (Method returns) and the plugins' changes (App modified) each have their block. */
 export function overrideSummaryLines(rt) {
   const active = [...(rt.methodOverrides?.values() ?? [])]; if (!active.length) return null;
-  const calls = active.reduce((sum, entry) => sum + entry.hits, 0);
-  const lines = [`Method returns REPLACED: ${active.length} methods, ${calls} calls (debugging tool; the bodies of these methods do not run)`];
-  for (const entry of active.slice(0, 6)) lines.push(`  ${entry.key} = ${entry.display} (${entry.hits} calls)`);
-  if (active.length > 6) lines.push(`  … and ${active.length - 6} more`);
+  const page = active.filter(hook => hook.owner.kind === 'page'), plugins = active.filter(hook => hook.owner.kind !== 'page'), lines = [];
+  if (page.length) {
+    const calls = page.reduce((sum, hook) => sum + hook.hits, 0);
+    lines.push(`Method returns REPLACED: ${page.length} methods, ${calls} calls (debugging tool; the bodies of these methods do not run)`);
+    for (const hook of page.slice(0, 6)) lines.push(`  ${hook.key} = ${hook.display} (${hook.hits} calls)`);
+    if (page.length > 6) lines.push(`  … and ${page.length - 6} more`);
+  }
+  if (plugins.length) {
+    const calls = plugins.reduce((sum, hook) => sum + hook.hits, 0), byKind = HOOK_KINDS.map(kind => [kind, plugins.filter(hook => hook.kind === kind).length]).filter(([, n]) => n).map(([kind, n]) => `${n} ${kind}`);
+    lines.push(`App modified by plugins: ${plugins.length} method changes (${byKind.join(', ')}), ${calls} calls (chosen by the user; listed on the page as "App modified")`);
+    for (const hook of plugins.slice(0, 8)) lines.push(`  ${hook.kind} ${hook.key} ${hook.kind === 'observe' ? '' : hookDetail(hook) + ' '}(${hook.hits} calls${hook.dropped ? `, ${hook.dropped} not delivered` : ''}) · ${ownerText(hook.owner)}`);
+    if (plugins.length > 8) lines.push(`  … and ${plugins.length - 8} more`);
+  }
   return lines;
 }
 

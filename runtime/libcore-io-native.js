@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { throwNew } from './java-throw.js?v=d509c7905654';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=d509c7905654';
-import { networkOf, isIpLiteral } from './network-native.js?v=d509c7905654';
-import { Blocked } from './scheduler.js?v=d509c7905654';
-import { installUdp } from './udp-native.js?v=d509c7905654';
-import { createLoopback } from './loopback-socket.js?v=d509c7905654';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=d509c7905654';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { throwNew } from './java-throw.js?v=3e71109809bc';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=3e71109809bc';
+import { networkOf, isIpLiteral } from './network-native.js?v=3e71109809bc';
+import { Blocked } from './scheduler.js?v=3e71109809bc';
+import { installUdp } from './udp-native.js?v=3e71109809bc';
+import { createLoopback } from './loopback-socket.js?v=3e71109809bc';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=3e71109809bc';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=3e71109809bc';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -122,6 +122,10 @@ function raiseSocketFailure(runtime, desc, failure) {
   if (unserved) {
     const peer = desc.http.peer, message = `Socket to ${peer.host}:${peer.port}: ${unserved.message}. Only HTTP/1.1 requests over java.net.Socket reach the network in the browser (src/virtual-http-socket.js)`;
     networkOf(runtime).log?.unsupported({ api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${peer.host.includes(':') ? `[${peer.host}]` : peer.host}:${peer.port}`, host: peer.host, port: peer.port, message });
+    // A device component's own connection (a device option's preinstalled package, src/microg-device.js: microG's push channel) is not the app under test: the device records the
+    // failure explicitly and the component gets the IOException a phone without a route there gives, so the app keeps running. The app's own sockets keep the lab error.
+    const device = runtime.platform.onUnservedSocket?.(runtime, { host: peer.host, port: peer.port, message: unserved.message });
+    if (device) throwNew(runtime, device.type, device.message);
     throw new APKError(message, { kind: 'raw-socket-unsupported' });
   }
   if (failure?.type) throwNew(runtime, failure.type, failure.message);

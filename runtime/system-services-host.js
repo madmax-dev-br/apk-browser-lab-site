@@ -1,6 +1,6 @@
-import { gcRoot } from './heap-gc.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=d509c7905654';
+import { gcRoot } from './heap-gc.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=3e71109809bc';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -291,6 +291,46 @@ export function createSystemServicesHost(platform) {
   def(PACKAGE, 'getName', '()Ljava/lang/String;', (r, _m, [self]) => r.object(self).packageName); def(PACKAGE, 'toString', '()Ljava/lang/String;', (r, _m, [self]) => 'package ' + r.object(self).packageName);
   for (const name of ['getImplementationVersion', 'getSpecificationVersion', 'getImplementationTitle', 'getImplementationVendor', 'getSpecificationTitle', 'getSpecificationVendor']) def(PACKAGE, name, '()Ljava/lang/String;', () => null);
 
+  // ---- android.text.format.Formatter.formatFileSize / formatShortFileSize -------------------------------------------------------------------------------
+  // The lab's framework resources are the API 36 profile, which has byteShort and fileSizeSuffix but no longer the kilobyteShort..petabyteShort strings the android-13 source
+  // reads: since Android 14 the unit names come from ICU (MeasureFormat SHORT). This follows that Formatter: RoundedBytesResult.roundBytes (units over 900, the same digits per
+  // range, FLAG_SHORTER), a NumberFormat of the Configuration's first locale with exactly those fraction digits, no grouping and HALF_UP, the ICU short unit name (Intl's, the
+  // same CLDR data) taken from the formatted measure, byteShort as the override for bytes, then fileSizeSuffix ("%1$s %2$s") and bidiWrap for a right-to-left locale.
+  {
+    const FORMATTER_T = 'Landroid/text/format/Formatter;', CONTEXT_T = 'Landroid/content/Context;', RES_T = 'Landroid/content/res/Resources;', STRING_T = 'Ljava/lang/String;';
+    registry.type(FORMATTER_T, 'Ljava/lang/Object;', [], { allocatable: false });
+    const vcall = (r, receiver, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, [receiver, ...args], 'virtual');
+    const scall = (r, owner, name, parameters, result, args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, args, 'static');
+    const FLAG_SHORTER = 1, FLAG_IEC_UNITS = 8, UNITS = ['byte', 'kilobyte', 'megabyte', 'gigabyte', 'terabyte', 'petabyte'];
+    const roundBytes = (sizeBytes, flags) => {   // RoundedBytesResult.roundBytes: float arithmetic, as the original
+      const unit = (flags & FLAG_IEC_UNITS) ? 1024 : 1000, negative = sizeBytes < 0n; let result = Math.fround(Number(negative ? -sizeBytes : sizeBytes)), units = 0, mult = 1;
+      while (result > 900 && units < UNITS.length - 1) { units++; mult *= unit; result = Math.fround(result / unit); }
+      const digits = mult === 1 || result >= 100 ? 0 : result < 1 ? 2 : result < 10 ? ((flags & FLAG_SHORTER) ? 1 : 2) : ((flags & FLAG_SHORTER) ? 0 : 2);
+      return { value: negative ? -result : result, units, digits };
+    };
+    const INTERNAL_STRING = { byteShort: 0x010401c3, fileSizeSuffix: 0x01040422 };   // com.android.internal.R.string ids of the resource profile (framework-aosp/generated/com/android/internal/R.java)
+    const frameworkString = (_r, _resources, name) => INTERNAL_STRING[name];
+    const localeTag = (r, context) => {
+      const configuration = vcall(r, vcall(r, context, CONTEXT_T, 'getResources', [], RES_T), RES_T, 'getConfiguration', [], 'Landroid/content/res/Configuration;');
+      const locale = vcall(r, vcall(r, configuration, 'Landroid/content/res/Configuration;', 'getLocales', [], 'Landroid/os/LocaleList;'), 'Landroid/os/LocaleList;', 'get', ['I'], 'Ljava/util/Locale;', [0]);
+      return { locale, tag: r.stringCharacters(vcall(r, locale, 'Ljava/util/Locale;', 'toLanguageTag', [], STRING_T)) };
+    };
+    const formatFileSize = (r, context, sizeBytes, flags) => {
+      if (context === null) return '';
+      const resources = vcall(r, context, CONTEXT_T, 'getResources', [], RES_T), { locale, tag } = localeTag(r, context), rounded = roundBytes(BigInt(sizeBytes), flags);
+      const options = { minimumFractionDigits: rounded.digits, maximumFractionDigits: rounded.digits, useGrouping: false, roundingMode: 'halfExpand' };
+      const number = new Intl.NumberFormat(tag, options).format(rounded.value);
+      const units = rounded.units === 0 ? r.stringCharacters(vcall(r, resources, RES_T, 'getString', ['I'], STRING_T, [frameworkString(r, resources, 'byteShort')]))   // getSuffixOverride
+        : new Intl.NumberFormat(tag, { ...options, style: 'unit', unit: UNITS[rounded.units], unitDisplay: 'short' }).formatToParts(rounded.value).filter(part => part.type === 'unit').map(part => part.value).join('');
+      const args = r.newArray('[Ljava/lang/Object;', 2); r.array(args).elements = [number, units];
+      const text = vcall(r, context, CONTEXT_T, 'getString', ['I', '[Ljava/lang/Object;'], STRING_T, [frameworkString(r, resources, 'fileSizeSuffix'), args]);
+      const rtl = scall(r, 'Landroid/text/TextUtils;', 'getLayoutDirectionFromLocale', ['Ljava/util/Locale;'], 'I', [locale]) === 1;   // View.LAYOUT_DIRECTION_RTL
+      return rtl ? vcall(r, scall(r, 'Landroid/text/BidiFormatter;', 'getInstance', ['Z'], 'Landroid/text/BidiFormatter;', [1]), 'Landroid/text/BidiFormatter;', 'unicodeWrap', [STRING_T], STRING_T, [text]) : text;
+    };
+    def(FORMATTER_T, 'formatFileSize', `(${CONTEXT_T}J)${STRING_T}`, (r, _m, [context, size]) => formatFileSize(r, context, size, 0x4), { static: true });                       // FLAG_SI_UNITS
+    def(FORMATTER_T, 'formatShortFileSize', `(${CONTEXT_T}J)${STRING_T}`, (r, _m, [context, size]) => formatFileSize(r, context, size, 0x4 | FLAG_SHORTER), { static: true });
+  }
+
   // ---- java.util.logging (libcore: the root logger's AndroidHandler forwards to android.util.Log; default level INFO) ----------------------------------
   const LOGGER = 'Ljava/util/logging/Logger;', LEVEL = 'Ljava/util/logging/Level;', levels = { OFF: 2147483647, SEVERE: 1000, WARNING: 900, INFO: 800, CONFIG: 700, FINE: 500, FINER: 400, FINEST: 300, ALL: -2147483648 };
   registry.type(LEVEL, 'Ljava/lang/Object;', [], { allocatable: true }); registry.type(LOGGER, 'Ljava/lang/Object;', [], { allocatable: true });
@@ -351,6 +391,23 @@ export function createSystemServicesHost(platform) {
     def(LOG_RECORD, 'get' + name, `()${type}`, (r, _m, [self]) => r.object(self).record[key]); def(LOG_RECORD, 'set' + name, `(${type})V`, (r, _m, [self, value]) => { r.object(self).record[key] = value; });
   }
   def(LOG_RECORD, 'getMillis', '()J', (r, _m, [self]) => r.object(self).record.millis);
+  // java.util.logging.Formatter (abstract: format(LogRecord) comes from the app's subclass). getHead/getTail are "" and formatMessage is libcore's: the record's message, run through
+  // MessageFormat.format(message, parameters) when there are parameters and the message has one of "{0" "{1" "{2" "{3"; any exception there leaves the message as it is.
+  // (A LogRecord here never carries a ResourceBundle: setResourceBundle is not modelled, so there is no localization step.)
+  const FORMATTER = 'Ljava/util/logging/Formatter;';
+  registry.type(FORMATTER, 'Ljava/lang/Object;', [], { allocatable: true });
+  def(FORMATTER, '<init>', '()V', () => {});
+  def(FORMATTER, 'getHead', `(${HANDLER})Ljava/lang/String;`, () => '');
+  def(FORMATTER, 'getTail', `(${HANDLER})Ljava/lang/String;`, () => '');
+  def(FORMATTER, 'formatMessage', `(${LOG_RECORD})Ljava/lang/String;`, (r, _m, [, record]) => {
+    if (record === null) r.throwJava('Ljava/lang/NullPointerException;', null);
+    const { message, parameters } = r.object(record).record;
+    if (message === null || parameters === null || !r.array(parameters).elements.length) return message;
+    const text = r.stringCharacters(message);
+    if (!['{0', '{1', '{2', '{3'].some(marker => text.includes(marker))) return message;
+    try { return r.dispatch({ owner: 'Ljava/text/MessageFormat;', name: 'format', parameters: ['Ljava/lang/String;', '[Ljava/lang/Object;'], result: 'Ljava/lang/String;', signature: '(Ljava/lang/String;[Ljava/lang/Object;)Ljava/lang/String;' }, [message, parameters], 'static'); }
+    catch (error) { if (error?.name === 'JavaException') return message; throw error; }   // catch (Exception ex) { return format; }
+  });
   // setSourceClassName / setSourceMethodName keep what they are given; a record that was never told its source would infer it from the calling stack frame (LogRecord.inferCaller), which is not modelled
   for (const [name, key] of [['SourceClassName', 'sourceClass'], ['SourceMethodName', 'sourceMethod']]) {
     def(LOG_RECORD, 'set' + name, '(Ljava/lang/String;)V', (r, _m, [self, value]) => { r.object(self).record[key] = value; });

@@ -1,20 +1,20 @@
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=d509c7905654';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=d509c7905654';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=d509c7905654';
-import { inspectELF } from './native-inspector.js?v=d509c7905654';
-import { elfBuildId } from './elf-build-id.js?v=d509c7905654';
-import { inflateRaw } from './inflate.js?v=d509c7905654';
-import { crc32, inflateEntry } from './zip-entry.js?v=d509c7905654';
-import { resolveDevice } from './device-profile.js?v=d509c7905654';
-import { resourceProfileFor } from './device-configuration.js?v=d509c7905654';
-import { JniBridge } from './jni-host.js?v=d509c7905654';
-import { providerForApk } from './native-provider-variants.js?v=d509c7905654';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=d509c7905654';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=d509c7905654';
-import { AndroidResources } from './android-resources.js?v=d509c7905654';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=d509c7905654';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=d509c7905654';
-import { FrameworkProvider } from './framework-provider.js?v=d509c7905654';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=3e71109809bc';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=3e71109809bc';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=3e71109809bc';
+import { inspectELF } from './native-inspector.js?v=3e71109809bc';
+import { elfBuildId } from './elf-build-id.js?v=3e71109809bc';
+import { inflateRaw } from './inflate.js?v=3e71109809bc';
+import { crc32, inflateEntry } from './zip-entry.js?v=3e71109809bc';
+import { resolveDevice } from './device-profile.js?v=3e71109809bc';
+import { resourceProfileFor } from './device-configuration.js?v=3e71109809bc';
+import { JniBridge } from './jni-host.js?v=3e71109809bc';
+import { providerForApk } from './native-provider-variants.js?v=3e71109809bc';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=3e71109809bc';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=3e71109809bc';
+import { AndroidResources } from './android-resources.js?v=3e71109809bc';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=3e71109809bc';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=3e71109809bc';
+import { FrameworkProvider } from './framework-provider.js?v=3e71109809bc';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -184,6 +184,13 @@ export function resolveManifestReferences(manifest, resolve, warnings = []) {
     }
     if (!Object.keys(entry.refs).length) delete entry.refs;
   }
+  // <provider android:authorities="@string/..."> (ParsedProviderUtils: getNonConfigurationString): the authorities are the string's value
+  for (const detail of manifest?.componentDetails ?? []) {
+    if (detail.authoritiesRef === undefined) continue;
+    let value = null; try { const resource = resolve(detail.authoritiesRef); if (resource?.kind === 'string' && typeof resource.value === 'string') value = resource.value; } catch { value = null; }
+    if (value === null) { warnings.push(`Manifest: <provider android:authorities> of ${detail.name} is resource 0x${detail.authoritiesRef.toString(16)}, which is not a string; the provider has no authority`); continue; }
+    detail.authorities = value; delete detail.authoritiesRef;
+  }
   return manifest;
 }
 export function parseManifest(data) {
@@ -255,7 +262,8 @@ export function parseManifest(data) {
       const components = { service: services, provider: providers, receiver: receivers };
       if (components[name] && typeof attrs.name === 'string') components[name].push(resolveName(attrs.name));
       if (components[name] || name === 'application') node.component = name === 'application' ? { metaData: (application.metaData ??= []) } : { metaData: [] };
-      if (components[name] && typeof attrs.name === 'string') { const detail = { kind: name, name: resolveName(attrs.name), authorities: attrs.authorities ?? null, exported: attrs.exported, enabled: attrs.enabled, process: attrs.process ?? null, initOrder: attrs.initOrder ?? 0, multiprocess: attrs.multiprocess, directBootAware: attrs.directBootAware, grantUriPermissions: attrs.grantUriPermissions, permission: attrs.permission ?? null, readPermission: attrs.readPermission ?? null, writePermission: attrs.writePermission ?? null, foregroundServiceType: attrs.foregroundServiceType ?? 0, metaData: node.component.metaData, order: componentDetails.length }; node.component.detail = detail; componentDetails.push(detail); if (name === 'provider') providerDetails.push(detail); }
+      if (components[name] && typeof attrs.name === 'string') { const detail = { kind: name, name: resolveName(attrs.name), authorities: attrs.authorities ?? null, exported: attrs.exported, enabled: attrs.enabled, process: attrs.process ?? null, initOrder: attrs.initOrder ?? 0, multiprocess: attrs.multiprocess, directBootAware: attrs.directBootAware, grantUriPermissions: attrs.grantUriPermissions, permission: attrs.permission ?? null, readPermission: attrs.readPermission ?? null, writePermission: attrs.writePermission ?? null, foregroundServiceType: attrs.foregroundServiceType ?? 0, metaData: node.component.metaData, order: componentDetails.length }; if (name === 'provider' && (attrTypes.authorities === 1 || attrTypes.authorities === 2) && typeof attrs.authorities === 'number') { detail.authoritiesRef = attrs.authorities >>> 0; detail.authorities = null; }   // android:authorities="@string/...": resolved once the resources are read (resolveManifestReferences)
+        node.component.detail = detail; componentDetails.push(detail); if (name === 'provider') providerDetails.push(detail); }
       if (name === 'action' && typeof attrs.name === 'string') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner?.detail) (owner.detail.actions ??= []).push(attrs.name); }
       // a service's / receiver's <intent-filter> as IntentFilter sees it (actions, categories, <data> schemes and types, priority): what broadcast resolution matches (src/broadcast-queue.js)
       if (name === 'intent-filter') { const owner = [...stack].reverse().find(n => n.component)?.component; if (owner?.detail) { node.componentFilter = { actions: [], categories: [], data: [], priority: Number(attrs.priority) | 0 }; (owner.detail.filters ??= []).push(node.componentFilter); } }
@@ -301,7 +309,8 @@ export function parseManifest(data) {
       if (size < 24 || !stack.length) fail('Malformed AXML closing element');
       const node = stack.pop();
       if (node.name !== str(b.u32(p + 20))) fail('Mismatched AXML closing element');
-      if (node.filter?.main && node.filter.launcher) node.filter.activity.launcher = true;
+      // a disabled <activity>/<activity-alias> (android:enabled="false") is not resolved by PackageManager, so its MAIN/LAUNCHER filter does not make a launcher entry
+      if (node.filter?.main && node.filter.launcher && !(node.filter.activity.enabled === false || node.filter.activity.enabled === 0 || node.filter.activity.enabled === 'false')) node.filter.activity.launcher = true;
       if (node.filter?.view && node.filter.browsable && node.filter.autoVerify && node.filter.schemes.some(scheme => scheme === 'http' || scheme === 'https')) for (const host of node.filter.hosts) autoVerifyHosts.add(host);   // the domains DomainVerificationManager reports for this package
     }
     p += size;
@@ -716,11 +725,14 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // the original SMS decoding classes (framework-aosp/profiles/telephony): referenced by the APK, or possibly by a companion package (its code is not scanned at load: the "With microG"
   // option's SMS Retriever decodes SMS_RECEIVED with them)
   const usesTelephony=files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))||(options.companionPackages?.length??0)>0||!!options.microg;   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
+  // the original android.app.IntentService (framework-aosp/profiles/services): referenced by the APK, or possibly by a companion package (microG's check-in service is one)
+  const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
     {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:'APK-references-android.content.res.Configuration'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
+    {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
   for(const selection of profiles){
@@ -851,7 +863,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     if (companion.nativeLibraries.length) warnings.push(`Companion package ${companion.packageName} packages ${companion.nativeLibraries.length} native files; they are not offered to JNI (a companion's System.loadLibrary fails naming the library)`);
   }
   if (options.microg) {
-    const microg = enableMicrog(runtime, { version: options.microg.version });   // the signer hook, the locked settings file, the refused permissions, the forbidden-feature entry points; before any app code runs
+    const microg = enableMicrog(runtime, { version: options.microg.version, services: options.microg.services ?? null });   // the signer hook, the ROM-defaults file and the settings guard, the user's online services (src/microg-services.js), the entry points; before any app code runs
     const mocks = options.microg.mocks;   // optional { [entryPointId]: handler }: a mock value for a forbidden feature's entry point (src/microg-entry-points.js); the lab ships none
     if (mocks) for (const [id, handler] of Object.entries(mocks)) microg.mock(id, handler);
   }

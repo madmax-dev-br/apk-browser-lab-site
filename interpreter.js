@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { BUCKET } from './time-breakdown.js?v=d509c7905654';
-import { Blocked, QUANTUM } from './scheduler.js?v=d509c7905654';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { BUCKET } from './time-breakdown.js?v=3e71109809bc';
+import { Blocked, QUANTUM } from './scheduler.js?v=3e71109809bc';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=3e71109809bc';
 
 // Frame-based DEX interpreter.
 //
@@ -29,6 +29,12 @@ export class PendingCall { constructor(method, code, args, definition = null) { 
  * may handle an exception thrown by the callee. This is how host code orchestrates Java without nesting a run loop.
  */
 export class Invoke { constructor(method, args, mode = 'virtual', then = null, onError = null) { this.method = method; this.args = args; this.mode = mode; this.then = then; this.onError = onError; } }
+Invoke.prototype.body = null;
+/**
+ * An Invoke whose callee is a body already chosen (src/method-overrides.js: a call a plugin observes): the step runs `body` (a PendingCall) as ordinary frames instead of
+ * dispatching the method again, which would reach the same hook. then/onError see its value or exception (the observer records them and passes them on unchanged).
+ */
+export class BodyInvoke extends Invoke { constructor(body, then, onError) { super(body.method, body.args, 'direct', then, onError); this.body = body; } }
 /** Marker frame under the callee of an Invoke; holds the continuation. It has no registers or code. */
 class ContFrame { constructor(invoke) { this.cont = invoke; this.method = null; this.code = null; } }
 const OUT_FRAME = 1, OUT_BLOCKED = 2, DRIVE = { kind: 'drive' }, NO_GETTER = Symbol('no getter'), HANDOFF = Symbol('bridge outcome handed to the run loop');
@@ -556,7 +562,7 @@ function pump(rt, thread, input) {
       }
       case 'call': {
         const inv = frames[frames.length - 1].cont; let R;
-        try { R = rt.dispatch(inv.method, inv.args, inv.mode, null, true); } catch (error) { input = { kind: 'error', error }; continue; }
+        try { R = inv.body !== null ? inv.body : rt.dispatch(inv.method, inv.args, inv.mode, null, true); } catch (error) { input = { kind: 'error', error }; continue; }   // BodyInvoke: the body is chosen
         if (R instanceof PendingCall) { frames.push(makeFrame(rt, R.method, R.code, R.args)); return OUT_FRAME; }
         if (R instanceof Blocked) { thread.blocked = R; thread.blockKind = 'callee'; thread.state = 'blocked'; return OUT_BLOCKED; }
         if (R instanceof Invoke) { frames.push(new ContFrame(R)); continue; }

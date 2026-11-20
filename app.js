@@ -1,56 +1,59 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=d509c7905654';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d509c7905654';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=d509c7905654';
-import { drawFrameGraph } from './frame-graph.js?v=d509c7905654';
-import { clientIdentityStatus } from './client-identity.js?v=d509c7905654';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState } from './device-settings.js?v=d509c7905654';
-import { initCollapsibleSections } from './panel-sections.js?v=d509c7905654';
-import { warmupLabel } from './warmup.js?v=d509c7905654';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d509c7905654';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=d509c7905654';
-import { initHelpTips } from './help-tips.js?v=d509c7905654';
-import { createToolDock } from './tool-dock.js?v=d509c7905654';
-import { createPermissionsPanel } from './permissions-panel.js?v=d509c7905654';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=d509c7905654';
-import { createAppDataPanel } from './app-data-panel.js?v=d509c7905654';
-import { createCameraLab } from './camera-lab.js?v=d509c7905654';
-import { createOverridesPanel } from './overrides-panel.js?v=d509c7905654';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d509c7905654';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d509c7905654';
-import { createHostMapPanel } from './host-map-panel.js?v=d509c7905654';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d509c7905654';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d509c7905654';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d509c7905654';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d509c7905654';
-import { createDeviceView, createViewState } from './device-view.js?v=d509c7905654';
-import { createTaskSwitcher } from './task-switcher.js?v=d509c7905654';
-import { createDeviceZoom } from './device-zoom.js?v=d509c7905654';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d509c7905654';
-import { formatApiGapReport } from './api-gap-scan.js?v=d509c7905654';
-import { createLogcatPanel } from './logcat-panel.js?v=d509c7905654';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d509c7905654';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d509c7905654';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d509c7905654';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=d509c7905654';
-import { createAppPalette } from './app-palette.js?v=d509c7905654';
-import { createScreenRecorder } from './screen-recorder.js?v=d509c7905654';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=d509c7905654';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d509c7905654';
-import { createAdb } from './adb-commands.js?v=d509c7905654';
-import { createAdbTerminal } from './adb-terminal.js?v=d509c7905654';
-import { memorySummary } from './worker-memory.js?v=d509c7905654';
-import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d509c7905654';
-import { createModalHost } from './lab-modal.js?v=d509c7905654';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=d509c7905654';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=d509c7905654';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d509c7905654';
-import { createDragLayer } from './lab-drag.js?v=d509c7905654';
-import { createLabScroll } from './lab-scroll.js?v=d509c7905654';
-import { createGlSurfaces } from './gl-surfaces.js?v=d509c7905654';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d509c7905654';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d509c7905654';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d509c7905654';
-import { resolveIntentFields } from './intent-resolver.js?v=d509c7905654';
+import { APKWorkerClient } from './apk-worker-client.js?v=3e71109809bc';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=3e71109809bc';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=3e71109809bc';
+import { drawFrameGraph } from './frame-graph.js?v=3e71109809bc';
+import { clientIdentityStatus } from './client-identity.js?v=3e71109809bc';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState } from './device-settings.js?v=3e71109809bc';
+import { initCollapsibleSections } from './panel-sections.js?v=3e71109809bc';
+import { warmupLabel } from './warmup.js?v=3e71109809bc';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=3e71109809bc';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=3e71109809bc';
+import { initHelpTips } from './help-tips.js?v=3e71109809bc';
+import { createToolDock } from './tool-dock.js?v=3e71109809bc';
+import { createPermissionsPanel } from './permissions-panel.js?v=3e71109809bc';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=3e71109809bc';
+import { createAppDataPanel } from './app-data-panel.js?v=3e71109809bc';
+import { createCameraLab } from './camera-lab.js?v=3e71109809bc';
+import { createOverridesPanel } from './overrides-panel.js?v=3e71109809bc';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=3e71109809bc';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=3e71109809bc';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=3e71109809bc';
+import { MICROG_SERVICES } from './microg-services.js?v=3e71109809bc';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=3e71109809bc';
+import { createHostMapPanel } from './host-map-panel.js?v=3e71109809bc';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=3e71109809bc';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=3e71109809bc';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=3e71109809bc';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=3e71109809bc';
+import { createDeviceView, createViewState } from './device-view.js?v=3e71109809bc';
+import { createTaskSwitcher } from './task-switcher.js?v=3e71109809bc';
+import { createDeviceZoom } from './device-zoom.js?v=3e71109809bc';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=3e71109809bc';
+import { formatApiGapReport } from './api-gap-scan.js?v=3e71109809bc';
+import { createLogcatPanel } from './logcat-panel.js?v=3e71109809bc';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=3e71109809bc';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=3e71109809bc';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=3e71109809bc';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=3e71109809bc';
+import { createAppPalette } from './app-palette.js?v=3e71109809bc';
+import { createScreenRecorder } from './screen-recorder.js?v=3e71109809bc';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=3e71109809bc';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=3e71109809bc';
+import { createAdb } from './adb-commands.js?v=3e71109809bc';
+import { createAdbTerminal } from './adb-terminal.js?v=3e71109809bc';
+import { memorySummary } from './worker-memory.js?v=3e71109809bc';
+import { createMcpLink, generateMcpToken, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=3e71109809bc';
+import { createModalHost } from './lab-modal.js?v=3e71109809bc';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=3e71109809bc';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=3e71109809bc';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=3e71109809bc';
+import { createDragLayer } from './lab-drag.js?v=3e71109809bc';
+import { createLabScroll } from './lab-scroll.js?v=3e71109809bc';
+import { createGlSurfaces } from './gl-surfaces.js?v=3e71109809bc';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=3e71109809bc';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=3e71109809bc';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=3e71109809bc';
+import { resolveIntentFields } from './intent-resolver.js?v=3e71109809bc';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -209,7 +212,7 @@ function showError(error, title = 'Run attempt interrupted') {
   if (error.details) details.push(typeof error.details === 'string' ? error.details : JSON.stringify(error.details, null, 2));
   if (error.trace?.length) details.push('Last VM instructions:\n' + error.trace.slice(-40).join('\n'));
   $('error-detail').textContent = [...new Set(details)].join('\n');
-  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), ignoredActivities: ignoredPanel.activeCount(), endpointMocks: mocksPanel.activeCount(), hostRedirects: hostMapPanel.activeLines(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
+  state.errorReport = buildDiagnosticReport({ error, packageName: inventory?.packageName ?? state.fileName ?? 'APK', tolerateMissing: $('tolerate-missing')?.value ?? 'off', methodOverrides: overridesPanel.activeCount(), appModified: methodHooksPanel?.pluginCount() ?? 0, ignoredActivities: ignoredPanel.activeCount(), endpointMocks: mocksPanel.activeCount(), hostRedirects: hostMapPanel.activeLines(), build: document.querySelector?.('script[src*="app.js"]')?.src?.split('v=')[1] ?? '' }).text;
   $('error-detail').hidden = !details.length;
   $('error-diagnostics').hidden = !details.length;
   $('error-diagnostics').open = false;
@@ -362,7 +365,12 @@ let mcpLink = null;
 const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.modal) and "Expand" on a plugin card
 const pluginModals = new Map();   // modal id -> { modal, pluginId }
 /** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controls and in the Logcat like the user's. */
+let methodHooksPanel = null;   // "App modified" (src/method-hooks-panel.js): made with the Controls panels below
 const pluginActions = {
+  /** lab.hook / lab.unhook / lab.hooks (src/method-hooks.js): a method change chosen by the user, installed between two VM events and listed on the page as "App modified". */
+  hook(plugin, spec) { if (!methodHooksPanel) throw Object.assign(new Error('lab.hook is not available here.'), { code: 'unsupported' }); return methodHooksPanel.add(plugin, spec); },
+  unhook(plugin, { id }) { if (!methodHooksPanel) throw Object.assign(new Error('lab.unhook is not available here.'), { code: 'unsupported' }); return methodHooksPanel.remove(id, { owner: plugin.id }); },
+  hooks(plugin, { all = false } = {}) { return methodHooksPanel ? methodHooksPanel.list({ owner: all ? null : plugin.id }) : []; },
   /** lab.adb: an adb command line run by the page's interpreter, as the adb terminal runs it (no files of the computer: a plugin runs in a sandboxed Worker). */
   async adb(plugin, { command = null, args = null } = {}) {
     const result = await runAdb(`plugin ${plugin.name}`, Array.isArray(args) && args.length ? { args } : { command: String(command ?? '') });
@@ -460,7 +468,8 @@ async function freshenSemantics() {
   const snapshot = await apkVM.refreshSemantics();
   if (snapshot && token === state.operation && state.runtime === apkVM) renderSnapshot(snapshot);
 }
-const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, freshen: freshenSemantics, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); labHighlights.closeOwner(id); labOverlays.closeOwner(id); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); }, onFrameWatch: on => labOverlays.setFrameWatch(on) });
+const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, freshen: freshenSemantics, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); labHighlights.closeOwner(id); labOverlays.closeOwner(id); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); }, onFrameWatch: on => labOverlays.setFrameWatch(on),
+  onStopped: id => { methodHooksPanel?.removeOwner(id).catch(error => appendTrace(`App modified: the changes of a stopped plugin could not be removed: ${error?.message ?? error}`)); } });   // a plugin's session ended: its method changes go with it
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
 window.apkLabVM = apkVM;   // test and console access: await apkLabVM.screenState() is the text Copy diagnostics copies
 window.apkLabOpen = (url, name = String(url).split('/').pop()) => importSource({ name, url: new URL(url, location.href).href }, true);   // test and console access: open and run an APK by URL (scripts/capture-plugin-examples.mjs)
@@ -491,6 +500,7 @@ const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => sta
     hostMapPanel.addRule(`${entry.scheme ? entry.scheme + '://' : ''}${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}`);
   } });   // src/netlog-panel.js; "Allow" types the host into the Device field, the same path as typing it
 apkVM.onNetlog = message => { netlogPanel.push(message); pluginHost.netlog(message); };
+apkVM.onMethodHookCalls = message => pluginHost.hookCalls(message);   // observed calls (lab.hook { observe }): each batch to the plugin that observes
 const glSurfaces = createGlSurfaces();   // OpenGL ES window surfaces of the app (src/gles-native.js -> src/gl-surfaces.js)
 apkVM.onGlFrame = frame => glSurfaces.frame(frame);
 window.apkLabNetlog = netlogPanel;   // test and console access: .store.entries
@@ -631,7 +641,7 @@ async function importSource(source, autoRun = false) {
   if (state.busy || state.runStarting) { cancelOperation(); state.runStarting = false; }
   state.reimportShelfId = null;   // set again if this load fails for an installed app
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
-  glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
+  glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); methodHooksPanel?.vmEnded(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   // A new run (another APK, or the app opened again from its launcher icon) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Keep app data" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; showClientCertState(); state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
@@ -661,12 +671,12 @@ async function importSource(source, autoRun = false) {
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processed in the browser`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     frameMeter.reset();   // the frame counts of "Show frame rate" start with the app
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, microg: deviceState.settings.microg === true }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: deviceForVM(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, microg: deviceState.settings.microg === true, microgServices: deviceState.settings.microgServices }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
       showLoadTimes(); appendTrace(`Loaded in ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
-    await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
+    await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await methodHooksPanel.attach(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory); showDeviceHome('installed');
     if (source.file && apkShelf) {   // an APK from a file is kept on the home screen (one entry per package: a new build replaces the old one); a hosted example is not
       try { const saved = await apkShelf.save({ name: source.name, packageName: result.inventory.packageName || null, blob: source.file, handle: source.handle ?? null, previousId: source.shelfId ?? null }); state.shelfId = saved.id; source.shelfId = saved.id; describeSavedApp(); apkShelf.describe(saved.id, { activities: intentActivities(result.inventory) }).catch(() => {}); navigator.storage?.persist?.().catch(() => {}); }
@@ -801,7 +811,16 @@ const appDataPanel = createAppDataPanel({ $, vm: apkVM, modals: modalHost, ready
 $('cp-sec-appdata')?.addEventListener('toggle', () => { if ($('cp-sec-appdata').open) appDataPanel.refresh(); });
 const cameraLab = createCameraLab({ $, vm: apkVM });   // the device's cameras: source, frames for the VM, the camera screen of the capture Intents
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
+methodHooksPanel = createMethodHooksPanel({ $, vm: apkVM, trace: appendTrace, removePageRow: key => overridesPanel.removeKey(key), getPackage: () => state.inventory?.packageName ?? null });
+window.apkLabMethodHooks = methodHooksPanel;   // test and console access: .list(), .summary()
 const microgEntriesPanel = createMicrogEntriesPanel({ $, vm: apkVM });
+// "microG services" (src/microg-services-panel.js): each switch is a device setting, saved, recorded in the trace and, with a running microG, applied to it at once.
+const microgServicesPanel = createMicrogServicesPanel({ $, onChange: services => {
+  const before = deviceState.settings.microgServices ?? {};
+  for (const service of MICROG_SERVICES) if ((before[service.id] === true) !== services[service.id]) appendTrace(`microG service ${service.label} turned ${services[service.id] ? `on: microG talks to ${service.who} (${service.hosts.join(', ')})` : 'off'} (Device > microG services)`);
+  applyDeviceSettings({ ...readDevicePanel(), microgServices: services });
+  if (apkVM.worker && state.loadedMicrog === true) apkVM.setMicrogServices(services).then(current => microgServicesPanel.update(current, true), () => {});
+} });
 const ignoredPanel = createIgnoredActivitiesPanel({ $, vm: apkVM });
 pluginsPanel = createPluginsPanel({ $, host: pluginHost, modals: modalHost, toolbarRoot: $('plugin-toolbar'), onPower: level => apkVM.setPluginPower(level).catch(() => {}) });
 // "Plugin power": the Worker's serving numbers (served, VM time, deferred, rejected, longest) next to the level, every 2 s while a plugin runs (src/plugin-power.js)
@@ -1121,7 +1140,7 @@ const runAdb = (who, input, io) => { appendTrace(`adb (${who}): ${typeof input.c
 if ($('adb-terminal')?.querySelector?.('.adb-output')) window.apkLabTerminal = createAdbTerminal({ root: $('adb-terminal'), run: (command, io) => runAdb('terminal', { command }, io) });
 window.apkLabAdb = adbInterpreter;   // test and console access: await apkLabAdb.run({ command: 'adb shell wm size' })
 const mcpTools = createMcpTools({ controls: mcpControls, input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], pluginStore: { list: () => pluginsPanel?.list?.() ?? [], save: spec => { const saved = pluginsPanel.save(spec); appendTrace(`MCP (save_plugin): plugin "${saved.plugin.name}" ${saved.created ? 'created' : 'changed'}${saved.plugin.enabled ? '' : ' (off)'}`); return saved; } }, clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries, frameStats: () => frameMeter.enabled ? frameMeter.summary() : null,
-  status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null }) });
+  status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null, appModified: methodHooksPanel?.summary() ?? { count: 0 } }) });
 window.apkLabMcpTools = mcpTools;   // test and console access: await apkLabMcpTools.execute('plugins', {})
 mcpLink = createMcpLink({ execute: (tool, args, context) => mcpTools.execute(tool, args, context), onState: ({ state: linkState, message, calls, lastTool }) => {
   const connected = linkState === 'conectado';
@@ -1191,7 +1210,7 @@ const deviceView = createDeviceView({ $, state, deviceState, frameMeter, hideErr
   },
   rendered(snapshot, composeReady) {
     syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup); taskSwitcher?.sync(snapshot, state.inventory);
-    overridesPanel.hits(snapshot.methodOverrides); microgEntriesPanel.update(snapshot.deviceOptions?.microg?.entryPoints ?? null); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
+    overridesPanel.hits(snapshot.methodOverrides); methodHooksPanel.update(snapshot.methodHooks); microgEntriesPanel.update(snapshot.deviceOptions?.microg?.entryPoints ?? null); microgServicesPanel.update(snapshot.deviceOptions?.microg?.services ?? null, state.loadedMicrog); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); showCoreUsage(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); syncFrameGraph(); if (snapshot.vmHealth) { const before = JSON.stringify(state.lastVmHealth?.clientIdentity ?? null); state.lastVmHealth = snapshot.vmHealth; if (JSON.stringify(snapshot.vmHealth.clientIdentity ?? null) !== before) showClientCertState(); } if (snapshot.vmHealth?.renderer) showRendererStatus(snapshot.vmHealth.renderer, true); composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
     if (snapshot.droppedEvent) appendTrace(`Event dropped: View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) no longer exists in the VM.`);
     // The VM raised java.lang.OutOfMemoryError (even if the app caught it): never silent.
@@ -1256,12 +1275,12 @@ function writeDevicePanel(settings) {
   if ($('vm-renderer')) $('vm-renderer').value = settings.renderer ?? 'gpu'; showEngine(settings);
   if ($('vm-raster-scale')) $('vm-raster-scale').value = String(settings.raster?.motionScale ?? 1); if ($('vm-raster-still')) $('vm-raster-still').value = String(settings.raster?.stillScale ?? 1); if ($('vm-raster-navigation')) $('vm-raster-navigation').checked = settings.raster?.navigation === true;
   customScreenPanel.write(settings);
-  if ($('dev-microg')) $('dev-microg').checked = settings.microg === true; updateMicrogHint(settings);
+  if ($('dev-microg')) $('dev-microg').checked = settings.microg === true; updateMicrogHint(settings); microgServicesPanel.write(settings);
   const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'landscape' : 'portrait'}`;
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, customScreen: customScreenPanel.read(deviceState.settings.customScreen), orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: `${$('dev-locale').value}-${$('dev-region')?.value || 'US'}`, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, microg: $('dev-microg')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, microg: $('dev-microg')?.checked === true, microgServices: microgServicesPanel.read(), eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "VM memory": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('en-US')} objects`; };

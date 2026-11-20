@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=d509c7905654';
-import { bitsFloat, floatBits } from './host-contract.js?v=d509c7905654';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=d509c7905654';
+import { Blocked } from './scheduler.js?v=3e71109809bc';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=3e71109809bc';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md). These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
@@ -268,6 +268,14 @@ function glFor(r, name) {
   return context;
 }
 const raise = (context, error) => { if (context.error === GL.NO_ERROR) context.error = error; };
+/** glGetString of the current context (GLES20, and GLES10's, below). */
+function glGetString(r, c, gl, [name]) {
+  switch (name) {
+    case GL.VERSION: return GL_VERSION_STRING; case GL.SHADING_LANGUAGE_VERSION: return GLSL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab';
+    case GL.RENDERER: return c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2'; case GL.EXTENSIONS: return c.group.extensions.join(' ');
+    default: raise(c, GL.INVALID_ENUM); return null;
+  }
+}
 const nameOf = (context, kind, object) => object ? context.group.reverse.get(object) ?? 0 : 0;
 const objectOf = (context, kind, name) => name ? context.group.names[kind].get(name) ?? null : null;
 function lookup(context, kind, name) { if (!name) return null; const object = context.group.names[kind].get(name); if (!object) { raise(context, GL.INVALID_OPERATION); return undefined; } return object; }
@@ -620,13 +628,7 @@ function glesBindings(add) {
   }
   both(S30, 'glGetIntegeri_v', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const v = gl.getIndexedParameter(args[0], args[1]); if (v === null || v === undefined) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'I', [typeof v === 'object' ? nameOf(c, 'buffer', v) : Number(v)]); });
   both(S30, 'glGetInteger64i_v', ['(II[JI)V', `(II${LONG_BUFFER})V`], (r, c, gl, args) => { const v = gl.getIndexedParameter(args[0], args[1]); if (v === null || v === undefined) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'J', [typeof v === 'object' ? nameOf(c, 'buffer', v) : Number(v)], 'long'); });
-  S20('glGetString', `(I)${STRING}`, (r, c, gl, [name]) => {
-    switch (name) {
-      case GL.VERSION: return GL_VERSION_STRING; case GL.SHADING_LANGUAGE_VERSION: return GLSL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab';
-      case GL.RENDERER: return c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2'; case GL.EXTENSIONS: return c.group.extensions.join(' ');
-      default: raise(c, GL.INVALID_ENUM); return null;
-    }
-  }, null);
+  S20('glGetString', `(I)${STRING}`, glGetString, null);
   S30('glGetStringi', `(II)${STRING}`, (r, c, gl, [name, index]) => { if (name !== GL.EXTENSIONS) { raise(c, GL.INVALID_ENUM); return null; } if (index < 0 || index >= c.group.extensions.length) { raise(c, GL.INVALID_VALUE); return null; } return c.group.extensions[index]; }, null);
   // ---- ES 3.0 draws, queries, transform feedback, uniform blocks, syncs ----
   S30('glDrawArraysInstanced', '(IIII)V', (r, c, gl, [mode, first, count, instances]) => { uploadClientArrays(r, c, first + count); gl.drawArraysInstanced(mode, first, count, instances); });
@@ -817,6 +819,16 @@ function platformOf(r) {
 }
 
 /** The bindings of every GL / EGL native of the original classes: Map 'owner->name(signature)' -> (runtime, args). */
+/**
+ * android.opengl.GLES10 (not in the framework DEX): glGetString only, over the same context as GLES20 (a GL ES 1.x string query is answered by the device's one GL, here WebGL2 behind
+ * ES 3.0). It is what code that reads the extension strings of a context it made current asks (device-configuration reports); any other GLES10 call fails naming it.
+ */
+export function createGles10Host() {
+  const registry = createHostRegistry(), { def, type } = registry, GLES10 = 'Landroid/opengl/GLES10;';
+  type(GLES10, 'Ljava/lang/Object;');
+  def(GLES10, 'glGetString', `(I)${STRING}`, (r, _m, args) => { const c = glFor(r, 'glGetString'); return c ? glGetString(r, c, c.gl, args) : null; }, { static: true });
+  return registry;
+}
 export function createGlesNativeBindings() {
   const bindings = new Map();
   const glAdd = (owner, name, signature, body, fallback) => bindings.set(`${owner}->${name}${signature}`, (r, args) => { const c = glFor(r, name); return c ? body(r, c, c.gl, args) : fallback; });

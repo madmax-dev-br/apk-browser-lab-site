@@ -44,6 +44,8 @@ import zlib from 'node:zlib';
 import { Readable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { readFileSync, writeFileSync, mkdirSync, statSync, renameSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const { createWebViewRelay } = createRequire(import.meta.url)('./relay-webview.cjs');   // WebView documents: the same file as the desktop relay's src/webview.cjs
 
 export const DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-connection', 'transfer-encoding', 'upgrade', 'te', 'trailer', 'host', 'content-length', 'expect']);
@@ -68,6 +70,7 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const fail = (res, status, message) => { res.statusCode = status; res.setHeader('Content-Type', 'text/plain; charset=utf-8'); res.end(message); };
   const server = http.createServer(async (req, res) => {
+    if (webview.owns(req)) return webview.serve(req, res);   // a WebView document (http://<label>.localhost:<port>/...): scripts/relay-webview.cjs, docs/NETWORK.md "WebView documents"
     const origin = req.headers.origin ?? '';
     const url = new URL(req.url, 'http://relay.invalid');
     if (url.pathname !== `/${token}/` && url.pathname !== `/${token}`) {
@@ -119,15 +122,20 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
     response.on('error', () => res.destroy()).pipe(res);
   });
   const sessions = new Set();   // the open channels, so close() ends them (a WebSocket is not an HTTP request the server would wait for)
+  // WebView documents: one hop per request (the frame follows redirects itself, so the lab decides each one), with the relay's resolver, --ca roots and client identities
+  const webview = createWebViewRelay({ token, allowed, timeoutMs, port: () => server.address()?.port ?? 0,
+    upstream: (target, method, headers, body, { signal, timeoutMs: ms }) => send(target, method, headers, body, ms ?? timeoutMs, 0, identities, ca, { ...transport, signal, manualRedirects: true }) });
   server.on('upgrade', (req, socket) => {
     const pathname = new URL(req.url, 'http://relay.invalid').pathname;
+    if (pathname === `/${token}/webview`) return webview.channel(req, socket);
     if (pathname === `/${token}/mux`) return muxChannel({ req, socket, allowed, answer: exchange => relayAnswer({ ...exchange, identities, ca, timeoutMs, transport }), sessions });
     return tunnel({ req, socket, token, allowed, timeoutMs, identities, ca });
   });
   const close = server.close.bind(server);   // an upgraded socket keeps the server open, so close() ends the channels and the kept-alive upstream connections first
-  server.close = callback => { for (const socket of sessions) socket.destroy(); for (const agent of Object.values(agents)) agent.destroy(); return close(callback); };
+  server.close = callback => { webview.close(); for (const socket of sessions) socket.destroy(); for (const agent of Object.values(agents)) agent.destroy(); return close(callback); };
   server.clientIdentityCount = () => identities.size;
   server.channelCount = () => sessions.size;
+  server.webviewChannelCount = () => webview.channelCount();
   server.closeChannels = () => { for (const socket of sessions) socket.destroy(); };   // drops every open channel at once (as a relay that stops does)
   return server;
 }
@@ -452,7 +460,7 @@ function send(url, method, headers, body, timeoutMs, hops = 0, identities = null
     const agent = transport.agents?.[url.protocol];   // the relay's keep-alive agents; a connection with its own TLS material (a client identity, --ca roots) is not pooled
     const request = (url.protocol === 'https:' ? https : http).request(url, { method, headers: outgoing, timeout: timeoutMs, ...(agent ? { agent } : {}), ...(transport.signal ? { signal: transport.signal } : {}), ...(transport.lookup ? { lookup: transport.lookup } : {}), ...(identity ? { key: identity.key, cert: identity.cert, agent: false } : {}), ...(roots ? { ca: roots, agent: false } : {}) }, response => {
       const status = response.statusCode, location = response.headers.location;
-      if ([301, 302, 303, 307, 308].includes(status) && location) {
+      if (!transport.manualRedirects && [301, 302, 303, 307, 308].includes(status) && location) {
         response.resume();
         if (hops >= 20) return reject(Object.assign(new Error('Too many follow-up requests: 21'), { code: 'EREDIRECT' }));
         const next = new URL(location, url), asGet = status === 303 || ((status === 301 || status === 302) && method === 'POST');

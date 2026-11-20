@@ -1,0 +1,15 @@
+Original Android 13 services profile (android.app.IntentService)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-services-profile.sh     (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/intent-service.test.mjs
+
+Contents: the pinned android-13.0.0_r1 original listed in framework-aosp/services-sources.txt, compiled unchanged (no source
+transform): android.app.IntentService and its ServiceHandler. Its superclass android.app.Service is the lab's host class
+(src/job-scheduler-host.js); the original's onCreate starts a HandlerThread "IntentService[<name>]", onStart posts each Intent to it,
+onHandleIntent runs there and stopSelf(startId) follows, onDestroy quits the Looper.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
+(src/apk-loader.js) adds this DEX when the APK's DEX references android.app.IntentService, when a companion package is installed that may
+(the "With microG" option: microG's check-in service is an IntentService; a companion's code is not scanned at load), or when the loader
+option enableServicesProfile is true.

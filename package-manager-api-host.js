@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
 
 // android.content.pm.PackageManager public API (API 33) that the package model of app-services-host does not answer yet, ported from android-13.0.0_r1 PackageManager.java /
 // ApplicationPackageManager.java for a device with this app and the system packages of that model. Flag-holder overloads (ComponentInfoFlags / PackageInfoFlags / ResolveInfoFlags) forward to the
@@ -66,14 +66,16 @@ export function createPackageManagerApiHost(platform) {
   });
   def(PM, 'getLeanbackLaunchIntentForPackage', `(${STRING})${INTENT}`, (r, _m, [, name]) => { if (nullish(name)) npe(r, 'packageName'); return null; });   // no Leanback launcher on a phone
   def(PM, 'getLaunchIntentSenderForPackage', `(${STRING})Landroid/content/IntentSender;`, () => unsupported('PackageManager.getLaunchIntentSenderForPackage: IntentSender is not part of the lab framework', 'intent-sender-unsupported'));
-  const resourcesOf = (r, name) => { if (text(r, name) !== own()) notFound(r, text(r, name)); return nullish(platform.application) ? platform.resourcesForContext(r, null) : call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES); };   // the package's Resources exist without its Application (a launcher asks before the app is started)
+  // A second installed package the caller can see (src/package-registry.js): its own Resources object, over its own resources.arsc.
+  const companionNamed = (r, name) => { const P = platform.packages; if (!P?.multi || name === own()) return null; const entry = P.byName(name); if (!entry || entry.main) return null; platform.appServices.findPackage(r, name); return entry; };
+  const resourcesOf = (r, name) => { const other = companionNamed(r, text(r, name)); if (other) return platform.packages.packageResources(r, other); if (text(r, name) !== own()) notFound(r, text(r, name)); return nullish(platform.application) ? platform.resourcesForContext(r, null) : call(r, platform.application, 'Landroid/content/Context;', 'getResources', [], RESOURCES); };   // the package's Resources exist without its Application (a launcher asks before the app is started)
   def(PM, 'getResourcesForApplication', `(${STRING})${RESOURCES}`, (r, _m, [, name]) => { if (nullish(name)) npe(r); return resourcesOf(r, name); });
   def(PM, 'getResourcesForApplication', `(${APP_INFO})${RESOURCES}`, (r, _m, [, info]) => { if (nullish(info)) npe(r); return resourcesOf(r, r.object(info).fields.get(`Landroid/content/pm/PackageItemInfo;->packageName:${STRING}`)); });
   def(PM, 'getResourcesForApplication', `(${APP_INFO}${CONFIG})${RESOURCES}`, (r, _m, [self, info]) => call(r, self, PM, 'getResourcesForApplication', [APP_INFO], RESOURCES, [info]));
   def(PM, 'getResourcesForActivity', `(${COMPONENT})${RESOURCES}`, (r, _m, [, component]) => resourcesOf(r, call(r, component, COMPONENT, 'getPackageName', [], STRING)));
-  const iconOf = (r, resId) => resId ? call(r, resourcesOf(r, own()), RESOURCES, 'getDrawable', ['I', 'Landroid/content/res/Resources$Theme;'], DRAWABLE, [resId, null]) : null;
+  const iconOf = (r, resId, pkg = own()) => resId ? call(r, resourcesOf(r, pkg), RESOURCES, 'getDrawable', ['I', 'Landroid/content/res/Resources$Theme;'], DRAWABLE, [resId, null]) : null;
   const defaultIcon = r => call(r, callStatic(r, RESOURCES, 'getSystem', [], RESOURCES), RESOURCES, 'getDrawable', ['I', 'Landroid/content/res/Resources$Theme;'], DRAWABLE, [0x01080093, null]);   // android.R.drawable.sym_def_app_icon
-  const appIcon = (r, name, kind) => { const n = known(r, name); if (n !== own()) return defaultIcon(r); const icon = platform.manifest?.application?.[kind]; return typeof icon === 'number' && icon ? iconOf(r, icon) : defaultIcon(r); };
+  const appIcon = (r, name, kind) => { const n = known(r, name); const other = companionNamed(r, n); if (other) { const icon = other.manifest?.application?.[kind]; return typeof icon === 'number' && icon ? iconOf(r, icon, n) : defaultIcon(r); } if (n !== own()) return defaultIcon(r); const icon = platform.manifest?.application?.[kind]; return typeof icon === 'number' && icon ? iconOf(r, icon) : defaultIcon(r); };
   for (const [name, kind] of [['getApplicationIcon', 'icon'], ['getApplicationLogo', 'logo'], ['getApplicationBanner', 'banner']]) {
     def(PM, name, `(${STRING})${DRAWABLE}`, (r, _m, [, pkg]) => kind === 'icon' ? appIcon(r, pkg, kind) : (known(r, pkg), kind === 'logo' && typeof platform.manifest?.application?.logo === 'number' ? iconOf(r, platform.manifest.application.logo) : null));
     def(PM, name, `(${APP_INFO})${DRAWABLE}`, (r, _m, [self, info]) => call(r, self, PM, name, [STRING], DRAWABLE, [r.object(info).fields.get(`Landroid/content/pm/PackageItemInfo;->packageName:${STRING}`)]));
@@ -90,9 +92,9 @@ export function createPackageManagerApiHost(platform) {
   }
   def(PM, 'getDefaultActivityIcon', `()${DRAWABLE}`, r => defaultIcon(r));
   def(PM, 'isDefaultApplicationIcon', `(${DRAWABLE})Z`, (r, _m, [, drawable]) => { if (nullish(drawable)) return 0; const id = r.object(drawable).fields.get('Landroid/graphics/drawable/Drawable;->mSourceResId:I'); return id === 0x01080093 ? 1 : 0; });
-  def(PM, 'getDrawable', `(${STRING}I${APP_INFO})${DRAWABLE}`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own()) notFound(r, text(r, pkg)); return resId ? iconOf(r, resId) : null; });
-  def(PM, 'getText', `(${STRING}I${APP_INFO})Ljava/lang/CharSequence;`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own()) return null; return resId ? call(r, resourcesOf(r, pkg), RESOURCES, 'getText', ['I'], 'Ljava/lang/CharSequence;', [resId]) : null; });
-  def(PM, 'getXml', `(${STRING}I${APP_INFO})Landroid/content/res/XmlResourceParser;`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own()) return null; return resId ? call(r, resourcesOf(r, pkg), RESOURCES, 'getXml', ['I'], 'Landroid/content/res/XmlResourceParser;', [resId]) : null; });
+  def(PM, 'getDrawable', `(${STRING}I${APP_INFO})${DRAWABLE}`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own() && !companionNamed(r, text(r, pkg))) notFound(r, text(r, pkg)); return resId ? iconOf(r, resId, text(r, pkg)) : null; });
+  def(PM, 'getText', `(${STRING}I${APP_INFO})Ljava/lang/CharSequence;`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own() && !companionNamed(r, text(r, pkg))) return null; return resId ? call(r, resourcesOf(r, pkg), RESOURCES, 'getText', ['I'], 'Ljava/lang/CharSequence;', [resId]) : null; });
+  def(PM, 'getXml', `(${STRING}I${APP_INFO})Landroid/content/res/XmlResourceParser;`, (r, _m, [, pkg, resId]) => { if (text(r, pkg) !== own() && !companionNamed(r, text(r, pkg))) return null; return resId ? call(r, resourcesOf(r, pkg), RESOURCES, 'getXml', ['I'], 'Landroid/content/res/XmlResourceParser;', [resId]) : null; });
   // ---- PackageItemInfo / ComponentInfo / ResolveInfo label and icon loading (android-13.0.0_r1 PackageItemInfo.loadLabel / loadIcon / loadXmlMetaData, ComponentInfo.getIconResource, ResolveInfo.loadLabel / loadIcon) ----
   // The lab's component infos carry name, package and the application info; a component without its own label or icon shares the application's (what the framework's package parser records).
   const ITEM = 'Landroid/content/pm/PackageItemInfo;', COMPONENT_INFO = 'Landroid/content/pm/ComponentInfo;', CHARS = 'Ljava/lang/CharSequence;', BUNDLE = 'Landroid/os/Bundle;';

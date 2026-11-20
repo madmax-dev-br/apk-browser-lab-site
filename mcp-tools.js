@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=d509c7905654';
+import { blockValue, outputsOf } from './plugin-host.js?v=3e71109809bc';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -96,7 +96,8 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
   const tools = {
     async lab_status() {
       const screen = await query('screen', {});
-      const frameRate = frameStats(); return [text({ apk: status(), screen, ...(frameRate ? { frameRate } : {}), plugins: plugins().map(plugin => ({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, errors: plugin.errorCount || undefined })) })];
+      const frameRate = frameStats(), { appModified, ...apk } = status() ?? {};   // appModified: the method changes in effect (src/method-hooks-panel.js summary), never left out while one is active
+      return [text({ apk, screen, ...(frameRate ? { frameRate } : {}), ...(appModified?.count || appModified?.failed?.length ? { appModified } : {}), plugins: plugins().map(plugin => ({ id: plugin.id, name: plugin.name, status: plugin.status, reason: plugin.reason || undefined, errors: plugin.errorCount || undefined })) })];
     },
     async screenshot(args) {
       let ready = null; if (args.wait_ready) ready = await waitReady(args.timeout_ms);

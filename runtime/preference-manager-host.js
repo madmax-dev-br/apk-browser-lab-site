@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
 
 // android.preference.PreferenceManager's statics, following android-13.0.0_r1 frameworks/base/core/java/android/preference/PreferenceManager.java:
-//   getDefaultSharedPreferences(Context)  = context.getSharedPreferences(packageName + "_preferences", MODE_PRIVATE)   (the same SharedPreferences instance, listeners and files as getSharedPreferences by that name)
+//   getDefaultSharedPreferences(Context)  = context.getSharedPreferences(packageName + "_preferences", MODE_PRIVATE); getDefaultSharedPreferencesName(Context) = that name   (the same SharedPreferences instance, listeners and files as getSharedPreferences by that name)
 //   setDefaultValues(Context, int, boolean) / (Context, String, int, int, boolean): unless the marker says it ran (KEY_HAS_SET_DEFAULT_VALUES in a SharedPreferences of that name) or readAgain, the preference XML
 //   is inflated like PreferenceInflater does and every preference's android:defaultValue is written to the target SharedPreferences through one Editor, applied once, for keys that are not there yet; then the marker is set.
 // The legacy android.preference.Preference classes are not in the framework DEX: what setDefaultValues needs from them (the tag -> class mapping, each class's onGetDefaultValue / onSetInitialValue, persistence rules)
@@ -90,6 +90,7 @@ export function createPreferenceManagerHost() {
 
   const nullContext = (r, context) => { if (context === null) r.throwJava('Ljava/lang/NullPointerException;', 'Attempt to invoke virtual method on a null object reference'); };
   def(MANAGER, 'getDefaultSharedPreferences', `(${CONTEXT})${PREFS}`, (r, _m, [context]) => { nullContext(r, context); return sharedPreferences(r, context, defaultName(r, context), defaultMode()); }, { static: true });
+  def(MANAGER, 'getDefaultSharedPreferencesName', `(${CONTEXT})${STRING}`, (r, _m, [context]) => { nullContext(r, context); return defaultName(r, context); }, { static: true });   // API 24
   def(MANAGER, 'setDefaultValues', `(${CONTEXT}IZ)V`, (r, _m, [context, resId, readAgain]) => { nullContext(r, context); setDefaults(r, context, defaultName(r, context), defaultMode(), resId, !!readAgain); }, { static: true });
   def(MANAGER, 'setDefaultValues', `(${CONTEXT}${STRING}IIZ)V`, (r, _m, [context, name, mode, resId, readAgain]) => { nullContext(r, context); setDefaults(r, context, text(r, name), mode, resId, !!readAgain); }, { static: true });
   return { ...registry, interfaces: registry.interfacesOf };

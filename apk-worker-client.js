@@ -1,8 +1,8 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=d509c7905654';
-import { createRasterReceiver } from './raster-cache.js?v=d509c7905654';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=d509c7905654';
+import { createWebAudioPlayer } from './web-audio-player.js?v=3e71109809bc';
+import { createRasterReceiver } from './raster-cache.js?v=3e71109809bc';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=3e71109809bc';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d509c7905654', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=3e71109809bc', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -38,6 +38,7 @@ export class APKWorkerClient {
       if (data?.type === 'app-data') { this.appData = data.status; this.onAppData?.(data.status); return; }
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
+      if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
       if (data?.type === 'webview') { this.onWebView?.(data); return; }
       if (data?.type === 'gl-frame') { this.onGlFrame?.(data.frame); return; }   // a frame of an OpenGL ES window surface (src/gles-native.js, drawn by src/gl-surfaces.js)   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); const waiting = this.apiGapWaiters; this.apiGapWaiters = null; for (const resolve of waiting ?? []) resolve(this.apiGaps); return; }   // static estimate, posted once per `requestApiGaps()`; never part of a request
@@ -104,9 +105,9 @@ export class APKWorkerClient {
       catch (error) { this.cancel(error); }
     });
   }
-  async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false } = {}) {
+  async load(buffer, { onProgress, nativeVersionMismatch = false, device = null, frameworkDex = null, frameworkResources = null, resourceConfigBytes = null, resourceConfigMetadata = null, tolerateMissing = 'off', strictCrash = false, keepData = true, clearData = false, webview = true, memoryMiB = 0, methodOverrides = [], ignoredActivities = [], endpointMocks = [], eventSeconds = 0, permissions = null, motionRaster = true, rasterScale = undefined, rasterNavigation = false, rasterSettled = 1, logcatStreaming = false, renderer = 'cpu', engine = 'js', coreMemory = null, microg = false, microgServices = null } = {}) {
     this.cancel(null, { keepFresh: true }); this.rasters.reset(); this.apiGaps = null; this.apiGapWaiters = null; this.fresh = false;   // a Worker started by prewarm() that has run nothing yet is kept: its assets are loading or loaded
-    const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
+    const response = await this.request('load', { buffer, nativeVersionMismatch: nativeVersionMismatch === true, device, frameworkDex, frameworkResources, resourceConfigBytes, resourceConfigMetadata, tolerateMissing, strictCrash, keepData, clearData, webview, memoryMiB, methodOverrides, ignoredActivities, endpointMocks, eventSeconds, permissions, motionRaster, rasterScale, rasterNavigation, rasterSettled, logcatStreaming, renderer: renderer === 'gpu' ? 'gpu' : 'cpu', engine: engine === 'wasm' ? 'wasm' : 'js', coreMemory, microg: microg === true, microgServices: microgServices && typeof microgServices === 'object' ? { ...microgServices } : null }, { onProgress, timeoutMs: this.loadTimeoutMs, transfer: [buffer, ...(frameworkDex ? [frameworkDex] : []), ...(resourceConfigBytes ? [resourceConfigBytes] : [])] });
     this.appData = response.appData ?? null; this.renderer = response.renderer ?? null;
     return { inventory: response.inventory, appData: this.appData, renderer: this.renderer };
   }
@@ -180,8 +181,13 @@ export class APKWorkerClient {
   /** The Worker's plugin serving stats { served, ms, deferred, rejected, maxMs, batches, batched, queued } and its level; null without a Worker. */
   async pluginPowerStatus() { if (!this.worker) return null; const reply = await this.sideCall('plugin-power', {}, 2000); return { level: reply.level, stats: reply.stats }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
+  /** The plugins' method changes (lab.hook, src/method-hooks.js), answered between two VM events: op 'add' ({ spec, owner: { id, name }, id }), 'remove' ({ id, owner }),
+   *  'remove-owner' ({ owner }) or 'list'. Resolves { loaded, hook?, removed?, hooks } (hooks: every change of the VM); rejects with `code` (and `errors` for a smali body). */
+  async methodHooks(op, payload = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); return this.sideCall('method-hooks', { ...payload, op, power: this.pluginPower }, 15000); }
   /** The "com microG" entry points (src/microg-entry-points.js): sets the page's constant-value mocks ([{ id, value }]; an id left out is unmocked) and resolves the entry-point rows. */
   async setMicrogMocks(mocks) { return (await this.sideCall('microg-mocks', { mocks })).entryPoints ?? []; }
+  /** "microG services" (src/microg-services.js): the user's choice of microG's online services, applied to a running microG as its settings screen applies a switch; resolves microG's state ({ chosen, effective, ... }) or null without microG. */
+  async setMicrogServices(services) { return (await this.sideCall('microg-services', { services })).services ?? null; }
   async setIgnoredActivities(entries) { return (await this.sideCall('ignored-activities', { entries })).statuses; }
   /** The permission states and the simulated location ({ config, location }), applied between two VM events; either part may be left out. */
   async setPermissions(payload) { return this.sideCall('permissions-config', payload); }

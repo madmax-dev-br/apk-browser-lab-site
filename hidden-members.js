@@ -1,4 +1,4 @@
-import TABLES from './hidden-member-tables.js?v=d509c7905654';
+import TABLES from './hidden-member-tables.js?v=3e71109809bc';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with

@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { bestDateTimePattern, defaultHourCycle } from './date-skeleton.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { bestDateTimePattern, defaultHourCycle } from './date-skeleton.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
 
 // android.icu.text / android.icu.util classes mapped over the lab's java.text hosts and the engine's CLDR data (Intl). Android 13 ships ICU4J as android.icu.*; the lab does not carry ICU4J (hundreds
 // of classes plus its resource bundles), so each android.icu class below is a thin object holding the java.text / java.util object it maps to (`inner`) and forwarding the same-named API:
@@ -176,14 +176,77 @@ export function createIcuTextHost(platform) {
     if (nullish(width)) npe(r, 'formatWidth'); const display = r.object(width).unitDisplay; if (!display) unsupported('MeasureFormat width NUMERIC');
     const o = r.allocate(MEASURE_FORMAT); r.object(o).measureFormat = { tag: text(r, callV(r, localeOf(r, locale) ?? defaultLocale(r), LOCALE, 'toLanguageTag', [], STRING)), display }; return o;
   }, { static: true });
-  def(MEASURE_FORMAT, 'formatMeasures', `([${MEASURE})${STRING}`, (r, _m, [self, measures]) => {
-    const { tag, display } = r.object(self).measureFormat, parts = r.array(measures).elements.map(ref => {
-      const measure = r.object(ref), unit = r.object(measure.measureUnit).intlUnit; if (!unit) unsupported('MeasureFormat.formatMeasures for a unit other than the time units');
-      const bits = call(r, measure.measureNumber, 'Ljava/lang/Number;', 'doubleValue', [], 'D'), value = typeof bits === 'bigint' ? new Float64Array(new BigInt64Array([bits]).buffer)[0] : Number(bits);
-      return new Intl.NumberFormat(tag, { style: 'unit', unit, unitDisplay: display }).format(value);
+  // Units Intl formats as ICU does (CLDR "digital" and "concentr" units): bytes and bits, the SI multiples, percent.
+  for (const [name, unit] of [['BIT', 'bit'], ['BYTE', 'byte'], ['KILOBIT', 'kilobit'], ['KILOBYTE', 'kilobyte'], ['MEGABIT', 'megabit'], ['MEGABYTE', 'megabyte'], ['GIGABIT', 'gigabit'], ['GIGABYTE', 'gigabyte'], ['TERABIT', 'terabit'], ['TERABYTE', 'terabyte'], ['PETABYTE', 'petabyte'], ['PERCENT', 'percent']])
+    staticField(MEASURE_UNIT, name, MEASURE_UNIT, r => { const o = r.allocate(MEASURE_UNIT); r.object(o).intlUnit = unit; return o; });
+  const doubleOf = (r, number) => { const bits = call(r, number, 'Ljava/lang/Number;', 'doubleValue', [], 'D'); return typeof bits === 'bigint' ? new Float64Array(new BigInt64Array([bits]).buffer)[0] : Number(bits); };
+  const intlUnitOf = (r, unitRef, what) => { const unit = r.object(unitRef).intlUnit; if (!unit) unsupported(`${what} for a MeasureUnit the lab does not map to an Intl unit`); return unit; };
+  // getInstance(locale, width, NumberFormat): the measure's number takes that NumberFormat's fraction digits (and grouping); without one, the locale's default NumberFormat (at most 3 fraction digits)
+  for (const localeType of [LOCALE, ULOCALE]) def(MEASURE_FORMAT, 'getInstance', `(${localeType}${FORMAT_WIDTH}${I_NF})${MEASURE_FORMAT}`, (r, _m, [locale, width, numberFormat]) => {
+    if (nullish(width)) npe(r, 'formatWidth'); const display = r.object(width).unitDisplay; if (!display) unsupported('MeasureFormat width NUMERIC');
+    const digits = nullish(numberFormat) ? {} : { minimumFractionDigits: call(r, numberFormat, I_NF, 'getMinimumFractionDigits', [], 'I'), maximumFractionDigits: call(r, numberFormat, I_NF, 'getMaximumFractionDigits', [], 'I'), useGrouping: call(r, numberFormat, I_NF, 'isGroupingUsed', [], 'Z') !== 0 };
+    const o = r.allocate(MEASURE_FORMAT); r.object(o).measureFormat = { tag: text(r, callV(r, localeOf(r, locale) ?? defaultLocale(r), LOCALE, 'toLanguageTag', [], STRING)), display, digits }; return o;
+  }, { static: true });
+  const formatMeasureList = (r, self, refs) => {
+    const { tag, display, digits = {} } = r.object(self).measureFormat, parts = refs.map(ref => {
+      if (nullish(ref) || r.typeOf(ref) !== MEASURE) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Expecting a Measure');
+      const measure = r.object(ref); return new Intl.NumberFormat(tag, { ...digits, style: 'unit', unit: intlUnitOf(r, measure.measureUnit, 'MeasureFormat'), unitDisplay: display }).format(doubleOf(r, measure.measureNumber));
     });
     return new Intl.ListFormat(tag, { type: 'unit', style: display }).format(parts);
+  };
+  def(MEASURE_FORMAT, 'formatMeasures', `([${MEASURE})${STRING}`, (r, _m, [self, measures]) => formatMeasureList(r, self, r.array(measures).elements));
+  // Format.format(Object): ICU's MeasureFormat takes a Measure, a Measure[] or a Collection of them
+  def(MEASURE_FORMAT, 'format', `(${OBJECT})${STRING}`, (r, _m, [self, object]) => {
+    if (nullish(object)) npe(r);
+    if (r.typeOf(object) === MEASURE) return formatMeasureList(r, self, [object]);
+    if (r.typeOf(object) === `[${MEASURE}`) return formatMeasureList(r, self, r.array(object).elements);
+    if (r.isSubtype(r.typeOf(object), 'Ljava/util/Collection;')) return formatMeasureList(r, self, r.array(call(r, object, 'Ljava/util/Collection;', 'toArray', [], `[${OBJECT}`)).elements);
+    r.throwJava('Ljava/lang/IllegalArgumentException;', `Cannot format ${r.typeOf(object).slice(1, -1).replaceAll('/', '.')}`);
   });
+
+  // ---- android.icu.number (API 30): NumberFormatter.with() / withLocale(), the immutable settings chain, LocalizedNumberFormatter.format -> FormattedNumber --------------------------
+  // Modelled settings: unit (an Intl-mapped MeasureUnit), unitWidth (NARROW / SHORT / FULL_NAME / HIDDEN), precision (integer, unlimited, fixed/min/max/minMax fraction), roundingMode;
+  // ICU's defaults: at most 6 fraction digits, HALF_EVEN, SHORT unit width. Each setter returns a new formatter, as in ICU. Other settings fail by name.
+  const NF_N = 'Landroid/icu/number/NumberFormatter;', SETTINGS = 'Landroid/icu/number/NumberFormatterSettings;', UNLOC = 'Landroid/icu/number/UnlocalizedNumberFormatter;', LOC = 'Landroid/icu/number/LocalizedNumberFormatter;';
+  const PRECISION = 'Landroid/icu/number/Precision;', FRACTION_PRECISION = 'Landroid/icu/number/FractionPrecision;', FORMATTED = 'Landroid/icu/number/FormattedNumber;', UNIT_WIDTH = 'Landroid/icu/number/NumberFormatter$UnitWidth;';
+  type(SETTINGS, OBJECT, [], { allocatable: false }); type(UNLOC, SETTINGS, [], { allocatable: true }); type(LOC, SETTINGS, [], { allocatable: true }); type(NF_N, OBJECT, [], { allocatable: false });
+  type(PRECISION, OBJECT, [], { allocatable: true }); type(FRACTION_PRECISION, PRECISION, [], { allocatable: true }); type(FORMATTED, OBJECT, ['Ljava/lang/CharSequence;'], { allocatable: true }); type(UNIT_WIDTH, 'Ljava/lang/Enum;', [], { allocatable: true });
+  ['NARROW', 'SHORT', 'FULL_NAME', 'ISO_CODE', 'HIDDEN'].forEach((name, ordinal) => staticField(UNIT_WIDTH, name, UNIT_WIDTH, r => { const o = r.allocate(UNIT_WIDTH); Object.assign(r.object(o), { enumName: name, enumOrdinal: ordinal }); return o; }));
+  const settingsOf = (r, self) => self === null ? {} : r.object(self).numberSettings ?? {};
+  const derive = (r, self, change, type = r.typeOf(self)) => { const o = r.allocate(type === LOC || type === UNLOC ? type : r.isSubtype(type, LOC) ? LOC : UNLOC); r.object(o).numberSettings = { ...settingsOf(r, self), ...change }; return o; };
+  def(NF_N, 'with', `()${UNLOC}`, r => derive(r, null, {}, UNLOC), { static: true });
+  def(NF_N, 'withLocale', `(${LOCALE})${LOC}`, (r, _m, [locale]) => { if (nullish(locale)) npe(r); return derive(r, null, { locale }, LOC); }, { static: true });
+  def(NF_N, 'withLocale', `(${ULOCALE})${LOC}`, (r, _m, [locale]) => { if (nullish(locale)) npe(r); return derive(r, null, { locale: localeOf(r, locale) }, LOC); }, { static: true });
+  for (const owner of [UNLOC, LOC]) {
+    const setter = (name, param, change) => def(owner, name, `(${param})${SETTINGS}`, (r, _m, [self, value]) => derive(r, self, change(r, value)));
+    setter('unit', MEASURE_UNIT, (r, unit) => ({ unit: nullish(unit) ? null : intlUnitOf(r, unit, 'NumberFormatter.unit') }));
+    setter('unitWidth', UNIT_WIDTH, (r, width) => { const name = nullish(width) ? 'SHORT' : r.object(width).enumName; if (name === 'ISO_CODE') unsupported('NumberFormatter.unitWidth(ISO_CODE) (a currency setting)'); return { unitWidth: name }; });
+    setter('precision', PRECISION, (r, precision) => ({ precision: nullish(precision) ? null : r.object(precision).precision }));
+    setter('roundingMode', RMODE, (r, mode) => { if (nullish(mode)) npe(r); const name = r.object(mode).enumName ?? text(r, call(r, mode, 'Ljava/lang/Enum;', 'name', [], STRING)); const intl = { UP: 'expand', DOWN: 'trunc', CEILING: 'ceil', FLOOR: 'floor', HALF_UP: 'halfExpand', HALF_DOWN: 'halfTrunc', HALF_EVEN: 'halfEven' }[name]; if (!intl) unsupported(`NumberFormatter.roundingMode(${name})`); return { roundingMode: intl }; });
+  }
+  def(UNLOC, 'locale', `(${LOCALE})${LOC}`, (r, _m, [self, locale]) => { if (nullish(locale)) npe(r); return derive(r, self, { locale }, LOC); });
+  def(UNLOC, 'locale', `(${ULOCALE})${LOC}`, (r, _m, [self, locale]) => { if (nullish(locale)) npe(r); return derive(r, self, { locale: localeOf(r, locale) }, LOC); });
+  const precision = (r, type, value) => { const o = r.allocate(type); r.object(o).precision = value; return o; };
+  const digitsArg = (r, n, name) => { if (n < 0 || n > 999) r.throwJava('Ljava/lang/IllegalArgumentException;', `${name} must be between 0 and 999 (inclusive)`); return n; };
+  def(PRECISION, 'integer', `()${FRACTION_PRECISION}`, r => precision(r, FRACTION_PRECISION, { minimumFractionDigits: 0, maximumFractionDigits: 0 }), { static: true });
+  def(PRECISION, 'unlimited', `()${PRECISION}`, r => precision(r, PRECISION, { minimumFractionDigits: 0, maximumFractionDigits: 100 }), { static: true });
+  def(PRECISION, 'fixedFraction', `(I)${FRACTION_PRECISION}`, (r, _m, [n]) => precision(r, FRACTION_PRECISION, { minimumFractionDigits: digitsArg(r, n, 'Fraction length'), maximumFractionDigits: n }), { static: true });
+  def(PRECISION, 'minFraction', `(I)${FRACTION_PRECISION}`, (r, _m, [n]) => precision(r, FRACTION_PRECISION, { minimumFractionDigits: digitsArg(r, n, 'Fraction length'), maximumFractionDigits: 100 }), { static: true });
+  def(PRECISION, 'maxFraction', `(I)${FRACTION_PRECISION}`, (r, _m, [n]) => precision(r, FRACTION_PRECISION, { minimumFractionDigits: 0, maximumFractionDigits: digitsArg(r, n, 'Fraction length') }), { static: true });
+  def(PRECISION, 'minMaxFraction', `(II)${FRACTION_PRECISION}`, (r, _m, [min, max]) => { digitsArg(r, min, 'Fraction length'); digitsArg(r, max, 'Fraction length'); if (min > max) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Fraction length must be between 0 and 999 (inclusive)'); return precision(r, FRACTION_PRECISION, { minimumFractionDigits: min, maximumFractionDigits: max }); }, { static: true });
+  const formatNumber = (r, self, value) => {
+    const s = settingsOf(r, self), tag = text(r, callV(r, s.locale ?? defaultLocale(r), LOCALE, 'toLanguageTag', [], STRING));
+    const options = { minimumFractionDigits: 0, maximumFractionDigits: 6, roundingMode: s.roundingMode ?? 'halfEven', ...(s.precision ?? {}) };
+    if (s.unit && s.unitWidth !== 'HIDDEN') Object.assign(options, { style: 'unit', unit: s.unit, unitDisplay: { NARROW: 'narrow', FULL_NAME: 'long' }[s.unitWidth] ?? 'short' });
+    const o = r.allocate(FORMATTED); r.object(o).formattedText = new Intl.NumberFormat(tag, options).format(value); return o;
+  };
+  def(LOC, 'format', `(D)${FORMATTED}`, (r, _m, [self, bits]) => formatNumber(r, self, typeof bits === 'bigint' ? new Float64Array(new BigInt64Array([bits]).buffer)[0] : Number(bits)));
+  def(LOC, 'format', `(J)${FORMATTED}`, (r, _m, [self, value]) => formatNumber(r, self, BigInt(value)));
+  def(LOC, 'format', `(Ljava/lang/Number;)${FORMATTED}`, (r, _m, [self, number]) => { if (nullish(number)) npe(r); return formatNumber(r, self, doubleOf(r, number)); });
+  def(FORMATTED, 'toString', `()${STRING}`, (r, _m, [self]) => r.object(self).formattedText);
+  def(FORMATTED, 'length', '()I', (r, _m, [self]) => r.object(self).formattedText.length);
+  def(FORMATTED, 'charAt', '(I)C', (r, _m, [self, i]) => r.object(self).formattedText.charCodeAt(i));
+  def(FORMATTED, 'subSequence', `(II)Ljava/lang/CharSequence;`, (r, _m, [self, a, b]) => r.object(self).formattedText.slice(a, b));
   def(I_DATEF, 'getPatternInstance', `(Landroid/icu/text/DateFormat$HourCycle;${STRING}${LOCALE})${I_DATEF}`, () => unsupported('DateFormat.getPatternInstance(hourCycle, ...)'), { static: true });
   for (const [name, params, result] of [['format', [DATE, SB, FP], SB], ['parse', [STRING], DATE], ['parse', [STRING, PP], DATE], ['parseObject', [STRING], OBJECT], ['setTimeZone', [I_TZ], 'V'], ['getTimeZone', [], I_TZ], ['setLenient', ['Z'], 'V'], ['isLenient', [], 'Z']]) { try { forward(I_DATEF, J_DATEF, name, params, result); } catch { /* unsupported at call */ } }
   def(I_DATEF, 'getCalendar', '()Landroid/icu/util/Calendar;', () => unsupported('DateFormat.getCalendar (android.icu.util.Calendar)')); def(I_DATEF, 'setCalendar', '(Landroid/icu/util/Calendar;)V', () => unsupported('DateFormat.setCalendar (android.icu.util.Calendar)'));

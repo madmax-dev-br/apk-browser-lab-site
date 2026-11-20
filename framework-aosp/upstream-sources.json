@@ -34198,5 +34198,55 @@
     "sha256": "a0029bd9744daeefced32145af80a243022836c6369660301c840cd72037d840",
     "bytes": 5668,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/metrics/LogSessionId.java",
+    "localPath": "framework-aosp/upstream/android/media/metrics/LogSessionId.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/metrics/LogSessionId.java?format=TEXT",
+    "sha256": "5d426608711fe38fb9a3c4fe79e8827941213811c2b05bdb87947feb9bcf7360",
+    "bytes": 1846,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telecomm/java/android/telecom/PhoneAccountHandle.java",
+    "localPath": "framework-aosp/upstream/android/telecom/PhoneAccountHandle.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telecomm/java/android/telecom/PhoneAccountHandle.java?format=TEXT",
+    "sha256": "939ce27830b3a4d34cc3e5ad0861cb66070e901bb160fee870b66252f73b7dad",
+    "bytes": 9687,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "telecomm/java/android/telecom/PhoneAccount.java",
+    "localPath": "framework-aosp/upstream/android/telecom/PhoneAccount.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/telecomm/java/android/telecom/PhoneAccount.java?format=TEXT",
+    "sha256": "fdfa4a09dd5d84766b33d191f28ec1a5f04477d306e115f707544cfd1a7a8c4c",
+    "bytes": 46631,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/provider/SearchRecentSuggestions.java",
+    "localPath": "framework-aosp/upstream/android/provider/SearchRecentSuggestions.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/provider/SearchRecentSuggestions.java?format=TEXT",
+    "sha256": "e5d679e2c5a45aa080bde408fcc99349171873edd57ebc688fb2cc46243777c6",
+    "bytes": 10522,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/app/IntentService.java",
+    "localPath": "framework-aosp/upstream/android/app/IntentService.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/IntentService.java?format=TEXT",
+    "sha256": "932081ce333e5cdeff6ea390ee2441da3c99e81268ef8a36f9bebfbfb05e1c5b",
+    "bytes": 6818,
+    "license": "Apache-2.0"
   }
 ]

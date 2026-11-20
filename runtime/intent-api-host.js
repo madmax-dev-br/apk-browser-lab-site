@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
 
 // android.content.Intent public API (API 33) the platform Intent model did not carry, ported from android-13.0.0_r1 Intent.java: filter identity (filterEquals / filterHashCode / cloneFilter),
 // fillIn, selectors, clip data, source bounds, identifier, the list extras, createChooser, the make*Activity factories, the Intent URI syntax (toUri / parseUri / getIntent) and mime type
@@ -382,6 +382,34 @@ export function createIntentApiHost(platform) {
   def(INTENT, 'parseUri', `(${STRING}I)${INTENT}`, (r, _m, [uri, flags]) => { if (nullish(uri)) npe(r); return parseUri(r, r.stringCharacters(uri), flags); }, { static: true });
   def(INTENT, 'getIntent', `(${STRING})${INTENT}`, (r, _m, [uri]) => { if (nullish(uri)) npe(r); return parseUri(r, r.stringCharacters(uri), 0); }, { static: true });
   def(INTENT, 'getIntentOld', `(${STRING})${INTENT}`, (r, _m, [uri]) => { if (nullish(uri)) npe(r); return getIntentOld(r, r.stringCharacters(uri), 0); }, { static: true });
-  def(INTENT, 'parseIntent', '(Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/util/AttributeSet;)Landroid/content/Intent;', () => unsupported('Intent.parseIntent reads <intent> shortcut XML through R.styleable.Intent and Resources.parseBundleExtra, which the framework resource data does not carry', 'intent-xml-unsupported'), { static: true });
+  // Intent.parseIntent (android-13.0.0_r1 Intent.java, as a preference or shortcut XML declares an <intent>): android:action, targetPackage + targetClass (the component),
+  // data, mimeType and identifier of the element (literal values, or the string a resource reference names), then its <categories android:name="..."> children. An <extra>
+  // child (Resources.parseBundleExtra) fails explicitly, naming what is missing.
+  const ANDROID_NS = 'http://schemas.android.com/apk/res/android', PARSER = 'Lorg/xmlpull/v1/XmlPullParser;', ATTRS = 'Landroid/util/AttributeSet;', RESOURCES = 'Landroid/content/res/Resources;';
+  const icall = (r, receiver, owner, name, parameters = [], result = 'V', args = []) => r.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, r.argumentWords(parameters, args, { receiver }), 'interface');
+  def(INTENT, 'parseIntent', `(${RESOURCES}${PARSER}${ATTRS})${INTENT}`, (r, _m, [resources, parser, attrs]) => {
+    if (nullish(resources) || nullish(parser)) npe(r);
+    const attribute = name => {
+      const ref = icall(r, attrs, ATTRS, 'getAttributeResourceValue', [STRING, STRING, 'I'], 'I', [ANDROID_NS, name, 0]);
+      if (ref) return text(r, call(r, resources, RESOURCES, 'getString', ['I'], STRING, [ref]));
+      return text(r, icall(r, attrs, ATTRS, 'getAttributeValue', [STRING, STRING], STRING, [ANDROID_NS, name]));
+    };
+    const intent = newIntent(r);
+    call(r, intent, INTENT, 'setAction', [STRING], INTENT, [attribute('action')]);
+    const targetPackage = attribute('targetPackage'), targetClass = attribute('targetClass');
+    if (targetPackage !== null && targetClass !== null) call(r, intent, INTENT, 'setComponent', [COMPONENT], INTENT, [construct(r, COMPONENT, [STRING, STRING], [targetPackage, targetClass])]);
+    const data = attribute('data'), mimeType = attribute('mimeType');
+    call(r, intent, INTENT, 'setDataAndType', ['Landroid/net/Uri;', STRING], INTENT, [data !== null ? callStatic(r, 'Landroid/net/Uri;', 'parse', [STRING], 'Landroid/net/Uri;', [data]) : null, mimeType]);
+    call(r, intent, INTENT, 'setIdentifier', [STRING], INTENT, [attribute('identifier')]);
+    const outer = icall(r, parser, PARSER, 'getDepth', [], 'I');
+    for (let type = icall(r, parser, PARSER, 'next', [], 'I'); type !== 1 && (type !== 3 || icall(r, parser, PARSER, 'getDepth', [], 'I') > outer); type = icall(r, parser, PARSER, 'next', [], 'I')) {   // END_DOCUMENT 1, END_TAG 3, TEXT 4
+      if (type === 3 || type === 4) continue;
+      const node = text(r, icall(r, parser, PARSER, 'getName', [], STRING));
+      if (node === 'categories') { const category = attribute('name'); if (category !== null) call(r, intent, INTENT, 'addCategory', [STRING], INTENT, [category]); }
+      else if (node === 'extra') unsupported('Intent.parseIntent: an <extra> element needs Resources.parseBundleExtra (R.styleable.Extra), which the virtual device does not implement', 'intent-xml-unsupported');
+      callStatic(r, 'Lcom/android/internal/util/XmlUtils;', 'skipCurrentTag', [PARSER], 'V', [parser]);
+    }
+    return intent;
+  }, { static: true });
   return registry;
 }

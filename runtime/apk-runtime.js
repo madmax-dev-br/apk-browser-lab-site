@@ -1,33 +1,34 @@
-import { VMClock } from './vm-clock.js?v=d509c7905654';
-import { overrideHit, RUN_BODY } from './method-overrides.js?v=d509c7905654';
-import { OperationMonitor } from './operation-monitor.js?v=d509c7905654';
-import { ExecutionProfile } from './execution-profile.js?v=d509c7905654';
-import { SamplingProfiler } from './sampling-profiler.js?v=d509c7905654';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d509c7905654';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d509c7905654';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d509c7905654';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d509c7905654';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d509c7905654';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=d509c7905654';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d509c7905654';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d509c7905654';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d509c7905654';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d509c7905654';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=d509c7905654';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=d509c7905654';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=d509c7905654';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=d509c7905654';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=d509c7905654';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=d509c7905654';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=d509c7905654';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=d509c7905654';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=d509c7905654';
+import STATIC_SHIMS from './shim-static-methods.js?v=3e71109809bc';
+import { VMClock } from './vm-clock.js?v=3e71109809bc';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=3e71109809bc';
+import { OperationMonitor } from './operation-monitor.js?v=3e71109809bc';
+import { ExecutionProfile } from './execution-profile.js?v=3e71109809bc';
+import { SamplingProfiler } from './sampling-profiler.js?v=3e71109809bc';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=3e71109809bc';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=3e71109809bc';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=3e71109809bc';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=3e71109809bc';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=3e71109809bc';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=3e71109809bc';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=3e71109809bc';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=3e71109809bc';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=3e71109809bc';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=3e71109809bc';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=3e71109809bc';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=3e71109809bc';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=3e71109809bc';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=3e71109809bc';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=3e71109809bc';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=3e71109809bc';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=3e71109809bc';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=3e71109809bc';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=3e71109809bc';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=d509c7905654';
-import { bootClassLacksMember } from './boot-class-members.js?v=d509c7905654';
-export { APKError } from './apk-error.js?v=d509c7905654';
+import { Scheduler, Blocked } from './scheduler.js?v=3e71109809bc';
+import { bootClassLacksMember } from './boot-class-members.js?v=3e71109809bc';
+export { APKError } from './apk-error.js?v=3e71109809bc';
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
 const fail = message => { throw new APKError(message); };
@@ -1976,7 +1977,7 @@ export class APKRuntime {
       }
       owner = this.parent(owner);
     }
-    return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, actionModes: this.platform?.actionModes?.snapshot?.(this) ?? [], activityName: dottedName(this.activityType), views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
+    return { systemBars: this.platform?.systemBarsHost?.snapshot?.(this) ?? null, actionModes: this.platform?.actionModes?.snapshot?.(this) ?? [], activityName: dottedName(this.activityType), activityPackage: this.platform?.activityPackage && this.activityType ? (entry => entry.main ? this.platform.packageName : entry.name)(this.platform.activityPackage(this, this.activityType)) : null, views, texts, counters, clicks: this.clicks, trace: [...this.trace], closed: false, canGoBack: !!navigation.canGoBack, navigation, ...this.executionSnapshot() };
   }
   /**
    * The end of a host call: its host allocations stop being roots. The most recent 8192 of them stay protected in a ring anyway (a platform closure queued by the call -- a listener delivery, a
@@ -2185,7 +2186,7 @@ export class APKRuntime {
       if (step instanceof Blocked) { step = this.scheduler.resolveNested(step); continue; }
       if (!(step instanceof Invoke)) return step;
       let value;
-      try { value = this.dispatch(step.method, step.args, step.mode); }
+      try { value = step.body !== null ? this.execute(step.body.method, step.body.code, step.body.args) : this.dispatch(step.method, step.args, step.mode); }   // a BodyInvoke (src/interpreter.js) names its body
       catch (error) { if (step.onError === null) throw error; step = step.onError(error); continue; }
       step = step.then === null ? value : step.then(value);
     }
@@ -2226,14 +2227,14 @@ export class APKRuntime {
       if (resolution.kind === 'bridge') { this.lastBridge = resolution; this.lastBridgeDepth = this.depth; if (this.profile.active) this.profile.host(resolution.key); this.monitor.hostEnter(resolution.key, resolution); this.record(resolution.text ??= `${resolution.skia ? 'SKIA' : 'SHIM'} ${resolution.key}`); this.lastHostCall = resolution.key; return hostReturn(resolution.selected, this.bridge(resolution.selected, args, mode, resolution.key, resolution)); }
       if (resolution.kind === 'default') {
         const defaultMethod = resolution.defaultMethod;
-        if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(defaultMethod.method.key); if (overridden !== undefined) return overrideHit(this, overridden, defaultMethod, mode); }   // src/method-overrides.js
+        if (this.methodOverrides !== null) { const hook = this.methodOverrides.get(defaultMethod.method.key); if (hook !== undefined) return hookCall(this, hook, defaultMethod, args, mode, wantFrame); }   // src/method-overrides.js: a method change the user chose
         if (this.methodInterceptors !== null) { const intercept = this.methodInterceptors.get(defaultMethod.method.key); if (intercept !== undefined) { const value = intercept(this, defaultMethod, args, mode); if (value !== RUN_BODY) return value; } }   // src/method-overrides.js setMethodInterceptor
         this.recordMethod(defaultMethod.method);
         if (wantFrame) return new PendingCall(defaultMethod.method, defaultMethod.code, args);
         return this.execute(defaultMethod.method, defaultMethod.code, args);
       }
       const definition = resolution.definition;
-      if (this.methodOverrides !== null) { const overridden = this.methodOverrides.get(definition.method.key); if (overridden !== undefined) return overrideHit(this, overridden, definition, mode); }   // src/method-overrides.js: the body does not run
+      if (this.methodOverrides !== null) { const hook = this.methodOverrides.get(definition.method.key); if (hook !== undefined) return hookCall(this, hook, definition, args, mode, wantFrame); }   // src/method-overrides.js: a method change the user chose (a fixed return or exception, an observed call, a smali body)
       let intercepted = false;   // src/method-overrides.js setMethodInterceptor: the interceptor answers the value, or the body runs without filling a call-site cache (every call reaches it)
       if (this.methodInterceptors !== null) { const intercept = this.methodInterceptors.get(definition.method.key); if (intercept !== undefined) { const value = intercept(this, definition, args, mode); if (value !== RUN_BODY) return value; intercepted = true; } }
       if (resolution.fast !== undefined) { const fast = resolution.fast(this, args); if (fast !== FALLTHROUGH) return fast; }   // host fast path of a framework method (src/io-fast-paths.js); FALLTHROUGH runs the DEX body
@@ -2823,7 +2824,8 @@ export class APKRuntime {
     if (accessible) return;
     const owner = member.field?.owner ?? member.method.owner, caller = this.currentMethod?.owner, flags = member.flags;
     const ownerPublic = (this.classNesting(owner).modifiers ?? this.classes.get(owner)?.flags ?? 1) & 1;
-    const samePackage = caller && caller.slice(0, caller.lastIndexOf('/')) === owner.slice(0, owner.lastIndexOf('/'));
+    const packageOf = type => type.lastIndexOf('/') < 0 ? '' : type.slice(1, type.lastIndexOf('/'));   // a class of the unnamed package ("Lfoo;") is in package "", like every other class there
+    const samePackage = caller && packageOf(caller) === packageOf(owner);
     const classAccess = ownerPublic || samePackage || caller === owner;
     const allowed = flags & 1 ? true : flags & 2 ? caller === owner : samePackage || ((flags & 4) && caller && this.isSubtype(caller, owner) && ((flags & 8) || !receiver || this.isSubtype(this.typeOf(receiver), caller)));
     if (!classAccess || !allowed) this.throwJava('Ljava/lang/IllegalAccessException;', `${caller ?? 'external caller'} cannot access ${owner}`);
@@ -2831,7 +2833,7 @@ export class APKRuntime {
   reflectionInvoke(member, accessible, receiver, argumentsArray, wrap = true) {
     const method = member.method, parameters = isNull(argumentsArray) ? [] : this.array(argumentsArray).elements;
     if (parameters.length !== method.parameters.length) this.throwJava('Ljava/lang/IllegalArgumentException;', 'Reflection argument count mismatch');
-    const constructor = method.name === '<init>', staticCall = !!(member.flags & 8) || (!!(member.flags & 0x10000) && !constructor && isNull(receiver));
+    const constructor = method.name === '<init>', staticCall = !!(member.flags & 8) || (!!(member.flags & 0x10000) && !constructor && (SHIMS.has(method.key ?? `${method.owner}->${method.name}${method.signature}`) ? STATIC_SHIMS.has(method.key ?? `${method.owner}->${method.name}${method.signature}`) : isNull(receiver)));   // a core shim is static only if the jar says so (an instance shim with a null receiver is a NullPointerException); other host members keep the old rule
     this.reflectionAccess(member, accessible, receiver);
     if (constructor) {
       const flags = this.classes.get(method.owner)?.flags ?? 0;
@@ -2904,7 +2906,8 @@ export class APKRuntime {
         // The contract host that serves the key is the first step of AndroidPlatform.invoke (a host that serves a key keeps serving it); remembered on the resolution with the body itself, so the
         // repeated call neither rebuilds the key text nor searches the hosts.
         let host = resolution.contractHost; if (host === undefined) host = resolution.contractHost = this.platform.contractHosts?.find(candidate => candidate.supports(key)) ?? null;
-        if (host !== null && host.callWith !== undefined) return host.callWith(this, method, args, resolution.contractFn ??= host.fnFor(key));
+        // Once a second package has a window (platform.companionUi), every call goes through AndroidPlatform.invoke, which puts the receiver's package's resources in scope first.
+        if (host !== null && host.callWith !== undefined && this.platform.companionUi !== true) return host.callWith(this, method, args, resolution.contractFn ??= host.fnFor(key));
       }
       return this.platform.invoke(this, method, args, mode, key);
     }

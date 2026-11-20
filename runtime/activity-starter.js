@@ -15,7 +15,8 @@ const enumValue = (value, names) => typeof value === 'string' && Object.hasOwn(n
 
 /** The task-related manifest attributes of an Activity (android:launchMode, taskAffinity, noHistory, ...), with the application-level taskAffinity default. */
 export function activityInfoOf(manifest, packageName, type) {
-  const name = type.slice(1, -1).replaceAll('/', '.'), declaration = manifest?.activities?.find(value => value.descriptor === type || value.name === name) ?? {}, application = manifest?.application ?? {};
+  // a second installed package's Activity class is defined under its loader alias (Lfoo/Bar$$ldrN;): its declaration is found by the plain name
+  const name = type.slice(1, -1).replace(/\$\$ldr\d+$/, '').replaceAll('/', '.'), plain = `L${name.replaceAll('.', '/')};`, declaration = manifest?.activities?.find(value => value.descriptor === plain || value.name === name) ?? {}, application = manifest?.application ?? {};
   const affinity = typeof declaration.taskAffinity === 'string' ? declaration.taskAffinity : typeof application.taskAffinity === 'string' ? application.taskAffinity : packageName;
   return {
     type, launchMode: enumValue(declaration.launchMode, LAUNCH_MODE), documentLaunchMode: enumValue(declaration.documentLaunchMode, DOCUMENT_MODE), affinity,
@@ -91,6 +92,9 @@ export class ActivityStarter {
     else if (info.documentLaunchMode === DOCUMENT_MODE.never) flags &= ~FLAG.NEW_DOCUMENT;
     else if ((flags & FLAG.NEW_DOCUMENT) !== 0) flags |= FLAG.NEW_TASK;
     const source = fromActivity ? sourceFrame : null, lm = info.launchMode;
+    // ActivityStarter.setInitialState runs sendNewTaskResultRequestIfNeeded on the flags as they stand here (the caller's, the document mode's): the NEW_TASK that
+    // computeLaunchingTaskFlags adds below for a singleTask / singleInstance target or a singleInstance source does not cancel a result request.
+    const requested = flags;
     // computeLaunchingTaskFlags
     if (!source) flags |= FLAG.NEW_TASK;
     else if (p.activityInfo(source.type).launchMode === LAUNCH_MODE.singleInstance) flags |= FLAG.NEW_TASK;
@@ -146,7 +150,7 @@ export class ActivityStarter {
     // A result requested from an Activity that lands in another task is cancelled at once (ActivityStarter.sendNewTaskResultRequestIfNeeded); a delivered-to-existing launch drops the request.
     const finalTask = plan.deliver ? p.taskOf(plan.deliver) : task;
     if (receiver) {
-      if (plan.deliver || (adding && (flags & FLAG.NEW_TASK) !== 0 && finalTask !== sourceTask)) {
+      if (plan.deliver || (adding && (requested & FLAG.NEW_TASK) !== 0 && finalTask !== sourceTask)) {
         if (!plan.deliver) { (receiver.pendingActivityResults ||= []).push({ requestCode: code, resultCode: 0, data: null }); plan.cancelled = receiver; }
         plan.receiver = null; plan.code = -1;
       }

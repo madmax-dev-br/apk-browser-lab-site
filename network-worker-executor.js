@@ -1,5 +1,5 @@
-import { captureBody } from './network-capture.js?v=d509c7905654';
-import { describeFailure } from './network-transport.js?v=d509c7905654';
+import { captureBody } from './network-capture.js?v=3e71109809bc';
+import { describeFailure } from './network-transport.js?v=3e71109809bc';
 
 // Main-side half of the synchronous network bridge. The exchange runs in a dedicated worker (network-worker.js): it fetches, then hands the response to this side through
 // SharedArrayBuffers (head as JSON, body through a ring buffer, state words) and wakes it with Atomics.notify, so a VM frame that cannot yield to the event loop can wait for
@@ -36,7 +36,7 @@ export class WorkerExecutor {
     op.shared = { control: new Int32Array(control), data: new Uint8Array(data), headParsed: false };
     this.exchanges.set(op.handle, op);
     op.onAbort = () => { if (this.worker) this.post({ type: 'abort', id: op.handle }); this.exchanges.delete(op.handle); };
-    this.post({ type: 'start', id: op.handle, request: { method: request.method, url: request.url, headers: request.headers, body: request.body ? Uint8Array.from(request.body) : null, redirect: request.redirect }, control, data, signal: this.signal.buffer, options });
+    this.post({ type: 'start', id: op.handle, request: { method: request.method, url: request.url, headers: request.headers, body: request.body ? Uint8Array.from(request.body) : null, redirect: request.redirect, api: request.api ?? null }, control, data, signal: this.signal.buffer, options });
   }
 
   /** Copies what the worker produced into the operation. Returns true if the operation changed. */

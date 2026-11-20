@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=d509c7905654">
-  <link rel="stylesheet" href="./lab-tokens.css?v=d509c7905654">
+  <link rel="stylesheet" href="./site-pages.css?v=3e71109809bc">
+  <link rel="stylesheet" href="./lab-tokens.css?v=3e71109809bc">
 </head>
 <body>
   <header class="topbar">
@@ -301,6 +301,18 @@
             <ul>
               <li><a href="#api-methods"><code>methods</code></a></li>
               <li><a href="#api-invoke"><code>invoke</code></a></li>
+            </ul>
+          </div>
+          <div>
+            <a class="api-index-group" href="#h-hooks">Changing app methods</a>
+            <ul>
+              <li><a href="#api-hook"><code>hook</code></a></li>
+              <li><a href="#api-hook-returns"><code>returns</code>, <code>throws</code></a></li>
+              <li><a href="#api-hook-observe"><code>observe</code></a></li>
+              <li><a href="#api-on-call"><code>on('call')</code></a></li>
+              <li><a href="#api-hook-smali"><code>smali</code></a></li>
+              <li><a href="#api-hooks"><code>hooks</code></a></li>
+              <li><a href="#api-unhook"><code>unhook</code></a></li>
             </ul>
           </div>
           <div>
@@ -874,6 +886,63 @@
           </dl>
         </div>
 
+        <h3 id="h-hooks">Changing the app's methods</h3>
+        <p>At your request a plugin may change one of the app's methods, in three levels: a fixed outcome, observed calls, or a body you write in smali. It is never silent: every change shows on the page as <b>App modified</b> (a chip in the device's bar that opens the list: method, kind, live call count, who made it and a <b>Remove</b> button), is recorded in the trace when it is installed and removed, is counted in the diagnostics summary and the report, and appears in MCP <code>lab_status</code>. The page's Controls › Method returns rows are the same list. The lab ships no change to any app, and none for an app's protections.</p>
+
+        <div class="api" id="api-hook">
+          <h4 class="api-sig"><code>await lab.hook(method, { returns | throws, message | observe: true | smali, persist })</code></h4>
+          <p>Changes one method, from its next call. Give exactly one of <code>returns</code>, <code>throws</code>, <code>observe</code> or <code>smali</code>.</p>
+          <dl class="facts">
+            <div><dt>Method</dt><dd>Smali form <code>'Lpkg/Class;-&gt;name(Params)Ret'</code>, the Java form of Method returns (<code>'pkg.Class.name(int): boolean'</code>), or <code>{ className, name, signature }</code>, overloads chosen as <a href="#api-invoke"><code>lab.invoke</code></a> chooses them. The change applies to the <b>resolved definition</b>: the class that declares the body, looked up the class chain as a call resolves it, so an override in a subclass is a different method.</dd></div>
+            <div><dt>Returns</dt><dd><code class="shape">{ id, method, kind, owner, plugin, hits, detail, framework, persist, declaredIn }</code></dd></div>
+            <div><dt>Lifetime</dt><dd>The plugin's session, in the package that was running: when the plugin stops (Stop, Restart, an edit, off, removed) its changes go. <code>lab.reload</code> keeps the VM and the changes. A new VM (the APK opened again, a restart after a crash) starts without them, unless the change was made with <code>persist: true</code>: the page installs it again, with the same id, before the app's code runs. A second <code>lab.hook</code> of the same method by the same plugin replaces its first.</dd></div>
+            <div><dt>Refused</dt><dd><code>unsupported</code>, naming why: native methods (native code; protected native libraries are never touched), abstract methods, static initializers, framework classes the lab implements in JavaScript (no DEX, such as <code>java.lang.String</code>), and a smali body for a framework method. Framework methods the lab runs from DEX (the AOSP originals) take <code>returns</code>, <code>throws</code> and <code>observe</code>. Other errors: <code>no-class</code>, <code>no-method</code>, <code>ambiguous</code>, <code>conflict</code> (another plugin or a Method returns row changed it), <code>limit</code>, <code>verify</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-hook-returns">
+          <h4 class="api-sig"><code>lab.hook(method, { returns: value })</code>, <code>lab.hook(method, { throws: 'pkg.Type', message })</code></h4>
+          <p>A fixed outcome: the body does not run. The value is checked by the return type, as in Method returns (a <code>long</code> beyond 2<sup>53</sup> as <code>BigInt</code> or <code>{ long: '…' }</code>, a <code>String</code> as text, other references only <code>null</code>). An exception class of the app is made with its own constructor; a framework one as the lab makes its own exceptions. The first call and every 100th is a Logcat warning (tag <code>APKWebLab</code>).</p>
+        </div>
+
+        <div class="api" id="api-hook-observe">
+          <h4 class="api-sig"><code>lab.hook(method, { observe: true, depth = 0, maxString = 200, maxItems = 5 })</code></h4>
+          <p>The body runs unchanged and each call is recorded, with its receiver, arguments, value or exception, thread and time, in the format of <a href="#valores">Values</a>. Observing never changes what the app computes.</p>
+          <dl class="facts">
+            <div><dt>Cost</dt><dd>Calls are recorded on the VM's thread and reach the page in batches (one message every 250 ms at most, never one per call), within <b>Plugin power</b>'s budget of calls per second for all observed methods together: 200 (Normal), 1 000 (High), 5 000 (Max). The rest are counted as not delivered.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-on-call">
+          <h4 class="api-sig"><code>lab.on('call', fn)</code></h4>
+          <p>The observed calls of the plugin's own changes, one call per <code>fn</code>, in order.</p>
+          <dl class="facts">
+            <div><dt>Delivers</dt><dd><code class="shape">{ hook, method, receiver, args, returned | thrown, thread, ms, at, seq, dropped }</code>: <code>thrown</code> is <code>{ $type, message, $handle }</code>; <code>dropped</code>, when present, is how many calls of that change were not delivered before this one.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-hook-smali">
+          <h4 class="api-sig"><code>lab.hook(method, { smali: '.registers N …' })</code></h4>
+          <p>Replaces the body with code you write, as baksmali prints a body: <code>.registers</code> or <code>.locals</code>, labels, <code>.catch</code> / <code>.catchall</code>, <code>.packed-switch</code>, <code>.sparse-switch</code>, <code>.array-data</code> (debug directives are ignored). The lab assembles it into a DEX of its own that both engines run; compiled callers and inline caches that had bound the old code are reset, and <code>lab.unhook</code> brings the original back exactly.</p>
+          <dl class="facts">
+            <div><dt>Verified</dt><dd>Before anything is installed: register counts and operand widths, <code>pN</code> within the parameters, literals within range, branch targets, every path assigning a register before reading it, the kind of every value (32-bit, wide pair, reference, an object whose constructor has not run), <code>move-result</code> after a call of that kind, the return matching the method, no path running off the end, and the classes, methods and fields it names resolving in the running VM. A failure rejects with <code>code: 'verify'</code> and <code>error.errors = [{ line, message }]</code>.</dd></div>
+            <div><dt>Not supported</dt><dd><code>invoke-polymorphic</code>, <code>invoke-custom</code>, <code>const-method-handle</code>, <code>const-method-type</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-hooks">
+          <h4 class="api-sig"><code>await lab.hooks({ all })</code></h4>
+          <p>The plugin's changes with their live counts (<code>all: true</code>: every change of the VM, Method returns rows included).</p>
+          <dl class="facts">
+            <div><dt>Returns</dt><dd><code class="shape">[{ id, method, kind, hits, delivered, dropped, state, … }]</code>: a <code>persist</code> change that could not be installed again in a new VM has <code>state: 'failed'</code> and <code>error</code>.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-unhook">
+          <h4 class="api-sig"><code>await lab.unhook(id)</code></h4>
+          <p>Removes one of the plugin's changes: the original method runs again from the next call. <code class="shape">{ removed }</code></p>
+        </div>
+
         <h3 id="api-saida">Output and utilities</h3>
         <p>Each <code>lab.ui</code> call adds a block. A block with the same <code>id</code> is replaced in place, which lets you update a value without stacking output. Text is always shown as text, never as HTML.</p>
         <div class="table-scroll"><table class="ref">
@@ -903,7 +972,7 @@
         <h3 id="handles">Handles and “collected object”</h3>
         <p>A handle has the form <code>"h&lt;id&gt;.&lt;epoch&gt;"</code>: the object's id in the VM and the VM's epoch. A handle from another run is refused. Keeping a handle does <b>not</b> keep the object alive: when the app lets go of it, the collector frees it and the query answers with the code <code>collected</code> (“collected object”). Handle that error by looking the object up again, as the Observe a ViewModel example does.</p>
         <h3 id="codigos-de-erro">Error codes</h3>
-        <p>Query errors have <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>no-class</code> (the class is not in the DEX files), <code>not-initialized</code> (the app has not initialized the class yet), <code>bad-class</code>, <code>bad-args</code>, <code>busy</code> (the queue was full or the VM was busy; try later), <code>failed</code>. <code>lab.screenshot</code> also uses <code>no-image</code>, <code>not-found</code> (the <code>key</code> is no longer on the screen) and <code>unsupported</code>.</p>
+        <p>Query errors have <code>error.code</code>: <code>no-apk</code>, <code>collected</code>, <code>bad-handle</code>, <code>bad-path</code>, <code>bad-query</code>, <code>no-class</code> (the class is not in the DEX files), <code>not-initialized</code> (the app has not initialized the class yet), <code>bad-class</code>, <code>bad-args</code>, <code>busy</code> (the queue was full or the VM was busy; try later), <code>failed</code>. <code>lab.screenshot</code> also uses <code>no-image</code>, <code>not-found</code> (the <code>key</code> is no longer on the screen) and <code>unsupported</code>. <a href="#h-hooks"><code>lab.hook</code></a> also uses <code>no-method</code>, <code>ambiguous</code>, <code>unsupported</code>, <code>conflict</code>, <code>limit</code> and <code>verify</code> (with <code>error.errors</code>, one <code>{ line, message }</code> per problem of a smali body).</p>
       </section>
 
       <section id="custos" aria-labelledby="h-custos">
@@ -915,17 +984,18 @@
           <li><b>On the VM:</b> queries wait in a queue and run only between app events, never within 120 ms after an input of yours, with at most 40 ms of querying per second.</li>
           <li><b>More expensive:</b> <code>composeTree</code> and <code>layoutBounds</code> with names, one per second per plugin; <code>screenshot</code>, one every 500 ms (a call before that waits its turn). <code>instances</code> and <code>referrers</code> scan the heap in pages of up to 40 ms (at most 200 ms with <code>budgetMs</code>), each page one query in the queue.</li>
           <li><b>Output:</b> the panel redraws at most 10 times per second and only when open; console, errors and blocks have limits.</li>
+          <li><b>Changed methods:</b> nothing while no change is active. A changed method's calls go through the VM's dispatch; observed calls are recorded within Plugin power's budget (200, 1 000 or 5 000 per second) and delivered in batches at most every 250 ms.</li>
         </ul>
       </section>
 
       <section id="nao-permitido" aria-labelledby="h-nao">
         <h2 id="h-nao">What is not allowed</h2>
         <ul>
-          <li><b>Writing to the app from outside.</b> There is no API to change the app's fields, state or files directly. The actions in <a href="#api">Acting on the lab</a> use the lab's controls (reloading the screen, mocks, windows), which you see in Controls.</li>
+          <li><b>Writing to the app from outside.</b> There is no API to change the app's fields, state or files directly. The actions in <a href="#api">Acting on the lab</a> use the lab's controls (reloading the screen, mocks, windows), which you see in Controls. The app's code changes only through <a href="#h-hooks"><code>lab.hook</code></a>, at your request, and always shows as App modified.</li>
           <li><b>Queries that run code.</b> No query runs code from the app or from libraries. Values are read from the fields the objects already have, as in a heap dump: a query does not create state (a getter that would create an object is not called; the field is read). The only way to run app code is to ask explicitly, with <a href="#h-metodos"><code>lab.invoke</code></a>: a lab operation, like a click, that runs the app's own method and appears in the execution log.</li>
           <li><b>Touching protected natives.</b> Plugins have no access to native code.</li>
         </ul>
-        <p>To change the app's behavior there are dedicated tools, which leave a trace in the Logcat and in the Summary: Method returns, Ignored activities, Redirect hosts and Endpoint mocks, in Controls.</p>
+        <p>To change the app's behavior there are dedicated tools, which leave a trace in the Logcat and in the Summary: Method returns, Ignored activities, Redirect hosts and Endpoint mocks, in Controls, and <a href="#h-hooks"><code>lab.hook</code></a> for plugins.</p>
       </section>
 
       <section id="seguranca" aria-labelledby="h-seguranca">
@@ -1189,6 +1259,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
           <li><a href="#ex-por-id">Highlight and capture by id</a></li>
           <li><a href="#ex-janela">Panel in a window</a></li>
           <li><a href="#ex-mock">Mock from the plugin</a></li>
+          <li><a href="#ex-hook">Watch and change a method</a></li>
           <li><a href="#ex-rolar">Scroll to the middle or to a position</a></li>
           <li><a href="#ex-aba">Side tab</a></li>
           <li><a href="#ex-botoes">Plugin buttons</a></li>
@@ -1372,6 +1443,36 @@ await draw();</code></pre></div>
 await lab.reload('reopen');
 lab.ui.kv({ mock: id, active: (await lab.mocks()).length });</code></pre></div>
         <figure class="ex-shot"><img src="./plugin-examples/ex-mock.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="The Mock from the plugin example running in the lab, in the approvals example app"><figcaption>The mock created and the screen reopened.</figcaption></figure>
+
+        <h3 id="ex-hook">Watch and change a method</h3>
+        <p>Observes a static method's calls in a table, then, with buttons, fixes what it returns or replaces its body with smali. Each change shows on the page as App modified and goes when the plugin stops. Name a method of your app instead of the example one.</p>
+        <div class="code" data-name="Watch and change a method"><pre><code>const method = 'Lcom/example/app/Rules;-&gt;isEnabled(Ljava/lang/String;)Z';   // static boolean isEnabled(String)
+const rows = [];
+lab.on('call', call =&gt; {
+  rows.unshift({ args: JSON.stringify(call.args), result: JSON.stringify(call.thrown ?? call.returned), ms: call.ms, thread: call.thread });
+  rows.length = Math.min(rows.length, 20);
+  lab.ui.table(rows, ['args', 'result', 'ms', 'thread'], { id: 'calls' });
+});
+const watch = await lab.hook(method, { observe: true });
+lab.ui.text(`Observing ${watch.method}`, { id: 'state' });
+await lab.button({ label: 'Always true' }, async () =&gt; {
+  const fixed = await lab.hook(method, { returns: true });   // the plugin's second change of the method replaces its first
+  lab.ui.text(`${fixed.method} returns ${fixed.value}`, { id: 'state' });
+});
+await lab.button({ label: 'Smali body' }, async () =&gt; {
+  try {
+    await lab.hook(method, { smali: `.registers 3
+      const-string v0, "beta_"
+      invoke-virtual {p0, v0}, Ljava/lang/String;-&gt;startsWith(Ljava/lang/String;)Z
+      move-result v0
+      return v0` });
+    lab.ui.text('isEnabled(name) is now name.startsWith("beta_")', { id: 'state' });
+  } catch (error) { lab.ui.json(error.errors ?? error.message, { id: 'state' }); }   // the verifier's errors, each with its line
+});
+await lab.button({ label: 'Original' }, async () =&gt; {
+  for (const change of await lab.hooks()) await lab.unhook(change.id);
+  lab.ui.text('Original method', { id: 'state' });
+});</code></pre></div>
 
         <h3 id="ex-rolar">Scroll to the middle or to a position</h3>
         <p>Scrolls the main list to 50 % and then to 300 px from the start, through the app's own scrolling, and shows where it stopped. In the lab, 1 px = 1 dp.</p>
@@ -1578,6 +1679,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=d509c7905654"></script>
+  <script type="module" src="./site-pages.js?v=3e71109809bc"></script>
 </body>
 </html>

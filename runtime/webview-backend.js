@@ -1,8 +1,11 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { networkOf } from './network-native.js?v=d509c7905654';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=d509c7905654';
-import { buildCsp } from './webview-bridge.js?v=d509c7905654';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { networkOf } from './network-native.js?v=3e71109809bc';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=3e71109809bc';
+import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=3e71109809bc';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=3e71109809bc';
+import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=3e71109809bc';
+import { endpointHost } from './relay-mux.js?v=3e71109809bc';
+import { siteOf } from './cookie-host.js?v=3e71109809bc';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and
@@ -70,15 +73,16 @@ const isNull = v => v === null || v === undefined || v === 0;
 const STORAGE_LIMIT = 5 * 1024 * 1024;
 
 /** `post(message)` sends a message to the page; `labOrigin` is the page origin (empty when there is none, e.g. tests). */
-export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs = 30000 }) {
+export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs = 30000, createSocket = url => new globalThis.WebSocket(url) }) {
   const views = new Map();   // WebView id -> { self }
   const host = () => platform.webView.internals;
   const note = (r, key, line) => { const notes = platform.webViewNotes ??= new Set(); if (!notes.has(key)) { notes.add(key); r.record(line); } };
   const strict = r => r.tolerateMissing === 'off' || r.tolerateMissing === undefined;
   const valuesOf = (r, self) => r.object(host().settingsOf(r, self)).values;
-  const policyFor = (r, state) => {
-    const network = networkOf(r), settings = state.settings ? r.object(state.settings).values : null;
-    return { labOrigin, online: network.online, allowed: (hostname, port) => network.allowed(hostname, port), blockNetworkLoads: !!settings?.get('BlockNetworkLoads') };
+  /** The device's network policy for a main-frame load of `url`. Through the relay a "Redirect hosts" rule also lets a host through (the relay fetches where the rule says). */
+  const policyFor = (r, state, url = null) => {
+    const network = networkOf(r), settings = state.settings ? r.object(state.settings).values : null, relayed = url !== null && !!webviewRelayEndpoint(network.policy);
+    return { labOrigin, online: network.online, allowed: (hostname, port) => network.allowed(hostname, port) || (relayed && !!network.redirectFor(url)), blockNetworkLoads: !!settings?.get('BlockNetworkLoads') };
   };
   const serial = request => ({ kind: request.kind, url: request.url, baseUrl: request.baseUrl ?? null, data: request.data ?? null, mime: request.mime ?? null, encoding: request.encoding ?? null,
     body: request.body ? Array.from(request.body) : null, headers: Object.fromEntries(request.headers ?? []) });
@@ -176,6 +180,218 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
   };
   const toBridge = (state, payload) => post({ type: 'webview', op: 'bridge', id: state.id, loadId: state.bridge.loadId, payload: { t: 'call', ...payload } });
 
+  // ---- relay mode (docs/NETWORK.md "WebView documents through the relay") -----------------------------------------------------------------------------------------------------------
+  // With an APK Lab Relay as the device's Proxy, a remote page is not framed directly: the relay serves it to the frame (http://<label>.localhost:<port>/..., one label per origin per
+  // WebView) and asks here about every request of the document before it leaves the computer. The answers come from the device: its network policy ("Allowed hosts", offline,
+  // "Redirect hosts", WebSettings.setBlockNetworkLoads/Image), the WebView's app's cookie jar (Cookie out, Set-Cookie in, never the browser's), the app's shouldInterceptRequest, the
+  // WebSettings user agent, and for the main document the page bridge (so it is scriptable: evaluateJavascript, @JavascriptInterface with return values, console, title). Without a relay
+  // (or when the relay does not have the channel) a remote page is framed directly, opaque, exactly as before.
+  const sameOrigin = (url, origin) => { try { return new URL(url).origin === origin; } catch { return false; } };
+  const relayState = { channel: null, endpoint: null, r: null, keys: new Map(), requests: new Map() };
+  const signal = () => platform.onExternalActivity?.();
+  const now = r => Math.floor(r.clock.wall());
+  /** The real URL behind a slot address of the relay (a URL the document reported), else the URL itself. */
+  const realOf = url => (typeof url === 'string' && relayState.channel?.realUrl(url)) || url;
+  /** The relay's WebView channel for the device's Proxy now, or null (no APK Lab Relay address: the frame shows remote pages directly). */
+  const relayFor = r => {
+    const endpoint = webviewRelayEndpoint(networkOf(r).policy);
+    if (endpoint !== relayState.endpoint) { relayState.channel?.close(); relayState.channel = null; relayState.endpoint = endpoint; }
+    if (!endpoint) return null;
+    relayState.r = r;
+    const where = endpointHost(endpoint);
+    return relayState.channel ??= new WebViewRelayChannel({ endpoint, create: createSocket, onMessage: onRelay, onEvent: (kind, detail) => {
+      if (kind === 'open') note(r, `relay-open:${endpoint}`, `NET WebView documents through the relay at ${where}: the relay serves remote pages to the WebView's frame and the device decides each of their requests (policy, the app's cookies, shouldInterceptRequest)`);
+      else if (kind === 'unavailable') r.record(`NET WebView relay channel NOT available at ${where}: ${detail.reason}; remote pages are framed directly (opaque)`);
+      else if (kind === 'dropped') r.record(`NET WebView relay channel dropped at ${where}: ${detail.reason}`);
+    } });
+  };
+  const markupKey = () => { const bytes = new Uint8Array(16); globalThis.crypto.getRandomValues(bytes); return Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); };
+  /** The page bridge for a main document the relay serves (put after its <head> by the relay): the same bridge as a scriptable document, plus the key of its synchronous calls. */
+  const relayMarkup = (r, self, state, url, loadId) => {
+    const h = host(), values = valuesOf(r, self), origin = storageOrigin(url), key = markupKey(), session = state.sessionStorage ??= new Map();
+    for (const [old, known] of relayState.keys) if (known.id === state.id && known.loadId !== loadId) relayState.keys.delete(old);   // a replaced document's calls are refused anyway
+    relayState.keys.set(key, { id: state.id, loadId });
+    const storage = origin && values.get('DomStorageEnabled') ? { local: Object.fromEntries(profile().storage.get(origin) ?? []), session: Object.fromEntries(session.get(origin) ?? []) } : null;
+    const config = { loadId, userAgent: values.get('UserAgentString'), domStorage: !!values.get('DomStorageEnabled'), textZoom: values.get('TextZoom') ?? 100, interfaces: h.interfaceDescriptors(r, state), resolve: null, storage, cookies: null, relay: { key } };
+    return asciiMarkup(bridgeMarkup({ csp: null, config, javascript: true }));
+  };
+  /** Android's error for a document the relay could not fetch (the relay reports Node's error code). */
+  const relayError = (code, message) => {
+    const c = String(code ?? '');
+    if (c === 'ENOTFOUND' || c === 'EAI_AGAIN') return [WEBVIEW_ERRORS.HOST_LOOKUP, 'net::ERR_NAME_NOT_RESOLVED'];
+    if (c === 'ECONNREFUSED') return [WEBVIEW_ERRORS.CONNECT, 'net::ERR_CONNECTION_REFUSED'];
+    if (c === 'ETIMEDOUT') return [WEBVIEW_ERRORS.TIMEOUT, 'net::ERR_TIMED_OUT'];
+    if (c === 'ECONNRESET') return [WEBVIEW_ERRORS.CONNECT, 'net::ERR_CONNECTION_RESET'];
+    if (/^(CERT_|ERR_TLS|ERR_SSL|DEPTH_ZERO|SELF_SIGNED|UNABLE_TO_)/.test(c)) return [WEBVIEW_ERRORS.FAILED_SSL_HANDSHAKE, 'net::ERR_CERT_AUTHORITY_INVALID'];
+    return [WEBVIEW_ERRORS.UNKNOWN, `net::ERR_FAILED (${c}: ${String(message ?? '').slice(0, 200)})`];
+  };
+  /** A remote page through the relay: the frame gets the page's slot address; the document's requests come back here (onRelay). Without the channel, the page is framed directly. */
+  const relayLoad = (r, self, state, request, loadId, channel) => {
+    const h = host(), stale = () => state.destroyed || loadId !== state.loadId, shown = state.url;
+    channel.ready().then(ok => {
+      if (stale()) return;
+      const bridge = state.bridge;
+      if (!ok) {   // as before the relay mode: framed by URL, opaque
+        bridge.scriptable = false; bridge.relay = false;
+        h.postMain(r, () => { if (!stale()) commit(r, self, state, ''); }, [self, state.client, state.chrome]);
+        show(r, self, state, request); signal(); return;
+      }
+      return channel.openDocument(state.id, request.url).then(opened => {
+        if (stale()) return;
+        if (opened.error) { h.postMain(r, () => { if (!stale()) fail(r, self, state, shown, WEBVIEW_ERRORS.CONNECT, `net::ERR_PROXY_CONNECTION_FAILED (the relay could not serve this page: ${opened.error})`, { started: state.bridge.committed }); }, [self, state.client, state.chrome]); signal(); return; }
+        const values = valuesOf(r, self), javascript = !!values.get('JavaScriptEnabled');
+        Object.assign(bridge, { javascript, documentUrl: request.url, origin: storageOrigin(request.url) });
+        state.relayExpect = { url: request.url, loadId }; state.relayReferer = null;
+        views.set(state.id, { self, state });
+        post({ type: 'webview', op: 'load', id: state.id, loadId, request: serial({ ...request, url: opened.frameUrl }), javascript, timeoutMs, userAgent: values.get('UserAgentString'), viewport: viewport(r, self), resolve: null, bridge: null, relay: true });
+        signal();
+      });
+    });
+  };
+  /** A navigation the relay-served document started itself (it asked first, synchronously): a new load of this WebView whose document the frame is already fetching. On the main thread. */
+  const startRelayNavigation = (r, self, state, url, { reload = false } = {}) => {
+    const h = host(), wasLoading = state.loading, loadId = ++state.loadId, referer = state.bridge?.documentUrl ?? null;
+    backend.failPending(r, self, state);
+    state.loading = true; state.url = url; state.originalUrl = reload ? state.originalUrl ?? url : url; state.title = ''; state.contentHeight = 0; state.scroll = { x: 0, y: 0 };
+    state.bridge = newBridge(loadId, { scriptable: true, relay: true, url, reload, javascript: !!valuesOf(r, self).get('JavaScriptEnabled'), documentUrl: url, origin: storageOrigin(url) });
+    if (!reload) h.pushHistory(state, { url, originalUrl: url, title: null, request: { kind: 'url', url, headers: new Map() } });
+    state.relayExpect = { url, loadId }; state.relayReferer = referer;
+    post({ type: 'webview', op: 'adopt', id: state.id, loadId, timeoutMs });
+    if (!wasLoading) progress(r, self, state, 10); else state.progress = 10;
+    h.clientCall(r, state, 'onLoadResource', [WEBVIEW, STRING], 'V', [self, url]);
+  };
+  function onRelay(message) {
+    const r = relayState.r, channel = relayState.channel; if (!r || !channel) return;
+    try {
+      if (message.t === 'request') relayRequest(r, channel, message);
+      else if (message.t === 'response') relayResponse(r, message);
+      else if (message.t === 'done') relayDone(r, message);
+      else if (message.t === 'call') relayCall(r, channel, message);
+    } finally { signal(); }
+  }
+  /** A request of a relay-served document: may it go out, with which cookies and headers, or does the app answer it (shouldInterceptRequest)? */
+  function relayRequest(r, channel, m) {
+    const deny = (fields = {}) => channel.send({ t: 'decision', rid: m.rid, allow: false, ...fields });
+    const entry = views.get(m.view); if (!entry || entry.state.destroyed) { deny({ reason: 'no such WebView' }); return; }
+    const { self, state } = entry, h = host(), net = networkOf(r), values = valuesOf(r, self);
+    let url; try { url = new URL(m.url); } catch { deny(); return; }
+    // the main document of this WebView: the load the device asked for (or a document's own navigation it allowed), or a redirect of it; anything else is a request of the document
+    let main = false;
+    if (m.nav && state.relayExpect && state.relayExpect.loadId === state.loadId && sameUrl(state.relayExpect.url, m.url)) { main = true; state.relayExpect = null; }
+    else if (m.nav && m.redirectOf !== null && m.redirectOf === state.relayMain) main = true;
+    const bridge = state.bridge;
+    if (main) {
+      state.relayMain = m.rid;
+      if (m.redirectOf !== null && bridge) { state.url = m.url; Object.assign(bridge, { url: m.url, documentUrl: m.url, origin: storageOrigin(m.url) }); const current = state.history[state.index]; if (current) current.url = m.url; }
+    }
+    const top = main ? m.url : bridge?.documentUrl || state.url || m.url;
+    const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80, mapped = net.redirectFor(m.url);
+    const blocked = !!values.get('BlockNetworkLoads') || (!main && m.dest === 'image' && (!!values.get('BlockNetworkImage') || !values.get('LoadsImagesAutomatically')));
+    if (!net.online || blocked || (!net.allowed(url.hostname, port) && !mapped)) {
+      if (!blocked) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'WebView', method: m.method, url: m.url, host: url.hostname, port }); }
+      deny({ reason: !net.online ? 'offline' : blocked ? 'WebSettings' : 'refused-by-allowlist' });
+      if (main) h.postMain(r, () => { if (!state.destroyed && bridge === state.bridge) fail(r, self, state, m.url, !net.online ? WEBVIEW_ERRORS.CONNECT : blocked ? WEBVIEW_ERRORS.UNKNOWN : WEBVIEW_ERRORS.HOST_LOOKUP, !net.online ? 'net::ERR_INTERNET_DISCONNECTED' : blocked ? 'net::ERR_ACCESS_DENIED (WebSettings.setBlockNetworkLoads)' : `net::ERR_NAME_NOT_RESOLVED (${url.hostname} is not in the allowed hosts of the virtual device)`, { started: bridge?.committed, shown: state.url }); }, [self, state.client, state.chrome]);
+      return;
+    }
+    net.noteHost(url.hostname);
+    // cookies: the WebView's app's jar; a cross-site request carries them only with setAcceptThirdPartyCookies (off by default since API 21), and never Strict/Lax ones (SameSite)
+    const jar = platform.cookieJarOf?.(state.packageName) ?? null;
+    let topHost = null; try { topHost = new URL(top).hostname; } catch { /* no document yet */ }
+    const crossSite = !main && topHost !== null && siteOf(topHost) !== siteOf(url.hostname), cookiesOk = !!jar?.accepts && (!crossSite || jar.acceptsThirdParty(self?.ref ?? self));
+    const cookie = cookiesOk ? jar.header(url, now(r), { crossSite, topLevelGet: main && m.method === 'GET' }) : null;
+    // the Origin and Referer a browser at the document's real address would send (strict-origin-when-cross-origin)
+    const from = main ? state.relayReferer : top;
+    let origin = null, referer = null;
+    try { if (from) { const at = new URL(from); origin = at.origin; referer = at.origin === url.origin ? at.href.split('#')[0] : `${at.origin}/`; } } catch { /* no referrer */ }
+    if (main && m.redirectOf === null && !state.relayReferer) { origin = null; referer = null; }   // a load the app asked for has no referrer
+    const log = net.log?.begin({ method: m.method, url: m.url, headers: m.headers ?? [] }, { api: 'WebView', mapped, proxy: endpointHost(relayState.endpoint) }) ?? null;
+    relayState.requests.set(m.rid, { view: m.view, main, url: m.url, cookiesOk, log, head: null, bridge });
+    const decide = respond => channel.send({ t: 'decision', rid: m.rid, allow: true, upstream: mapped?.url ?? null, cookie, userAgent: values.get('UserAgentString'), origin, referer,
+      csp: relayCsp({ port: channel.hello?.port ?? 0, javascript: !!values.get('JavaScriptEnabled'), blockNetworkImage: !!values.get('BlockNetworkImage'), loadsImages: !!values.get('LoadsImagesAutomatically') }),
+      inject: main && values.get('JavaScriptEnabled') ? relayMarkup(r, self, state, m.url, state.loadId) : null, ...(respond ? { respond } : {}) });
+    if (!main) h.postMain(r, () => { if (!state.destroyed) h.clientCall(r, state, 'onLoadResource', [WEBVIEW, STRING], 'V', [self, m.url]); }, [self, state.client]);
+    if (!h.overridesIntercept(r, state)) { decide(null); return; }
+    // the app's WebViewClient answers requests itself: asked on its own thread (here the main thread, after the calls already queued), the frame waits for the answer
+    h.postMain(r, () => {
+      if (state.destroyed) { deny(); return; }
+      const answered = h.intercept(r, self, state, { url: m.url, method: m.method, headers: new Map(m.headers ?? []), mainFrame: main, gesture: !!m.user });
+      if (answered?.failed) { deny({ reason: answered.failed }); return; }
+      if (!answered) { decide(null); return; }
+      if (answered.status >= 400) backend.httpError(r, self, state, m.url, main, answered);
+      decide({ status: answered.status, reason: answered.reason, mime: `${answered.mime}${answered.encoding && !/charset/i.test(answered.mime) ? `; charset=${answered.encoding}` : ''}`, body: toBase64(answered.bytes) });
+      if (log) net.log?.observe(log, { head: { status: answered.status, reason: answered.reason, headers: [['content-type', answered.mime]] }, received: answered.bytes.length, ended: true });
+      signal();
+    }, [self, state.client]);
+  }
+  const sameUrl = (a, b) => { try { return new URL(a).href === new URL(b).href; } catch { return a === b; } };
+  /** The relay's answer for a request: Set-Cookie into the app's jar (before the frame can follow a redirect), the network log, and the main document's failure or HTTP error. */
+  function relayResponse(r, m) {
+    const info = relayState.requests.get(m.rid); if (!info) return;
+    const entry = views.get(info.view), net = networkOf(r);
+    if (m.error) { relayState.requests.delete(m.rid); if (info.log) net.log?.observe(info.log, { error: { type: 'relay', message: `${m.error.code}: ${m.error.message}` } }); }
+    else {
+      info.head = { status: m.status | 0, reason: String(m.reason ?? ''), headers: Array.isArray(m.headers) ? m.headers : [] };
+      if (info.log) net.log?.observe(info.log, { head: info.head, received: 0 });
+      const jar = entry ? platform.cookieJarOf?.(entry.state.packageName) : null;
+      if (jar && info.cookiesOk && Array.isArray(m.setCookie)) for (const header of m.setCookie) jar.store(info.url, String(header), now(r));
+    }
+    if (!entry || !info.main) return;
+    const { self, state } = entry, h = host(), bridge = info.bridge;
+    if (m.error) { const [code, description] = relayError(m.error.code, m.error.message); h.postMain(r, () => { if (!state.destroyed && state.bridge === bridge) fail(r, self, state, info.url, code, description, { started: bridge.committed, shown: state.url }); }, [self, state.client, state.chrome]); return; }
+    if (m.status >= 400 && !m.location) {
+      const mime = (info.head.headers.find(([name]) => String(name).toLowerCase() === 'content-type')?.[1] ?? 'text/html').split(';')[0].trim();
+      h.postMain(r, () => { if (!state.destroyed && state.bridge === bridge && !bridge.silent) backend.httpError(r, self, state, info.url, true, { status: m.status | 0, reason: String(m.reason ?? ''), mime, encoding: null }); }, [self, state.client]);
+    }
+  }
+  function relayDone(r, m) {
+    const info = relayState.requests.get(m.rid); if (!info) return;
+    relayState.requests.delete(m.rid);
+    if (info.log) networkOf(r).log?.observe(info.log, { head: info.head ?? { status: 200, reason: '', headers: [] }, received: Number(m.bytes) || 0, ended: true });
+  }
+  /** A synchronous call of a relay-served document: a @JavascriptInterface method (on the JavaBridge thread), document.cookie, or a navigation the app may take over. */
+  function relayCall(r, channel, m) {
+    const reply = body => channel.send({ t: 'result', cid: m.cid, body });
+    const body = m.body && typeof m.body === 'object' ? m.body : {}, known = relayState.keys.get(String(body.key ?? ''));
+    const entry = known ? views.get(known.id) : null;
+    if (!entry || known.id !== m.view || entry.state.destroyed || entry.state.loadId !== known.loadId) { reply({ ok: false, stale: true }); return; }
+    const { self, state } = entry, h = host(), bridge = state.bridge;
+    if (m.kind === 'cookie') {
+      const jar = platform.cookieJarOf?.(state.packageName), url = bridge?.documentUrl;
+      if (!jar || !url || !/^https?:/i.test(url)) { reply({ ok: true, value: '' }); return; }
+      if (body.op === 'set') { if (jar.accepts) jar.store(url, String(body.value ?? '').slice(0, 4096), now(r), { script: true }); reply({ ok: true }); return; }
+      reply({ ok: true, value: jar.header(url, now(r), { script: true }) ?? '' }); return;
+    }
+    if (m.kind === 'js') {
+      const name = String(body.name ?? ''), method = String(body.method ?? ''), args = Array.isArray(body.args) ? body.args.slice(0, 32) : [];
+      const object = state.interfaces.get(name); if (object === undefined) { reply({ ok: false, missing: true }); return; }
+      h.javaBridge(r, { object, method, args, skip: () => { if (!state.destroyed) return false; reply({ ok: false, stale: true }); return true; }, done: outcome => {
+        if (!outcome?.called) { r.record(`LOG W chromium: [WARNING:CONSOLE(0)] "Uncaught Error: Method not found (${name}.${method} with ${args.length} argument(s))"`); reply({ ok: false, missing: true }); return; }
+        if (outcome.error) { r.record(`LOG E chromium: ${name}.${method} threw ${outcome.error.slice(1, -1).replaceAll('/', '.')}`); reply({ ok: false, thrown: 'Java exception was raised during method invocation' }); return; }
+        const value = h.returnValue(r, outcome.result, outcome.value);
+        if (value.object) note(r, `return-object:${name}.${method}`, `STUB-WEBVIEW addJavascriptInterface (${name}.${method} returns an object: the lab hands a page only primitives and strings, so the page received undefined)`);
+        reply(value.undefined || value.object ? { ok: true, undefined: true } : { ok: true, value: value.value });
+      } }, [self, object]);
+      return;
+    }
+    if (m.kind === 'nav') {
+      const target = String(body.url ?? ''), real = channel.realUrl(target) ?? target;
+      if (!/^https?:/i.test(real)) { reply({ allow: true }); return; }
+      h.postMain(r, () => {
+        if (state.destroyed || state.bridge !== bridge) { reply({ allow: false }); return; }
+        if (body.reload) { startRelayNavigation(r, self, state, real, { reload: true }); reply({ allow: true }); return; }   // reload / history traversal of the document: Android does not ask the app
+        const request = h.requestObject(r, real, { gesture: !!body.user, method: body.method === 'POST' ? 'POST' : 'GET' });
+        const overridden = h.clientCall(r, state, 'shouldOverrideUrlLoading', [WEBVIEW, REQUEST], 'Z', [self, request]);
+        commit(r, self, state, '');
+        if (overridden) { reply({ allow: false }); return; }
+        if (!channel.isSlot(target)) { reply({ allow: false }); backend.load(r, self, state, { kind: 'url', url: real, headers: new Map() }); return; }   // not through a slot: the device loads it through the relay itself
+        startRelayNavigation(r, self, state, real);
+        reply({ allow: true });
+      }, [self, state.client]);
+      return;
+    }
+    reply({ ok: false });
+  }
+
   const backend = {
     capabilities: Object.freeze({ frame: true, bridge: true }),
     /** Start a main-frame load (loadUrl, loadData, loadDataWithBaseURL, postUrl, reload, back/forward): refuse it with Android's error, or ask the page to load it. */
@@ -185,15 +401,18 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       views.set(state.id, { self, state });
       const keep = request.history === 'keep' || !!request.reload;
       /** History: a new entry for a new navigation (also one that fails: the error page is a page), none for reload and back/forward. */
+      let relayChannel = null;
       const record = (shown, original) => { if (!keep) h.pushHistory(state, { url: shown, originalUrl: original ?? shown, title: null, request: { ...request, history: undefined, reload: undefined } }); };
       if (request.kind === 'url' || request.kind === 'post') {
-        const decision = decideNavigation(request.url, policyFor(r, state));
+        const decision = decideNavigation(request.url, policyFor(r, state, (() => { try { return new URL(request.url, labOrigin || undefined).href; } catch { return null; } })()));
         if (!decision.ok) {
           if (decision.refusal) networkOf(r).logRefusal({ api: 'WebView', method: request.kind === 'post' ? 'POST' : 'GET', url: request.url, host: new URL(request.url, labOrigin || undefined).hostname });
           record(display); fail(r, self, state, display, decision.code, decision.description); return;
         }
         request = { ...request, url: decision.url }; if (request.displayUrl === undefined) request.displayUrl = decision.url;
         if (decision.blank) request = { ...request, kind: 'dataBase', baseUrl: 'about:blank', data: BLANK_DOCUMENT, mime: 'text/html', encoding: null, callbackUrl: 'about:blank' };
+        // a remote page with an APK Lab Relay as the device's Proxy: the relay serves it to the frame and the device decides each of its requests (relay mode, below)
+        else if (/^https?:/i.test(decision.url) && !(labOrigin && sameOrigin(decision.url, labOrigin))) relayChannel = relayFor(r);
       } else if (request.kind === 'dataBase' && request.baseUrl !== 'about:blank') {
         try { new URL(request.baseUrl); }   // the base only has to be an absolute URL: nothing is fetched from it
         catch { record(request.baseUrl); fail(r, self, state, request.baseUrl, WEBVIEW_ERRORS.BAD_URL, 'net::ERR_INVALID_URL'); return; }
@@ -202,7 +421,7 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       const shown = request.displayUrl ?? request.url, announced = request.callbackUrl ?? shown, loadId = ++state.loadId, wasLoading = state.loading;
       backend.failPending(r, self, state);   // evaluations queued for the document that is being replaced have no document to run in
       state.loading = true; state.url = shown; state.originalUrl = keep ? state.originalUrl ?? shown : shown; state.title = ''; state.contentHeight = 0; state.scroll = { x: 0, y: 0 };
-      state.bridge = newBridge(loadId, { scriptable: scriptable(request), url: announced, reload: !!request.reload });
+      state.bridge = newBridge(loadId, { scriptable: scriptable(request) || !!relayChannel, relay: !!relayChannel, url: announced, reload: !!request.reload });
       record(shown, shown);
       const isAsset = request.kind === 'url' && request.url.startsWith(ASSET_PREFIX), lab = state.bridge.scriptable, intercepts = h.overridesIntercept(r, state);
       h.postMain(r, () => {
@@ -219,6 +438,7 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
         if (bridge.scriptable && (isAsset || intercepts || final.kind === 'dataBase' && final.baseUrl?.startsWith(ASSET_PREFIX))) bridge.resolve = { base: final.baseUrl && final.baseUrl !== 'about:blank' ? final.baseUrl : final.url };
         show(r, self, state, final);
       };
+      if (relayChannel) { relayLoad(r, self, state, request, loadId, relayChannel); return; }
       if (!isAsset && !(lab && intercepts && request.kind === 'url')) { dispatch(request); return; }
       // The lab produces this main document itself, after the callbacks already queued (Android answers shouldInterceptRequest off the UI thread, later than loadUrl returns).
       h.postMain(r, () => {
@@ -233,7 +453,7 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       }, [self, state.client, state.chrome]);
     },
     stop(r, self, state) { post({ type: 'webview', op: 'stop', id: state.id }); backend.failPending(r, self, state); if (state.bridge) state.bridge.silent = true; },
-    destroy(r, self, state) { post({ type: 'webview', op: 'destroy', id: state.id }); views.delete(state.id); },
+    destroy(r, self, state) { post({ type: 'webview', op: 'destroy', id: state.id }); views.delete(state.id); relayState.channel?.forget(state.id); },
     interfaceChanged() { /* an interface added or removed takes effect at the next load, as on Android */ },
     settingChanged() { /* applied at the next load: the sandbox, the policy and the bridge configuration of a document are fixed when it is created */ },
     deliver(r, self, state, callback, value) {
@@ -329,17 +549,18 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
             if (event.kind !== 'alert') note(r, 'dialog:' + event.kind, `STUB-WEBVIEW ${name} (window.${event.kind}() cannot block the page until the app answers: the page already got ${event.kind === 'confirm' ? 'false' : 'null'}; the app's answer is not delivered)`);
           });
           break;
-        case 'popup': queue(() => backend.popup(r, self, state, event)); break;
-        case 'js':
-          queue(() => {
-            const object = state.interfaces.get(event.name); if (object === undefined || !Array.isArray(event.args)) return;
-            const outcome = h.invokeInterface(r, object, String(event.method), event.args);
-            if (!outcome.called) r.record(`LOG W chromium: [WARNING:CONSOLE(0)] "Uncaught TypeError: ${event.name}.${event.method} is not a function (no @JavascriptInterface method with ${event.args.length} argument(s))"`);
+        case 'popup': queue(() => backend.popup(r, self, state, { ...event, url: realOf(event.url) })); break;
+        case 'js': {
+          // Android runs @JavascriptInterface methods on its JavaBridge thread, never on the UI thread (src/webview-host.js javaBridge)
+          const object = state.interfaces.get(event.name); if (object === undefined || !Array.isArray(event.args)) break;
+          h.javaBridge(r, { object, method: String(event.method), args: event.args, skip: () => state.destroyed || event.loadId !== state.loadId, done: outcome => {
+            if (!outcome?.called) r.record(`LOG W chromium: [WARNING:CONSOLE(0)] "Uncaught TypeError: ${event.name}.${event.method} is not a function (no @JavascriptInterface method with ${event.args.length} argument(s))"`);
             else if (outcome.error) r.record(`LOG E chromium: ${event.name}.${event.method} threw ${outcome.error.slice(1, -1).replaceAll('/', '.')}`);
-            else if (outcome.result !== 'V') note(r, `return:${event.name}.${event.method}`, `STUB-WEBVIEW addJavascriptInterface (${event.name}.${event.method} returns a value: a sandboxed frame has no synchronous channel into the VM, so the page received undefined)`);
-          });
+            else if (outcome.result !== 'V') note(r, `return:${event.name}.${event.method}`, `STUB-WEBVIEW addJavascriptInterface (${event.name}.${event.method} returns a value: a sandboxed frame has no synchronous channel into the VM, so the page received undefined; a document the relay serves gets it)`);
+          } }, [self, object]);
           break;
-        case 'navigate': queue(() => backend.navigation(r, self, state, event)); break;
+        }
+        case 'navigate': queue(() => backend.navigation(r, self, state, { ...event, url: realOf(event.url) })); break;
         case 'resource': queue(() => backend.resource(r, self, state, event)); break;
         case 'cookie': queue(() => { const base = bridge.origin && bridge.origin !== 'file://' ? bridge.documentUrl : null; if (base) h.call(r, cookieManager(r), 'Landroid/webkit/CookieManager;', 'setCookie', [STRING, STRING], 'V', [base, String(event.value)]); }); break;
         case 'storage':

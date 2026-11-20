@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "profile": "services",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "c4eccf577ad3878c204d551ddb93af734e043676030af60eb5eb590cecddd667",
+  "bytes": 2852,
+  "methods": 23,
+  "classes": [
+    "Landroid/app/IntentService$ServiceHandler;",
+    "Landroid/app/IntentService;"
+  ],
+  "classCount": 2,
+  "algorithmPatches": [],
+  "sourceTransforms": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/app/IntentService.java",
+      "localPath": "framework-aosp/upstream/android/app/IntentService.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/app/IntentService.java?format=TEXT",
+      "sha256": "932081ce333e5cdeff6ea390ee2441da3c99e81268ef8a36f9bebfbfb05e1c5b",
+      "bytes": 6818,
+      "license": "Apache-2.0"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "29dfc98aa8cc443ca39453e333fb8456899b65a1e197aa455b1e312684b21def",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original android.app.IntentService over the lab's android.app.Service host class: onHandleIntent runs on its own HandlerThread, stopSelf(startId) after each Intent",
+  "activationPolicy": "an installed package DEX references android.app.IntentService (or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

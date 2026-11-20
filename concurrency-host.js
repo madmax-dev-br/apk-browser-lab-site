@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { Blocked, VMThread } from './scheduler.js?v=d509c7905654';
-import { Invoke } from './interpreter.js?v=d509c7905654';
-import { GC_ROOTS } from './heap-gc.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { Blocked, VMThread } from './scheduler.js?v=3e71109809bc';
+import { Invoke } from './interpreter.js?v=3e71109809bc';
+import { GC_ROOTS } from './heap-gc.js?v=3e71109809bc';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -275,6 +275,8 @@ export function createConcurrencyHost(platform) {
   const subGroups = (r, group, recurse) => (r.threadGroups ?? []).filter(g => g.ref !== group.ref && !nullish(groupState(r, g).parent) && inGroup(r, group, groupState(r, g).parent, recurse));
   const fill = (r, array, items) => { if (nullish(array)) r.throwJava('Ljava/lang/NullPointerException;', 'list == null'); const target = r.array(array), n = Math.min(target.elements.length, items.length); for (let i = 0; i < n; i++) target.elements[i] = items[i]; return n; };
   def(GROUP, 'activeCount', '()I', (r, _m, [self]) => liveThreads(r, self, true).length);
+  // Thread.activeCount(): currentThread().getThreadGroup().activeCount(), as libcore; a thread that has finished has no group (0, as ThreadGroup is null there and the app would get an NPE)
+  def(THREAD, 'activeCount', '()I', r => { const group = r.dispatch({ owner: THREAD, name: 'getThreadGroup', parameters: [], result: GROUP, signature: `()${GROUP}` }, [currentThread(r)], 'virtual'); if (group === null) throwNew(r, 'Ljava/lang/NullPointerException;'); return liveThreads(r, group, true).length; }, { static: true });
   def(GROUP, 'activeGroupCount', '()I', (r, _m, [self]) => subGroups(r, self, true).length);
   def(GROUP, 'enumerate', `([${THREAD})I`, (r, _m, [self, array]) => fill(r, array, liveThreads(r, self, true)));
   def(GROUP, 'enumerate', `([${THREAD}Z)I`, (r, _m, [self, array, recurse]) => fill(r, array, liveThreads(r, self, !!recurse)));
@@ -660,6 +662,10 @@ export function createConcurrencyHost(platform) {
   type(SCHEDULED_TASK, FUTURE_TASK, ['Ljava/util/concurrent/ScheduledFuture;', 'Ljava/util/concurrent/Delayed;'], { allocatable: true });
   def(STPE, '<init>', '(I)V', (r, _m, [self, core]) => configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), null, null));
   def(STPE, '<init>', `(I${FACTORY})V`, (r, _m, [self, core, f]) => configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), f, null));
+  // (int, RejectedExecutionHandler) and (int, ThreadFactory, RejectedExecutionHandler): ThreadPoolExecutor's constructor throws NullPointerException for a null factory or handler
+  const nonNull = (r, ...refs) => { if (refs.some(ref => ref === null)) throwNew(r, 'Ljava/lang/NullPointerException;'); };
+  def(STPE, '<init>', `(I${HANDLER})V`, (r, _m, [self, core, h]) => { nonNull(r, h); configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), null, h); });
+  def(STPE, '<init>', `(I${FACTORY}${HANDLER})V`, (r, _m, [self, core, f, h]) => { nonNull(r, f, h); configure(r, self, core, 2147483647, 10n, null, newObject(r, 'Ljava/util/concurrent/LinkedBlockingQueue;', [], []), f, h); });
   // ScheduledThreadPoolExecutor policies (API 21; kotlinx.coroutines sets removeOnCancel by reflection). The values are kept and
   // readable with Java's defaults; the timer queue here never runs a cancelled task, and shutdown keeps its existing behaviour.
   for (const [policy, slot, initial] of [['RemoveOnCancelPolicy', 'removeOnCancel', false], ['ContinueExistingPeriodicTasksAfterShutdownPolicy', 'continuePeriodicAfterShutdown', false], ['ExecuteExistingDelayedTasksAfterShutdownPolicy', 'executeDelayedAfterShutdown', true]]) {

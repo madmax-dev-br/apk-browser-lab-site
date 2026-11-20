@@ -5,7 +5,7 @@
 // What the injected script does inside the frame (an opaque origin: `sandbox` never has allow-same-origin):
 //   * connects to the page over a MessageChannel it receives after a `hello` (window.parent is the only peer; the page checks `event.source`),
 //   * evaluates scripts the app sends (evaluateJavascript) and answers with the JSON-encoded result, as Android does,
-//   * exposes the app's @JavascriptInterface objects as window[name].method(...) (fire and forget: the synchronous return value is phase 3),
+//   * exposes the app's @JavascriptInterface objects as window[name].method(...) (fire and forget; in a document the relay serves, C.relay, a synchronous call that returns the value),
 //   * reports console output, document.title changes, alert(), and navigations the document starts (link clicks, form submits, scripted location changes),
 //   * applies the WebSettings the browser cannot: DOM storage on/off, the user agent string, text zoom.
 
@@ -68,7 +68,19 @@ export function injectIntoHead(html, snippet) {
 export function bridgeMarkup({ csp, config, javascript }) {
   const zoom = Number(config?.textZoom);
   const style = Number.isFinite(zoom) && zoom > 0 && zoom !== 100 ? `<style>html{-webkit-text-size-adjust:${zoom}%;text-size-adjust:${zoom}%;font-size:${zoom}%}</style>` : '';
-  return `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">${javascript ? `<script>${bridgeScript(config)}</script>` : ''}${style}`;
+  return `${csp ? `<meta http-equiv="Content-Security-Policy" content="${escapeAttribute(csp)}">` : ''}${javascript ? `<script>${bridgeScript(config)}</script>` : ''}${style}`;
+}
+/** Text with every character above U+007F written as a JavaScript \\uXXXX escape: the relay puts the markup into documents of any charset (only inside the script's JSON can they occur). */
+export const asciiMarkup = text => String(text).replace(/[\u0080-￿]/g, c => '\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+/**
+ * The Content-Security-Policy header of every response of a WebView document the relay serves (docs/NETWORK.md "WebView documents through the relay"): the document and what it loads
+ * reach the network only through the relay's slots (http://<label>.localhost:<port>), where the device decides each request; nothing goes to a host directly.
+ */
+export function relayCsp({ port, javascript = true, blockNetworkImage = false, loadsImages = true }) {
+  const relay = `http://*.localhost:${port}`, images = !loadsImages ? `'none'` : blockNetworkImage ? 'data: blob:' : `${relay} data: blob:`;
+  return [`default-src 'none'`, `script-src ${javascript ? `'unsafe-inline' 'unsafe-eval' ${relay} blob:` : `'none'`}`, `style-src 'unsafe-inline' ${relay} data:`, `img-src ${images}`,
+    `font-src ${relay} data:`, `media-src ${relay} data: blob:`, `connect-src ${relay}`, `frame-src ${relay} data: blob:`, `form-action ${relay}`, `worker-src ${relay} blob:`,
+    `manifest-src 'none'`, `object-src 'none'`].join('; ');
 }
 
 /**
@@ -116,7 +128,16 @@ export const encodeResult = new Function('return ' + ENCODE_SOURCE)();
 
 const BRIDGE = `(function () {
   'use strict';
-  var C = __CONFIG__, encode = __ENCODE__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0, waiting = {}, R = C.resolve || null;
+  var C = __CONFIG__, encode = __ENCODE__, port = null, queue = [], consoleCount = 0, calls = 0, helloTries = 0, waiting = {}, R = C.resolve || null, RL = C.relay || null;
+  /* a document the relay serves (C.relay): its synchronous calls are POSTs to its own slot, answered once the app answered (a JavaScript interface's return value, document.cookie,
+     the app's shouldOverrideUrlLoading); the native XHR is kept before anything below wraps it */
+  var XO = window.XMLHttpRequest && window.XMLHttpRequest.prototype, xhrOpen = XO && XO.open, xhrSend = XO && XO.send, xhrHeader = XO && XO.setRequestHeader;
+  function relayCall(kind, payload) {
+    var x = new XMLHttpRequest(); xhrOpen.call(x, 'POST', location.origin + '/__apkweb/' + kind, false); xhrHeader.call(x, 'content-type', 'text/plain');
+    payload.key = RL.key; xhrSend.call(x, JSON.stringify(payload));
+    if (x.status !== 200) throw new Error('relay ' + x.status);
+    return JSON.parse(x.responseText);
+  }
   function post(message) { if (port) { try { port.postMessage(message); } catch (e) { /* the page is gone */ } } else if (queue.length < 500) queue.push(message); }
   function text(value) {
     if (typeof value === 'string') return value;
@@ -228,7 +249,16 @@ const BRIDGE = `(function () {
     (names[name] || []).forEach(function (method) {
       Object.defineProperty(object, method, { enumerable: true, value: function () {
         if (++calls > 5000) return undefined;
-        post({ t: 'js', name: name, method: method, args: Array.prototype.slice.call(arguments, 0, 32).map(wire) });
+        var args = Array.prototype.slice.call(arguments, 0, 32).map(wire);
+        if (RL) {   /* as on Android: the page waits until the method returned on the app's JavaBridge thread, and gets its value */
+          var answer = null;
+          try { answer = relayCall('js', { name: name, method: method, args: args }); } catch (e) { answer = null; }
+          if (answer && answer.ok) return answer.undefined ? undefined : answer.value;
+          if (answer && answer.missing) throw new Error('Method not found');
+          if (answer && answer.thrown) throw new Error(answer.thrown);
+          if (answer) return undefined;
+        }
+        post({ t: 'js', name: name, method: method, args: args });
         return undefined;
       } });
     });
@@ -267,8 +297,16 @@ const BRIDGE = `(function () {
       } });
     } catch (e) { /* not definable */ }
   });
+  /* document.cookie of a document the relay serves: read from and written to the app's CookieManager at the moment of the access (its requests change it too) */
+  if (RL) {
+    try {
+      Object.defineProperty(document, 'cookie', { configurable: true,
+        get: function () { try { var a = relayCall('cookie', { op: 'get' }); return a && typeof a.value === 'string' ? a.value : ''; } catch (e) { return ''; } },
+        set: function (text) { try { relayCall('cookie', { op: 'set', value: limit(String(text), 4096) }); } catch (e) { /* the relay is gone */ } } });
+    } catch (e) { /* not definable */ }
+  }
   /* document.cookie: the cookies of the lab's CookieManager for the document's URL (not the browser's jar, which an opaque origin cannot use); assignments go to the CookieManager */
-  if (C.cookies) (function () {
+  if (C.cookies && !RL) (function () {
     var jar = Object.create(null);
     String(C.cookies.value || '').split(/;\\s*/).forEach(function (pair) { var at = pair.indexOf('='); if (pair) jar[at < 0 ? '' : pair.slice(0, at)] = at < 0 ? pair : pair.slice(at + 1); });
     try {
@@ -334,7 +372,49 @@ const BRIDGE = `(function () {
   /* navigations the document starts are the app's to allow: shouldOverrideUrlLoading */
   function absolute(url) { try { return new URL(url, (R && R.base) || document.baseURI).href; } catch (e) { return null; } }
   function navigate(url, method, body, gesture) { post({ t: 'navigate', url: limit(url, 8192), method: method, body: body === null ? null : limit(body, 65536), gesture: !!gesture, title: limit(document.title || '', 1024) }); }
-  document.addEventListener('click', function (event) {
+  /* a document the relay serves navigates by itself (its POST bodies, multipart forms, scripted navigations reach the relay intact); the app is asked first, synchronously, as on Android */
+  if (RL) {
+    try {
+      if (window.navigation && window.navigation.addEventListener) window.navigation.addEventListener('navigate', function (event) {
+        if (event.hashChange || event.downloadRequest !== null || event.destination.sameDocument) return;
+        var url = event.destination.url; if (!url || /^(javascript|about|data|blob):/i.test(url)) return;
+        var answer = null, again = event.navigationType === 'reload' || event.navigationType === 'traverse';
+        try { answer = relayCall('nav', { url: limit(url, 8192), method: event.formData ? 'POST' : 'GET', user: !!event.userInitiated, reload: again }); } catch (e) { return; }
+        if (answer && answer.allow === false && event.cancelable) event.preventDefault();
+      });
+    } catch (e) { /* no Navigation API: the document's own navigations are not reported (docs/NETWORK.md) */ }
+    /* a URL a script builds for another origin goes to that origin's slot (the relay answers /__apkweb/go with a redirect to it); this document's own URLs already resolve to its slot */
+    var mapUrl = function (u) {
+      var abs; try { abs = new URL(String(u), document.baseURI); } catch (e) { return u; }
+      if ((abs.protocol !== 'http:' && abs.protocol !== 'https:') || abs.origin === location.origin || /\\.localhost(:\\d+)?$/i.test(abs.host)) return u;
+      return location.origin + '/__apkweb/go?u=' + encodeURIComponent(abs.href);
+    };
+    var relayFetch = window.fetch ? window.fetch.bind(window) : null;
+    if (relayFetch) window.fetch = function (input, init) {
+      try {
+        if (typeof input === 'string' || (typeof URL !== 'undefined' && input instanceof URL)) input = mapUrl(input);
+        else if (typeof Request !== 'undefined' && input instanceof Request) { var m = mapUrl(input.url); if (m !== input.url) input = new Request(m, input); }
+      } catch (e) { /* left as it is: the policy refuses it */ }
+      return relayFetch(input, init);
+    };
+    if (XO) XO.open = function (method, url) { var args = Array.prototype.slice.call(arguments); if (args.length > 1) args[1] = mapUrl(url); return xhrOpen.apply(this, args); };
+    var nativeSet = window.Element && window.Element.prototype.setAttribute, relayTags = { IMG: 'src', SOURCE: 'src', AUDIO: 'src', VIDEO: 'src', TRACK: 'src', SCRIPT: 'src', LINK: 'href', IFRAME: 'src' };
+    var relayGuard = function (name, prop) {
+      var proto = window[name] && window[name].prototype, descriptor = proto && Object.getOwnPropertyDescriptor(proto, prop);
+      if (!descriptor || !descriptor.set) return;
+      Object.defineProperty(proto, prop, { configurable: true, enumerable: descriptor.enumerable, get: descriptor.get, set: function (value) { descriptor.set.call(this, mapUrl(value)); } });
+    };
+    relayGuard('HTMLImageElement', 'src'); relayGuard('HTMLSourceElement', 'src'); relayGuard('HTMLMediaElement', 'src'); relayGuard('HTMLTrackElement', 'src');
+    relayGuard('HTMLScriptElement', 'src'); relayGuard('HTMLLinkElement', 'href'); relayGuard('HTMLIFrameElement', 'src');
+    if (nativeSet) window.Element.prototype.setAttribute = function (name, value) {
+      var prop = relayTags[this.tagName]; if (prop && String(name).toLowerCase() === prop) return nativeSet.call(this, name, mapUrl(value));
+      return nativeSet.apply(this, arguments);
+    };
+    document.addEventListener('securitypolicyviolation', function (event) {
+      if (consoleCount++ < 1000) post({ t: 'console', level: 'warn', text: limit('Refused to load ' + (event.blockedURI || 'a resource') + ' (' + event.effectiveDirective + '): a WebView document the relay serves reaches the network only through the relay', 4096), source: String(event.sourceFile || location.href), line: event.lineNumber | 0 });
+    });
+  }
+  if (!RL) document.addEventListener('click', function (event) {
     if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
     var anchor = event.target && event.target.closest ? event.target.closest('a[href]') : null;
     if (!anchor) return;
@@ -347,7 +427,7 @@ const BRIDGE = `(function () {
     var url = absolute(href); if (!url) return;
     event.preventDefault(); navigate(url, 'GET', null, event.isTrusted === true);
   }, true);
-  document.addEventListener('submit', function (event) {
+  if (!RL) document.addEventListener('submit', function (event) {
     if (event.defaultPrevented) return;
     var form = event.target, submitter = event.submitter;
     var method = String((submitter && submitter.getAttribute('formmethod')) || form.getAttribute('method') || 'GET').toUpperCase();
@@ -360,7 +440,7 @@ const BRIDGE = `(function () {
     event.preventDefault();
     if (method === 'GET') { var u = new URL(target); u.search = pairs.toString(); navigate(u.href, 'GET', null, true); } else navigate(target, 'POST', pairs.toString(), true);
   }, true);
-  try {
+  if (!RL) try {
     if (window.navigation && window.navigation.addEventListener) window.navigation.addEventListener('navigate', function (event) {
       if (!event.cancelable || event.hashChange || event.downloadRequest !== null || event.destination.sameDocument || event.navigationType === 'reload' || event.navigationType === 'traverse') return;
       var url = event.destination.url; if (!url || /^(javascript|about):/i.test(url)) return;

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=d509c7905654';
-import { APKError } from './apk-error.js?v=d509c7905654';
+import { createHostRegistry } from './host-contract.js?v=3e71109809bc';
+import { APKError } from './apk-error.js?v=3e71109809bc';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -496,6 +496,16 @@ export function createViewApiHost(platform) {
     for (const other of [...(group.children ?? [])]) if (nullish(child) || ref(other) !== ref(child)) unFocus(other);
     const parent = group.parent;
     if (isGroup(r, parent)) r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'requestChildFocus', parameters: [VIEW, VIEW], result: 'V', signature: `(${VIEW}${VIEW})V` }, [parent, self, focused], 'virtual');
+  });
+  // ViewParent.focusableViewAvailable (ViewGroup.java, android-13.0.0_r1): a group passes the news up unless it blocks its descendants, is not visible or is itself focused
+  // (and does not put its descendants after it); at the window's root ViewRootImpl gives the view the focus only outside touch mode, and the virtual device is a touch screen
+  // in touch mode, so the walk ends there with no focus change (RecyclerView, ListView and PreferenceFragmentCompat call it when their list gets content).
+  def('Landroid/view/ViewGroup;', 'focusableViewAvailable', `(${VIEW})V`, (r, _m, [self, view]) => {
+    const parent = r.object(self).parent; if (!isGroup(r, parent)) return;
+    const focusability = r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'getDescendantFocusability', parameters: [], result: 'I', signature: '()I' }, [self], 'virtual');
+    if (focusability === 0x60000 || (r.object(self).visibility ?? 0) !== 0) return;   // FOCUS_BLOCK_DESCENDANTS, not VISIBLE
+    if (r.dispatch({ owner: VIEW, name: 'isFocused', parameters: [], result: 'Z', signature: '()Z' }, [self], 'virtual') && focusability !== 0x40000) return;   // focused itself, not FOCUS_AFTER_DESCENDANTS
+    r.dispatch({ owner: 'Landroid/view/ViewGroup;', name: 'focusableViewAvailable', parameters: [VIEW], result: 'V', signature: `(${VIEW})V` }, [parent, view], 'virtual');
   });
   // The drawing cache (deprecated since API 28): a bitmap of the view drawn into it, built on demand and kept until destroyDrawingCache / the next build
   def(VIEW, 'setDrawingCacheEnabled', '(Z)V', (r, _m, [self, enabled]) => { const view = r.object(self); view.drawingCacheEnabled = flag(enabled); if (!view.drawingCacheEnabled) viewCall(r, self, 'destroyDrawingCache'); });

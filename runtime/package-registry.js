@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=d509c7905654';
-import { gcRoot } from './heap-gc.js?v=d509c7905654';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=d509c7905654';
-import { AndroidResources } from './android-resources.js?v=d509c7905654';
+import { APKError } from './apk-error.js?v=3e71109809bc';
+import { gcRoot } from './heap-gc.js?v=3e71109809bc';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=3e71109809bc';
+import { AndroidResources } from './android-resources.js?v=3e71109809bc';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -153,6 +153,7 @@ export function createPackageRegistry(platform) {
       runtime.dispatch({ owner: type, name: 'onCreate', signature: '()V', parameters: [], result: 'V' }, [app], 'virtual');
       entry.state = 'started';
     } catch (failure) { entry.state = 'failed'; entry.failure = failure; throw failure; }
+    platform.onPackageProcessStarted?.(runtime, entry);   // a device option that applies its package's settings once the process is up (src/microg-device.js: the user's microG services)
   }
 
   // ---- ApplicationInfo of a companion (PackageParser / PackageInfoUtils over its manifest) -------------------------------------------------------------------------
@@ -162,8 +163,9 @@ export function createPackageRegistry(platform) {
     const key = `${entry.name}:${withMeta ? 1 : 0}`; if (appInfos.has(key)) return appInfos.get(key);
     const app = entry.manifest.application ?? {}, info = runtime.makeObject(APPLICATION_INFO), put = (name, type, value) => platform.infoField(runtime, info, APPLICATION_INFO, name, type, value);
     if (withMeta) put('metaData', 'Landroid/os/Bundle;', metaData(runtime, entry, app.metaData ?? []));
-    put('packageName', STRING, entry.name); put('name', STRING, entry.manifest.applicationName ?? null); put('className', STRING, entry.manifest.applicationName ?? null); put('theme', 'I', 0);
-    put('labelRes', 'I', 0); put('nonLocalizedLabel', 'Ljava/lang/CharSequence;', typeof app.label === 'string' ? app.label : null); put('icon', 'I', 0);
+    put('packageName', STRING, entry.name); put('name', STRING, entry.manifest.applicationName ?? null); put('className', STRING, entry.manifest.applicationName ?? null); put('theme', 'I', Number(app.theme) | 0);
+    // android:label / android:icon: a resource reference of the package's own table (number) goes to labelRes/icon, a literal string to nonLocalizedLabel (PackageParser.parseBaseApplication)
+    put('labelRes', 'I', typeof app.label === 'number' ? app.label : 0); put('nonLocalizedLabel', 'Ljava/lang/CharSequence;', typeof app.label === 'string' ? app.label : null); put('icon', 'I', typeof app.icon === 'number' ? app.icon : 0);
     put('targetSdkVersion', 'I', targetSdk(entry)); put('minSdkVersion', 'I', Number(entry.manifest.usesSdk?.minSdkVersion || 1)); put('uid', 'I', entry.uid);
     const data = `/data/user/0/${entry.name}`, process = processOf(entry);
     for (const [name, value] of Object.entries({ sourceDir: `${entry.codePath}/base.apk`, publicSourceDir: `${entry.codePath}/base.apk`, dataDir: data, deviceProtectedDataDir: `/data/user_de/0/${entry.name}`, credentialProtectedDataDir: data, nativeLibraryDir: `${entry.codePath}/lib/wasm32`, processName: process, taskAffinity: entry.name })) put(name, STRING, value);
@@ -182,11 +184,12 @@ export function createPackageRegistry(platform) {
   const resourceValue = (entry, id) => {
     if (entry.resourceTable === undefined) {
       entry.resourceTable = null;
-      if (entry.entries.has('resources.arsc')) entry.resourceTable = new AndroidResources(entry.reader('resources.arsc'), { chooseConfiguration: platform.resourceSelector?.chooseConfiguration, resolveExternal: rid => ((Number(rid) >>> 24) === 1 ? platform.resources?.frameworkTable?.resolve?.(rid) ?? null : null) });
+      if (entry.entries.has('resources.arsc')) entry.resourceTable = new AndroidResources(entry.reader('resources.arsc'), { chooseConfiguration: platform.resourceSelector?.chooseConfiguration, resolveExternal: rid => ((Number(rid) >>> 24) === 1 ? (platform.appResources ?? platform.resources)?.frameworkTable?.resolve?.(rid) ?? null : null) });
     }
     if (!entry.resourceTable) throw new APKError(`Resource 0x${(Number(id) >>> 0).toString(16)} of ${entry.name}: the package has no resources.arsc`, { kind: 'resource-unsupported' });
     const resolved = entry.resourceTable.resolve(id);
-    if (resolved.kind === 'unresolved' || resolved.kind === 'bag') throw new APKError(`Resource 0x${(Number(id) >>> 0).toString(16)} of ${entry.name} cannot provide a scalar: ${resolved.reason || resolved.kind}`, { kind: 'resource-unsupported', resourceId: id });
+    if (resolved.kind === 'bag') return resolved;   // the caller (meta-data) decides what a bag means
+    if (resolved.kind === 'unresolved') throw new APKError(`Resource 0x${(Number(id) >>> 0).toString(16)} of ${entry.name} cannot provide a scalar: ${resolved.reason || resolved.kind}`, { kind: 'resource-unsupported', resourceId: id });
     return resolved;
   };
   /**
@@ -198,16 +201,16 @@ export function createPackageRegistry(platform) {
     if (entry.resourceTable === undefined) { try { resourceValue(entry, 0x7f000000); } catch { /* only builds the table */ } }
     const table = entry.resourceTable;
     if (!table) throw new APKError(`Resources of ${entry.name}: the package has no resources.arsc`, { kind: 'resource-unsupported' });
-    const frameworkTable = platform.resources?.frameworkTable ?? null, trees = new Map();
+    const frameworkTable = (platform.appResources ?? platform.resources)?.frameworkTable ?? null, trees = new Map();
     const xml = id => {
       const resource = table.resolve(id); let leaf = resource; while (leaf.resolved) leaf = leaf.resolved;
       if (resource.kind !== 'string' || typeof resource.value !== 'string') throw new APKError(`XML resource 0x${(Number(id) >>> 0).toString(16)} of ${entry.name} cannot be resolved: ${resource.reason ?? resource.kind}`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0 });
-      if ((Number(id) >>> 24) === 1) return platform.resources.getXml(id);
+      if ((Number(id) >>> 24) === 1) return (platform.appResources ?? platform.resources).getXml(id);   // the framework's XML, from the app's environment (this one may be the scope in force)
       const path = resource.value; if (!entry.entries.has(path)) throw new APKError(`XML ${path} of ${entry.name} is not in the package`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0, path });
       if (!trees.has(path)) trees.set(path, table.parseLayout(entry.reader(path)));
       return trees.get(path);
     };
-    entry.resourcesEnvironment = { table, layouts: new Map(), xmlTrees: trees, frameworkTable, frameworkXml: !!platform.resources?.frameworkXml, packageEntry: entry,
+    entry.resourcesEnvironment = { table, layouts: new Map(), xmlTrees: trees, frameworkTable, frameworkXml: !!(platform.appResources ?? platform.resources)?.frameworkXml, packageEntry: entry,
       resolve: id => table.resolve(id), resolveBag: id => table.resolveBag(id), getAttribute: (node, name) => table.getAttribute(node, name), getLayout: id => xml(id), getXml: id => xml(id) };
     return entry.resourcesEnvironment;
   };
@@ -217,6 +220,8 @@ export function createPackageRegistry(platform) {
     resourcesEnvironment(entry);
     const resources = runtime.makeObject('Landroid/content/res/Resources;'); runtime.object(resources).packageEntry = entry; refs.set(key, resources); return resources;
   };
+  /** Whether a package has a resource table of its own (resources.arsc); the app always resolves in the app's environment. */
+  const hasResources = entry => entry.main || !!entry.entries?.has?.('resources.arsc');
   const processOf = (entry, detail = null) => {
     const declared = detail?.process ?? entry.manifest?.application?.process ?? null;   // all of a companion's android:process names share one VM process
     return declared ? (declared.startsWith(':') ? entry.name + declared : declared) : entry.name;
@@ -264,6 +269,7 @@ export function createPackageRegistry(platform) {
     const sdk = runtime.apiLevel ?? 33, requested = (entry.manifest.usesPermissions ?? []).some(p => p.name === permission && (p.maxSdkVersion === null || Number(p.maxSdkVersion) >= sdk));
     if (!requested) return false;
     if (api.defaultGrants.get(entry.name)?.has(permission) && !api.refusedPermissions.has(permission)) return true;   // granted by the device's default grants (a device option's preinstalled package)
+    if (platform.runtimePermissions?.grantedFor?.(entry, permission) && !api.refusedPermissions.has(permission)) return true;   // granted by the user in the package's own permission dialog (its Activity asked)
     return levelFor(runtime, entry, permission) === 'normal';
   };
   /** The level `permission` has for package `entry`: 'normal' when it is granted by installation alone. */
@@ -296,7 +302,6 @@ export function createPackageRegistry(platform) {
 
   // ---- Context methods of a companion's contexts (android-platform.js CONTEXTS) -------------------------------------------------------------------------------------
   const NOT_HANDLED = Symbol('not handled');
-  const unsupported = (entry, what) => { throw new APKError(`${what} on a Context of companion package ${entry.name}: the resources of a second installed package are not loaded (only its manifest, code and assets)`, { kind: 'package-resources-unsupported' }); };
   function contextInvoke(runtime, method, args) {
     const receiver = args[0]; if (!receiver || typeof receiver !== 'object') return NOT_HANDLED;
     const entry = contextEntry(runtime, receiver); if (entry.main) return NOT_HANDLED;
@@ -306,20 +311,19 @@ export function createPackageRegistry(platform) {
       case 'getApplicationInfo': return applicationInfoFor(runtime, entry);
       case 'getClassLoader': return runtime.object(receiver).packageCodeIncluded === false ? loaderOf(runtime, main) : loaderOf(runtime, entry);   // createPackageContext without CONTEXT_INCLUDE_CODE: no code of that package
       case 'getPackageManager': if (!entry.pm) { entry.pm = runtime.makeObject(PACKAGE_MANAGER); runtime.object(entry.pm).packageEntry = entry; refs.set(`${entry.name}:pm`, entry.pm); } return entry.pm;
-      case 'getResources': return packageResources(runtime, entry);
+      case 'getResources': {   // a configuration Context of the package (createConfigurationContext) carries its own Resources; every other Context of the package shares the package's
+        for (let c = receiver, depth = 0; c && typeof c === 'object' && depth < 64; depth++) { const o = runtime.object(c); if (o.contextResources) return o.contextResources; if (o.packageEntry && runtime.isSubtype(o.type, APP_CONTEXT) && !o.contextResources) break; c = o.baseContext ?? null; }
+        return packageResources(runtime, entry);
+      }
       case 'getString': case 'getText': {   // Context.getString(id[, args]) / getText(id) = getResources().getString/getText
         const parameters = method.parameters, result = method.result;
         return runtime.dispatch({ owner: 'Landroid/content/res/Resources;', name: method.name, parameters, result, signature: `(${parameters.join('')})${result}` }, [packageResources(runtime, entry), ...args.slice(1)], 'virtual');
       }
-      case 'createConfigurationContext': return unsupported(entry, 'Context.createConfigurationContext');
-      case 'startActivity': case 'startActivityForResult': {
-        const intent = args[1] && typeof args[1] === 'object' ? runtime.object(args[1]) : null, component = intent?.component ? runtime.object(intent.component) : null;
-        const className = component ? String(typeof component.className === 'string' ? component.className : runtime.stringCharacters(component.className)) : intent?.target ? intent.target.slice(1, -1).replaceAll('/', '.').replace(/\$\$ldr\d+$/, '') : null;
-        platform.onPackageActivityRefused?.(runtime, entry.name, className);   // a device option names what its package's Activity was for (src/microg-device.js)
-        throw new APKError(`Context.startActivity from companion package ${entry.name}: Activities of a second package are not supported`, { kind: 'package-activity-unsupported' });
-      }
-      case 'registerActivityLifecycleCallbacks': entry.activityCallbacks.push(args[1]); refs.set(`${entry.name}:activityCallbacks`, entry.activityCallbacks); return undefined;   // the companion's process has no Activities
-      case 'unregisterActivityLifecycleCallbacks': { const at = entry.activityCallbacks.findIndex(ref => ref?.ref === args[1]?.ref); if (at >= 0) entry.activityCallbacks.splice(at, 1); return undefined; }
+      case 'createConfigurationContext': return platform.createConfigurationContext(runtime, receiver, args[1]);   // ContextImpl.createConfigurationContext: the package's resources under the merged Configuration
+      // startActivity / startActivityForResult from a companion's Context go to the device's ActivityStarter (android-platform.js startActivity), as the companion's own start.
+      // registerActivityLifecycleCallbacks on the companion's Application: the callbacks its own Activities' lifecycle reaches (an Activity registers its own, on the Activity).
+      case 'registerActivityLifecycleCallbacks': if (runtime.isSubtype(runtime.object(receiver).type, 'Landroid/app/Activity;')) return NOT_HANDLED; entry.activityCallbacks.push(args[1]); refs.set(`${entry.name}:activityCallbacks`, entry.activityCallbacks); return undefined;
+      case 'unregisterActivityLifecycleCallbacks': { if (runtime.isSubtype(runtime.object(receiver).type, 'Landroid/app/Activity;')) return NOT_HANDLED; const at = entry.activityCallbacks.findIndex(ref => ref?.ref === args[1]?.ref); if (at >= 0) entry.activityCallbacks.splice(at, 1); return undefined; }
       default: return NOT_HANDLED;
     }
   }
@@ -330,7 +334,7 @@ export function createPackageRegistry(platform) {
     get multi() { return companions.size > 0; },
     main, entries, companions: () => [...companions.values()], byName, byUid, install, refs,
     callerEntry, contextEntry, entryOfClass, withCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
-    loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
+    loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, hasResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
     detailsOf, exported, providerFor, providerInstance, providerOwner, providerOwners,
     holds, levelFor, declaredPermission, sameSigners, securityException, visible, grant, targetSdk,
     contextInvoke,
