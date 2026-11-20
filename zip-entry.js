@@ -1,7 +1,7 @@
 // What expands one deflated (or stored) APK ZIP entry and checks it: CRC-32 and the bounded deflate-raw expansion. Shared by APKArchive (src/apk-loader.js) and by the helper
 // Workers that expand an APK's DEX files in parallel (src/zip-inflate-pool.js, src/zip-inflate-worker.js), so both run the same code. It imports nothing but APKError: a helper
 // Worker loads this module and nothing of the VM.
-import { APKError } from './apk-error.js?v=91b59af8dcf0';
+import { APKError } from './apk-error.js?v=c2aef97d559f';
 
 const fail = message => { throw new APKError(message); };
 // CRC-32 (ZIP, reflected 0xEDB88320), slicing-by-8: eight tables, eight bytes per step (an APK's entries are checked as they are extracted; byte at a time this was
@@ -12,8 +12,9 @@ const CRC_TABLES = (() => {
   for (let n = 0; n < 256; n++) for (let k = 1; k < 8; k++) t[k * 256 + n] = (t[(k - 1) * 256 + n] >>> 8) ^ t[t[(k - 1) * 256 + n] & 255];
   return t;
 })();
-export function crc32(bytes) {
-  const t = CRC_TABLES, n = bytes.length; let crc = ~0, i = 0;
+/** CRC-32 of `bytes`; `previous` continues a CRC over consecutive pieces (crc32(b, crc32(a)) is the CRC of a followed by b). */
+export function crc32(bytes, previous = 0) {
+  const t = CRC_TABLES, n = bytes.length; let crc = ~previous, i = 0;
   for (const end = n - (n & 7); i < end; i += 8) {
     const a = crc ^ (bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24);
     crc = t[1792 + (a & 255)] ^ t[1536 + ((a >>> 8) & 255)] ^ t[1280 + ((a >>> 16) & 255)] ^ t[1024 + (a >>> 24)]
@@ -23,8 +24,27 @@ export function crc32(bytes) {
   return ~crc >>> 0;
 }
 /** Runs crc32 over a scratch buffer: idle-time work toward optimized code before the first real entry (src/zip-inflate-worker.js runs it in rounds; cold, crc32 runs at about
- *  0.4 times its optimized speed). */
-export function warmCrc32(bytes = 1 << 20) { const scratch = new Uint8Array(bytes); for (let i = 0; i < 3; i++) crc32(scratch); }
+ *  0.4 times its optimized speed). The load image's checksum (below) is warmed with it. */
+export function warmCrc32(bytes = 1 << 20) { const scratch = new Uint8Array(bytes); for (let i = 0; i < 3; i++) { crc32(scratch); contentSum(scratch); } }
+
+/** Checksum of a load image's stored bytes (src/load-image.js: storage damage, truncation): two 32-bit Fletcher lanes over little-endian words, and the length. About ten times
+ *  faster than CRC-32 once optimized; fed in pieces whose lengths are multiples of 4 (the last one free). Which bytes belong to the APK is not this checksum's job: an image's
+ *  entries were checked against the APK's CRC-32 when it was written, and its source hash ties it to the APK. */
+const LITTLE_ENDIAN = new Uint8Array(new Uint16Array([1]).buffer)[0] === 1;   // Int32Array words, not Uint32Array: a word above 2^31 read from a Uint32Array is a double, and the loop then ran at ~1 GB/s instead of ~10
+export class ContentSum {
+  constructor() { this.a = 1; this.b = 0; this.length = 0; }
+  update(bytes) {
+    let a = this.a, b = this.b; const n = bytes.length, whole = n & ~3;
+    if (whole) {
+      if (LITTLE_ENDIAN && (bytes.byteOffset & 3) === 0) { const words = new Int32Array(bytes.buffer, bytes.byteOffset, whole >>> 2); for (let i = 0; i < words.length; i++) { a = (a + words[i]) | 0; b = (b + a) | 0; } }
+      else { const view = new DataView(bytes.buffer, bytes.byteOffset, whole); for (let i = 0; i < whole; i += 4) { a = (a + view.getInt32(i, true)) | 0; b = (b + a) | 0; } }
+    }
+    if (n & 3) { let tail = 0; for (let i = whole; i < n; i++) tail |= bytes[i] << ((i - whole) * 8); a = (a + tail) | 0; b = (b + a) | 0; }
+    this.a = a; this.b = b; this.length += n; return this;
+  }
+  hex() { return `${(this.a >>> 0).toString(16).padStart(8, '0')}${(this.b >>> 0).toString(16).padStart(8, '0')}-${this.length.toString(16)}`; }
+}
+export const contentSum = bytes => new ContentSum().update(bytes).hex();
 
 /** deflate-raw expansion of `compressed` (one entry's data) with DecompressionStream, refused past the entry's declared `size` or the caller's `limit`; `name` is the entry name the
  *  messages carry. Throws APKError('Unable to decompress <name>: ...') as APKArchive always has. */

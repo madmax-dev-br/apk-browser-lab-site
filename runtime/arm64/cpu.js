@@ -5,9 +5,9 @@
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=91b59af8dcf0';
-import { executeNeon } from './neon.js?v=91b59af8dcf0';
-import { DecodeCache } from './decode-cache.js?v=91b59af8dcf0';
+import { APKError } from '../apk-error.js?v=c2aef97d559f';
+import { executeNeon } from './neon.js?v=c2aef97d559f';
+import { DecodeCache } from './decode-cache.js?v=c2aef97d559f';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)

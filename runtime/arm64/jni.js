@@ -2,10 +2,11 @@
 // entries that run the JNI bridge's own handlers (src/jni-host.js JniBridge.handlersFor: the same JNI semantics as for the lab's WebAssembly libraries), and the
 // library objects the bridge binds native methods to (Java_ export names and RegisterNatives). Arguments follow AAPCS64: integers and pointers in X0-X7, float and
 // double in V0-V7, the rest on the stack; "..." arguments of Call<Type>Method continue in the same registers, a va_list is AAPCS64's structure.
-import { APKError } from '../apk-error.js?v=91b59af8dcf0';
-import { JNI_FUNCTIONS } from '../jni-function-table.js?v=91b59af8dcf0';
-import { variadic, vaList } from './libc.js?v=91b59af8dcf0';
-import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=91b59af8dcf0';
+import { APKError } from '../apk-error.js?v=c2aef97d559f';
+import { JNI_FUNCTIONS } from '../jni-function-table.js?v=c2aef97d559f';
+import { variadic, vaList } from './libc.js?v=c2aef97d559f';
+import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=c2aef97d559f';
+import { utf8 } from './text.js?v=c2aef97d559f';
 
 const JNI_OK = 0, JNI_EVERSION = -3, VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 // JNI parameters that are 32-bit integers (jint, jsize, jboolean, jbyte, jchar, jshort) rather than pointers or references: on AAPCS64 only their low 32 bits are defined
@@ -31,7 +32,7 @@ export function attachArm64Jni(process, bridge) {
       return parameters.map(type => type === 'D' || type === 'F' ? reader.double() : type === 'J' ? BigInt.asIntN(64, reader.int()) : type.startsWith('L') || type.startsWith('[') ? Number(reader.int()) : Number(BigInt.asIntN(32, reader.int())));
     },
     nativeMethods(methods, count) {   // JNINativeMethod { const char* name; const char* signature; void* fnPtr; } (24 bytes)
-      const out = [], decode = address => new TextDecoder().decode(mem.cString(address));
+      const out = [], decode = address => utf8.decode(mem.cString(address));
       for (let i = 0; i < count; i++) { const at = methods + 24 * i; out.push({ name: decode(mem.readPtr(at)), signature: decode(mem.readPtr(at + 8)), address: mem.readPtr(at + 16) }); }
       return out;
     },

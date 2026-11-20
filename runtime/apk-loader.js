@@ -1,21 +1,22 @@
-import { createArm64Native } from './arm64/glue.js?v=91b59af8dcf0';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=91b59af8dcf0';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=91b59af8dcf0';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=91b59af8dcf0';
-import { inspectELF } from './native-inspector.js?v=91b59af8dcf0';
-import { elfBuildId } from './elf-build-id.js?v=91b59af8dcf0';
-import { crc32 } from './zip-entry.js?v=91b59af8dcf0';
-import { resolveDevice } from './device-profile.js?v=91b59af8dcf0';
-import { resourceProfileFor } from './device-configuration.js?v=91b59af8dcf0';
-import { JniBridge } from './jni-host.js?v=91b59af8dcf0';
-import { providerForApk } from './native-provider-variants.js?v=91b59af8dcf0';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=91b59af8dcf0';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=91b59af8dcf0';
-import { AndroidResources } from './android-resources.js?v=91b59af8dcf0';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=91b59af8dcf0';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=91b59af8dcf0';
-import { FrameworkProvider } from './framework-provider.js?v=91b59af8dcf0';
-import { APKArchive } from './apk-archive.js?v=91b59af8dcf0';
+import { createArm64Native } from './arm64/glue.js?v=c2aef97d559f';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=c2aef97d559f';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=c2aef97d559f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=c2aef97d559f';
+import { inspectELF } from './native-inspector.js?v=c2aef97d559f';
+import { elfBuildId } from './elf-build-id.js?v=c2aef97d559f';
+import { crc32 } from './zip-entry.js?v=c2aef97d559f';
+import { resolveDevice } from './device-profile.js?v=c2aef97d559f';
+import { resourceProfileFor } from './device-configuration.js?v=c2aef97d559f';
+import { JniBridge } from './jni-host.js?v=c2aef97d559f';
+import { providerForApk } from './native-provider-variants.js?v=c2aef97d559f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=c2aef97d559f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=c2aef97d559f';
+import { AndroidResources } from './android-resources.js?v=c2aef97d559f';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=c2aef97d559f';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=c2aef97d559f';
+import { FrameworkProvider } from './framework-provider.js?v=c2aef97d559f';
+import { APKArchive } from './apk-archive.js?v=c2aef97d559f';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=c2aef97d559f';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -508,11 +509,23 @@ export async function loadAPK(arrayBuffer, options = {}) {
     totalDexBytes += size;
     if (totalDexBytes > MAX_DEX_TOTAL) fail(`APK DEX files exceed the combined ${MAX_DEX_TOTAL / 1048576} MiB limit: parsing them needs about 5x that in browser memory`);
   }
-  archive.prefetch(dexFiles, MAX_DEX, options.inflatePool);   // every DEX file expands at once in the helper Workers (the browser Worker's pool), while this thread reads the manifest and parses each file as it arrives
   const report = async (phase, completed, total, filename, message) => {
     if (options.onProgress) await options.onProgress({ phase, completed, total, ...(filename ? { filename } : {}), message });
   };
   const yieldControl = options.yieldControl ?? slicedYield();
+  // The load image (src/load-image.js, options.loadImage = { backend, revision }): verified as a whole before any of its entries is used; when used, its entries are not expanded
+  // (nor handed to the helpers below), when not, the deflated entries this run reads are noted for the image written after the launch. The open runs alongside the manifest and
+  // the resources: once its files are being read (asynchronously) and checked (in the helper Workers), this thread parses the stored resources.arsc; a deflated entry waits for
+  // the open's verdict (archive.imageReady), then comes from the image or is expanded as without one.
+  let loadImage = null;
+  const prefetchDex = () => archive.prefetch(dexFiles, MAX_DEX, options.inflatePool);   // every DEX file expands at once in the helper Workers (the browser Worker's pool), while this thread reads the manifest and parses each file as it arrives
+  if (options.loadImage) {
+    await report('image', 0, 1, undefined, 'Looking for a load image of this APK');
+    routeImageReads(archive);   // after installSplits: the image covers the view's names, the splits' entries included
+    archive.reads = new Set();
+    const { opened } = await beginLoadImage(archive, { pool: options.inflatePool, ...options.loadImage });   // its files being read; the helper Workers check them in parallel
+    archive.imageReady = opened.then(image => { loadImage = image; if (image.active) archive.reads = null; archive.imageReady = null; prefetchDex(); });
+  } else prefetchDex();
   const nativeLibraries = names.filter(name => name.endsWith('.so')).sort();
   const nativeLibraryDetails = nativeLibraries.map(path => {
     const entry = archive.entries.get(path), match = /^lib\/([^/]+)\/([^/]+)$/.exec(path);
@@ -532,7 +545,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let manifest = { packageName: null, applicationName: null, activities: [], services: [], providers: [], receivers: [], launcherActivity: null };
   await report('manifest', 0, 1, 'AndroidManifest.xml', 'Reading Android manifest');
   if (archive.entries.has('AndroidManifest.xml')) {
-    try { manifest = parseManifest(await archive.extract('AndroidManifest.xml', 2 * 1024 * 1024)); }
+    try { manifest = parseManifest(await archive.extract('AndroidManifest.xml', 2 * 1024 * 1024, { waitImage: false })); }   // small: not worth waiting for the image, which would hold back the resources
     catch (error) { warnings.push(`Manifest launcher detection unavailable: ${error.message}`); }
   } else warnings.push('AndroidManifest.xml is absent; choose an Activity or use the sole DEX Activity');
   await report('manifest', 1, 1, 'AndroidManifest.xml', 'Android manifest read');
@@ -560,6 +573,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
       frameworkGetXml: frameworkResources?.getXml,resourceConfiguration, onLayoutFiles: layoutFilesKnown, onColorFiles: colorFilesKnown }, (phase, completed, total, filename, message) => hold.progress({ phase, completed, total, ...(filename ? { filename } : {}), message }), yieldControl, hold.warnings);
     return { frameworkResources, resourceConfiguration, resources };
   } finally { layoutFilesKnown(null); colorFilesKnown(null); } }, { onProgress: options.onProgress, warnings });
+  if (archive.imageReady) await archive.imageReady;
+  if (options.loadImage) await report('image', 1, 1, undefined, loadImage.active ? 'Load image verified' : 'No load image used');
   const files = [], dexSummaries = [];
   for (let i = 0; i < dexFiles.length; i++) {
     const filename = dexFiles[i];
@@ -571,6 +586,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     await report('dex', i + 1, dexFiles.length, filename, `Parsed ${filename}: ${dex.classes.size} classes`);
     await yieldControl();
   }
+  if (loadImage) loadImage.dexFiles = files;   // the image written after the launch keeps these buffers as they are
   let framework = null;
   const provider = options.frameworkProvider ?? (options.frameworkDex ? new FrameworkProvider({ bytes: options.frameworkDex,
     properties: options.frameworkProperties, metadata: options.frameworkMetadata, expectedSha256: options.frameworkSha256,
@@ -820,6 +836,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
   runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed
+  if (loadImage) { runtime.loadImage = loadImage.status; if (companions.length) loadImage.status.companions = companions.map(c => c.packageName); }   // the summary's "Load image:" line (src/load-image.js loadImageText); the companion packages are APKs of their own, not in the image
   for (const companion of companions) {
     runtime.platform.packages.install(companion);
     if (companion.nativeLibraries.length) warnings.push(`Companion package ${companion.packageName} packages ${companion.nativeLibraries.length} native files; they are not offered to JNI (a companion's System.loadLibrary fails naming the library)`);
@@ -928,5 +945,5 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
   runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);
   runtime.apkFileSource = () => ({ bytes: archive.reader.bytes, archive });   // the loaded base APK: PackageManager.requestChecksums
-  return { runtime, inventory, inspectNativeLibraries, archive };
+  return { runtime, inventory, inspectNativeLibraries, archive, loadImage };
 }

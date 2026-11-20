@@ -5,20 +5,20 @@
 // device settings -> setDevice, "Tempo máximo por evento" -> setTimeLimits, "Retornos de métodos" -> setMethodOverrides, "Activities ignoradas" -> setIgnoredActivities,
 // "Mock de endpoints" -> setEndpointMocks, "Permissões" / location / dialog -> setPermissions + permissionResponse, "Abrir" -> startIntent, Logcat -> setLogcatStreaming,
 // Compose -> inspectCompose, plugins -> src/plugin-host.js. The host page is another origin: everything it sends is validated here before it reaches the VM.
-import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=91b59af8dcf0';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=91b59af8dcf0';
-import { formatApiGapReport } from '../api-gap-scan.js?v=91b59af8dcf0';
-import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=91b59af8dcf0';
-import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=91b59af8dcf0';
-import { parseMethodSpec } from '../method-overrides.js?v=91b59af8dcf0';
-import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=91b59af8dcf0';
-import { normalizeIntentRequest } from '../intent-resolver.js?v=91b59af8dcf0';
-import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=91b59af8dcf0';
-import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=91b59af8dcf0';
-import { screenFromSnapshot, screenKey, layoutBoundsElementOut, outputsOf, MAX_LOG_BATCH } from '../plugin-host.js?v=91b59af8dcf0';
-import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=91b59af8dcf0';
-import { rowToEntry } from '../logcat.js?v=91b59af8dcf0';
-import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=91b59af8dcf0';
+import { configToSettings, parseConfig, settingsToConfig, labConfigOf, describeError, envelope, stubListsFromSnapshot, MAX_APK_BYTES, DEVICE_KEYS, STREAMS, PERMISSION_DIALOG } from './protocol.js?v=c2aef97d559f';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=c2aef97d559f';
+import { formatApiGapReport } from '../api-gap-scan.js?v=c2aef97d559f';
+import { sanitizeSettings, deviceForVM } from '../device-settings.js?v=c2aef97d559f';
+import { normalizeMock, validateMock } from '../endpoint-mocks.js?v=c2aef97d559f';
+import { parseMethodSpec } from '../method-overrides.js?v=c2aef97d559f';
+import { sanitizeConfig as sanitizePermissionConfig, answerDialog, emptyConfig } from '../runtime-permissions.js?v=c2aef97d559f';
+import { normalizeIntentRequest } from '../intent-resolver.js?v=c2aef97d559f';
+import { buildDeepLinkRequest, describeDeepLink, DEFAULT_ACTION } from '../deep-link-panel.js?v=c2aef97d559f';
+import { buildLayoutBoundsElements } from '../compose-inspector-panel.js?v=c2aef97d559f';
+import { screenFromSnapshot, screenKey, layoutBoundsElementOut, outputsOf, MAX_LOG_BATCH } from '../plugin-host.js?v=c2aef97d559f';
+import { normalizePlugin, validatePlugin, MAX_PLUGINS } from '../plugin-store.js?v=c2aef97d559f';
+import { rowToEntry } from '../logcat.js?v=c2aef97d559f';
+import { parseRule, describeRule, ruleKey, hitText } from '../host-map.js?v=c2aef97d559f';
 
 export const SCREENSHOT_GAP_MS = 250, PLUGIN_OUTPUT_MS = 100, MAX_STREAM_BATCH = MAX_LOG_BATCH;
 const LAB_LIVE = ['methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog'];
@@ -236,7 +236,7 @@ export function createFrameController({ vm, state, deviceState, post, fetchImpl 
     try {
       const keep = buffer.slice(0); source.bytes = keep;
       const settings = deviceState.settings; loaded = { memoryMiB: settings.memoryMiB ?? 0, strictCrash: config.strictCrash === true, engine: settings.engine ?? 'js' };
-      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat(), renderer: settings.renderer ?? 'cpu', textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), engine: loaded.engine, coreMemory: settings.coreMemory }); if (token !== state.operation) return; rendererStatus = result.renderer ?? null;
+      const result = await vm.load(buffer, { device: deviceForVM(settings), tolerateMissing: tolerateRunning, strictCrash: loaded.strictCrash, webview: config.webview === 'on', keepData: source.keepData, clearData: !!dataOptions.clearData, motionRaster: deviceState.motionRaster !== false, memoryMiB: loaded.memoryMiB, eventSeconds: settings.eventSeconds ?? 0, logcatStreaming: wantsLogcat(), renderer: settings.renderer ?? 'cpu', textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), engine: loaded.engine, coreMemory: settings.coreMemory, loadImage: settings.loadImage === true || config.loadImage === true }); if (token !== state.operation) return; rendererStatus = result.renderer ?? null;
       logcatSent = wantsLogcat(); dataKey = null; reportData(result.appData);
       state.runtime = vm; state.inventory = result.inventory; inventory = result.inventory; packageName = String(result.inventory?.packageName || '');
       const rejected = []; await pushLab(loadKeys(), rejected); if (token !== state.operation) return;   // before any app code runs, as the panels' attach() does on the test page

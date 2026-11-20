@@ -1,36 +1,36 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=91b59af8dcf0';
-import { VMClock } from './vm-clock.js?v=91b59af8dcf0';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=91b59af8dcf0';
-import { OperationMonitor } from './operation-monitor.js?v=91b59af8dcf0';
-import { ExecutionProfile } from './execution-profile.js?v=91b59af8dcf0';
-import { SamplingProfiler } from './sampling-profiler.js?v=91b59af8dcf0';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=91b59af8dcf0';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=91b59af8dcf0';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=91b59af8dcf0';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=91b59af8dcf0';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=91b59af8dcf0';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=91b59af8dcf0';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=91b59af8dcf0';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=91b59af8dcf0';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=91b59af8dcf0';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=91b59af8dcf0';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=91b59af8dcf0';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=91b59af8dcf0';
-import { APKError } from './apk-error.js?v=91b59af8dcf0';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=91b59af8dcf0';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=91b59af8dcf0';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=91b59af8dcf0';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=91b59af8dcf0';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=91b59af8dcf0';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=91b59af8dcf0';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=91b59af8dcf0';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=91b59af8dcf0';
+import STATIC_SHIMS from './shim-static-methods.js?v=c2aef97d559f';
+import { VMClock } from './vm-clock.js?v=c2aef97d559f';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=c2aef97d559f';
+import { OperationMonitor } from './operation-monitor.js?v=c2aef97d559f';
+import { ExecutionProfile } from './execution-profile.js?v=c2aef97d559f';
+import { SamplingProfiler } from './sampling-profiler.js?v=c2aef97d559f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c2aef97d559f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c2aef97d559f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c2aef97d559f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c2aef97d559f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c2aef97d559f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=c2aef97d559f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c2aef97d559f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c2aef97d559f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c2aef97d559f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c2aef97d559f';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=c2aef97d559f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c2aef97d559f';
+import { APKError } from './apk-error.js?v=c2aef97d559f';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c2aef97d559f';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=c2aef97d559f';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=c2aef97d559f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c2aef97d559f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c2aef97d559f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c2aef97d559f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c2aef97d559f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=c2aef97d559f';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=91b59af8dcf0';
-import { bootClassLacksMember } from './boot-class-members.js?v=91b59af8dcf0';
-export { APKError } from './apk-error.js?v=91b59af8dcf0';
-import { BinaryReader } from './binary-reader.js?v=91b59af8dcf0';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=91b59af8dcf0';
+import { Scheduler, Blocked } from './scheduler.js?v=c2aef97d559f';
+import { bootClassLacksMember } from './boot-class-members.js?v=c2aef97d559f';
+export { APKError } from './apk-error.js?v=c2aef97d559f';
+import { BinaryReader } from './binary-reader.js?v=c2aef97d559f';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=c2aef97d559f';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1129,7 +1129,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
   'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
   'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
-  'loadTiming', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
+  'loadTiming', 'loadImage', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',

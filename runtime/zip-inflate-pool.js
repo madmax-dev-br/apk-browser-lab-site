@@ -42,9 +42,35 @@ export class InflatePool {
       catch (error) { this.crash(helper, error); }
     });
   }
+  /** One file of a load image (src/load-image.js): read in the least loaded helper from the origin private file system (`root`/`dir`/`file`) and its checksum taken there
+   *  (src/zip-entry.js contentSum); resolves `{ bytes, sum, ms }` with the bytes transferred here, rejects on any helper error (the caller then does without the image).
+   *  `size`: the expected length, for the choice of helper. */
+  readImageFile({ root, dir, file, size = 0 }) {
+    this.start();
+    if (!this.helpers.length) return Promise.reject(new Error('no APK inflate helper'));
+    const helper = this.helpers.reduce((best, h) => h.queuedBytes < best.queuedBytes ? h : best), id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      helper.jobs.set(id, { resolve, reject, bytes: size, image: true }); helper.queuedBytes += size;
+      try { helper.worker.postMessage({ id, op: 'image-file', root, dir, file }); }
+      catch (error) { this.crash(helper, error); }
+    });
+  }
+  /** SHA-256 of `bytes` (a view; copied, never detached) in the least loaded helper: resolves the digest as an ArrayBuffer (the load image's source hash, src/load-image.js). */
+  digest(bytes) {
+    this.start();
+    if (!this.helpers.length) return Promise.reject(new Error('no APK inflate helper'));
+    const helper = this.helpers.reduce((best, h) => h.queuedBytes < best.queuedBytes ? h : best), id = this.nextId++, copy = bytes.slice();
+    return new Promise((resolve, reject) => {
+      helper.jobs.set(id, { resolve, reject, bytes: bytes.length, digest: true }); helper.queuedBytes += bytes.length;
+      try { helper.worker.postMessage({ id, op: 'sha256', bytes: copy }, [copy.buffer]); }
+      catch (error) { this.crash(helper, error); }
+    });
+  }
   settle(helper, data) {
     const job = helper.jobs.get(data?.id); if (!job) return;
     helper.jobs.delete(data.id); helper.queuedBytes -= job.bytes;
+    if (job.digest) { if (data.digest instanceof ArrayBuffer) job.resolve(data.digest); else job.reject(new Error(String(data?.error ?? 'APK helper gave no digest'))); return; }
+    if (job.image) { if (data.bytes instanceof Uint8Array && typeof data.sum === 'string') job.resolve({ bytes: data.bytes, sum: data.sum, ms: data.ms }); else job.reject(new Error(String(data?.error ?? 'APK helper gave no image file'))); return; }
     if (data.bytes instanceof Uint8Array && Number.isInteger(data.crc)) job.resolve({ bytes: data.bytes, crc: data.crc >>> 0 });
     else { this.stats.failed++; job.reject(new Error(String(data?.error ?? 'APK inflate helper gave no result'))); }
   }

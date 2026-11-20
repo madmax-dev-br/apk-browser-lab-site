@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=91b59af8dcf0") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=91b59af8dcf0">
-  <link rel="stylesheet" href="./lab-theme.css?v=91b59af8dcf0">
-  <meta name="apk-browser-build" content="91b59af8dcf0">
+  <style>@import url("./styles.css?v=c2aef97d559f") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=c2aef97d559f">
+  <link rel="stylesheet" href="./lab-theme.css?v=c2aef97d559f">
+  <meta name="apk-browser-build" content="c2aef97d559f">
 </head>
 <body>
   <header class="topbar">
@@ -155,6 +155,7 @@
               <summary><h3 id="cp-run-title">Execution</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
               <label class="cp-field" for="vm-engine"><span>VM engine <em id="vm-engine-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>What runs the app's code; applies when the APK is opened again</small></span><select id="vm-engine" aria-describedby="vm-engine-note"><option value="wasm">WebAssembly core (default)</option><option value="js">JavaScript VM</option></select></label>
               <p id="vm-engine-note" class="cp-note" role="status"></p>
+              <label class="cp-check" for="vm-load-image"><input id="vm-load-image" type="checkbox"><span>Load image<small>Off by default. Keeps, in this browser's private storage, the expanded DEX files and compiled XML of an APK after its launch (of an APK set: of the base and its splits together), so the next open of the same APK reads them instead of expanding them (a few tens of ms on a large APK, for about the APK's DEX size in storage). The APK is not changed; the image is checked (content hash, lab build, checksums) before each use, and the diagnostics summary says whether it was used, written or refused. Applies when the APK is opened again</small></span></label>
               <label class="cp-field" for="vm-memory"><span>VM memory <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>Java heap budget; applies when the APK is opened again</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
               <p id="vm-memory-note" class="cp-note">This number is the Java heap budget (VM objects and arrays; the other budgets grow with it). The browser uses more than that: DEX tables, CanvasKit, rasters and one JavaScript object per Java object. A tab above ~2–4 GiB may be killed by the browser. The engine limit is 2,097,152 objects (4 GiB is capped to it).</p>
               <p id="vm-memory-device" class="cp-note"></p>
@@ -308,7 +309,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=91b59af8dcf0"></script>
+  <script type="module" src="./app.js?v=c2aef97d559f"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

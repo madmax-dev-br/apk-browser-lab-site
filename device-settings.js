@@ -1,11 +1,11 @@
-import { coreMemorySetting } from './core-memory.js?v=91b59af8dcf0';
-import { isMemoryStep } from './memory-budget.js?v=91b59af8dcf0';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=91b59af8dcf0';
-import { sanitizeHostMap } from './host-map.js?v=91b59af8dcf0';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=91b59af8dcf0';
-import { sanitizeLocation } from './runtime-permissions.js?v=91b59af8dcf0';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=91b59af8dcf0';
-import { sanitizeMicrogServices } from './microg-services.js?v=91b59af8dcf0';
+import { coreMemorySetting } from './core-memory.js?v=c2aef97d559f';
+import { isMemoryStep } from './memory-budget.js?v=c2aef97d559f';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=c2aef97d559f';
+import { sanitizeHostMap } from './host-map.js?v=c2aef97d559f';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=c2aef97d559f';
+import { sanitizeLocation } from './runtime-permissions.js?v=c2aef97d559f';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=c2aef97d559f';
+import { sanitizeMicrogServices } from './microg-services.js?v=c2aef97d559f';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -61,6 +61,7 @@ export function sanitizeSettings(input = {}) {
   out.layoutBounds = input.layoutBounds === true;   // page-only developer option ("Show layout bounds"); the VM never sees it
   out.frameGraph = input.frameGraph === true;   // page-only developer option ("Show frame rate": the FPS line and the frame-time bars, src/frame-meter.js); off by default, applied live, the VM never sees it
   out.arm64Native = input.arm64Native === true;   // "Run ARM64 native code" (src/arm64/, docs/ARM64-NATIVE.md): off by default; read by the next load, recorded in the trace
+  out.loadImage = input.loadImage === true;   // "Load image" (src/load-image.js): off by default (docs/PERFORMANCE-STRATEGY.md, step 1: it did not pay on the large examples); read by the next load, never part of the device model the app sees
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
   out.microgServices = sanitizeMicrogServices(input.microgServices);   // "microG services" (src/microg-services.js): each online service of microG off by default; read by the next load and sent live to a VM that runs microG (vm.setMicrogServices), never part of the device model
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;

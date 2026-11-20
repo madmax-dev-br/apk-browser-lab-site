@@ -2,11 +2,11 @@
 // loads from its own lib/arm64-v8a/ directory (mapped and relocated by src/arm64/elf.js), and the system libraries Android provides (libc, libm, libdl, liblog,
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: libraries and mmap regions grow from 0x01000000, the heap is malloc's own region, the main
 // thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=91b59af8dcf0';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=91b59af8dcf0';
-import { Arm64Memory } from './memory.js?v=91b59af8dcf0';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=91b59af8dcf0';
-import { NativeThreads } from './threads.js?v=91b59af8dcf0';
+import { APKError } from '../apk-error.js?v=c2aef97d559f';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=c2aef97d559f';
+import { Arm64Memory } from './memory.js?v=c2aef97d559f';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=c2aef97d559f';
+import { NativeThreads } from './threads.js?v=c2aef97d559f';
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 

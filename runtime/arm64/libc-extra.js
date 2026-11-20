@@ -1,14 +1,15 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=91b59af8dcf0';
-import { formatC, variadic, vaList } from './libc.js?v=91b59af8dcf0';
-import { addSockets } from './sockets.js?v=91b59af8dcf0';
-import { addMoreLibc } from './libc-more.js?v=91b59af8dcf0';
-import { addSyscalls } from './syscalls.js?v=91b59af8dcf0';
+import { APKError } from '../apk-error.js?v=c2aef97d559f';
+import { formatC, variadic, vaList } from './libc.js?v=c2aef97d559f';
+import { addSockets } from './sockets.js?v=c2aef97d559f';
+import { addMoreLibc } from './libc-more.js?v=c2aef97d559f';
+import { addSyscalls } from './syscalls.js?v=c2aef97d559f';
+import { utf8 } from './text.js?v=c2aef97d559f';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
-const decoder = new TextDecoder(), encoder = new TextEncoder();
+const decoder = utf8, encoder = new TextEncoder();
 
 export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.now(), assets = null } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));

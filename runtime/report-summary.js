@@ -1,12 +1,13 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=91b59af8dcf0';
-import { staticRetentionLines } from './heap-gc.js?v=91b59af8dcf0';
-import { overrideSummaryLines } from './method-overrides.js?v=91b59af8dcf0';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=91b59af8dcf0';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=91b59af8dcf0';
-import { hostMapSummaryLines } from './host-map.js?v=91b59af8dcf0';
-import { attributeGap } from './worker-task-log.js?v=91b59af8dcf0';
+import { TimeBreakdown, loadTimingText } from './time-breakdown.js?v=c2aef97d559f';
+import { staticRetentionLines } from './heap-gc.js?v=c2aef97d559f';
+import { overrideSummaryLines } from './method-overrides.js?v=c2aef97d559f';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=c2aef97d559f';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=c2aef97d559f';
+import { hostMapSummaryLines } from './host-map.js?v=c2aef97d559f';
+import { attributeGap } from './worker-task-log.js?v=c2aef97d559f';
+import { loadImageText } from './load-image.js?v=c2aef97d559f';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -42,6 +43,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     if (frames.length) out.push(`  at: ${frames.join(' ← ')}`);
   });
   part(() => { if (runtime.loadTiming) out.push(loadTimingText(runtime.loadTiming)); });   // where the time of the load went, by phase
+  part(() => { if (runtime.loadImage) out.push(loadImageText(runtime.loadImage)); });   // the load image (src/load-image.js): used, written or refused and why, never silent
   part(() => {   // (a) memory
     if (runtime.engine === 'wasm' && runtime.wasm) {   // the core's heap is counted in bytes, not in records of the JavaScript VM
       const m = runtime.wasm.memoryInfo();

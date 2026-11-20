@@ -2,7 +2,8 @@
 // It maps the PT_LOAD segments at a page-aligned base, reads the dynamic section (DT_NEEDED, SONAME, symbol and string tables, init/fini arrays), and applies
 // the relocations in their three encodings: plain RELA (DT_RELA, DT_JMPREL), Android's packed APS2 (DT_ANDROID_RELA) and RELR (DT_RELR / DT_ANDROID_RELR).
 // Symbols are resolved by the process (other libraries first, then the lab's libc); a relocation type it does not know stops the load naming it.
-import { APKError } from '../apk-error.js?v=91b59af8dcf0';
+import { APKError } from '../apk-error.js?v=c2aef97d559f';
+import { utf8 } from './text.js?v=c2aef97d559f';
 
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'arm64-elf', ...details }); };
 const PT_LOAD = 1, PT_DYNAMIC = 2, PT_TLS = 7, PT_GNU_RELRO = 0x6474e552;
@@ -47,7 +48,7 @@ export function mapLibrary(process, elf, name) {
     if (tag === DT.NEEDED) needed.push(value); else if (!dyn.has(tag)) dyn.set(tag, value);
   }
   const strtab = base + (dyn.get(DT.STRTAB) ?? fail(`${name}: no DT_STRTAB`)), symtab = base + (dyn.get(DT.SYMTAB) ?? fail(`${name}: no DT_SYMTAB`));
-  const str = offset => new TextDecoder().decode(mem.cString(strtab + offset));
+  const str = offset => utf8.decode(mem.cString(strtab + offset));
   const lib = { name, soname: dyn.has(DT.SONAME) ? str(dyn.get(DT.SONAME)) : name, base, end: base + high, needed: needed.map(str), dyn, strtab, symtab, exports: new Map(), elf };
   // the symbol count: DT_HASH's nchain, else the highest index the GNU hash chains reach
   let count = 0;
@@ -93,7 +94,7 @@ export function relocate(process, lib, resolve) {
   if (dyn.has(DT.RELA)) rela(dyn.get(DT.RELA), dyn.get(DT.RELASZ) ?? 0);
   if (dyn.has(DT.ANDROID_RELA)) {   // APS2: sleb128 stream of grouped relocations (bionic linker_reloc_iterators.h)
     const at = base + dyn.get(DT.ANDROID_RELA);
-    if (new TextDecoder().decode(mem.bytes(at, 4)) !== 'APS2') fail(`${lib.name}: DT_ANDROID_RELA without the APS2 signature`);
+    if (utf8.decode(mem.bytes(at, 4)) !== 'APS2') fail(`${lib.name}: DT_ANDROID_RELA without the APS2 signature`);
     const next = sleb128Reader(mem, at + 4); let count = Number(next()), offset = next(), info = 0n, addend = 0n;
     while (count > 0) {
       const groupSize = Number(next()), flags = Number(next()), byInfo = flags & 1, byOffset = flags & 2, byAddend = flags & 4, hasAddend = flags & 8;
