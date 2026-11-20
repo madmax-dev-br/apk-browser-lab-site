@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=57e968aaaf17';
-import { floatBits } from './host-contract.js?v=57e968aaaf17';
-import { getSolidPaint } from './paint-host.js?v=57e968aaaf17';
-import { premultiply, unpremultiply } from './image-codecs.js?v=57e968aaaf17';
+import { APKError } from './apk-error.js?v=d509c7905654';
+import { floatBits } from './host-contract.js?v=d509c7905654';
+import { getSolidPaint } from './paint-host.js?v=d509c7905654';
+import { premultiply, unpremultiply } from './image-codecs.js?v=d509c7905654';
 
 // The public android.graphics.Bitmap API (API 33) over the Skia-backed bitmap model of bitmap-host.js: construction (createBitmap overloads, createScaledBitmap, copy, extractAlpha), pixel access
 // (getPixel(s)/setPixel(s)/getColor/copyPixelsTo|FromBuffer/eraseColor), reconfiguration, density, color space and compress(). Validation, messages and exceptions follow Bitmap.java / Bitmap.cpp of
