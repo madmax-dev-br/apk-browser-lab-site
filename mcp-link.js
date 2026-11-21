@@ -1,23 +1,16 @@
-// The page's side of the MCP bridge (scripts/lab-mcp.mjs, published as tools/lab-mcp.mjs): Controls › MCP › Connect opens an event stream to the bridge on this machine
-// (http://127.0.0.1:8790 by default), receives each tool call the MCP client makes and posts back what src/mcp-tools.js answers. Nothing runs while disconnected; the bridge
-// accepts only the lab's origins and the pairing token. The token is generated here (generateMcpToken) and handed to the bridge through the MCP client's configuration
-// (mcpClientConfig: the JSON shown in Controls › MCP, token in APK_WEB_LAB_MCP_TOKEN). No process.*.
+// The page's side of the MCP bridge (scripts/lab-mcp.mjs, published as tools/lab-mcp.mjs): the page finds the bridge on this machine (http://127.0.0.1:8790 by default) and
+// connects by itself (the owner's decision, 2026-11-20: no pairing token, no Connect click). It opens an event stream to the bridge, receives each tool call the MCP client makes and
+// posts back what src/mcp-tools.js answers. The bridge accepts only the lab's origins (its Origin check is the protection, with 127.0.0.1 as the default address). While no bridge
+// answers, the link looks again quietly with a growing pause (watch / nudge); nothing it does writes to the console. No process.*.
 
-/** Kept equal to DEFAULT_ORIGINS / DEFAULT_PORT / TOKEN_ENV of scripts/lab-mcp.mjs (tests/lab-mcp.test.mjs checks it). */
+/** Kept equal to DEFAULT_ORIGINS / DEFAULT_PORT of scripts/lab-mcp.mjs (tests/lab-mcp.test.mjs checks it). */
 export const MCP_DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 export const MCP_DEFAULT_PORT = 8790;
-export const MCP_TOKEN_ENV = 'APK_WEB_LAB_MCP_TOKEN';
-export const MCP_TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
+export const MCP_DEFAULT_URL = `http://127.0.0.1:${MCP_DEFAULT_PORT}`;
 export const MCP_SERVER_NAME = 'apk-lab';
 export const MCP_SCRIPT_PLACEHOLDER = '/path/to/lab-mcp.mjs';
-
-/** A new pairing token: 192 random bits from crypto.getRandomValues, base64url (32 characters). */
-export function generateMcpToken(cryptoImpl = globalThis.crypto) {
-  if (typeof cryptoImpl?.getRandomValues !== 'function') throw new Error('This browser has no crypto.getRandomValues.');
-  const bytes = cryptoImpl.getRandomValues(new Uint8Array(24));
-  let binary = ''; for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
+/** The pause between two looks for a bridge that is not there: from the first to the last, then the last again (ms). */
+export const MCP_RETRY_STEPS = [2000, 4000, 8000, 15000, 30000, 60000];
 
 /** The port of a bridge address ("http://127.0.0.1:8790" -> 8790), or the default. */
 export function mcpBridgePort(url) {
@@ -25,26 +18,36 @@ export function mcpBridgePort(url) {
 }
 
 /**
- * The entry for the MCP client's configuration (a project .mcp.json, claude_desktop_config.json ...): starts the bridge with this page's token, the port of the bridge
- * address and, when this page is not one of the bridge's default origins, --origin for it. -> { mcpServers: { 'apk-lab': { command, args, env } } }
+ * Settings stored by an older page ({ url, token, lan, agent }): the same without the token, which nothing uses any more. -> { url, lan, agent, changed } (`changed`: the stored
+ * record should be written again).
  */
-export function mcpClientConfig({ token, scriptPath = MCP_SCRIPT_PLACEHOLDER, port = MCP_DEFAULT_PORT, origin = null } = {}) {
+export function migrateMcpSettings(saved) {
+  const record = saved && typeof saved === 'object' && !Array.isArray(saved) ? saved : {};
+  const url = typeof record.url === 'string' && /^https?:\/\//.test(record.url.trim()) ? record.url.trim() : MCP_DEFAULT_URL;
+  return { url, lan: record.lan === true, agent: typeof record.agent === 'string' ? record.agent : null, changed: 'token' in record };
+}
+
+/**
+ * The entry for an MCP client that starts the bridge itself over stdio (a project .mcp.json, claude_desktop_config.json ...): the port of the bridge address and, when this page is
+ * not one of the bridge's default origins, --origin for it. -> { mcpServers: { 'apk-lab': { command, args } } }
+ */
+export function mcpClientConfig({ scriptPath = MCP_SCRIPT_PLACEHOLDER, port = MCP_DEFAULT_PORT, origin = null } = {}) {
   const args = [String(scriptPath ?? '').trim() || MCP_SCRIPT_PLACEHOLDER];
   if (Number(port) !== MCP_DEFAULT_PORT) args.push('--port', String(port));
   if (origin && /^https?:\/\//.test(origin) && !MCP_DEFAULT_ORIGINS.includes(origin)) args.push('--origin', origin);
-  return { mcpServers: { [MCP_SERVER_NAME]: { command: 'node', args, env: { [MCP_TOKEN_ENV]: String(token ?? '') } } } };
+  return { mcpServers: { [MCP_SERVER_NAME]: { command: 'node', args } } };
 }
 
-/** The one terminal command that fetches the bridge and leaves it serving MCP over HTTP with this page's token (scripts/lab-mcp.mjs serve). `lan`: also for other machines of the network. */
-export function mcpServeCommand({ token, port = MCP_DEFAULT_PORT, origin = null, lan = false, scriptUrl = 'tools/lab-mcp.mjs' } = {}) {
-  const parts = [`curl -sO ${scriptUrl}`, '&&', 'node lab-mcp.mjs serve', '--token', String(token ?? '')];
+/** The one terminal command that fetches the bridge and leaves it serving MCP over HTTP (scripts/lab-mcp.mjs serve). `lan`: also for other machines of the network. */
+export function mcpServeCommand({ port = MCP_DEFAULT_PORT, origin = null, lan = false, scriptUrl = 'tools/lab-mcp.mjs' } = {}) {
+  const parts = [`curl -sO ${scriptUrl}`, '&&', 'node lab-mcp.mjs serve'];
   if (Number(port) !== MCP_DEFAULT_PORT) parts.push('--port', String(port));
   if (origin && /^https?:\/\//.test(origin) && !MCP_DEFAULT_ORIGINS.includes(origin)) parts.push('--origin', origin);
   if (lan) parts.push('--host', '0.0.0.0');
   return parts.join(' ');
 }
 /** The address an MCP client connects to (Streamable HTTP), and the Claude Code command that adds it. */
-export function mcpHttpAddress({ token, port = MCP_DEFAULT_PORT, host = '127.0.0.1' } = {}) { return `http://${host}:${Number(port) || MCP_DEFAULT_PORT}/mcp/${encodeURIComponent(String(token ?? ''))}`; }
+export function mcpHttpAddress({ port = MCP_DEFAULT_PORT, host = '127.0.0.1' } = {}) { return `http://${host}:${Number(port) || MCP_DEFAULT_PORT}/mcp`; }
 export function mcpAgentCommand(options = {}) { return `claude mcp add --transport http ${MCP_SERVER_NAME} ${mcpHttpAddress(options)}`; }
 
 /** The agents the page has a ready-made setup for. */
@@ -65,16 +68,26 @@ export function mcpAgentSetup(agent, options = {}) {
 }
 
 /**
- * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (adb install / push) and context.sendFile(slot, blob) hands it one to write (adb pull). onState({ state: 'desconectado' | 'conectando' | 'conectado' | 'erro', message, server, calls }).
- * Returns { connect({ url, token }), disconnect(), get connected(), state }.
+ * execute(tool, args, context) -> Promise<{ content, isError }>; context.fetchFile(file) reads a file the bridge offers with the call (adb install / push) and context.sendFile(slot, blob)
+ * hands it one to write (adb pull). onState({ state, message, server, calls, lastTool }), state: 'desconectado' (off: stopped by the user, or another tab took the bridge),
+ * 'procurando' (no bridge answers yet: looking again later), 'ocupado' (the bridge serves another lab tab), 'conectando', 'conectado', 'erro'.
+ * Returns { watch({ url }), nudge(), connect({ url }), disconnect(), get connected(), get state }:
+ *  - watch: look for the bridge now and keep looking while it is not there (a pause from MCP_RETRY_STEPS); connects as soon as it answers and no other tab holds it;
+ *  - nudge: look again now (the section was opened, the tab became visible), from the shortest pause;
+ *  - connect: the user's Connect: connect now, taking the bridge from another tab if one holds it, and keep watching;
+ *  - disconnect: the user's Disconnect: close the link and stop looking until watch or connect.
+ * `timers` ({ setTimeout, clearTimeout }) and `visible()` (no look while the page is hidden) are injectable for tests.
  */
-export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = globalThis.EventSource, fetchImpl = (...args) => globalThis.fetch(...args) }) {
-  const S = { source: null, base: null, state: 'desconectado', message: '', server: null, calls: 0, lastTool: null };
-  const emit = (state, message = '') => { S.state = state; S.message = message; onState({ state, message, server: S.server, calls: S.calls, lastTool: S.lastTool }); };
+export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = globalThis.EventSource, fetchImpl = (...args) => globalThis.fetch(...args), timers = { setTimeout: (fn, ms) => globalThis.setTimeout(fn, ms), clearTimeout: id => globalThis.clearTimeout(id) }, visible = () => globalThis.document?.visibilityState !== 'hidden', probeTimeoutMs = 2000 }) {
+  const S = { source: null, base: null, url: MCP_DEFAULT_URL, state: 'desconectado', message: '', server: null, calls: 0, lastTool: null, watching: false, timer: null, attempt: 0, looking: null };
+  const emit = (state, message = '') => { if (S.state === state && S.message === message) return; S.state = state; S.message = message; onState({ state, message, server: S.server, calls: S.calls, lastTool: S.lastTool }); };
+  const report = () => onState({ state: S.state, message: S.message, server: S.server, calls: S.calls, lastTool: S.lastTool });
+  const clean = url => String(url ?? '').trim().replace(/\/+$/, '');
+  const originHint = () => { const origin = globalThis.location?.origin; return origin && !MCP_DEFAULT_ORIGINS.includes(origin) ? ` If it is running, it must accept this page's origin (${origin}): the command above carries --origin.` : ''; };
   async function answer(call) {
     const base = S.base; if (!base) return;
     let result; try { result = await execute(call.tool, call.args ?? {}, { fetchFile: file => fetchFile(base, file), sendFile: (slot, blob, options) => sendFile(base, slot, blob, options) }); } catch (error) { result = { isError: true, content: [{ type: 'text', text: String(error?.message ?? error) }] }; }
-    S.calls++; S.lastTool = call.tool; if (S.state === 'conectado') emit('conectado', S.message);
+    S.calls++; S.lastTool = call.tool; if (S.state === 'conectado') report();
     try { await fetchImpl(`${base}/result`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: call.id, ...result }) }); }
     catch (error) { emit('erro', `the response did not reach the bridge: ${error?.message ?? error}`); }
   }
@@ -93,47 +106,63 @@ export function createMcpLink({ execute, onState = () => {}, EventSourceImpl = g
     const res = await fetchImpl(`${base}/file/${id}${/^[a-z0-9]{1,8}$/.test(String(ext ?? '')) ? `?ext=${ext}` : ''}`, { method: 'POST', headers: { 'content-type': 'application/octet-stream' }, body: blob });
     if (!res?.ok) { let reason = ''; try { reason = (await res.json())?.error ?? ''; } catch { /* no body */ } throw new Error(`The bridge did not write the file (HTTP ${res?.status ?? '?'}${reason ? `: ${reason}` : ''}).`); }
   }
-  function connect({ url, token }) {
-    disconnect(false);
-    const clean = String(url ?? '').trim().replace(/\/+$/, ''), key = String(token ?? '').trim();
-    if (!/^https?:\/\//.test(clean)) { emit('erro', 'Invalid address (e.g. http://127.0.0.1:8790).'); return false; }
-    if (!key) { emit('erro', 'No token: click Generate new and run the step 1 command again.'); return false; }
-    if (!MCP_TOKEN_PATTERN.test(key)) { emit('erro', 'Invalid token (16 or more letters, digits, _ or -): click Generate new and run the step 1 command again.'); return false; }
-    if (typeof EventSourceImpl !== 'function') { emit('erro', 'This browser has no EventSource.'); return false; }
-    S.key = key; S.base = `${clean}/${encodeURIComponent(key)}`; S.calls = 0; S.server = null; emit('conectando', `${clean}…`);
-    const source = new EventSourceImpl(`${S.base}/events`); S.source = source;
-    source.addEventListener('hello', event => { if (S.source !== source) return; try { S.server = JSON.parse(event.data).server ?? null; } catch { S.server = null; } emit('conectado', `${clean}`); });
+  /** GET <url>/hello, bounded: -> { status: 'up', connected, server } | { status: 'refused', error } (403: another origin) | { status: 'down' }. */
+  async function hello(url) {
+    const controller = typeof AbortController === 'function' ? new AbortController() : null, timer = timers.setTimeout(() => controller?.abort(), probeTimeoutMs);
+    try {
+      const res = await fetchImpl(`${url}/hello`, { cache: 'no-store', ...(controller ? { signal: controller.signal } : {}) });
+      let body = null; try { body = await res.json(); } catch { body = null; }
+      if (res?.status === 403) return { status: 'refused', error: body?.error ?? 'origin not allowed' };
+      if (!res?.ok || !body?.server) return { status: 'down' };
+      return { status: 'up', connected: body.connected === true, server: body.server };
+    } catch { return { status: 'down' }; }
+    finally { timers.clearTimeout(timer); }
+  }
+  function schedule(fast = false) {
+    if (S.timer !== null) { timers.clearTimeout(S.timer); S.timer = null; }
+    if (!S.watching || S.source) return;
+    const pause = fast ? MCP_RETRY_STEPS[0] : MCP_RETRY_STEPS[Math.min(S.attempt, MCP_RETRY_STEPS.length - 1)];
+    S.attempt++; S.timer = timers.setTimeout(() => { S.timer = null; look(); }, pause);
+  }
+  /** One look for the bridge; connects when it answers and is free (or when `take`: the user's Connect). */
+  async function look({ take = false } = {}) {
+    if (S.source || S.looking) return S.looking;
+    if (!take && !visible()) { schedule(); return null; }   // a hidden tab looks again when it is shown (nudge) or after the pause
+    const url = S.url;
+    S.looking = (async () => {
+      const found = await hello(url);
+      if (url !== S.url || (!S.watching && !take)) return;
+      if (found.status === 'up' && (take || S.take || !found.connected)) { S.take = false; open(url); return; }
+      if (found.status === 'up') { emit('ocupado', `The bridge at ${url} is serving another lab tab. Connect takes it over here.`); schedule(); return; }
+      if (found.status === 'refused') { emit('erro', `The bridge at ${url} refused this page (${found.error}).${originHint()}`); schedule(); return; }
+      emit('procurando', `Waiting for the bridge at ${url}: run the command above in a terminal and leave it open; the page connects by itself.${originHint()}`); schedule();
+    })().finally(() => { S.looking = null; });
+    return S.looking;
+  }
+  function open(url) {
+    if (typeof EventSourceImpl !== 'function') { emit('erro', 'This browser has no EventSource.'); return; }
+    closeSource();
+    S.base = url; S.calls = 0; S.server = null; emit('conectando', `${url}…`);
+    const source = new EventSourceImpl(`${url}/events`); S.source = source;
+    source.addEventListener('hello', event => { if (S.source !== source) return; try { S.server = JSON.parse(event.data).server ?? null; } catch { S.server = null; } S.attempt = 0; emit('conectado', url); });
     source.addEventListener('call', event => { if (S.source !== source) return; let call; try { call = JSON.parse(event.data); } catch { return; } answer(call); });
-    source.addEventListener('replaced', () => { if (S.source !== source) return; disconnect(false); emit('desconectado', 'Another tab connected to this bridge.'); });
-    source.onerror = () => {
-      if (S.source !== source) return;
-      // EventSource reconnects by itself (the bridge restarts with the MCP client); CLOSED means a refusal (wrong token or origin). EventSource does not say which, so ask the
-      // bridge once (GET /<token>/hello answers 401 for another token, 403 for another origin) and say it plainly.
-      if (source.readyState !== 2) emit('conectando', `reconnecting to ${clean}…`);
-      diagnose(source, clean);
-    };
+    source.addEventListener('replaced', () => { if (S.source !== source) return; closeSource(); S.watching = false; emit('desconectado', 'Another lab tab connected to this bridge. Connect takes it back here.'); });
+    // The bridge stopped (or the network dropped): close the stream at once, instead of letting EventSource retry every few seconds, and go back to looking with a pause.
+    source.onerror = () => { if (S.source !== source) return; closeSource(); S.attempt = 0; emit('procurando', `The bridge at ${url} stopped answering: looking for it again…`); schedule(true); };
+  }
+  function closeSource() { if (S.source) { try { S.source.close(); } catch { /* already closed */ } } S.source = null; S.base = null; }
+  function setUrl(url) {
+    const next = clean(url);
+    if (!/^https?:\/\//.test(next)) { emit('erro', `Invalid bridge address (e.g. ${MCP_DEFAULT_URL}).`); return false; }
+    if (next !== S.url) { closeSource(); S.url = next; S.attempt = 0; }
     return true;
   }
-  async function diagnose(source, clean) {
-    if (S.checking === source) return; S.checking = source;
-    let status = 0, body = null;
-    try { const res = await fetchImpl(`${S.base ?? `${clean}/${encodeURIComponent(S.key ?? '')}`}/hello`, { cache: 'no-store' }); status = res?.status ?? 0; body = await res?.json?.().catch(() => null); }
-    catch { status = -1; }
-    finally { if (S.checking === source) S.checking = null; }
-    if (S.source !== source) return;
-    if (status === 401) { disconnect(false); emit('erro', `The bridge at ${clean} refused this page's token. The token changed or the MCP client still uses the old one: stop the bridge and run the step 1 command again (and update the address in the agent).`); }
-    else if (status === 403) { disconnect(false); emit('erro', `The bridge at ${clean} refused this origin (${body?.error ?? 'origin not allowed'}). Run the step 1 command again: it carries --origin for this page.`); }
-    else if (status === -1) {
-      // a bridge that refuses this origin answers without CORS headers, which looks like no bridge at all from here
-      const origin = globalThis.location?.origin, hint = origin && !MCP_DEFAULT_ORIGINS.includes(origin) ? ` If the bridge is running, it must accept this origin (${origin}): the step 1 command already carries --origin.` : '';
-      if (source.readyState === 2) { disconnect(false); emit('erro', `No bridge at ${clean}: is the step 1 command running in the terminal? Run it and click Connect.${hint}`); }
-      else emit('conectando', `No bridge at ${clean} yet: is the step 1 command running in the terminal? Trying again…${hint}`);
-    }
-    else if (source.readyState === 2) { disconnect(false); emit('erro', `The bridge at ${clean} closed the connection${body?.error ? `: ${body.error}` : ''}.`); }
-  }
-  function disconnect(notify = true) {
-    if (S.source) { try { S.source.close(); } catch { /* already closed */ } }
-    S.source = null; S.base = null; if (notify) emit('desconectado', '');
-  }
-  return { connect, disconnect, get connected() { return S.state === 'conectado'; }, get state() { return { ...S, source: undefined }; } };
+  return {
+    watch({ url = S.url } = {}) { if (!setUrl(url)) return false; S.watching = true; if (!S.source) { S.attempt = 0; look(); } return true; },
+    nudge() { if (!S.watching || S.source) return; S.attempt = 0; if (S.timer !== null) { timers.clearTimeout(S.timer); S.timer = null; } look(); },
+    connect({ url = S.url } = {}) { if (!setUrl(url)) return false; S.watching = true; S.take = true; if (S.timer !== null) { timers.clearTimeout(S.timer); S.timer = null; } closeSource(); S.attempt = 0; look({ take: true }); return true; },
+    disconnect(notify = true) { S.watching = false; S.take = false; if (S.timer !== null) { timers.clearTimeout(S.timer); S.timer = null; } closeSource(); if (notify) emit('desconectado', 'Disconnected. Connect connects again.'); },
+    get connected() { return S.state === 'conectado'; },
+    get state() { return { state: S.state, message: S.message, server: S.server, calls: S.calls, lastTool: S.lastTool, watching: S.watching, url: S.url }; },
+  };
 }

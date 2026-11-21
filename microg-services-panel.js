@@ -1,9 +1,9 @@
-// The "microG services" group of the Device section (src/index.html #dev-microg-services): one switch per online service of microG (src/microg-services.js), each off by default,
+// The "microG services" group of the "microG settings" dialog (src/index.html #dev-microg-services, src/microg-settings-dialog.js): one switch per online service of microG (src/microg-services.js), each off by default,
 // each saying plainly who it talks to. The choice is a device setting (src/device-settings.js microgServices, saved with the others); it reaches the device at the next load and,
 // while an APK runs with microG, at once (vm.setMicrogServices): the device then flips microG's own switch the way microG's settings screen does. The status line shows microG's
 // switches as the device last saw them written (a change made in microG's own screens shows there too). No timer of its own.
 
-import { MICROG_SERVICES, sanitizeMicrogServices } from './microg-services.js?v=ebd42d0a624c';
+import { MICROG_SERVICES, sanitizeMicrogServices } from './microg-services.js?v=a64e78a38c60';
 
 /** The plain-language line of one service: who it talks to and what for (pure). */
 export function microgServiceText(service) {
@@ -19,6 +19,13 @@ export function microgServicesStatus({ chosen, microgOn, loadedMicrog, effective
   return { state: inMicrog.length ? 'on' : 'off', text: `In microG now: ${inMicrog.length ? inMicrog.join(', ') : 'all off'}.${needsCheckin}` };
 }
 
+/** The short line next to the "microG settings…" button in the Device section (pure): the services as microG has them (`effective`) or, before it runs, as chosen. */
+export function microgSettingsSummary({ chosen, effective = null }) {
+  const source = effective ?? chosen, on = MICROG_SERVICES.filter(service => source?.[service.id]).map(service => service.label);
+  if (!on.length) return 'services: all off';
+  return `services: ${on.length <= 2 ? on.join(', ') : `${on.length} of ${MICROG_SERVICES.length}`} on`;
+}
+
 export function createMicrogServicesPanel({ $, onChange }) {
   const list = () => $('dev-microg-service-list');
   const box = $('dev-microg-service-list');
@@ -32,7 +39,7 @@ export function createMicrogServicesPanel({ $, onChange }) {
   }));
   const read = () => sanitizeMicrogServices(Object.fromEntries(MICROG_SERVICES.map(service => [service.id, list()?.querySelector?.(`[data-service="${service.id}"]`)?.checked === true])));
   let last = { chosen: null, microgOn: false, loadedMicrog: undefined, effective: null };
-  const show = () => { const note = $('dev-microg-services-status'); if (!note) return; const { state, text } = microgServicesStatus(last); note.textContent = text; note.dataset.state = state === 'warn' ? 'warn' : state === 'on' ? 'ok' : ''; };
+  const show = () => { const note = $('dev-microg-services-status'); if (!note) return; const { state, text } = microgServicesStatus(last); note.textContent = text; note.dataset.state = state === 'warn' ? 'warn' : state === 'on' ? 'ok' : ''; const summary = $('dev-microg-settings-summary'); if (summary) summary.textContent = microgSettingsSummary(last); };
   return {
     read,
     /** The saved setting into the switches. */

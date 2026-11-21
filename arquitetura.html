@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How APK Browser Lab runs an Android APK in the browser: from the file to the screen, threads and time, memory, rendering, network, native code, tools and limitations.">
-  <link rel="stylesheet" href="./site-pages.css?v=ebd42d0a624c">
-  <link rel="stylesheet" href="./lab-tokens.css?v=ebd42d0a624c">
+  <link rel="stylesheet" href="./site-pages.css?v=a64e78a38c60">
+  <link rel="stylesheet" href="./lab-tokens.css?v=a64e78a38c60">
 </head>
 <body>
   <header class="topbar">
@@ -253,13 +253,13 @@
         </ul>
         <h3 id="cors-resolver">Four ways to solve it</h3>
         <ol>
-          <li><b>Local CORS relay (to use the real API).</b> A small Node program that runs on your machine, repeats each request as the phone would and returns the response to the page with the CORS headers. It listens only on 127.0.0.1, requires the token printed at startup, accepts only the lab's origin (the public site and a local copy, by default), answers the private network preflight, follows redirects and returns the <code>Set-Cookie</code> headers, which the browser would hide. It reaches any destination, including servers on this machine or the local network (localhost, 192.168…). It stores nothing.
+          <li><b>Local CORS relay (to use the real API).</b> A small Node program that runs on your machine, repeats each request as the phone would and returns the response to the page with the CORS headers. It listens only on 127.0.0.1, needs no token, accepts only the lab's origin (the public site and a local copy, by default), answers the private network preflight, follows redirects and returns the <code>Set-Cookie</code> headers, which the browser would hide. It reaches any destination, including servers on this machine or the local network (localhost, 192.168…). It stores nothing.
             <div class="code" data-name="CORS relay"><pre><code># Node 18 or newer
-curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mjs
+curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mjs -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/relay-webview.cjs
 node cors-relay.mjs
-# options: --port 8787 · --origin &lt;page origin&gt; (repeatable) · --token &lt;token&gt;</code></pre></div>
-            You can also download the file directly: <a href="./tools/cors-relay.mjs" download>cors-relay.mjs</a>.
-            Copy the Proxy URL it prints into <b>Controls › Device › Proxy</b> (in the embedded component, the <code>proxyUrl</code> option). The <code>{url}</code> in the URL is replaced with each request's destination.</li>
+# options: --port 8787 · --origin &lt;page origin&gt; (repeatable)</code></pre></div>
+            You can also download the files directly: <a href="./tools/cors-relay.mjs" download>cors-relay.mjs</a> and <a href="./tools/relay-webview.cjs" download>relay-webview.cjs</a> (its WebView part), in the same folder.
+            On the default port (8787) there is nothing to copy: the page finds the relay by itself and <b>Controls › Device › Proxy</b> says "Relay found at 127.0.0.1:8787 (automatic)"; the page looks again before each app is opened, so a relay started later is used from the next launch, and the execution log names the proxy each run used. On another port, put the address it prints (<code>http://127.0.0.1:&lt;port&gt;/?url={url}</code>) in the Proxy field (in the embedded component, the <code>proxyUrl</code> option); the <code>{url}</code> is replaced with each request's destination.</li>
           <li><b>Endpoint mock (no network).</b> In <b>Controls › Endpoint mocks</b>, the response comes from the lab itself and the request never goes out, so there is no CORS. Good for screens that depend on a specific response.</li>
           <li><b>Redirect to a server of your own.</b> In <b>Controls › Redirect hosts</b>, send the API host to a server you control (a mock server, a debugging proxy, a test environment). That server must answer CORS for the lab's origin, including on <code>OPTIONS</code>:
             <div class="code" data-name="CORS headers"><pre><code>Access-Control-Allow-Origin: https://madmax-dev-br.github.io
@@ -339,6 +339,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=ebd42d0a624c"></script>
+  <script type="module" src="./site-pages.js?v=a64e78a38c60"></script>
 </body>
 </html>

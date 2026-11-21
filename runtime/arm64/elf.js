@@ -2,8 +2,8 @@
 // It maps the PT_LOAD segments at a page-aligned base, reads the dynamic section (DT_NEEDED, SONAME, symbol and string tables, init/fini arrays), and applies
 // the relocations in their three encodings: plain RELA (DT_RELA, DT_JMPREL), Android's packed APS2 (DT_ANDROID_RELA) and RELR (DT_RELR / DT_ANDROID_RELR).
 // Symbols are resolved by the process (other libraries first, then the lab's libc); a relocation type it does not know stops the load naming it.
-import { APKError } from '../apk-error.js?v=ebd42d0a624c';
-import { utf8 } from './text.js?v=ebd42d0a624c';
+import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { utf8 } from './text.js?v=a64e78a38c60';
 
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'arm64-elf', ...details }); };
 const PT_LOAD = 1, PT_DYNAMIC = 2, PT_TLS = 7, PT_GNU_RELRO = 0x6474e552;
@@ -26,7 +26,7 @@ export function parseElf(bytes) {
 
 function sleb128Reader(mem, start) {
   let at = start;
-  return () => { let result = 0n, shift = 0n, byte; do { byte = mem.u8[at++]; result |= BigInt(byte & 0x7f) << shift; shift += 7n; } while (byte & 0x80); if (byte & 0x40 && shift < 64n) result -= 1n << shift; return result; };
+  return () => { let result = 0n, shift = 0n, byte; do { byte = mem.byte(at++); result |= BigInt(byte & 0x7f) << shift; shift += 7n; } while (byte & 0x80); if (byte & 0x40 && shift < 64n) result -= 1n << shift; return result; };
 }
 
 /**
@@ -61,7 +61,7 @@ export function mapLibrary(process, elf, name) {
   }
   lib.symbolCount = count;
   lib.symbol = index => {
-    const at = symtab + index * 24, nameOff = mem.readU32(at), info = mem.u8[at + 4], shndx = mem.dv.getUint16(at + 6, true), value = Number(mem.read64(at + 8));
+    const at = symtab + index * 24, nameOff = mem.readU32(at), info = mem.byte(at + 4), shndx = mem.uint16(at + 6), value = Number(mem.read64(at + 8));
     return { name: str(nameOff), bind: info >> 4, type: info & 15, defined: shndx !== 0, value: shndx === 0xfff1 ? value : base + value };
   };
   for (let i = 1; i < count; i++) { const s = lib.symbol(i); if (s.defined && s.name && (s.bind === 1 || s.bind === 2 || s.bind === 10) && !lib.exports.has(s.name)) lib.exports.set(s.name, s.value); }

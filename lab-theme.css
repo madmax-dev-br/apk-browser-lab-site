@@ -48,7 +48,7 @@
 :where(.controls-column,.trace,.tool-dock,.em-scrim,.lab-modal-scrim) :where([data-state=ok]){color:var(--ok)}
 :where(.controls-column,.trace,.tool-dock,.em-scrim,.lab-modal-scrim) :where([data-state=warn]){color:var(--amber-ink)}
 /* values that are code: URIs, hosts, class and file names */
-#deeplink-input,#deeplink-component,#dev-hosts,#dev-proxy,#mcp-script,#mcp-url,#mcp-token,#em-url,#em-body,#em-body-contains,.ov-method,.ov-value,.ia-name,.hm-from,.hm-to,.em-header input,.pl-code,#ov-search,#ia-filter{font-family:var(--mono);font-size:12px}
+#deeplink-input,#deeplink-component,#dev-hosts,#dev-proxy,#mcp-script,#mcp-url,#em-url,#em-body,#em-body-contains,.ov-method,.ov-value,.ia-name,.hm-from,.hm-to,.em-header input,.pl-code,#ov-search,#ia-filter{font-family:var(--mono);font-size:12px}
 /* primary actions */
 .cp-button.primary,.pb-button.pb-primary{background-color:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:500}
 .cp-button.primary:hover:not(:disabled),.pb-button.pb-primary:hover:not(:disabled){background-color:var(--accent-hover);border-color:var(--accent-hover)}
@@ -233,8 +233,7 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .em-name{font-size:12px;color:var(--muted)}
 .em-code{font:600 12px/18px var(--mono);color:var(--soft)}
 #pl-template{max-width:100%;font-size:12px;padding:3px 26px 3px 8px}
-.mcp-token-row{gap:6px}
-.mcp-token-row input,.control-panel #mcp-url,.control-panel #mcp-token{padding:5px 10px;border:1px solid var(--line-strong);border-radius:var(--r-control);background-color:var(--surface);color:var(--ink);font:400 12px/20px var(--mono)}
+.control-panel #mcp-url{padding:5px 10px;border:1px solid var(--line-strong);border-radius:var(--r-control);background-color:var(--surface);color:var(--ink);font:400 12px/20px var(--mono)}
 .mcp-config{margin:0 0 14px}
 .mcp-config-head{gap:10px;margin-bottom:6px;font-size:14px;color:var(--soft);align-items:flex-start}
 .mcp-config-json{padding:10px 12px;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--code-bg);color:var(--code-ink);font:400 12px/1.5 var(--mono)}
@@ -251,6 +250,7 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .help-tab:hover:not(:disabled){background:var(--surface-2);color:var(--ink);border-color:transparent;border-left-color:var(--line-strong)}
 .help-tab[aria-selected=true],.help-tab[aria-selected=true]:hover{color:var(--accent-ink);background:var(--accent-soft);border-left-color:var(--accent)}
 .help-tab-mark{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-right:6px;border-radius:50%;background:var(--amber-soft);color:var(--amber-ink);font:700 10px/1 var(--sans)}
+.microg-dialog{font:400 14px/1.55 var(--sans);color:var(--ink)}.microg-dialog .cp-note{font-size:13px}.microg-dialog .cp-subtitle{font-size:13px;font-weight:600;color:var(--ink)}.microg-dialog .cp-grid label{color:var(--ink);font-weight:500}   /* "microG settings" (src/microg-settings-dialog.js): page text, not the modal's monospace */
 @media (max-width:620px){.help-tablist{border-right:0;border-bottom:1px solid var(--line)}.help-tab{border-left:0;border-bottom:2px solid transparent;white-space:nowrap}.help-tab[aria-selected=true]{border-bottom-color:var(--accent)}}
 
 /* ---- 5. Stage: the device on the drawing ---------------------------------------------------------------------------------------------------------------------- */

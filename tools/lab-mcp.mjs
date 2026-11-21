@@ -3,27 +3,26 @@
 // the output of the running plugins, the Compose tree and CompositionLocals, ViewModels and static state, Logcat and the network log, "Screen ready".
 // A web page cannot accept connections, so this small process sits between them:
 //
-//   MCP client  --stdio (JSON-RPC, MCP)-->  lab-mcp.mjs  <--HTTP on 127.0.0.1 (events + results)--  the lab page (Controls > MCP > Connect)
+//   MCP client  --stdio (JSON-RPC, MCP)-->  lab-mcp.mjs  <--HTTP on 127.0.0.1 (events + results)--  the lab page (Controls > MCP: it connects by itself)
 //
-//   node lab-mcp.mjs                      run by the MCP client, configured with the JSON the page shows in Controls › MCP:
-//                                         { "mcpServers": { "apk-lab": { "command": "node", "args": ["/path/to/lab-mcp.mjs"], "env": { "APK_WEB_LAB_MCP_TOKEN": "<the page's token>" } } } }
-//   node lab-mcp.mjs serve --token <t>    the simple way: stays running and serves MCP over HTTP at http://<host>:<port>/mcp/<token> (Streamable HTTP, JSON responses), so the
-//                                         client only needs that address (claude mcp add --transport http apk-lab <url>). --host 127.0.0.1 by default; --host 0.0.0.0 (or a
-//                                         local IP) also accepts MCP clients from other machines of the network: the token in the address is then the only protection and the
-//                                         traffic is plain HTTP, so use it on networks you trust. The page always reaches the bridge on this machine (127.0.0.1).
-//   node lab-mcp.mjs token                prints the token of ~/.apk-web-lab-mcp-token (only used when neither --token nor APK_WEB_LAB_MCP_TOKEN is given)
-//   options: --port 8790  --origin <lab origin> (repeatable)  --token <token>  --timeout-ms 60000
+//   node lab-mcp.mjs serve                the simple way: stays running and serves MCP over HTTP at http://<host>:<port>/mcp (Streamable HTTP, JSON responses), so the client
+//                                         only needs that address (claude mcp add --transport http apk-lab http://127.0.0.1:8790/mcp). --host 127.0.0.1 by default; --host
+//                                         0.0.0.0 (or a local IP) also accepts MCP clients from other machines of the network: then ANY machine on the network can drive the lab
+//                                         (there is no token) and the traffic is plain HTTP, so use it on networks you trust. The page always reaches the bridge on this machine.
+//   node lab-mcp.mjs                      run by the MCP client over stdio: { "mcpServers": { "apk-lab": { "command": "node", "args": ["/path/to/lab-mcp.mjs"] } } }
+//   options: --port 8790  --origin <lab origin> (repeatable)  --timeout-ms 60000   (--token and APK_WEB_LAB_MCP_TOKEN, from older versions, are ignored)
 //
-// Every tool call is answered by the page, with what the page shows at that moment; the bridge stores nothing. The adb tool reads and writes files here: the local files its command line
-// names are offered to the page (GET /<token>/file/<id>, same origin and token checks, only while that call is in flight): read for `adb install <apk>` and `adb push <local> …`, written for `adb pull … [local]`, `> file` and the video of record_screen (the page posts
-// the bytes to POST /<token>/file/<id>). Only paths written in the MCP client's own command, only for the length of the call. Safety: it listens on 127.0.0.1 only; the page's requests must come
-// from one of the allowed origins (the public lab and a local copy by default: another site open in the same browser is refused by its Origin) and carry the pairing token. The
-// token is always required: the page generates it (shown in its MCP JSON) and the client passes it in APK_WEB_LAB_MCP_TOKEN (or --token); without either, the token kept in
-// ~/.apk-web-lab-mcp-token (created once, readable only by you) is used, as before. Tokens are compared in constant time and never logged. Node.js built-ins only. Protocol logs
-// go to stderr; stdout carries MCP messages only.
+// No pairing token (the owner's decision, 2026-11-20): the page finds the bridge on its default address and connects by itself (src/mcp-link.js). Every tool call is answered by
+// the page, with what the page shows at that moment; the bridge stores nothing. The adb tool reads and writes files here: the local files its command line names are offered to the
+// page (GET /file/<id>, same origin check, only while that call is in flight, under an id of 128 random bits): read for `adb install <apk>` and `adb push <local> …`, written for
+// `adb pull … [local]`, `> file` and the video of record_screen (the page posts the bytes to POST /file/<id>). Only paths written in the MCP client's own command, only for the length
+// of the call. Safety: it listens on 127.0.0.1 only by default (other machines cannot reach it); the page's requests must come from one of the allowed origins (the public lab and a
+// local copy by default: another site open in the same browser is refused by its Origin), and so must every browser request to /mcp (a page of another site cannot drive it).
+// MCP clients that are not browsers send no Origin and are admitted: a program on this machine can use the bridge. An address from an older version (/mcp/<token>, /<token>/events)
+// keeps working: the extra segment is ignored. Node.js built-ins only. Protocol logs go to stderr; stdout carries MCP messages only.
 import http from 'node:http';
-import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
-import { readFileSync, writeFileSync, createReadStream, createWriteStream } from 'node:fs';
+import { randomBytes } from 'node:crypto';
+import { createReadStream, createWriteStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { networkInterfaces } from 'node:os';
@@ -33,7 +32,7 @@ import { fileURLToPath } from 'node:url';
 export const DEFAULT_PORT = 8790;
 export const DEFAULT_ORIGINS = ['https://madmax-dev-br.github.io', 'http://127.0.0.1:8765', 'http://localhost:8765'];
 export const PROTOCOL_VERSIONS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-export const SERVER_INFO = { name: 'apk-web-lab', title: 'APK Web Lab (page open in the browser)', version: '1.3.0' };
+export const SERVER_INFO = { name: 'apk-web-lab', title: 'APK Web Lab (page open in the browser)', version: '1.4.0' };
 const MAX_RESULT_BYTES = 24 * 1024 * 1024;
 export const MAX_APK_BYTES = 1024 * 1024 * 1024;   // the lab's own limit for an APK (src/app.js)
 const LONG_CALL_MS = 300000;   // reading, loading and starting an app can take minutes for a large APK
@@ -103,25 +102,19 @@ export const TOOLS = [
   { name: 'host_redirects', description: 'The Redirect hosts rules (the app asks for one host, the lab serves it from another, e.g. a local server): without rules, the current ones; rules replaces all of them: [{ from: "api.example.com", to: "localhost:8080", enabled: true }].', inputSchema: obj({ rules: { type: 'array', items: { type: 'object' }, description: 'the new rules (replaces all)' } }) },
 ];
 
-export const TOKEN_ENV = 'APK_WEB_LAB_MCP_TOKEN';
-export const TOKEN_PATTERN = /^[A-Za-z0-9_-]{16,256}$/;
-/** Constant-time token check (both sides hashed first, so lengths do not leak either). */
-export function tokenMatches(given, expected) {
-  const digest = value => createHash('sha256').update(String(value ?? '')).digest();
-  return typeof given === 'string' && typeof expected === 'string' && expected.length > 0 && timingSafeEqual(digest(given), digest(expected));
-}
-/** Which token the bridge uses: --token, then APK_WEB_LAB_MCP_TOKEN, then ~/.apk-web-lab-mcp-token. -> { token, source } or { error } (never contains the token). */
-export function resolveToken({ argToken = null, env = {}, file = tokenFile(), readFile = readOrCreateToken } = {}) {
-  const pick = (value, source) => TOKEN_PATTERN.test(value) ? { token: value, source } : { error: `invalid token in ${source}: use the token the page shows in Controls › MCP (16 or more letters, digits, _ or -)` };
-  if (argToken != null) return pick(String(argToken).trim(), '--token');
-  const fromEnv = env[TOKEN_ENV]; if (fromEnv != null && String(fromEnv).trim() !== '') return pick(String(fromEnv).trim(), TOKEN_ENV);
-  return { token: readFile(file), source: file };
-}
-
-export function tokenFile() { return path.join(homedir(), '.apk-web-lab-mcp-token'); }
-export function readOrCreateToken(file = tokenFile()) {
-  try { const text = readFileSync(file, 'utf8').trim(); if (/^[A-Za-z0-9_-]{16,}$/.test(text)) return text; } catch { /* created below */ }
-  const token = randomBytes(18).toString('base64url'); writeFileSync(file, token + '\n', { mode: 0o600 }); return token;
+/** The environment variable older page setups passed the pairing token in: ignored now (said once on stderr). */
+export const LEGACY_TOKEN_ENV = 'APK_WEB_LAB_MCP_TOKEN';
+const PAGE_ACTIONS = new Set(['events', 'result', 'file', 'hello']);
+/**
+ * The page side of a path: { action, id } for /events, /result, /hello and /file/<id>; an older page put its token first (/<token>/events, /<token>/file/<id>), which is
+ * ignored. null for anything else.
+ */
+export function pageRoute(pathname) {
+  const parts = String(pathname ?? '').split('/').slice(1);
+  const at = PAGE_ACTIONS.has(parts[0]) ? 0 : PAGE_ACTIONS.has(parts[1]) && /^[A-Za-z0-9_%-]{1,512}$/.test(parts[0] ?? '') ? 1 : -1; if (at < 0) return null;
+  const action = parts[at], rest = parts.slice(at + 1);
+  if (action === 'file') return rest.length === 1 && rest[0] ? { action, id: rest[0] } : null;
+  return rest.length === 0 || (rest.length === 1 && rest[0] === '') ? { action, id: null } : null;
 }
 
 /** The words of a command line as a shell splits them (quotes, backslashes), with | ; && || > >> as { op } entries; null when a quote is left open. Kept equal to splitLine of
@@ -171,23 +164,18 @@ export function adbLocalFiles({ command = null, args = null } = {}) {
 }
 
 /** The bridge: an HTTP side for the page and an MCP side (handle(message) -> response or null). */
-export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins = DEFAULT_ORIGINS, token, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {
-  if (!TOKEN_PATTERN.test(String(token ?? ''))) throw new Error('lab-mcp: the bridge needs a token (16 or more letters, digits, _ or -)');
+export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins = DEFAULT_ORIGINS, timeoutMs = 60000, log = message => process.stderr.write(`[lab-mcp] ${message}\n`) } = {}) {   // a `token` option, from older versions, is ignored
   const allowed = new Set(origins), pending = new Map(), files = new Map(), uploads = new Map(); let page = null, nextId = 1, server = null, refused = null, refusedLogged = 0;
   const cors = (origin, res, extra = {}) => { res.setHeader('Access-Control-Allow-Origin', origin); res.setHeader('Vary', 'Origin'); for (const [name, value] of Object.entries(extra)) res.setHeader(name, value); };
   const send = (res, status, body, origin) => { if (origin) cors(origin, res); res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify(body)); };
-  /** MCP over HTTP (Streamable HTTP, JSON responses only): POST /mcp/<token> with one JSON-RPC message or a batch. A browser page of another site is refused by its Origin;
-   *  clients that are not browsers send none, and the token in the address (or Authorization: Bearer) is what admits them. */
+  /** MCP over HTTP (Streamable HTTP, JSON responses only): POST /mcp with one JSON-RPC message or a batch (/mcp/<anything>, an older address with a token, is the same). A
+   *  browser page of another site is refused by its Origin; clients that are not browsers send none and are admitted (no token since 2026-11-20). */
   function onMcp(req, res, url, origin) {
     const plain = (status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...headers }); res.end(body === null ? '' : JSON.stringify(body)); };
     if (origin && !allowed.has(origin)) { plain(403, { error: `origin not allowed: ${origin}` }); return; }
     if (origin) cors(origin, res);
     if (req.method === 'OPTIONS') { res.writeHead(204, { 'Access-Control-Allow-Methods': 'POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type, authorization, mcp-protocol-version' }); res.end(); return; }
-    let given = ''; try { given = decodeURIComponent(url.pathname.split('/')[2] ?? ''); } catch { /* refused below */ }
-    if (!given) given = /^Bearer (.+)$/i.exec(req.headers.authorization ?? '')?.[1] ?? '';
-    // 403, never 401: to an MCP client a 401 means "log in with OAuth" (MCP authorization), and clients such as Cursor then start an OAuth flow this bridge does not have and
-    // wait there. The token is in the address: a wrong or missing one is simply refused, with the reason.
-    if (!tokenMatches(given, token)) { plain(403, { jsonrpc: '2.0', id: null, error: { code: -32001, message: 'token refused: use the address the bridge showed at startup (…/mcp/<token>), with the page\'s token (Controls › MCP)' } }); return; }
+    // never 401: to an MCP client a 401 means "log in with OAuth" (MCP authorization), and clients such as Cursor then start an OAuth flow this bridge does not have
     if (req.method !== 'POST') { plain(405, { jsonrpc: '2.0', id: null, error: { code: -32000, message: 'Method Not Allowed: this bridge answers POST (no server-initiated stream)' } }, { allow: 'POST' }); return; }
     let size = 0; const chunks = [];
     req.on('data', chunk => { size += chunk.length; if (size > 4 * 1024 * 1024) { req.destroy(); return; } chunks.push(chunk); });
@@ -202,19 +190,16 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
     const origin = req.headers.origin ?? null, url = new URL(req.url, 'http://127.0.0.1');
     if (url.pathname === '/mcp' || url.pathname.startsWith('/mcp/')) { onMcp(req, res, url, origin); return; }
     // OAuth discovery (RFC 9728 protected-resource and RFC 8414 server metadata, which MCP clients look up): none here, said plainly, so a client goes on without OAuth
-    if (url.pathname.startsWith('/.well-known/')) { res.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ error: 'this bridge does not use OAuth: the token goes in the address (…/mcp/<token>)' })); return; }
-    if (!origin || !allowed.has(origin)) { send(res, 403, { error: `origin not allowed: ${origin ?? '(none)'}; run with --origin ${origin ?? '<lab origin>'}` }); return; }
+    if (url.pathname.startsWith('/.well-known/')) { res.writeHead(404, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(JSON.stringify({ error: 'this bridge does not use OAuth: connect to http://127.0.0.1:<port>/mcp' })); return; }
+    if (!origin || !allowed.has(origin)) {
+      if (origin) { refused = { at: Date.now(), origin }; if (Date.now() - refusedLogged > 5000) { refusedLogged = Date.now(); log(`page refused: its origin (${origin}) is not one of the lab's; run with --origin ${origin} to allow it`); } }
+      send(res, 403, { error: `origin not allowed: ${origin ?? '(none)'}; run with --origin ${origin ?? '<lab origin>'}` }); return;
+    }
     if (req.method === 'OPTIONS') {
       cors(origin, res, { 'Access-Control-Allow-Methods': 'GET, POST', 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? 'content-type', 'Access-Control-Max-Age': '600', ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}) });
       res.writeHead(204); res.end(); return;
     }
-    const [, key, action] = url.pathname.split('/');
-    let given = ''; try { given = decodeURIComponent(key ?? ''); } catch { /* malformed: refused below */ }
-    if (!tokenMatches(given, token)) {
-      refused = { at: Date.now(), origin };
-      if (Date.now() - refusedLogged > 5000) { refusedLogged = Date.now(); log(`page refused (${origin}): its token is different from this bridge's. Stop the bridge and run the Controls › MCP command again (or copy the configuration again, if the MCP client starts the bridge).`); }
-      send(res, 401, { error: 'token refused: this page\'s token is different from the one configured in the bridge. Stop the bridge and run the Controls › MCP command again (or copy the configuration again, if the MCP client starts the bridge).', code: 'bad-token' }, origin); return;
-    }
+    const route = pageRoute(url.pathname), action = route?.action ?? null;
     if (req.method === 'GET' && action === 'events') {
       cors(origin, res); res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
       if (page) { page.res.write('event: replaced\ndata: {}\n\n'); page.res.end(); }
@@ -235,12 +220,12 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
       return;
     }
     if (req.method === 'GET' && action === 'file') {   // a local file of an adb call in flight (adb install, adb push), streamed from disk to the page (nothing is kept here)
-      const entry = files.get(url.pathname.split('/')[3] ?? ''); if (!entry) { send(res, 404, { error: 'unknown file: its adb call has already finished' }, origin); return; }
+      const entry = files.get(route.id ?? ''); if (!entry) { send(res, 404, { error: 'unknown file: its adb call has already finished' }, origin); return; }
       cors(origin, res); res.writeHead(200, { 'content-type': 'application/vnd.android.package-archive', 'content-length': String(entry.size), 'cache-control': 'no-store' });
       const stream = createReadStream(entry.file, { start: 0, end: entry.size - 1 }); stream.on('error', () => res.destroy()); res.on('close', () => stream.destroy()); stream.pipe(res); return;
     }
     if (req.method === 'POST' && action === 'file') {   // the bytes of a file an adb call in flight writes on this machine (adb pull, `> file`), streamed to disk
-      const slot = uploads.get(url.pathname.split('/')[3] ?? ''); if (!slot) { send(res, 404, { error: 'unknown output file: its call has already finished' }, origin); return; }
+      const slot = uploads.get(route.id ?? ''); if (!slot) { send(res, 404, { error: 'unknown output file: its call has already finished' }, origin); return; }
       if (slot.exts && !slot.named) { const ext = url.searchParams.get('ext') ?? ''; if (!slot.exts.includes(ext)) { send(res, 400, { error: `extension not accepted for this file (${slot.exts.join(', ')})` }, origin); return; } slot.dest += `.${ext}`; slot.named = true; }   // a file the bridge named without its extension: the page says which of the allowed ones it is
       const out = createWriteStream(slot.dest, { flags: slot.append ? 'a' : 'w' }); let bytes = 0, failed = false;
       const fail = (status, message) => { if (failed) return; failed = true; out.destroy(); slot.error = message; send(res, status, { error: message }, origin); };
@@ -255,8 +240,8 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
   /** Sends one tool call to the page; resolves with { content, isError }. */
   function callPage(name, args) {
     if (!page) {
-      const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` A page (${refused.origin}) tried to connect ${Math.round((Date.now() - refused.at) / 1000)} s ago with another token and was refused: run the Controls › MCP command again (did the token change?) for the MCP client's configuration and restart the MCP server.` : '';
-      return Promise.resolve({ isError: true, content: [{ type: 'text', text: `The APK Web Lab page is not connected. Open the lab in the browser, load the APK and click Connect in Controls › MCP.${mismatch}` }] });
+      const mismatch = refused && Date.now() - refused.at < 10 * 60 * 1000 ? ` A page of ${refused.origin} tried to connect ${Math.round((Date.now() - refused.at) / 1000)} s ago and was refused by its origin: start the bridge with --origin ${refused.origin} (the command in Controls › MCP carries it).` : '';
+      return Promise.resolve({ isError: true, content: [{ type: 'text', text: `The APK Web Lab page is not connected. Open the lab in the browser: it connects to the bridge by itself (Controls › MCP shows the state).${mismatch}` }] });
     }
     const long = name === 'adb';
     const id = nextId++, wait = name === 'wait_ready' ? Math.max(timeoutMs, Number(args?.timeout_ms ?? 15000) + 5000) : long ? Math.max(timeoutMs, LONG_CALL_MS + (Number(args?.wait_ms) || 15000)) : timeoutMs;
@@ -328,9 +313,9 @@ export function createBridge({ port = DEFAULT_PORT, host = '127.0.0.1', origins 
 }
 
 /** The addresses an MCP client can use for a bridge bound to `host`: the loopback one, and for 0.0.0.0 every local IPv4 of this machine. */
-export function mcpAddresses(host, port, token, interfaces = networkInterfaces()) {
+export function mcpAddresses(host, port, interfaces = networkInterfaces()) {
   const hosts = host === '0.0.0.0' ? ['127.0.0.1', ...Object.values(interfaces).flat().filter(entry => entry && entry.family === 'IPv4' && !entry.internal).map(entry => entry.address)] : [host];
-  return [...new Set(hosts)].map(name => `http://${name}:${port}/mcp/${encodeURIComponent(token)}`);
+  return [...new Set(hosts)].map(name => `http://${name}:${port}/mcp`);
 }
 
 /** MCP over stdio: one JSON-RPC message per line on stdin, responses on stdout. */
@@ -349,27 +334,26 @@ export function serveStdio(bridge, { input = process.stdin, output = process.std
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
-  const args = process.argv.slice(2), options = { port: DEFAULT_PORT, host: '127.0.0.1', serve: false, origins: [...DEFAULT_ORIGINS], token: null, timeoutMs: 60000 };
+  const args = process.argv.slice(2), options = { port: DEFAULT_PORT, host: '127.0.0.1', serve: false, origins: [...DEFAULT_ORIGINS], timeoutMs: 60000 }, ignored = [];
+  if (process.env[LEGACY_TOKEN_ENV]) ignored.push(LEGACY_TOKEN_ENV);
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg === 'token') { console.log(readOrCreateToken()); process.exit(0); }
+    if (arg === 'token') { console.error('lab-mcp: there is no pairing token any more; the lab page connects to the bridge by itself.'); process.exit(0); }
     else if (arg === 'serve') options.serve = true;
     else if (arg === '--host') options.host = String(args[++i]);
     else if (arg === '--port') options.port = Number(args[++i]);
     else if (arg === '--origin') options.origins.push(String(args[++i]).replace(/\/$/, ''));
-    else if (arg === '--token') options.token = String(args[++i]);
+    else if (arg === '--token') { i++; ignored.push('--token'); }
     else if (arg === '--timeout-ms') options.timeoutMs = Number(args[++i]);
-    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [serve] [token] [--host 127.0.0.1] [--port 8790] [--origin <lab origin>]... [--token <token>] [--timeout-ms 60000]  (or the token in APK_WEB_LAB_MCP_TOKEN, as in the JSON of Controls › MCP)'); process.exit(0); }
+    else if (arg === '--help' || arg === '-h') { console.error('node lab-mcp.mjs [serve] [--host 127.0.0.1] [--port 8790] [--origin <lab origin>]... [--timeout-ms 60000]'); process.exit(0); }
   }
-  const chosen = resolveToken({ argToken: options.token, env: process.env });
-  if (chosen.error) { process.stderr.write(`[lab-mcp] ${chosen.error}\n`); process.exit(1); }
-  options.token = chosen.token;
   const bridge = createBridge(options);
-  process.stderr.write(`[lab-mcp] pairing token: ${chosen.source}${chosen.source === tokenFile() ? ' (node lab-mcp.mjs token; paste into Controls › MCP › Token)' : ''}\n`);
+  if (ignored.length) process.stderr.write(`[lab-mcp] ${ignored.join(', ')}: ignored, the bridge has no pairing token any more\n`);
+  if (options.host !== '127.0.0.1' && options.host !== 'localhost') process.stderr.write(`[lab-mcp] listening on ${options.host}: ANY machine that reaches this port can drive the lab (there is no token) and the traffic is plain HTTP; use it on networks you trust\n`);
   bridge.listen().then(port => {
     if (!options.serve) { serveStdio(bridge); return; }
-    for (const address of mcpAddresses(options.host, port, options.token)) process.stderr.write(`[lab-mcp] MCP: ${address}\n`);
-    process.stderr.write('[lab-mcp] in the agent: claude mcp add --transport http apk-lab <one of the addresses above>   ·   on the page: Controls › MCP › Connect   ·   Ctrl+C stops\n');
+    for (const address of mcpAddresses(options.host, port)) process.stderr.write(`[lab-mcp] MCP: ${address}\n`);
+    process.stderr.write(`[lab-mcp] in the agent: claude mcp add --transport http apk-lab http://127.0.0.1:${port}/mcp   ·   the lab page connects by itself (Controls › MCP shows it)   ·   Ctrl+C stops\n`);
   }, error => { process.stderr.write(`[lab-mcp] could not open port ${options.port}: ${error.message}\n`); process.exit(1); });
   if (!options.serve) process.stdin.on('end', () => bridge.close().then(() => process.exit(0)));
   else for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => bridge.close().then(() => process.exit(0)));

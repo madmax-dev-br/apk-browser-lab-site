@@ -7,7 +7,7 @@
 // The cache lives on the process's memory (every thread of the process shares it). A write into a 4 KiB page holding a cached instruction drops that page's entries, so
 // code a library writes, decrypts or patches at run time is decoded again before it runs.
 
-import { decodeBitMasks, ror, ones } from './cpu.js?v=ebd42d0a624c';
+import { decodeBitMasks, ror, ones } from './cpu.js?v=a64e78a38c60';
 
 const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 const bit = (word, n) => (word >>> n) & 1, field = (word, lo, width) => (word >>> lo) & ((1 << width) - 1);
@@ -15,21 +15,25 @@ const signExtend = (value, bits) => (value << (32 - bits)) >> (32 - bits);
 const PAGE = 4096;
 
 export class DecodeCache {
-  constructor(memory) { this.memory = memory; this.steps = new Map(); this.pages = new Map(); this.low = Infinity; this.high = -Infinity; }
+  // Keys are offsets from the process's base (src/arm64/memory.js): small integers, which the maps hash and compare faster than the window's large addresses.
+  constructor(memory) { this.memory = memory; this.base = memory.base ?? 0; this.steps = new Map(); this.pages = new Map(); this.low = Infinity; this.high = -Infinity; }
   /** The step of the instruction at `at` (decoded now when it is not cached yet). */
   get(cpu, at) {
-    let step = this.steps.get(at);
+    const key = at - this.base;
+    let step = this.steps.get(key);
     if (step === undefined) {
       const word = this.memory.fetch32(at);
       step = compile(word, at) ?? ((c) => c.execute(word, at));
-      this.steps.set(at, step);
-      const page = Math.floor(at / PAGE); let list = this.pages.get(page); if (!list) this.pages.set(page, list = []); list.push(at);
-      if (at < this.low) this.low = at; if (at + 4 > this.high) this.high = at + 4;
+      this.steps.set(key, step);
+      const page = Math.floor(key / PAGE); let list = this.pages.get(page); if (!list) this.pages.set(page, list = []); list.push(key);
+      if (key < this.low) this.low = key; if (key + 4 > this.high) this.high = key + 4;
     }
     return step;
   }
   /** A write of `length` bytes at `address`: drops the cached instructions of the pages it touches. */
-  written(address, length) {
+  written(address, length) { this.writtenAt(address - this.base, length); }
+  /** The same for a write at offset `address` from the process's base (what src/arm64/memory.js has at hand). */
+  writtenAt(address, length) {
     if (address >= this.high || address + length <= this.low) return;
     for (let page = Math.floor(address / PAGE), last = Math.floor((address + Math.max(length, 1) - 1) / PAGE); page <= last; page++) {
       const list = this.pages.get(page); if (!list) continue;

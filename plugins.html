@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=ebd42d0a624c">
-  <link rel="stylesheet" href="./lab-tokens.css?v=ebd42d0a624c">
+  <link rel="stylesheet" href="./site-pages.css?v=a64e78a38c60">
+  <link rel="stylesheet" href="./lab-tokens.css?v=a64e78a38c60">
 </head>
 <body>
   <header class="topbar">
@@ -1042,41 +1042,40 @@ lab.watch({ static: 'com.example.Session' }, 'current.user', v =&gt; lab.ui.json
       <section id="mcp" aria-labelledby="h-mcp">
         <h2 id="h-mcp">MCP: Claude using this page</h2>
         <p>An MCP client (Claude Code, Claude Desktop) can use the lab page open in your browser: take a screenshot of the screen or of a component, read the plugins' output, the Compose tree with the CompositionLocals of each composable, ViewModels and static state, the Logcat and the network, and install an APK from your computer, open and close the installed apps. A web page does not accept connections, so a small bridge runs on your computer between the two:</p>
-        <div class="code" data-name="connection path"><pre><code>MCP client  --HTTP (address) or stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  this page (Controls › MCP › Connect)</code></pre></div>
+        <div class="code" data-name="connection path"><pre><code>MCP client  --HTTP (address) or stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  this page (connects by itself)</code></pre></div>
 
         <h3 id="mcp-endereco">Connect by address (the simple way)</h3>
-        <p>The bridge stays running and the agent connects to it by an HTTP address, with an IP and a port. In <b>Controls › MCP</b> the page shows the two ready-made texts, already with its pairing token:</p>
+        <p>The bridge stays running and the agent connects to it by an HTTP address, with an IP and a port. There is no token to copy: the page finds the bridge on its address and connects by itself while it runs. <b>Controls › MCP</b> shows the two ready-made texts:</p>
         <ol>
           <li><b>Run in the terminal and leave it open</b> (Node.js 22 or newer, no dependencies). The command downloads the bridge and starts it; it shows the addresses it serves on.
-            <div class="code" data-name="start the bridge"><pre><code>curl -sO https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs &amp;&amp; node lab-mcp.mjs serve --token &lt;the page's token&gt;</code></pre></div></li>
+            <div class="code" data-name="start the bridge"><pre><code>curl -sO https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs &amp;&amp; node lab-mcp.mjs serve</code></pre></div></li>
           <li><b>Connect the agent to the address.</b> In Claude Code:
-            <div class="code" data-name="add to the agent"><pre><code>claude mcp add --transport http apk-lab http://127.0.0.1:8790/mcp/&lt;the page's token&gt;</code></pre></div>
+            <div class="code" data-name="add to the agent"><pre><code>claude mcp add --transport http apk-lab http://127.0.0.1:8790/mcp</code></pre></div>
             In Codex, in <code>~/.codex/config.toml</code>:
             <div class="code" data-name="Codex"><pre><code>[mcp_servers.apk-lab]
-url = "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;"</code></pre></div>
+url = "http://127.0.0.1:8790/mcp"</code></pre></div>
             In Cursor, in <code>.cursor/mcp.json</code> (the page also offers a link that adds it with one click):
-            <div class="code" data-name="Cursor"><pre><code>{ "mcpServers": { "apk-lab": { "url": "http://127.0.0.1:8790/mcp/&lt;the page's token&gt;" } } }</code></pre></div>
-            In <b>Controls › MCP</b>, the <b>Claude</b>, <b>Codex</b> and <b>Cursor</b> buttons each show one of these texts already with the token. Other MCP clients accept the same address as an HTTP server (Streamable HTTP).</li>
-          <li><b>Click Connect</b> on the page.</li>
+            <div class="code" data-name="Cursor"><pre><code>{ "mcpServers": { "apk-lab": { "url": "http://127.0.0.1:8790/mcp" } } }</code></pre></div>
+            In <b>Controls › MCP</b>, the <b>Claude</b>, <b>Codex</b> and <b>Cursor</b> buttons each show one of these texts. Other MCP clients accept the same address as an HTTP server (Streamable HTTP).</li>
+          <li><b>Nothing to click:</b> the page connects to the bridge as soon as it answers, and <b>Controls › MCP</b> shows the state (waiting for the bridge, connected, in another tab). While no bridge runs it looks again quietly, with a longer pause each time. On the public site the browser may first ask whether this page may reach your computer (Local Network Access): the page asks only once you open the MCP section. With two lab tabs open, the first keeps the bridge; <b>Connect</b> takes it to the tab you are in.</li>
         </ol>
-        <p><b>Agent on another machine on the network:</b> check <b>Accept agents from other machines on the network</b> (the command gains <code>--host 0.0.0.0</code>) and use in the agent the address with the local IP that the bridge shows, for example <code>http://192.168.0.20:8790/mcp/&lt;token&gt;</code>. The page keeps talking to the bridge through <code>127.0.0.1</code>, so the bridge and the browser stay on the same computer. In this mode anyone on the network can reach the port: the token in the address is the only protection and the traffic goes unencrypted; use it only on trusted networks.</p>
+        <p><b>Agent on another machine on the network:</b> check <b>Accept agents from other machines on the network</b> (off by default; the command gains <code>--host 0.0.0.0</code>) and use in the agent the address with the local IP that the bridge shows, for example <code>http://192.168.0.20:8790/mcp</code>. The page keeps talking to the bridge through <code>127.0.0.1</code>, so the bridge and the browser stay on the same computer. With it on, <b>any machine on the network can drive the lab, without a token or password</b>, and the traffic goes unencrypted; use it only on networks you trust.</p>
 
         <h3 id="mcp-conectar">Connect through the client's configuration (the client starts the bridge)</h3>
         <ol>
           <li><b>Download the bridge</b> (Node.js 22 or newer, no dependencies) and replace <code>/path/to/lab-mcp.mjs</code> with the place where you saved it.
             <div class="code" data-name="download the bridge"><pre><code>curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs</code></pre></div></li>
-          <li><b>Copy the configuration.</b> Use the page's pairing token (192 random bits, kept only in this browser; <b>Show</b> reveals it, <b>Generate new</b> replaces it) in the JSON below and paste it into your project's <code>.mcp.json</code> (Claude Code) or into <code>claude_desktop_config.json</code> (Claude Desktop); if the file already has <code>mcpServers</code>, merge the <code>apk-lab</code> entry with the others. Restart the client: it starts the bridge by itself.
+          <li><b>Add it to the configuration.</b> Paste the JSON below into your project's <code>.mcp.json</code> (Claude Code) or into <code>claude_desktop_config.json</code> (Claude Desktop); if the file already has <code>mcpServers</code>, merge the <code>apk-lab</code> entry with the others. Restart the client: it starts the bridge by itself.
             <div class="code" data-name="MCP client configuration"><pre><code>{
   "mcpServers": {
     "apk-lab": {
       "command": "node",
-      "args": ["/path/to/lab-mcp.mjs"],
-      "env": { "APK_WEB_LAB_MCP_TOKEN": "&lt;the page's token&gt;" }
+      "args": ["/path/to/lab-mcp.mjs"]
     }
   }
 }</code></pre></div>
-            With another port, the JSON carries <code>--port</code>; on a copy of the lab at another origin, <code>--origin</code>.</li>
-          <li><b>Connect:</b> in <b>Controls › MCP</b>, click <b>Connect</b>. The browser may ask for permission for the page to access the local network: allow it. If the bridge has another token (you generated a new one, or the client uses an old configuration), both sides refuse with a clear message: copy the JSON again and restart the MCP server in the client.</li>
+            With another port, add <code>"--port", "8791"</code> to <code>args</code>; on a copy of the lab at another origin, <code>"--origin", "&lt;its origin&gt;"</code>. An older configuration with <code>APK_WEB_LAB_MCP_TOKEN</code> keeps working: the bridge ignores the token and says so.</li>
+          <li><b>Nothing to click:</b> the page connects by itself once the client has started the bridge (the browser may ask once whether the page may reach your computer: allow it).</li>
           <li><b>Ask Claude:</b> “take a screenshot of the Save button”, “which LocalContentColor does each text on the screen receive?”, “what is plugin X showing?”, “which requests failed?”, “make /v1/profile return a premium user and reload the screen”, “watch the Logcat for errors while I navigate”, “filter by Pendentes, search for Monitor and show me the result”, “install the app-debug.apk I just built, open it and show me the first screen”, “run this test script's adb commands in the lab”.</li>
         </ol>
 
@@ -1236,12 +1235,12 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
 
         <h3 id="mcp-seguranca">Bridge security</h3>
         <ul>
-          <li><b>Who can reach it:</b> the bridge listens only on 127.0.0.1, accepts only the lab's origins (this page and a local copy; others with <code>--origin</code>) and requires the token, compared in constant time and never written to the logs; it stores nothing.</li>
-          <li><b>Files:</b> the bridge only reads a file that an <code>adb</code> command line names (<code>adb install</code>, <code>adb push</code>): the file at the requested path (an <code>.apk</code> up to 1 GiB), handed to this page while the call lasts, with the same origin and token check. The page receives the file's name and size, not the path. <code>record_screen</code> writes the video at the path requested on <code>stop</code>. The <code>adb</code> tool does the same with the files the command line mentions: it reads the one in <code>adb install</code> and the one in <code>adb push</code>, and writes the destination of <code>adb pull</code> and of <code>&gt; file</code> (it overwrites, like a shell). No other path is read or written. With <code>--host 0.0.0.0</code>, an agent on another machine that has the token can ask for these reads and writes at any path you can reach on this machine.</li>
-          <li><b>Token:</b> without <code>APK_WEB_LAB_MCP_TOKEN</code> or <code>--token</code>, the bridge uses the token in <code>~/.apk-web-lab-mcp-token</code> (<code>node lab-mcp.mjs token</code> shows it), which can be pasted into the page's Token field, as before.</li>
+          <li><b>Who can reach it:</b> the bridge listens only on 127.0.0.1 by default, so other machines cannot reach it, and it accepts only the lab's origins (this page and a local copy; others with <code>--origin</code>): another site open in the browser is refused by its Origin, on the page's side and on <code>/mcp</code>. There is no token: a program on this computer can use the bridge. It stores nothing.</li>
+          <li><b>Files:</b> the bridge only reads a file that an <code>adb</code> command line names (<code>adb install</code>, <code>adb push</code>): the file at the requested path (an <code>.apk</code> up to 1 GiB), handed to this page while the call lasts, with the same origin check, under a random id of that call. The page receives the file's name and size, not the path. <code>record_screen</code> writes the video at the path requested on <code>stop</code>. The <code>adb</code> tool does the same with the files the command line mentions: it reads the one in <code>adb install</code> and the one in <code>adb push</code>, and writes the destination of <code>adb pull</code> and of <code>&gt; file</code> (it overwrites, like a shell). No other path is read or written. With <code>--host 0.0.0.0</code>, any agent on another machine of the network can ask for these reads and writes at any path you can reach on this machine (there is no token).</li>
+          <li><b>Older setups:</b> a <code>--token</code>, <code>APK_WEB_LAB_MCP_TOKEN</code> or an address ending in <code>/mcp/&lt;token&gt;</code> keep working; the token is ignored.</li>
           <li><b>What changes in the app:</b> the MCP does not change the app from the inside: besides the reads, it taps and types like you and uses the lab's controls (mocks, reloading the screen, installing, opening and closing apps), which appear in Controls, on the home screen and in the execution log.</li>
           <li><b>Visible tab:</b> keep the lab's tab visible while you use it (background tabs get slow).</li>
-          <li><b>Options:</b> <code>--port</code>, <code>--origin</code>, <code>--token</code>, <code>--timeout-ms</code>.</li>
+          <li><b>Options:</b> <code>--port</code>, <code>--origin</code>, <code>--host</code>, <code>--timeout-ms</code>.</li>
         </ul>
       </section>
 
@@ -1679,6 +1678,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=ebd42d0a624c"></script>
+  <script type="module" src="./site-pages.js?v=a64e78a38c60"></script>
 </body>
 </html>

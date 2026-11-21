@@ -5,7 +5,8 @@
 //   - a <small> hint inside a field's label text (label.cp-field > span > small, label.cp-check > span > small): its tab is named after the field;
 //   - a static paragraph (p.cp-note without role="status", not listed in KEEP): its tab is named after the field that points at it (aria-describedby), the field right
 //     before it, the sub-section it sits in (data-help-title, legend or .cp-subtitle), or "Overview"; a debugging warning (p.cp-note.ov-warning) gets a "!" on its tab and on the icon.
-import { createModalHost } from './lab-modal.js?v=ebd42d0a624c';
+//   - texts inside [data-help-skip] are left where they are: a block that shows its own notes (the microG settings dialog, src/microg-settings-dialog.js).
+import { createModalHost } from './lab-modal.js?v=a64e78a38c60';
 
 const KEEP = new Set(['perms-empty', 'vm-memory-device']);   // state messages without role="status": they say what to do next
 const OVERVIEW = 'Overview';
@@ -59,11 +60,11 @@ function noteTitle(section, note) {
 function collect(section) {
   const found = [];
   for (const small of section.querySelectorAll('label.cp-field > span > small, label.cp-check > span > small')) {
-    if (small.closest('.help-store') || !small.textContent.trim()) continue;
+    if (small.closest('.help-store, [data-help-skip]') || !small.textContent.trim()) continue;
     found.push({ node: small, title: labelText(small.parentElement) || OVERVIEW, warning: false });
   }
   for (const note of section.querySelectorAll('p.cp-note')) {
-    if (note.closest('.help-store') || note.getAttribute('role') === 'status' || KEEP.has(note.id) || !note.textContent.trim()) continue;
+    if (note.closest('.help-store, [data-help-skip]') || note.getAttribute('role') === 'status' || KEEP.has(note.id) || !note.textContent.trim()) continue;
     found.push({ node: note, title: noteTitle(section, note), warning: note.classList.contains('ov-warning') });
   }
   found.sort((a, b) => (a.node.compareDocumentPosition(b.node) & 4 ? -1 : 1));   // DOCUMENT_POSITION_FOLLOWING: a comes first

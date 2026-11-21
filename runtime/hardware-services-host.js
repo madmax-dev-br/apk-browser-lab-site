@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
-import { gcRoot } from './heap-gc.js?v=ebd42d0a624c';
-import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=ebd42d0a624c';
-import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=ebd42d0a624c';
-import { GC_ROOTS } from './heap-gc.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { gcRoot } from './heap-gc.js?v=a64e78a38c60';
+import { installAudioManager, installRingtoneManager } from './audio-manager-host.js?v=a64e78a38c60';
+import { createHostRegistry, doubleBits, floatBits } from './host-contract.js?v=a64e78a38c60';
+import { GC_ROOTS } from './heap-gc.js?v=a64e78a38c60';
 
 // System services for the hardware and device state a browser tab does not have, answered the way a real device with that hardware absent answers (android-13.0.0_r1 service
 // contracts): no screen lock (KeyguardManager), no vibrator motor, no sensors, no GPS, no fingerprint/biometric hardware, an audio mixer with default volumes
@@ -47,8 +47,8 @@ export function createHardwareServicesHost(platform) {
   registry.staticField(EFFECT, 'DEFAULT_AMPLITUDE', 'I', () => -1);
   for (const [name, value] of Object.entries({ EFFECT_CLICK: 0, EFFECT_DOUBLE_CLICK: 1, EFFECT_TICK: 2, EFFECT_HEAVY_CLICK: 5 })) registry.staticField(EFFECT, name, 'I', () => value);
 
-  // ---- AudioManager: src/audio-manager-host.js (volumes, ringer/DND rule, focus stack, devices, session ids) ---------------------------------------------------
-  const audioManager = installAudioManager({ platform, def, service, call, holds, emptyList }), ringtones = installRingtoneManager({ platform, def, type, holds });
+  // ---- AudioManager: src/audio-manager-host.js (volumes, ringer/DND rule, focus stack, devices, session ids, Spatializer) -----------------------------------------------
+  const audioManager = installAudioManager({ platform, def, type, staticField: registry.staticField, service, call, holds, emptyList }), ringtones = installRingtoneManager({ platform, def, type, holds });
 
   // ---- LocationManager (android-13.0.0_r1 LocationManager / LocationManagerService) ----------------------------------------------------------------------------------------------------------
   // The providers exist (passive, gps, network, fused). Location is off by default, like an emulator with the setting off: isLocationEnabled/isProviderEnabled are false, there is no last location,

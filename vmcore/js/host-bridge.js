@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ebd42d0a624c';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=ebd42d0a624c';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ebd42d0a624c';
-import { HandleTable } from './handles.js?v=ebd42d0a624c';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=ebd42d0a624c';
-import { coreImports } from './boundary-imports.js?v=ebd42d0a624c';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=ebd42d0a624c';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=ebd42d0a624c';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=ebd42d0a624c';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=ebd42d0a624c';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=ebd42d0a624c';
-import { timedExports, timedBridge } from './core-timing.js?v=ebd42d0a624c';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ebd42d0a624c';
-import { Blocked } from '../../runtime/scheduler.js?v=ebd42d0a624c';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=ebd42d0a624c';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ebd42d0a624c';
-import { PaintRecords } from './paint-record.js?v=ebd42d0a624c';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a64e78a38c60';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=a64e78a38c60';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a64e78a38c60';
+import { HandleTable } from './handles.js?v=a64e78a38c60';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=a64e78a38c60';
+import { coreImports } from './boundary-imports.js?v=a64e78a38c60';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=a64e78a38c60';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=a64e78a38c60';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=a64e78a38c60';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=a64e78a38c60';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=a64e78a38c60';
+import { timedExports, timedBridge } from './core-timing.js?v=a64e78a38c60';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a64e78a38c60';
+import { Blocked } from '../../runtime/scheduler.js?v=a64e78a38c60';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=a64e78a38c60';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=a64e78a38c60';
+import { PaintRecords } from './paint-record.js?v=a64e78a38c60';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -570,13 +570,14 @@ export class WasmEngine {
     if (++rt.nestedRuns === 1) sched.beginEvent(rt);
     owner.nestedDepth++;
     const cut = rt.coreCut; rt.coreCut = false;   // a nested run has an owner: it never yields to the slice deadline (CoreThreads.mustYield), so its quantum is not cut for it either
-    let suspended = false;
+    let suspended = false, failure = null;
     try { return suspendable ? this.runSuspendable(owner, id, words, result, uncount, token) : this.runOn(owner, id, words, result, initClass, uncount, parked); }
-    catch (error) { if (error === MAIN_SUSPEND && suspendable && this.suspended === token.run) suspended = true; throw error; }
+    catch (error) { if (error === MAIN_SUSPEND && suspendable && this.suspended === token.run) suspended = true; else if (error !== MAIN_SUSPEND) failure = error; throw error; }
     finally {
       rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
       if (giveBack !== null) giveBack();
       if (parked !== null) { owner.blocked = parked.blocked; owner.state = parked.state; owner.timedOut = parked.timedOut; owner.coreWait = parked.coreWait; }
+      else if (failure !== null) sched.dropAbandonedWait(owner, failure);   // a wait this run's frames were in, left by an error that ended the run: it ends with them (a suspended run keeps its own)
       if (!suspended && rt.nestedRuns === 0 && owner === sched.main) rt.platform?.looperHost?.hostEventRan(rt);
     }
   }
@@ -676,6 +677,7 @@ export class WasmEngine {
     } catch (error) {
       if (error === MAIN_SUSPEND && this.suspended === run) return undefined;   // it waits for the event loop again: still suspended, its continuation still pending
       this.restoreRecord(run); outcome = { error };
+      sched.dropAbandonedWait(owner, error);   // the run's frames are gone: so is a wait the error left it in (Scheduler.dropAbandonedWait)
     } finally {
       this.suspendableRun = outer; rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
       if (this.suspended !== run && rt.nestedRuns === 0) rt.platform?.looperHost?.hostEventRan(rt);

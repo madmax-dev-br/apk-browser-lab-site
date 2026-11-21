@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=ebd42d0a624c") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=ebd42d0a624c">
-  <link rel="stylesheet" href="./lab-theme.css?v=ebd42d0a624c">
-  <meta name="apk-browser-build" content="ebd42d0a624c">
+  <style>@import url("./styles.css?v=a64e78a38c60") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=a64e78a38c60">
+  <link rel="stylesheet" href="./lab-theme.css?v=a64e78a38c60">
+  <meta name="apk-browser-build" content="a64e78a38c60">
 </head>
 <body>
   <header class="topbar">
@@ -57,6 +57,7 @@
                 <label for="dev-locale">Language</label><select id="dev-locale"></select>
                 <label for="dev-region">Region</label><select id="dev-region" title="The country of the device locale (Locale.getDefault, Configuration.locale): dates, numbers, currency and -rBR resources. The emulator SIM (TelephonyManager) stays the US one, as in the Android emulator"></select>
                 <label for="dev-orientation">Orientation</label><select id="dev-orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+                <p id="dev-orientation-lock" class="cp-note cp-orientation-lock" role="status" hidden></p>
                 <label for="dev-screen">Screen</label><select id="dev-screen"></select>
                 <div id="dev-custom-screen" class="cp-custom-screen" hidden><div class="cp-custom-row"><label for="dev-custom-w">Width</label><input id="dev-custom-w" type="number" min="1" max="4096" step="1" inputmode="numeric"><span aria-hidden="true">×</span><label for="dev-custom-h">Height</label><input id="dev-custom-h" type="number" min="1" max="4096" step="1" inputmode="numeric"><select id="dev-custom-unit" aria-label="Unit"><option value="dp">dp</option><option value="px">px</option></select></div><p id="dev-custom-msg" class="cp-note" role="status" aria-live="polite"></p></div>
                 <label for="dev-nav">Navigation</label><select id="dev-nav"><option value="gesture">Gestures</option><option value="buttons">3 buttons</option></select>
@@ -73,38 +74,50 @@
                 <label for="dev-network">Connectivity</label><select id="dev-network"><option value="online">Wi‑Fi (unmetered)</option><option value="metered">Mobile data (metered)</option><option value="offline">No connection</option></select>
                 <label for="dev-hosts-all">Allow all hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
                 <label for="dev-hosts">Allowed network hosts</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, *.cdn.example.com" aria-describedby="dev-hosts-note">
-                <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="https://relay.example.com/?url={url}" aria-describedby="dev-proxy-note">
+                <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="empty: the APK Lab Relay, found by itself" aria-describedby="dev-proxy-note">
                 <label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" aria-describedby="dev-relay-channel-note">
                 <label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note">
                 <label for="dev-arm64">Run ARM64 native code <em class="vm-memory-hint">experimental</em></label><input id="dev-arm64" type="checkbox" aria-describedby="dev-arm64-note">
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
+                <div class="cp-microg-open"><button id="dev-microg-settings" class="cp-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-describedby="dev-microg-settings-summary">microG settings…</button><span id="dev-microg-settings-summary" class="cp-microg-settings-summary" role="status">services: all off</span></div>
               </div>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
               <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
               <p id="dev-client-cert-status" class="cp-note" role="status"></p>
-              <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay over its token-protected channel, only for these hosts, and live there in memory only. Other hosts never see them.</p>
+              <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay on this computer (which answers the lab's pages only), only for these hosts, and live there in memory only. Other hosts never see them.</p>
               <p id="dev-arm64-note" class="cp-note">Run ARM64 native code: the app's own arm64-v8a libraries (from the APK and its splits) run in the lab's ARM64 interpreter, instruction by instruction, with the C library and JNI the lab provides; the device then reports arm64-v8a among its ABIs. Off: they cannot run, as before. An instruction, libc function or system call the interpreter does not have ends in an explicit error naming it. Read when the APK is opened.</p>
-              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
-              <fieldset id="dev-microg-services" class="cp-microg-services">
-                <legend class="cp-subtitle">microG services</legend>
-                <p class="cp-note">Each switch is microG's own (the one its settings screen has) and is off by default. Turning one on lets microG's code talk to that service's servers, as on a phone with microG: the requests show in Network, the change is recorded in the trace and saved with these settings. Nothing is faked: a token, a registration or a license only comes from the real server. Contribution of location data and microG's other data-donation switches stay off and are not offered.</p>
-                <div id="dev-microg-service-list" class="cp-grid cp-microg-service-list"></div>
-                <p id="dev-microg-services-status" class="cp-note" role="status"></p>
-                <div id="dev-microg-account" class="cp-microg-account">
-                  <button id="add-microg-account" class="cp-button" type="button" disabled>Add Google account (microG)</button>
-                  <p class="cp-note">Opens microG's sign-in screen on the device, as Settings › Accounts › Add account does on a phone with microG. You type your own Google email and password into Google's page there: they go to Google (accounts.google.com) through the APK Lab Relay, which serves that page to the device, and nowhere else. microG keeps the account with its data on this device (Clear microG data removes it). Needs Device registration on and the relay as the Proxy; the requests show in Network.</p>
-                  <p id="dev-microg-account-status" class="cp-note" role="status"></p>
+              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (microG settings, below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+              <div id="dev-microg-settings-store" class="cp-microg-store" data-help-skip hidden>
+                <div id="dev-microg-tab-services" data-microg-tab="services" data-title="Services">
+                  <fieldset id="dev-microg-services" class="cp-microg-services">
+                    <legend class="cp-subtitle">microG services</legend>
+                    <p class="cp-note">Each switch is microG's own (the one its settings screen has) and is off by default. Turning one on lets microG's code talk to that service's servers, as on a phone with microG: the requests show in Network, the change is recorded in the trace and saved with these settings. Nothing is faked: a token, a registration or a license only comes from the real server. Contribution of location data and microG's other data-donation switches stay off and are not offered.</p>
+                    <div id="dev-microg-service-list" class="cp-grid cp-microg-service-list"></div>
+                    <p id="dev-microg-services-status" class="cp-note" role="status"></p>
+                    <div id="dev-microg-account" class="cp-microg-account">
+                      <button id="add-microg-account" class="cp-button" type="button" disabled>Add Google account (microG)</button>
+                      <p class="cp-note">Opens microG's sign-in screen on the device, as Settings › Accounts › Add account does on a phone with microG. You type your own Google email and password into Google's page there: they go to Google (accounts.google.com) through the APK Lab Relay, which serves that page to the device, and nowhere else. microG keeps the account with its data on this device (Clear microG data removes it). Needs Device registration on and the relay as the Proxy; the requests show in Network.</p>
+                      <p id="dev-microg-account-status" class="cp-note" role="status"></p>
+                    </div>
+                  </fieldset>
                 </div>
-              </fieldset>
-              <div id="dev-microg-data" class="cp-microg-data"><span class="cp-subtitle">microG data</span>
-                <p class="cp-note">microG's data (its device registration, accounts, settings and databases) is kept between reloads as data of this device, shared by every app you open with microG, while "Keep app data between reloads" (Storage) is on. Clearing it does not stop the running device: microG keeps what it has in memory until the APK is reopened.</p>
-                <button id="clear-microg-data" class="cp-button" type="button" disabled>Clear microG data</button>
-                <p id="dev-microg-data-status" class="cp-note" role="status"></p>
-              </div>
-              <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
-              <div id="dev-microg-entries" class="cp-microg-entries" data-help-title="microG entry points" hidden>
-                <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
-                <ul id="dev-microg-entry-list" class="cp-list"></ul>
+                <div id="dev-microg-tab-data" data-microg-tab="data" data-title="Data">
+                  <div id="dev-microg-data" class="cp-microg-data"><span class="cp-subtitle">microG data</span>
+                    <p class="cp-note">microG's data (its device registration, accounts, settings and databases) is kept between reloads as data of this device, shared by every app you open with microG, while "Keep app data between reloads" (Storage) is on. Clearing it does not stop the running device: microG keeps what it has in memory until the APK is reopened.</p>
+                    <button id="clear-microg-data" class="cp-button" type="button" disabled>Clear microG data</button>
+                    <p id="dev-microg-data-status" class="cp-note" role="status"></p>
+                  </div>
+                </div>
+                <div id="dev-microg-tab-apis" data-microg-tab="apis" data-title="APIs">
+                  <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
+                </div>
+                <div id="dev-microg-tab-entries" data-microg-tab="entries" data-title="Entry points">
+                  <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
+                  <div id="dev-microg-entries" class="cp-microg-entries" hidden>
+                    <ul id="dev-microg-entry-list" class="cp-list"></ul>
+                  </div>
+                  <p id="dev-microg-entries-empty" class="cp-note" role="status">No entry points listed yet: they appear while an APK runs with microG.</p>
+                </div>
               </div>
               <p id="dev-hosts-note" class="cp-note">With "Allow all hosts" on (default) any name can be reached, still subject to CORS on the server (or to a proxy of your own). Off, only the hosts in the list are reachable and, with no hosts in the list, every name fails as on an offline phone.</p>
             </div></details>
@@ -234,14 +247,13 @@
             </div></details>
           <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
               <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">off</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Connects this page to an agent (Claude Code, Claude Desktop or another MCP client): it can take a screenshot of the screen or of a component, tap, type and read the output of the plugins, the Compose tree, the ViewModels, Logcat and the network of the app open here, install an APK from your computer, open and close the apps on the home screen, and run here the <code>adb</code> commands you use on an emulator. A small bridge (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) keeps running on your computer and the agent connects to it through an address (see <a href="plugins.html#mcp">how it works</a>).</p>
+              <p class="cp-note">Connects this page to an agent (Claude Code, Claude Desktop or another MCP client): it can take a screenshot of the screen or of a component, tap, type and read the output of the plugins, the Compose tree, the ViewModels, Logcat and the network of the app open here, install an APK from your computer, open and close the apps on the home screen, and run here the <code>adb</code> commands you use on an emulator. A small bridge (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) keeps running on your computer and the agent connects to it through an address; this page finds the bridge and connects by itself, with no token (see <a href="plugins.html#mcp">how it works</a>).</p>
               <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">1. Run in a terminal and leave it open</span><button id="mcp-copy" type="button" class="cp-button">Copy</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
-              <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox"><span>Accept agents from other machines on the network<small>The bridge also listens on this computer's local IP and shows the addresses on start. Anyone on the network can reach the port: the token in the address is the only protection and traffic is unencrypted. Use only on trusted networks.</small></span></label>
+              <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox"><span>Accept agents from other machines on the network<small>Off by default. The bridge also listens on this computer's local IP and shows the addresses on start. With it on, any machine on the network can drive the lab, without a token or password, and the traffic is unencrypted. Use only on networks you trust.</small></span></label>
               <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-agent-title">2. Connect the agent to this address</span><button id="mcp-copy-agent" type="button" class="cp-button">Copy</button></div><div id="mcp-agent-pick" class="mcp-agent-pick" role="group" aria-label="Agent"><button type="button" class="cp-button" data-agent="claude" aria-pressed="true">Claude</button><button type="button" class="cp-button" data-agent="codex" aria-pressed="false">Codex</button><button type="button" class="cp-button" data-agent="cursor" aria-pressed="false">Cursor</button></div><p id="mcp-agent-where" class="cp-note mcp-agent-where"></p><pre class="mcp-config-json" aria-labelledby="mcp-agent-title"><code id="mcp-agent-command"></code></pre><a id="mcp-agent-link" class="mcp-agent-link" hidden>Add to Cursor with one click</a></div>
-              <div class="cp-field mcp-token-field"><span><label for="mcp-token">Pairing token</label><small>generated in this browser and kept only there; it goes in the command and in the address above</small></span><div class="mcp-token-row"><input id="mcp-token" type="password" autocomplete="off" spellcheck="false"><button id="mcp-token-show" type="button" class="cp-button" aria-pressed="false" aria-controls="mcp-token">Show</button><button id="mcp-token-new" type="button" class="cp-button">Generate new</button></div></div>
-              <label class="cp-field" for="mcp-url"><span>Bridge address on this machine<small>the page always talks to the bridge through 127.0.0.1; default port 8790 (another port goes in the command)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
-              <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button primary">Connect</button></div>
-              <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Disconnected.</p>
+              <label class="cp-field" for="mcp-url"><span>Bridge address on this machine<small>the page looks for the bridge here and connects by itself while it runs; default port 8790 (another port goes in the command)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
+              <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button">Connect</button></div>
+              <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Looking for the bridge…</p>
             </div></details>
           </details>
         </section>
@@ -309,7 +321,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=ebd42d0a624c"></script>
+  <script type="module" src="./app.js?v=a64e78a38c60"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

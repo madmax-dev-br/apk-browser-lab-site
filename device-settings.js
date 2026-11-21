@@ -1,11 +1,13 @@
-import { coreMemorySetting } from './core-memory.js?v=ebd42d0a624c';
-import { isMemoryStep } from './memory-budget.js?v=ebd42d0a624c';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ebd42d0a624c';
-import { sanitizeHostMap } from './host-map.js?v=ebd42d0a624c';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=ebd42d0a624c';
-import { sanitizeLocation } from './runtime-permissions.js?v=ebd42d0a624c';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=ebd42d0a624c';
-import { sanitizeMicrogServices } from './microg-services.js?v=ebd42d0a624c';
+import { coreMemorySetting } from './core-memory.js?v=a64e78a38c60';
+import { isMemoryStep } from './memory-budget.js?v=a64e78a38c60';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a64e78a38c60';
+import { sanitizeHostMap } from './host-map.js?v=a64e78a38c60';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=a64e78a38c60';
+import { sanitizeLocation } from './runtime-permissions.js?v=a64e78a38c60';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=a64e78a38c60';
+import { sanitizeMicrogServices } from './microg-services.js?v=a64e78a38c60';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=a64e78a38c60';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=a64e78a38c60';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -22,20 +24,33 @@ export function sanitizeProxyUrl(value) {
   try { const url = new URL(value.trim().replace('{url}', 'TARGET')); const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname); if (url.protocol === 'https:' || (url.protocol === 'http:' && loopback)) return value.trim(); } catch { /* not a URL */ }
   return '';
 }
-/** What the "Proxy" field of Device says about a typed value (pure): { state: 'off' | 'on' | 'refused', text }. A refused value is not kept: without this
- *  line the app would go on without a proxy and nothing on the page would say why. */
-export function proxyState(raw) {
-  const typed = String(raw ?? '').trim(); if (!typed) return { state: 'off', text: 'No proxy: the browser fetches each URL straight from the server (subject to CORS).' };
-  const kept = sanitizeProxyUrl(typed); let host = null; try { host = new URL(kept.replace('{url}', 'x')).host; } catch { host = null; }
-  if (kept && host) return { state: 'on', text: `Proxy on: the app's requests go through ${host}${kept.includes('{url}') ? '' : ' (the target URL is appended at the end)'}. In Network they show the PROXY badge.` };
-  return { state: 'refused', text: 'Proxy refused and turned off: use https://… (or http:// only on localhost / 127.0.0.1), for example https://relay.example.com/?url={url}.' };
+/**
+ * What the "Proxy" field of Device says (pure): { state: 'off' | 'on' | 'auto' | 'checking' | 'refused', text }. An empty field means "find the APK Lab Relay by itself"
+ * (src/relay-detect.js): `detection` is the detector's state; `inUse` (optional) the proxy the running app was given ({ url, source }), when it differs from what the line
+ * describes. A refused value is not kept: without this line the app would go on without a proxy and nothing on the page would say why.
+ */
+export function proxyState(raw, detection = null, { inUse = null } = {}) {
+  const typed = String(raw ?? '').trim(), auto = RELAY_AUTO_BASE.replace(/^https?:\/\//, '');
+  const running = wanted => inUse && inUse.url !== wanted ? ` The app open now still uses ${inUse.url ? (inUse.source === 'auto' ? `the relay at ${auto}` : `the proxy ${hostOfProxy(inUse.url) ?? inUse.url}`) : 'no proxy'}; it changes when the app is opened again.` : '';
+  if (!typed) {
+    const status = detection?.status ?? 'unknown';
+    if (detection?.found) return { state: 'auto', text: `Relay found at ${auto} (automatic)${detection.version ? `: APK Lab Relay ${detection.version}` : ''}. The app's requests go through it; in Network they show the PROXY badge. Type an address here only for a custom proxy.${running(RELAY_AUTO_PROXY)}` };
+    if (status === 'checking' || status === 'unknown') return { state: 'checking', text: `Looking for the APK Lab Relay on ${auto}…` };
+    if (status === 'needs-permission') return { state: 'off', text: `No relay looked for yet: this browser asks before a page reaches your computer. "Look for the relay" asks once; until then the browser fetches directly (CORS applies).${running('')}`, action: 'look' };
+    if (status === 'blocked') return { state: 'off', text: `No relay: this browser blocks the page from reaching your computer (site settings › Local network access), so the browser fetches directly (CORS applies).${running('')}`, action: 'look' };
+    return { state: 'off', text: `No relay running: the browser fetches directly (CORS applies). Start the APK Lab Relay on this computer (node cors-relay.mjs, port ${RELAY_DEFAULT_PORT}) and the lab uses it by itself, or type a custom proxy here.${running('')}`, action: 'look' };
+  }
+  const kept = sanitizeProxyUrl(typed), host = kept ? hostOfProxy(kept) : null;
+  if (kept && host) return { state: 'on', text: `Custom proxy: the app's requests go through ${host}${kept.includes('{url}') ? '' : ' (the target URL is appended at the end)'}. In Network they show the PROXY badge. Empty the field to use the APK Lab Relay found on this computer.${running(kept)}` };
+  return { state: 'refused', text: `Proxy refused, not used: use https://… (or http:// only on localhost / 127.0.0.1), for example https://relay.example.com/?url={url}. Meanwhile ${detection?.found ? `the relay found at ${auto} is used` : 'the browser fetches directly (CORS applies)'}; empty, the field means "find the APK Lab Relay by itself".` };
 }
-/** What the line under "Parallel relay channel" says (pure): { state: 'off' | 'on' | 'warn', text }. The channel exists only through the APK Lab Relay (its /<token>/ address). */
-export function relayChannelState(on, proxyRaw) {
+const hostOfProxy = url => { try { return new URL(String(url).replace('{url}', 'x')).host; } catch { return null; } };
+/** What the line under "Parallel relay channel" says (pure): { state: 'off' | 'on' | 'idle' | 'warn', text }. The channel exists only through the APK Lab Relay (tcp-tunnel.js tunnelEndpoint). */
+export function relayChannelState(on, proxyRaw, detection = null) {
   if (!on) return { state: 'off', text: 'Parallel relay channel off: every exchange through the relay is a separate browser request (a preflight for most, about 6 at a time).' };
-  const kept = sanitizeProxyUrl(String(proxyRaw ?? '').trim()); let relay = false; try { relay = kept.includes('{url}') && /^\/[A-Za-z0-9_-]{8,128}\/?$/.test(new URL(kept.replace('{url}', 'x')).pathname); } catch { relay = false; }
-  if (!kept) return { state: 'warn', text: 'Parallel relay channel on, but no Proxy is set: it applies to exchanges through the APK Lab Relay only.' };
-  if (!relay) return { state: 'warn', text: 'Parallel relay channel on, but the Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/<token>/?url={url}): exchanges go as separate requests.' };
+  const typed = String(proxyRaw ?? '').trim(), kept = typed ? sanitizeProxyUrl(typed) : (detection?.found ? RELAY_AUTO_PROXY : '');
+  if (!kept) return { state: 'idle', text: 'Parallel relay channel on: it applies to exchanges through the APK Lab Relay, and no relay is in use now.' };
+  if (!tunnelEndpoint({ proxyUrl: kept })) return { state: 'warn', text: 'Parallel relay channel on, but the custom Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/?url={url}): exchanges go as separate requests.' };
   return { state: 'on', text: 'Parallel relay channel on: the app\'s exchanges share one WebSocket to the relay, all at once. A relay without it (older than 0.4.0) gets separate requests, as before; Network shows CHANNEL or NO CHANNEL on each entry.' };
 }
 // The engine a load uses when nothing names one: the WebAssembly core. `?engine=js` (the page) and `engine: 'js'` (the player) select the JavaScript VM;
@@ -43,7 +58,7 @@ export function relayChannelState(on, proxyRaw) {
 export const DEFAULT_ENGINE = 'wasm';
 export function sanitizeSettings(input = {}) {
   const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [], relayChannel: false }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
-  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); out.network.relayChannel = input.network.relayChannel === true; }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host. relayChannel: "Parallel relay channel" (src/relay-mux.js), off by default
+  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); out.network.relayChannel = input.network.relayChannel === true; }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host. relayChannel: "Parallel relay channel" (src/relay-mux.js): off here (embedders), on in the lab page's defaults
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   { const custom = checkCustomScreen(input.customScreen); out.customScreen = custom.value ?? DEFAULT_CUSTOM_SCREEN; if (out.screen === 'custom' && !custom.value) out.screen = DEFAULT_DEVICE.screen; }   // "Personalizado" { width, height, unit: 'dp' | 'px' } (device-profile.js checkCustomScreen); kept while a preset is selected so switching back restores it
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
@@ -71,14 +86,19 @@ export function sanitizeSettings(input = {}) {
 }
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
 /** The lab page's defaults: every host allowed, animations at 1× (as a device ships), every frame drawn at full resolution, moving or new (raster: motionScale 1, navigation off). */
-export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'] }, animatorScale: 1 }); }
+/** The parallel relay channel is on (it applies only through the APK Lab Relay; the 2026-11-20 default). */
+export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'], relayChannel: true }, animatorScale: 1 }); }
 /** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list.
  * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice.
  * 4 since animations are off and the moving screen is drawn at 35% by default: an older record held the old defaults (1× and 50%), not a choice.
  * 5 since every frame is drawn at full resolution by default (moving screens at 100%, a new screen not started at the motion resolution): an older record held 35% and the reduced
  *   first frame as defaults, not a choice.
- * 6 since animations are back at 1× by default: an older record held 0 (off) as the default, not a choice. */
-export const SETTINGS_VERSION = 6;
+ * 6 since animations are back at 1× by default: an older record held 0 (off) as the default, not a choice.
+ * 7 since the parallel relay channel is on by default and the relay has no token (2026-11-20): an older record held the channel off as the default, not a choice, and a Proxy
+ *   holding the APK Lab Relay's old token address on the default port (http://127.0.0.1:8787/<token>/?url={url}) is emptied, so the relay is found by itself. */
+export const SETTINGS_VERSION = 7;
+/** The address an older relay printed for the default port, with its token: the relay the page now finds by itself. */
+const OLD_DEFAULT_RELAY = /^http:\/\/(?:127\.0\.0\.1|localhost):8787\/[A-Za-z0-9_-]{8,128}\/\?url=\{url\}$/;
 export function loadDeviceSettings() {
   try {
     const text = globalThis.localStorage?.getItem(KEY); if (!text) return defaultDeviceSettings();
@@ -89,6 +109,7 @@ export function loadDeviceSettings() {
     if (stored && typeof stored === 'object' && !(stored.version >= 3)) { delete stored.engine; delete stored.renderer; }   // the old defaults were stored with every record: the new ones apply
     if (stored && typeof stored === 'object' && !(stored.version >= 6)) stored.animatorScale = 1;   // the defaults of each version apply once; what the user picks afterwards is kept
     if (stored && typeof stored === 'object' && !(stored.version >= 5)) stored.raster = { ...(stored.raster ?? {}), motionScale: 1, navigation: false };
+    if (stored && typeof stored === 'object' && !(stored.version >= 7)) { const network = { ...(stored.network ?? {}), relayChannel: true }; if (OLD_DEFAULT_RELAY.test(String(network.proxyUrl ?? '').trim())) network.proxyUrl = ''; stored.network = network; }
     return sanitizeSettings(stored);
   } catch { return defaultDeviceSettings(); }
 }

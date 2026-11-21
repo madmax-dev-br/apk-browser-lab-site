@@ -1,11 +1,11 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=ebd42d0a624c';
-import { BLOCKED } from './cpu.js?v=ebd42d0a624c';
-import { formatC, variadic } from './libc.js?v=ebd42d0a624c';
-import { lookup } from '../libcore-io-native.js?v=ebd42d0a624c';
-import { utf8 } from './text.js?v=ebd42d0a624c';
+import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { BLOCKED } from './cpu.js?v=a64e78a38c60';
+import { formatC, variadic } from './libc.js?v=a64e78a38c60';
+import { lookup } from '../libcore-io-native.js?v=a64e78a38c60';
+import { utf8 } from './text.js?v=a64e78a38c60';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -15,7 +15,7 @@ export function addMoreLibc(lib, { runtime } = {}) {
   // stdin / stdout / stderr: FILE* variables bionic exports since API 23, pointing into __sF
   const sf = p => { p.hostData ??= new Map(); if (!p.hostData.has('__sF')) p.hostData.set('__sF', lib.__data.__sF(p)); return p.hostData.get('__sF'); };
   for (const [name, index] of [['stdin', 0], ['stdout', 1], ['stderr', 2]]) lib.__data[name] = p => { const holder = p.malloc(8); p.memory.writePtr(holder, sf(p) + 152 * index); return holder; };
-  lib.__data._ctype_ = p => { const table = p.malloc(257); for (let i = 0; i < 256; i++) { const ch = String.fromCharCode(i); p.memory.u8[table + 1 + i] = (/[A-Z]/.test(ch) ? 1 : 0) | (/[a-z]/.test(ch) ? 2 : 0) | (/[0-9]/.test(ch) ? 4 : 0) | (/[ \t\n\v\f\r]/.test(ch) ? 8 : 0) | (/[!-\/:-@\[-`{-~]/.test(ch) ? 16 : 0) | (i < 32 || i === 127 ? 32 : 0) | (/[0-9A-Fa-f]/.test(ch) ? 64 : 0) | (ch === ' ' ? 128 : 0); } return table; };
+  lib.__data._ctype_ = p => { const table = p.malloc(257); for (let i = 0; i < 256; i++) { const ch = String.fromCharCode(i); p.memory.setByte(table + 1 + i, (/[A-Z]/.test(ch) ? 1 : 0) | (/[a-z]/.test(ch) ? 2 : 0) | (/[0-9]/.test(ch) ? 4 : 0) | (/[ \t\n\v\f\r]/.test(ch) ? 8 : 0) | (/[!-\/:-@\[-`{-~]/.test(ch) ? 16 : 0) | (i < 32 || i === 127 ? 32 : 0) | (/[0-9A-Fa-f]/.test(ch) ? 64 : 0) | (ch === ' ' ? 128 : 0)); } return table; };
   lib.__data.tzname = p => { const a = p.malloc(16); p.memory.writePtr(a, p.allocString('GMT')); p.memory.writePtr(a + 8, p.allocString('GMT')); return a; };
   lib.__data.timezone = p => { const a = p.malloc(8); p.memory.write64(a, 0n); return a; };
   // ---- POSIX semaphores (sem_t: the count in the first word) waiting as native threads do
@@ -33,26 +33,26 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.__pread_chk = lib.__pread64_chk = (p, c) => lib.pread(p, c); lib.__pwrite_chk = lib.__pwrite64_chk = lib.pwrite64 ? (p, c) => lib.pwrite64(p, c) : notProvided('pwrite');
   lib.__fgets_chk = (p, c) => { c.x[1] = c.x[2]; c.x[2] = c.x[3]; return lib.fgets(p, c); };
   lib.__umask_chk = lib.umask = () => 0o022;
-  lib.__FD_SET_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.u8[set + (fd >> 3)] |= 1 << (fd & 7); };
-  lib.__FD_CLR_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.u8[set + (fd >> 3)] &= ~(1 << (fd & 7)); };
-  lib.__FD_ISSET_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); return (p.memory.u8[set + (fd >> 3)] >> (fd & 7)) & 1; };
+  lib.__FD_SET_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.setByte(set + (fd >> 3), p.memory.byte(set + (fd >> 3)) | (1 << (fd & 7))); };
+  lib.__FD_CLR_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.setByte(set + (fd >> 3), p.memory.byte(set + (fd >> 3)) & (~(1 << (fd & 7)))); };
+  lib.__FD_ISSET_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); return (p.memory.byte(set + (fd >> 3)) >> (fd & 7)) & 1; };
   // ---- streams
   lib.ungetc = (p, c) => { const ch = s32(c, 0); if (ch < 0) return 0xffffffffffffffffn; p.unget ??= new Map(); p.unget.set(n(c, 1), ch); return ch; };
-  lib.getline = lib.__getline = (p, c) => { const lineptr = n(c, 0), sizePtr = n(c, 1); let out = []; for (;;) { c.x[0] = c.x[2]; const ch = Number(BigInt.asIntN(32, BigInt(lib.fgetc(p, { x: [x(c, 2)] })))); if (ch < 0) break; out.push(ch); if (ch === 10) break; } if (!out.length) return 0xffffffffffffffffn; let buf = p.memory.readPtr(lineptr), size = Number(p.memory.read64(sizePtr)); if (!buf || size < out.length + 1) { buf = p.malloc(out.length + 1); p.memory.writePtr(lineptr, buf); p.memory.write64(sizePtr, BigInt(out.length + 1)); } p.memory.copyIn(buf, Uint8Array.from(out)); p.memory.u8[buf + out.length] = 0; return out.length; };
+  lib.getline = lib.__getline = (p, c) => { const lineptr = n(c, 0), sizePtr = n(c, 1); let out = []; for (;;) { c.x[0] = c.x[2]; const ch = Number(BigInt.asIntN(32, BigInt(lib.fgetc(p, { x: [x(c, 2)] })))); if (ch < 0) break; out.push(ch); if (ch === 10) break; } if (!out.length) return 0xffffffffffffffffn; let buf = p.memory.readPtr(lineptr), size = Number(p.memory.read64(sizePtr)); if (!buf || size < out.length + 1) { buf = p.malloc(out.length + 1); p.memory.writePtr(lineptr, buf); p.memory.write64(sizePtr, BigInt(out.length + 1)); } p.memory.copyIn(buf, Uint8Array.from(out)); p.memory.setByte(buf + out.length, 0); return out.length; };
   lib.vprintf = (p, c) => lib.vfprintf(p, { ...c, x: [BigInt(sf(p) + 152), c.x[0], c.x[1], ...c.x.slice(3)], getD: i => c.getD(i), sp: c.sp, mem: c.mem });
   lib.__android_log_buf_print = (p, c) => { runtime?.record?.(`LOG ${'VVVDIWEFS'[n(c, 1)] ?? 'I'} ${str(p, x(c, 2))}: ${formatC(p.memory, str(p, x(c, 3)), variadic(c, 4))}`); return 1; };
   lib.tmpfile = (p, c) => { const path = `/data/local/tmp/native-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`; c.x[0] = BigInt(p.allocString(path)); c.x[1] = BigInt(p.allocString('w+')); return lib.fopen(p, c); };
   // ---- strings
   lib.memmem = (p, c) => { const hay = p.memory.bytes(n(c, 0), n(c, 1)), needle = p.memory.bytes(n(c, 2), n(c, 3)); if (!needle.length) return n(c, 0); outer: for (let i = 0; i + needle.length <= hay.length; i++) { for (let j = 0; j < needle.length; j++) if (hay[i + j] !== needle[j]) continue outer; return n(c, 0) + i; } return 0; };
-  lib.strsep = (p, c) => { const holder = n(c, 0), s = p.memory.readPtr(holder); if (!s) return 0; const delims = new Set(p.memory.cString(n(c, 1))); let e = s; while (p.memory.u8[e] && !delims.has(p.memory.u8[e])) e++; if (p.memory.u8[e]) { p.memory.u8[e] = 0; p.memory.writePtr(holder, e + 1); } else p.memory.writePtr(holder, 0); return s; };
+  lib.strsep = (p, c) => { const holder = n(c, 0), s = p.memory.readPtr(holder); if (!s) return 0; const delims = new Set(p.memory.cString(n(c, 1))); let e = s; while (p.memory.byte(e) && !delims.has(p.memory.byte(e))) e++; if (p.memory.byte(e)) { p.memory.setByte(e, 0); p.memory.writePtr(holder, e + 1); } else p.memory.writePtr(holder, 0); return s; };
   lib.fnmatch = (p, c) => { const pattern = str(p, x(c, 0)), name = str(p, x(c, 1)), re = new RegExp('^' + pattern.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$'); return re.test(name) ? 0 : 1; };
   lib.wcschr = (p, c) => { for (let i = 0; ; i++) { const v = p.memory.readU32(n(c, 0) + 4 * i); if (v === n(c, 1)) return n(c, 0) + 4 * i; if (!v) return 0; } };
   lib.wcsncmp = (p, c) => { for (let i = 0; i < n(c, 2); i++) { const a = p.memory.readU32(n(c, 0) + 4 * i), b = p.memory.readU32(n(c, 1) + 4 * i); if (a !== b) return a < b ? 0xffffffffffffffffn : 1; if (!a) return 0; } return 0; };
   lib.ldiv = lib.lldiv = (p, c) => { const a = BigInt.asIntN(64, x(c, 0)), b = BigInt.asIntN(64, x(c, 1)); c.x[1] = BigInt.asUintN(64, a % b); return BigInt.asUintN(64, a / b); };
   lib.getprogname = p => p.allocString('app_process64');
-  lib.inet_aton = (p, c) => { const parts = str(p, x(c, 0)).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.u8[n(c, 1) + i] = b; }); return 1; };
+  lib.inet_aton = (p, c) => { const parts = str(p, x(c, 0)).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.setByte(n(c, 1) + i, b); }); return 1; };
   lib.inet_ntoa = (p, c) => p.allocString([0, 8, 16, 24].map(s => (n(c, 0) >>> s) & 255).join('.'));
-  lib.getnameinfo = (p, c) => { const ip = [...p.memory.bytes(n(c, 0) + 4, 4)].join('.'), port = p.memory.dv.getUint16(n(c, 0) + 2, false); if (n(c, 2)) { const b = encoder.encode(ip); p.memory.copyIn(n(c, 2), b); p.memory.u8[n(c, 2) + b.length] = 0; } if (n(c, 4)) { const b = encoder.encode(String(port)); p.memory.copyIn(n(c, 4), b); p.memory.u8[n(c, 4) + b.length] = 0; } return 0; };
+  lib.getnameinfo = (p, c) => { const ip = [...p.memory.bytes(n(c, 0) + 4, 4)].join('.'), port = p.memory.uint16(n(c, 0) + 2, false); if (n(c, 2)) { const b = encoder.encode(ip); p.memory.copyIn(n(c, 2), b); p.memory.setByte(n(c, 2) + b.length, 0); } if (n(c, 4)) { const b = encoder.encode(String(port)); p.memory.copyIn(n(c, 4), b); p.memory.setByte(n(c, 4) + b.length, 0); } return 0; };
   lib.getifaddrs = (p, c) => { p.memory.writePtr(n(c, 0), 0); return 0; };   // the app's process sees no interface addresses it could use directly (the network is the relay)
   lib.freeifaddrs = () => {};
   // ---- time

@@ -1,18 +1,22 @@
 // The app's ARM64 native process (docs/ARM64-NATIVE.md): one address space (src/arm64/memory.js), one interpreter (src/arm64/cpu.js), the libraries the app
 // loads from its own lib/arm64-v8a/ directory (mapped and relocated by src/arm64/elf.js), and the system libraries Android provides (libc, libm, libdl, liblog,
-// libandroid ...) as host functions (src/arm64/libc.js). Layout: libraries and mmap regions grow from 0x01000000, the heap is malloc's own region, the main
-// thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=ebd42d0a624c';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=ebd42d0a624c';
-import { Arm64Memory } from './memory.js?v=ebd42d0a624c';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=ebd42d0a624c';
-import { NativeThreads } from './threads.js?v=ebd42d0a624c';
+// libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
+// disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
+// the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
+import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=a64e78a38c60';
+import { Arm64Memory } from './memory.js?v=a64e78a38c60';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=a64e78a38c60';
+import { NativeThreads } from './threads.js?v=a64e78a38c60';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=a64e78a38c60';
+
+export const ARM64_BASE = Number(ARM64_WINDOW);   // the process's lowest address (its first page stays unmapped, as NULL's)
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
 export class Arm64Process {
   constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null } = {}) {
-    this.memory = new Arm64Memory(64 * 1024 * 1024);
+    this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
     this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
     this.memory.cpu = this.cpu; this.memory.activeCpu = () => this.activeCpu; this.memory.recentCalls = () => { const out = []; for (let i = 1; i <= 8; i++) { const index = this.recentHost[(this.recentAt - i) & 7]; if (index !== null && index !== undefined) out.push(index === 'svc' ? 'svc' : this.hostNames[index]); } return out.reverse(); };   // a fault names the instruction of the thread that is running
@@ -20,7 +24,7 @@ export class Arm64Process {
     this.log = log;
     this.hostFns = []; this.hostIndex = new Map(); this.hostNames = []; this.recentHost = new Array(8).fill(null); this.recentAt = 0;
     this.libraries = new Map(); this.order = [];
-    this.nextMap = 0x01000000;
+    this.nextMap = ARM64_BASE + 0x01000000;
     this.heap = { free: new Map(), sizes: new Map() };
     this.atexit = []; this.tlsModules = []; this.tlsSize = 0;
     // the main thread: stack and TLS
@@ -52,7 +56,7 @@ export class Arm64Process {
   }
   free(ptr) { ptr = Number(ptr); if (!ptr) return; const size = this.heap.sizes.get(ptr); if (size === undefined) throw new APKError(`ARM64 native code: free() of 0x${ptr.toString(16)}, which malloc did not return (or freed twice)`, { kind: 'arm64-heap' }); this.heap.sizes.delete(ptr); (this.heap.free.get(size) ?? this.heap.free.set(size, []).get(size)).push(ptr); }
   usableSize(ptr) { return this.heap.sizes.get(Number(ptr)) ?? 0; }
-  allocString(text) { const bytes = new TextEncoder().encode(text), ptr = this.malloc(bytes.length + 1); this.memory.copyIn(ptr, bytes); this.memory.u8[ptr + bytes.length] = 0; return ptr; }
+  allocString(text) { const bytes = new TextEncoder().encode(text), ptr = this.malloc(bytes.length + 1); this.memory.copyIn(ptr, bytes); this.memory.setByte(ptr + bytes.length, 0); return ptr; }
   // ---- host entries
   hostEntry(name, fn) {
     if (this.hostIndex.has(name)) return HOST_BASE + 16 * this.hostIndex.get(name);

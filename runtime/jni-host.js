@@ -1,19 +1,19 @@
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
-import { constantField, nonConstantField } from './framework-constants.js?v=ebd42d0a624c';
-import { JavaException } from './apk-runtime.js?v=ebd42d0a624c';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=ebd42d0a624c';
-import { buildElfDescriptor } from './native-descriptor.js?v=ebd42d0a624c';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=ebd42d0a624c';
-import { NativeLinker, LinkError } from './native-linker.js?v=ebd42d0a624c';
-import { hostFunction } from './wasm-host-function.js?v=ebd42d0a624c';
-import { parseWasm } from './wasm-dylink.js?v=ebd42d0a624c';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=ebd42d0a624c';
-import { BUCKET, inBucket } from './time-breakdown.js?v=ebd42d0a624c';
-import { registerWasmMemory } from './unsafe-native.js?v=ebd42d0a624c';
-import { writeSkPath } from './skia-path-layout.js?v=ebd42d0a624c';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=ebd42d0a624c';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=ebd42d0a624c';
-import { withVariants } from './native-provider-variants.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { constantField, nonConstantField } from './framework-constants.js?v=a64e78a38c60';
+import { JavaException } from './apk-runtime.js?v=a64e78a38c60';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=a64e78a38c60';
+import { buildElfDescriptor } from './native-descriptor.js?v=a64e78a38c60';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=a64e78a38c60';
+import { NativeLinker, LinkError } from './native-linker.js?v=a64e78a38c60';
+import { hostFunction } from './wasm-host-function.js?v=a64e78a38c60';
+import { parseWasm } from './wasm-dylink.js?v=a64e78a38c60';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=a64e78a38c60';
+import { BUCKET, inBucket } from './time-breakdown.js?v=a64e78a38c60';
+import { registerWasmMemory } from './unsafe-native.js?v=a64e78a38c60';
+import { writeSkPath } from './skia-path-layout.js?v=a64e78a38c60';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=a64e78a38c60';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=a64e78a38c60';
+import { withVariants } from './native-provider-variants.js?v=a64e78a38c60';
 
 // JNI -> WebAssembly bridge.
 //
@@ -462,9 +462,10 @@ export class JniBridge {
   guardJni(name, body, lib = null) { const previous = this.currentLib; this.currentLib = lib; try { return this.#guard(name, body); } finally { this.currentLib = previous; } }
   #handlers(lib) {
     const r = this.runtime, self = this;
-    const view = () => new DataView(lib.memory.buffer), bytes = () => new Uint8Array(lib.memory.buffer);
-    const cString = ptr => { const b = bytes(); let end = ptr; while (b[end]) end++; return decodeModifiedUtf8(b.subarray(ptr, end)); };
-    const putCString = (text) => { const encoded = encodeModifiedUtf8(text), ptr = lib.malloc(encoded.length + 1); bytes().set(encoded, ptr); bytes()[ptr + encoded.length] = 0; return ptr; };
+    // Pointers are the native code's own addresses; the memory's buffer holds them at address - addressBase (0 for the wasm32 libraries, the ARM64 process's window for 64-bit code)
+    const view = () => new DataView(lib.memory.buffer), bytes = () => new Uint8Array(lib.memory.buffer), addressBase = lib.addressBase ?? 0, offset = ptr => ptr - addressBase;
+    const cString = ptr => { const b = bytes(), start = offset(ptr); let end = start; while (b[end]) end++; return decodeModifiedUtf8(b.subarray(start, end)); };
+    const putCString = (text) => { const encoded = encodeModifiedUtf8(text), ptr = lib.malloc(encoded.length + 1); bytes().set(encoded, offset(ptr)); bytes()[offset(ptr) + encoded.length] = 0; return ptr; };
     const stringOf = handle => { const v = self.#value(handle); return v === null ? null : r.stringCharacters(v); };
     const arrayOf = handle => { const v = self.#value(handle); if (v === null) throw new APKError('JNI array argument is null', { kind: 'jni-null' }); return r.array(v); };
     const outOfBounds = (message) => { self.#throwNew('Ljava/lang/ArrayIndexOutOfBoundsException;', message); };
@@ -534,7 +535,7 @@ export class JniBridge {
       return out;
     };
     const jvalues = (parameters, ptr) => {
-      const v = view(); return parameters.map((type, i) => { const at = ptr + i * 8; return type === 'J' ? v.getBigInt64(at, true) : type === 'D' ? v.getFloat64(at, true) : type === 'F' ? v.getFloat32(at, true) : type === 'Z' ? v.getUint8(at) : type === 'B' ? v.getInt8(at) : type === 'S' ? v.getInt16(at, true) : type === 'C' ? v.getUint16(at, true) : v.getInt32(at, true); });
+      const v = view(); return parameters.map((type, i) => { const at = offset(ptr) + i * 8; return type === 'J' ? v.getBigInt64(at, true) : type === 'D' ? v.getFloat64(at, true) : type === 'F' ? v.getFloat32(at, true) : type === 'Z' ? v.getUint8(at) : type === 'B' ? v.getInt8(at) : type === 'S' ? v.getInt16(at, true) : type === 'C' ? v.getUint16(at, true) : v.getInt32(at, true); });
     };
     const toVM = (type, raw) => {
       switch (type) {
@@ -602,35 +603,36 @@ export class JniBridge {
     // -- strings
     h.NewStringUTF = (_env, ptr) => ptr === 0 ? 0 : self.#local(cString(ptr));
     h.GetStringUTFLength = (_env, s) => encodeModifiedUtf8(stringOf(s)).length;
-    h.GetStringUTFChars = (_env, s, isCopy) => { if (isCopy) view().setUint8(isCopy, 1); const ptr = putCString(stringOf(s)); lib.allocations.set(ptr, 'string'); return ptr; };
+    h.GetStringUTFChars = (_env, s, isCopy) => { if (isCopy) view().setUint8(offset(isCopy), 1); const ptr = putCString(stringOf(s)); lib.allocations.set(ptr, 'string'); return ptr; };
     h.ReleaseStringUTFChars = (_env, _s, ptr) => { lib.allocations.delete(ptr); lib.free(ptr); };
     h.GetStringLength = (_env, s) => stringOf(s).length;
     h.GetStringChars = (_env, s, isCopy) => {
-      const text = stringOf(s), ptr = lib.malloc(text.length * 2 + 2), v = view(); if (isCopy) v.setUint8(isCopy, 1);
-      for (let i = 0; i < text.length; i++) v.setUint16(ptr + i * 2, text.charCodeAt(i), true); v.setUint16(ptr + text.length * 2, 0, true); lib.allocations.set(ptr, 'chars'); return ptr;
+      const text = stringOf(s), ptr = lib.malloc(text.length * 2 + 2), at = offset(ptr), v = view(); if (isCopy) v.setUint8(offset(isCopy), 1);
+      for (let i = 0; i < text.length; i++) v.setUint16(at + i * 2, text.charCodeAt(i), true); v.setUint16(at + text.length * 2, 0, true); lib.allocations.set(ptr, 'chars'); return ptr;
     };
     h.ReleaseStringChars = (_env, _s, ptr) => { lib.allocations.delete(ptr); lib.free(ptr); };
     h.GetStringCritical = h.GetStringChars; h.ReleaseStringCritical = h.ReleaseStringChars;
-    h.NewString = (_env, ptr, length) => { const v = view(); let text = ''; for (let i = 0; i < length; i++) text += String.fromCharCode(v.getUint16(ptr + i * 2, true)); return self.#local(text); };
+    h.NewString = (_env, ptr, length) => { const v = view(), at = offset(ptr); let text = ''; for (let i = 0; i < length; i++) text += String.fromCharCode(v.getUint16(at + i * 2, true)); return self.#local(text); };
     h.GetStringRegion = (_env, s, start, length, out) => {
       const text = stringOf(s); if (start < 0 || length < 0 || start + length > text.length) { self.#throwNew('Ljava/lang/StringIndexOutOfBoundsException;', `region ${start}+${length} out of ${text.length}`); return; }
-      const v = view(); for (let i = 0; i < length; i++) v.setUint16(out + i * 2, text.charCodeAt(start + i), true);
+      const v = view(), at = offset(out); for (let i = 0; i < length; i++) v.setUint16(at + i * 2, text.charCodeAt(start + i), true);
     };
     h.GetStringUTFRegion = (_env, s, start, length, out) => {
       const text = stringOf(s); if (start < 0 || length < 0 || start + length > text.length) { self.#throwNew('Ljava/lang/StringIndexOutOfBoundsException;', `region ${start}+${length} out of ${text.length}`); return; }
-      const encoded = encodeModifiedUtf8(text.slice(start, start + length)); bytes().set(encoded, out); bytes()[out + encoded.length] = 0;
+      const encoded = encodeModifiedUtf8(text.slice(start, start + length)); bytes().set(encoded, offset(out)); bytes()[offset(out) + encoded.length] = 0;
     };
 
     // -- arrays
     h.GetArrayLength = (_env, a) => arrayOf(a).elements.length;
-    // -- direct buffers (ART semantics): NewDirectByteBuffer calls DirectByteBuffer(long, int) like ART; the buffer's address is a wasm32 pointer, which libcore's Memory/Unsafe
-    //    natives resolve against the live process memory (unsafe-native.js registerWasmMemory), so reads and writes through the ByteBuffer hit the library's memory and survive memory.grow.
+    // -- direct buffers (ART semantics): NewDirectByteBuffer calls DirectByteBuffer(long, int) like ART; the buffer's address is the library's own pointer (a wasm32 one, below 4 GiB,
+    //    or an ARM64 one, in that process's window), which libcore's Memory/Unsafe natives resolve against the live memory it names (unsafe-native.js registerWasmMemory /
+    //    registerArm64Memory), so reads and writes through the ByteBuffer hit the library's memory and survive its growth.
     const DIRECT = 'Ljava/nio/DirectByteBuffer;', BUFFER = 'Ljava/nio/Buffer;';
     h.NewDirectByteBuffer = (_env, address, capacity) => {
       if (capacity < 0n || capacity > 0x7fffffffn) { self.#throwNew('Ljava/lang/IllegalArgumentException;', `negative or too large capacity: ${capacity}`); return 0; }
       r.resolveClass('java.nio.DirectByteBuffer', false);   // ART looks the class up the same way (boot class path)
       const object = r.allocate(DIRECT);
-      r.dispatch({ owner: DIRECT, name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [lib.directWindow !== undefined ? lib.directWindow + BigInt(address) : BigInt(address >>> 0), Number(capacity)], { receiver: object }), 'direct');
+      r.dispatch({ owner: DIRECT, name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [lib.pointerSize === 8 ? BigInt(address) : BigInt(address >>> 0), Number(capacity)], { receiver: object }), 'direct');
       return self.#local(object);
     };
     const directBuffer = handle => {   // the Buffer object when it is a direct java.nio.Buffer, else null
@@ -638,7 +640,7 @@ export class JniBridge {
       const object = r.object(v); if (!r.isSubtype(object.type, BUFFER)) return null;
       return r.dispatch({ owner: BUFFER, name: 'isDirect', parameters: [], result: 'Z', signature: '()Z' }, r.argumentWords([], [], { receiver: v }), 'virtual') ? object : null;
     };
-    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); if (!object) return 0; const address = BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n); if (lib.directWindow !== undefined) { const inside = address - lib.directWindow; return inside >= 0n && inside < 0x10000000000n ? Number(inside) : 0; } return Number(BigInt.asUintN(32, address)); };   // an ARM64 library sees only buffers over its own memory
+    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); if (!object) return 0; const address = BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n); if (lib.pointerSize === 8) return lib.memory.contains(Number(address)) ? Number(address) : 0; return Number(BigInt.asUintN(32, address)); };   // an ARM64 library sees only buffers over its own memory
     h.GetDirectBufferCapacity = (_env, buf) => { const object = directBuffer(buf); return object ? BigInt(object.fields.get('Ljava/nio/Buffer;->capacity:I') ?? 0) : -1n; };
     h.NewObjectArray = (_env, length, cls, init) => {
       if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; }
@@ -654,21 +656,21 @@ export class JniBridge {
       const copyIn = (v, at, cells, start, length) => { if (ArrayBuffer.isView(cells)) new Uint8Array(cells.buffer, cells.byteOffset + start * size, length * size).set(new Uint8Array(v.buffer, at, length * size)); else for (let i = 0; i < length; i++) cells[start + i] = read(v, at + i * size); };
       h[`New${name}Array`] = (_env, length) => { if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; } return self.#local(r.newArray(`[${code}`, length)); };
       h[`Get${name}ArrayElements`] = (_env, a, isCopy) => {
-        const array = arrayOf(a), ptr = lib.malloc(Math.max(1, array.cells.length * size)), v = view(); if (isCopy) v.setUint8(isCopy, 1);
-        copyOut(v, ptr, array.cells, 0, array.cells.length); lib.allocations.set(ptr, { array: self.#value(a), code, size }); return ptr;
+        const array = arrayOf(a), ptr = lib.malloc(Math.max(1, array.cells.length * size)), v = view(); if (isCopy) v.setUint8(offset(isCopy), 1);
+        copyOut(v, offset(ptr), array.cells, 0, array.cells.length); lib.allocations.set(ptr, { array: self.#value(a), code, size }); return ptr;
       };
       h[`Release${name}ArrayElements`] = (_env, a, ptr, mode) => {
         const array = arrayOf(a), v = view();
-        if (mode === 0 || mode === 1) copyIn(v, ptr, array.cells, 0, array.cells.length);
+        if (mode === 0 || mode === 1) copyIn(v, offset(ptr), array.cells, 0, array.cells.length);
         if (mode === 0 || mode === 2) { lib.allocations.delete(ptr); lib.free(ptr); }
       };
       h[`Get${name}ArrayRegion`] = (_env, a, start, length, out) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
-        copyOut(view(), out, array.cells, start, length);
+        copyOut(view(), offset(out), array.cells, start, length);
       };
       h[`Set${name}ArrayRegion`] = (_env, a, start, length, src) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
-        copyIn(view(), src, array.cells, start, length);
+        copyIn(view(), offset(src), array.cells, start, length);
       };
     }
     h.GetPrimitiveArrayCritical = (_env, a, isCopy) => {

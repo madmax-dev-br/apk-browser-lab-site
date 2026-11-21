@@ -3,10 +3,10 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=ebd42d0a624c';
-import { BLOCKED } from './cpu.js?v=ebd42d0a624c';
-import { extendLibc } from './libc-extra.js?v=ebd42d0a624c';
-import { utf8 } from './text.js?v=ebd42d0a624c';
+import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { BLOCKED } from './cpu.js?v=a64e78a38c60';
+import { extendLibc } from './libc-extra.js?v=a64e78a38c60';
+import { utf8 } from './text.js?v=a64e78a38c60';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -16,14 +16,14 @@ export function variadic(cpu, fixedGp, fixedFp = 0) {
   let gp = fixedGp, fp = fixedFp, stack = Number(cpu.sp);
   return {
     int() { if (gp < 8) return cpu.x[gp++]; const v = cpu.mem.read64(stack); stack += 8; return v; },
-    double() { if (fp < 8) return cpu.getD(fp++); const v = cpu.mem.dv.getFloat64(stack, true); stack += 8; return v; },
+    double() { if (fp < 8) return cpu.getD(fp++); const v = cpu.mem.float64(stack); stack += 8; return v; },
   };
 }
 export function vaList(mem, ptr) {
-  let stack = mem.readPtr(ptr); const grTop = mem.readPtr(ptr + 8), vrTop = mem.readPtr(ptr + 16); let grOffs = mem.dv.getInt32(ptr + 24, true), vrOffs = mem.dv.getInt32(ptr + 28, true);
+  let stack = mem.readPtr(ptr); const grTop = mem.readPtr(ptr + 8), vrTop = mem.readPtr(ptr + 16); let grOffs = mem.int32(ptr + 24), vrOffs = mem.int32(ptr + 28);
   return {
     int() { if (grOffs < 0) { const v = mem.read64(grTop + grOffs); grOffs += 8; return v; } const v = mem.read64(stack); stack += 8; return v; },
-    double() { if (vrOffs < 0) { const v = mem.dv.getFloat64(vrTop + vrOffs, true); vrOffs += 16; return v; } const v = mem.dv.getFloat64(stack, true); stack += 8; return v; },
+    double() { if (vrOffs < 0) { const v = mem.float64(vrTop + vrOffs); vrOffs += 16; return v; } const v = mem.float64(stack); stack += 8; return v; },
   };
 }
 /** printf-family formatting of a C format string with a variadic cursor. */
@@ -64,8 +64,8 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   const lib = {};
   const str = (p, ptr) => text(p.memory.cString(Number(ptr)));
   const setErrno = (p, value) => { p.memory.writeU32(p.errnoAddress, value); return -1; };
-  const write = (p, ptr, s) => { const bytes = new TextEncoder().encode(s); p.memory.copyIn(Number(ptr), bytes); p.memory.u8[Number(ptr) + bytes.length] = 0; return bytes.length; };
-  const bounded = (p, dst, size, s) => { const bytes = new TextEncoder().encode(s), n = Number(size); if (n > 0) { const k = Math.min(bytes.length, n - 1); p.memory.copyIn(Number(dst), bytes.subarray(0, k)); p.memory.u8[Number(dst) + k] = 0; } return bytes.length; };
+  const write = (p, ptr, s) => { const bytes = new TextEncoder().encode(s); p.memory.copyIn(Number(ptr), bytes); p.memory.setByte(Number(ptr) + bytes.length, 0); return bytes.length; };
+  const bounded = (p, dst, size, s) => { const bytes = new TextEncoder().encode(s), n = Number(size); if (n > 0) { const k = Math.min(bytes.length, n - 1); p.memory.copyIn(Number(dst), bytes.subarray(0, k)); p.memory.setByte(Number(dst) + k, 0); } return bytes.length; };
   const log = (priority, tag, message) => { const letter = 'VVVDIWEFS'[Number(priority)] ?? 'I'; runtime?.record?.(`LOG ${letter} ${tag}: ${message}`); };
   const x = (cpu, i) => cpu.x[i];
   const n = (cpu, i) => Number(cpu.x[i]);
@@ -89,25 +89,25 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.memchr = (p, c) => { const a = n(c, 0), b = p.memory.bytes(a, n(c, 2)), at = b.indexOf(Number(x(c, 1) & 0xffn)); return at < 0 ? 0 : a + at; };
   lib.memrchr = (p, c) => { const a = n(c, 0), b = p.memory.bytes(a, n(c, 2)), at = b.lastIndexOf(Number(x(c, 1) & 0xffn)); return at < 0 ? 0 : a + at; };
   lib.strlen = lib.__strlen_chk = (p, c) => p.memory.cString(n(c, 0)).length;
-  lib.strnlen = (p, c) => { const a = n(c, 0), max = n(c, 1); let i = 0; while (i < max && p.memory.u8[a + i]) i++; return i; };
+  lib.strnlen = (p, c) => { const a = n(c, 0), max = n(c, 1); let i = 0; while (i < max && p.memory.byte(a + i)) i++; return i; };
   const cmp = (a, b, max = Infinity, fold = false) => { for (let i = 0; i < max; i++) { let x1 = a[i] ?? 0, y1 = b[i] ?? 0; if (fold) { if (x1 >= 65 && x1 <= 90) x1 += 32; if (y1 >= 65 && y1 <= 90) y1 += 32; } if (x1 !== y1) return x1 - y1; if (!x1) return 0; } return 0; };
   const bytesOf = (p, ptr) => p.memory.cString(Number(ptr));
   lib.strcmp = (p, c) => cmp(bytesOf(p, x(c, 0)), bytesOf(p, x(c, 1)));
   lib.strncmp = (p, c) => cmp(bytesOf(p, x(c, 0)), bytesOf(p, x(c, 1)), n(c, 2));
   lib.strcasecmp = (p, c) => cmp(bytesOf(p, x(c, 0)), bytesOf(p, x(c, 1)), Infinity, true);
   lib.strncasecmp = (p, c) => cmp(bytesOf(p, x(c, 0)), bytesOf(p, x(c, 1)), n(c, 2), true);
-  lib.strcpy = lib.__strcpy_chk = (p, c) => { const src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(n(c, 0), src); p.memory.u8[n(c, 0) + src.length] = 0; return n(c, 0); };
-  lib.stpcpy = (p, c) => { const src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(n(c, 0), src); p.memory.u8[n(c, 0) + src.length] = 0; return n(c, 0) + src.length; };
+  lib.strcpy = lib.__strcpy_chk = (p, c) => { const src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(n(c, 0), src); p.memory.setByte(n(c, 0) + src.length, 0); return n(c, 0); };
+  lib.stpcpy = (p, c) => { const src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(n(c, 0), src); p.memory.setByte(n(c, 0) + src.length, 0); return n(c, 0) + src.length; };
   lib.strncpy = lib.__strncpy_chk = lib.__strncpy_chk2 = (p, c) => { const src = bytesOf(p, x(c, 1)), len = n(c, 2), d = n(c, 0); p.memory.fill(d, 0, len); p.memory.copyIn(d, src.subarray(0, Math.min(src.length, len))); return d; };
-  lib.strlcpy = lib.__strlcpy_chk = (p, c) => { const src = bytesOf(p, x(c, 1)), size = n(c, 2), d = n(c, 0); if (size) { const k = Math.min(src.length, size - 1); p.memory.copyIn(d, src.subarray(0, k)); p.memory.u8[d + k] = 0; } return src.length; };
-  lib.strcat = lib.__strcat_chk = (p, c) => { const d = n(c, 0), end = d + bytesOf(p, d).length, src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(end, src); p.memory.u8[end + src.length] = 0; return d; };
-  lib.strncat = lib.__strncat_chk = (p, c) => { const d = n(c, 0), end = d + bytesOf(p, d).length, src = bytesOf(p, x(c, 1)).slice(0, n(c, 2)); p.memory.copyIn(end, src); p.memory.u8[end + src.length] = 0; return d; };
-  lib.strlcat = lib.__strlcat_chk = (p, c) => { const d = n(c, 0), size = n(c, 2), dlen = bytesOf(p, d).length, src = bytesOf(p, x(c, 1)); if (dlen < size) { const k = Math.min(src.length, size - dlen - 1); p.memory.copyIn(d + dlen, src.subarray(0, k)); p.memory.u8[d + dlen + k] = 0; } return dlen + src.length; };
+  lib.strlcpy = lib.__strlcpy_chk = (p, c) => { const src = bytesOf(p, x(c, 1)), size = n(c, 2), d = n(c, 0); if (size) { const k = Math.min(src.length, size - 1); p.memory.copyIn(d, src.subarray(0, k)); p.memory.setByte(d + k, 0); } return src.length; };
+  lib.strcat = lib.__strcat_chk = (p, c) => { const d = n(c, 0), end = d + bytesOf(p, d).length, src = bytesOf(p, x(c, 1)).slice(); p.memory.copyIn(end, src); p.memory.setByte(end + src.length, 0); return d; };
+  lib.strncat = lib.__strncat_chk = (p, c) => { const d = n(c, 0), end = d + bytesOf(p, d).length, src = bytesOf(p, x(c, 1)).slice(0, n(c, 2)); p.memory.copyIn(end, src); p.memory.setByte(end + src.length, 0); return d; };
+  lib.strlcat = lib.__strlcat_chk = (p, c) => { const d = n(c, 0), size = n(c, 2), dlen = bytesOf(p, d).length, src = bytesOf(p, x(c, 1)); if (dlen < size) { const k = Math.min(src.length, size - dlen - 1); p.memory.copyIn(d + dlen, src.subarray(0, k)); p.memory.setByte(d + dlen + k, 0); } return dlen + src.length; };
   lib.strchr = lib.__strchr_chk = (p, c) => { const a = n(c, 0), b = bytesOf(p, a), ch = Number(x(c, 1) & 0xffn); if (ch === 0) return a + b.length; const at = b.indexOf(ch); return at < 0 ? 0 : a + at; };
   lib.strrchr = lib.__strrchr_chk = (p, c) => { const a = n(c, 0), b = bytesOf(p, a), ch = Number(x(c, 1) & 0xffn); if (ch === 0) return a + b.length; const at = b.lastIndexOf(ch); return at < 0 ? 0 : a + at; };
   lib.strstr = (p, c) => { const a = n(c, 0), hay = str(p, a), needle = str(p, x(c, 1)), at = hay.indexOf(needle); return at < 0 ? 0 : a + new TextEncoder().encode(hay.slice(0, at)).length; };
   lib.strdup = (p, c) => p.allocString(str(p, x(c, 0)));
-  lib.strndup = (p, c) => { const b = bytesOf(p, x(c, 0)).slice(0, n(c, 1)), ptr = p.malloc(b.length + 1); p.memory.copyIn(ptr, b); p.memory.u8[ptr + b.length] = 0; return ptr; };
+  lib.strndup = (p, c) => { const b = bytesOf(p, x(c, 0)).slice(0, n(c, 1)), ptr = p.malloc(b.length + 1); p.memory.copyIn(ptr, b); p.memory.setByte(ptr + b.length, 0); return ptr; };
   lib.strspn = (p, c) => { const s = bytesOf(p, x(c, 0)), set = new Set(bytesOf(p, x(c, 1))); let i = 0; while (i < s.length && set.has(s[i])) i++; return i; };
   lib.strcspn = (p, c) => { const s = bytesOf(p, x(c, 0)), set = new Set(bytesOf(p, x(c, 1))); let i = 0; while (i < s.length && !set.has(s[i])) i++; return i; };
   lib.strpbrk = (p, c) => { const a = n(c, 0), s = bytesOf(p, a), set = new Set(bytesOf(p, x(c, 1))); for (let i = 0; i < s.length; i++) if (set.has(s[i])) return a + i; return 0; };
@@ -239,7 +239,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
     for (const lib0 of p.order) {
       const info = p.malloc(64), phdrs = p.malloc(lib0.elf.segments.length * 56);
       lib0.elf.segments.forEach((s, i) => { const o = phdrs + 56 * i; p.memory.writeU32(o, s.type); p.memory.writeU32(o + 4, s.flags); p.memory.write64(o + 8, BigInt(s.offset)); p.memory.write64(o + 16, BigInt(s.vaddr)); p.memory.write64(o + 24, BigInt(s.vaddr)); p.memory.write64(o + 32, BigInt(s.filesz)); p.memory.write64(o + 40, BigInt(s.memsz)); p.memory.write64(o + 48, BigInt(s.align)); });
-      p.memory.writePtr(info, lib0.base); p.memory.writePtr(info + 8, p.allocString(lib0.name)); p.memory.writePtr(info + 16, phdrs); p.memory.dv.setUint16(info + 24, lib0.elf.segments.length, true);
+      p.memory.writePtr(info, lib0.base); p.memory.writePtr(info + 8, p.allocString(lib0.name)); p.memory.writePtr(info + 16, phdrs); p.memory.setUint16(info + 24, lib0.elf.segments.length);
       const result = Number(BigInt.asIntN(32, p.call(callback, [info, 64, data])));
       if (result !== 0) return result;
     }
@@ -312,10 +312,10 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   };
   lib.fread = (p, c) => { const size = n(c, 1), count = n(c, 2); if (!size || !count) return 0; return Math.floor(streamRead(p, stream(p, x(c, 3)), n(c, 0), size * count) / size); };
   lib.fwrite = (p, c) => { const size = n(c, 1), count = n(c, 2); if (!size || !count) return 0; return Math.floor(streamWrite(p, stream(p, x(c, 3)), n(c, 0), size * count) / size); };
-  lib.fgets = (p, c) => { const dst = n(c, 0), max = s32(c, 1), s = stream(p, x(c, 2)); let i = 0; while (i < max - 1) { const tmp = p.malloc(1), got = streamRead(p, s, tmp, 1), ch = p.memory.u8[tmp]; p.free(tmp); if (!got) break; p.memory.u8[dst + i++] = ch; if (ch === 10) break; } if (!i) return 0; p.memory.u8[dst + i] = 0; return dst; };
-  lib.fgetc = lib.getc = (p, c) => { const tmp = p.malloc(1), got = streamRead(p, stream(p, x(c, 0)), tmp, 1), ch = p.memory.u8[tmp]; p.free(tmp); return got ? ch : 0xffffffffffffffffn; };
+  lib.fgets = (p, c) => { const dst = n(c, 0), max = s32(c, 1), s = stream(p, x(c, 2)); let i = 0; while (i < max - 1) { const tmp = p.malloc(1), got = streamRead(p, s, tmp, 1), ch = p.memory.byte(tmp); p.free(tmp); if (!got) break; p.memory.setByte(dst + i++, ch); if (ch === 10) break; } if (!i) return 0; p.memory.setByte(dst + i, 0); return dst; };
+  lib.fgetc = lib.getc = (p, c) => { const tmp = p.malloc(1), got = streamRead(p, stream(p, x(c, 0)), tmp, 1), ch = p.memory.byte(tmp); p.free(tmp); return got ? ch : 0xffffffffffffffffn; };
   lib.fputs = (p, c) => { const bytes = bytesOf(p, x(c, 0)), ptr = p.malloc(bytes.length + 1); p.memory.copyIn(ptr, bytes); streamWrite(p, stream(p, x(c, 1)), ptr, bytes.length); p.free(ptr); return 1; };
-  lib.fputc = lib.putc = (p, c) => { const ptr = p.malloc(1); p.memory.u8[ptr] = n(c, 0) & 0xff; streamWrite(p, stream(p, x(c, 1)), ptr, 1); p.free(ptr); return n(c, 0) & 0xff; };
+  lib.fputc = lib.putc = (p, c) => { const ptr = p.malloc(1); p.memory.setByte(ptr, n(c, 0) & 0xff); streamWrite(p, stream(p, x(c, 1)), ptr, 1); p.free(ptr); return n(c, 0) & 0xff; };
   lib.fseek = lib.fseeko = lib.fseeko64 = (p, c) => { const s = stream(p, x(c, 0)), off = Number(BigInt.asIntN(64, x(c, 1))), whence = n(c, 2); if (s.seekfn) { const r = Number(BigInt.asIntN(64, p.call(s.seekfn, [s.cookie, BigInt.asUintN(64, BigInt(off)), whence]))); if (r < 0) return -1; s.offset = r; s.eof = false; return 0; } if (s.path === undefined) return setErrno(p, 29); s.offset = whence === 0 ? off : whence === 1 ? s.offset + off : fileBytes(s.path).length + off; s.eof = false; return 0; };
   lib.ftell = lib.ftello = lib.ftello64 = (p, c) => stream(p, x(c, 0)).offset;
   lib.rewind = (p, c) => { const s = stream(p, x(c, 0)); s.offset = 0; s.eof = false; };

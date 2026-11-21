@@ -88,7 +88,7 @@ adb exec-out uiautomator dump /dev/tty
 adb logcat -d *:E | grep -i timeout
 ```
 
-It is not adb: it is an interpreter that does in the page what each command does on a device, and that refuses by name what the page cannot reach. The page shows the command to start the bridge and the address for the agent under **Controls › MCP**. Details in [MCP: the agent using the page](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
+It is not adb: it is an interpreter that does in the page what each command does on a device, and that refuses by name what the page cannot reach. The page shows the command to start the bridge and the address for the agent under **Controls › MCP**, and connects to the bridge by itself while it runs (no token). Details in [MCP: the agent using the page](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
 
 ### Embed in another page
 

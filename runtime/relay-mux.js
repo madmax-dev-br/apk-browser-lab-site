@@ -1,7 +1,7 @@
-// The relay's parallel channel (docs/NETWORK.md "Parallel relay channel"; Device > "Parallel relay channel", off by default). Without it every exchange through the APK Lab Relay is
+// The relay's parallel channel (docs/NETWORK.md "Parallel relay channel"; Device > "Parallel relay channel", on by default since 2026-11-20). Without it every exchange through the APK Lab Relay is
 // its own browser fetch to the relay's one origin: a CORS preflight for most of them (the x-apkweb-* headers, a JSON Content-Type; the preflight cache is per URL and every target
 // URL differs), and at most about 6 at a time (the browser's HTTP/1.1 connections per origin), whatever the app runs in parallel. With it one WebSocket from this realm to the relay's
-// /<token>/mux endpoint carries every exchange at once, multiplexed by id; the relay runs them concurrently with its own HTTP client. VM-free; no process.*.
+// /mux endpoint carries every exchange at once, multiplexed by id; the relay runs them concurrently with its own HTTP client. VM-free; no process.*.
 //
 // What the app sees does not change: openExchange (src/network-transport.js) builds the same relay query and the same headers as for the per-request path, the relay decides the
 // exchange with the same code (scripts/cors-relay.mjs relayAnswer) and returns the headers the page would have got, and `fetch()` below hands openExchange a response object of the
@@ -19,20 +19,20 @@
 // Availability: the first exchange opens the channel and waits for the hello. No hello (an older relay, a relay that is not running, a proxy that is not the relay) means the
 // per-request path, for that exchange and for the next ones until `retryMs` later; the app's request never fails because the channel is missing. Exchanges in flight when an open
 // channel drops fail as a dropped connection does (ECONNRESET: java.net.SocketException "Connection reset"); the next exchange opens a new channel.
-import { tunnelEndpoint } from './tcp-tunnel.js?v=ebd42d0a624c';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=a64e78a38c60';
 
 export const MUX_VERSION = 1, MUX_WINDOW = 256 * 1024, MUX_FRAME = 64 * 1024;
 const KIND_REQUEST_BODY = 1, KIND_RESPONSE_BODY = 2;
 const SEND_HIGH_WATER = 1024 * 1024;   // request body bytes queued in the WebSocket (bufferedAmount) before this side waits for them to leave
 const NULL_BODY = new Set([101, 103, 204, 205, 304]);   // fetch gives these statuses (and HEAD) a null body
 
-/** The channel's endpoint for a device network: an explicit policy.muxUrl, or derived from an APK Lab Relay proxy URL (http(s)://host:port/<token>/?url={url}). Null when none. */
+/** The channel's endpoint for a device network: an explicit policy.muxUrl, or derived from an APK Lab Relay proxy URL (tcp-tunnel.js tunnelEndpoint). Null when none. */
 export function muxEndpoint(policy) {
   if (policy?.muxUrl) return String(policy.muxUrl);
   const tcp = tunnelEndpoint({ proxyUrl: policy?.proxyUrl });
   return tcp ? tcp.replace(/\/tcp$/, '/mux') : null;
 }
-/** host:port of an endpoint, for the trace and the page (the token stays out of both). */
+/** host:port of an endpoint, for the trace and the page (an older relay's token stays out of both). */
 export const endpointHost = endpoint => { try { return new URL(endpoint).host; } catch { return String(endpoint ?? ''); } };
 
 const abortError = signal => signal?.reason ?? (typeof DOMException === 'function' ? new DOMException('The operation was aborted.', 'AbortError') : Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }));
@@ -68,7 +68,7 @@ class ChannelBodyReader {
 
 export class RelayMux {
   /**
-   * `endpoint` ws(s)://host:port/<token>/mux; `create(url)` makes this realm's WebSocket (null: none, so the channel is unavailable); `onEvent(kind, detail)` hears 'open', 'unavailable'
+   * `endpoint` ws(s)://host:port/mux; `create(url)` makes this realm's WebSocket (null: none, so the channel is unavailable); `onEvent(kind, detail)` hears 'open', 'unavailable'
    * ({ reason }) and 'dropped' ({ reason, inFlight }).
    */
   constructor({ endpoint, create = url => new globalThis.WebSocket(url), onEvent = () => {}, retryMs = 15000, helloTimeoutMs = 3000, now = () => Date.now() }) {

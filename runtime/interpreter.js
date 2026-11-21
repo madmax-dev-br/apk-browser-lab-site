@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
-import { BUCKET } from './time-breakdown.js?v=ebd42d0a624c';
-import { Blocked, QUANTUM } from './scheduler.js?v=ebd42d0a624c';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { BUCKET } from './time-breakdown.js?v=a64e78a38c60';
+import { Blocked, QUANTUM } from './scheduler.js?v=a64e78a38c60';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=a64e78a38c60';
 
 // Frame-based DEX interpreter.
 //
@@ -641,12 +641,14 @@ export function runNested(rt, method, code, args) {
   // A non-Java failure that escapes the outermost run leaves monitors in an undefined state; reset them to what they were when the event began.
   const checkpoint = rt.nestedRuns === 1 ? (rt.monitors?.size ? new Map(rt.monitors) : EMPTY_MONITORS) : null;
   const directSite = noteReentry(rt), dstart = rt.dstart, dlimit = rt.dlimit;
+  let failure = null;
   try { return runLoop(rt, thread, base); }
-  catch (error) { if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
+  catch (error) { failure = error; if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
   finally {
     rt.t2Site = directSite; rt.dstart = dstart; rt.dlimit = dlimit; if (rt.nestedRuns === 1) foldDirectCalls(rt);
     thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread;
     if (parked !== null) { thread.blocked = parked.blocked; thread.blockKind = parked.kind; thread.state = parked.state; thread.timedOut = parked.timedOut; }
+    else if (failure !== null) rt.scheduler.dropAbandonedWait(thread, failure);   // a wait this run's frames were in, left by an error that ended the run: it ends with them (Scheduler.dropAbandonedWait)
     if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt);   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
   }
 }

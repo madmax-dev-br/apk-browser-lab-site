@@ -3,14 +3,16 @@
 // can send its requests through a relay instead (Controles > Dispositivo > Proxy, `{url}` placeholder; src/network-transport.js openExchange), and this is that relay: it repeats each
 // request from this machine, as the device would send it, and answers the page with CORS headers.
 //
-//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--new-token] [--config-dir <dir>] [--ca <ca.pem>]...
+//   node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--config-dir <dir>] [--ca <ca.pem>]...
 //   (--ca: CA certificates to trust besides the system's, for a server with an internal CA; the file is read again whenever it changes, no restart needed)
 //
-// The token and the port are saved (settings.json in the folder the APK Lab Relay desktop app uses: ~/Library/Application Support/apk-lab-relay on macOS, %APPDATA%\apk-lab-relay
-// on Windows, $XDG_CONFIG_HOME or ~/.config/apk-lab-relay elsewhere; --config-dir or APKWEB_RELAY_CONFIG_DIR choose another), so the Proxy address stays the same from one start to
-// the next and the page does not have to be given it again. --new-token makes (and saves) a new one: the old address stops working at once. --token <text> uses and saves that one.
+// No token (the owner's decision, 2026-11-20): on the default port the lab finds the relay by itself (GET /hello, src/relay-detect.js) and uses it with the Proxy field left empty;
+// on another port, put the printed address (http://127.0.0.1:<port>/?url={url}) in the Proxy field. A port given with --port is saved (settings.json in the folder the APK Lab Relay
+// desktop app uses: ~/Library/Application Support/apk-lab-relay on macOS, %APPDATA%\apk-lab-relay on Windows, $XDG_CONFIG_HOME or ~/.config/apk-lab-relay elsewhere; --config-dir or
+// APKWEB_RELAY_CONFIG_DIR choose another), so the address stays the same from one start to the next. An address from an older relay (http://127.0.0.1:<port>/<token>/?url={url})
+// keeps working: a first path segment before the relay's own paths is accepted and ignored. --token and --new-token, from older versions, are accepted and do nothing.
 //
-// Then put the printed "Proxy" URL in the lab's Proxy field. Contract with src/network-transport.js:
+// Contract with src/network-transport.js:
 //  - the target is the `url` query parameter; headers a browser may not send (Cookie, User-Agent, Origin, Referer ...) arrive as `x-apkweb-<name>` and are sent under their own name;
 //  - redirects are followed here (a browser hides redirect responses from the page);
 //  - Set-Cookie, which a browser never exposes, comes back as `x-apkweb-set-cookie`: a JSON array of the Set-Cookie values;
@@ -24,18 +26,19 @@
 //  - a request (or tunnel) that needs the identity carries `client-identity-key=<id of its leaf certificate>` in the relay's query: a relay that holds no identity for that
 //    destination (it was restarted: identities live in memory only) answers 502 `APKWEB_RELAY_NO_CLIENT_IDENTITY` instead of reaching the server without the certificate, and the lab
 //    hands the identity again and repeats the request (src/network-transport.js openExchange, src/tcp-tunnel.js).
-//  - a request with a token the relay does not have (an address from before --new-token) from an allowed page answers 404 `APKWEB_RELAY_TOKEN`, which the lab reports as such.
-//  - the parallel channel (/<token>/mux, a WebSocket; Device > "Parallel relay channel" in the lab, src/relay-mux.js): many exchanges at once over one connection, multiplexed by id,
+//  - GET /hello from an allowed page answers {"relay":"apk-lab-relay","version","features":[...]}: how the lab tells this relay from any other server on the port.
+//  - the parallel channel (/mux, a WebSocket; Device > "Parallel relay channel" in the lab, src/relay-mux.js): many exchanges at once over one connection, multiplexed by id,
 //    each answered by the same code as the per-request path (headers restored, redirects, Set-Cookie, error codes, timeouts), with a credit window per exchange so a slow reader
 //    never makes either side buffer without bound. Protocol in muxChannel below and in docs/NETWORK.md "Parallel relay channel".
 //
-// Safety: it listens on 127.0.0.1 only; every request must carry the random token printed at start-up in its path, and must come from one of the allowed origins (the public lab and a
-// local copy by default), so another site open in the same browser cannot use it. Destinations are not restricted (the owner's decision, 2026-11-16: the relay is meant to be free): the
+// Safety: it listens on 127.0.0.1 only (other machines cannot reach it), and every request must come from one of the allowed origins (the public lab and a local copy by default,
+// checked on each request, WebSocket upgrades included), so another site open in the same browser cannot use it. There is no token: a program on this machine can use the relay
+// as it could reach the internet by itself. Destinations are not restricted (the owner's decision, 2026-11-16: the relay is meant to be free): the
 // internet, this machine and the local network are all reachable. --allow-private, from older versions, is accepted and does nothing. It keeps no cookies and stores nothing but its
-// settings (token, port): what the app sends passes through and is forgotten.
+// settings (the port): what the app sends passes through and is forgotten.
 import http from 'node:http';
 import https from 'node:https';
-import { randomBytes, createHash, createPrivateKey, X509Certificate } from 'node:crypto';
+import { createHash, createPrivateKey, X509Certificate } from 'node:crypto';
 import os from 'node:os';
 import path from 'node:path';
 import net, { isIP } from 'node:net';
@@ -52,16 +55,26 @@ const HOP_BY_HOP = new Set(['connection', 'keep-alive', 'proxy-connection', 'tra
 const FROM_BROWSER = new Set(['origin', 'referer', 'cookie', 'accept-encoding', 'user-agent']);   // the browser's own values (the app's, if it set them, come as x-apkweb-*)
 const RESPONSE_DROP = new Set(['transfer-encoding', 'connection', 'keep-alive', 'set-cookie']);   // Content-Encoding stays: the browser decodes the body as it would from the server itself
 const MAX_BODY = 32 * 1024 * 1024;
-export const NO_IDENTITY_CODE = 'APKWEB_RELAY_NO_CLIENT_IDENTITY', TOKEN_CODE = 'APKWEB_RELAY_TOKEN', FEATURES = 'client-identity';
-const TOKEN_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
+export const NO_IDENTITY_CODE = 'APKWEB_RELAY_NO_CLIENT_IDENTITY', FEATURES = 'client-identity';
+export const DEFAULT_PORT = 8787, RELAY_VERSION = '0.5.0', RELAY_NAME = 'apk-lab-relay';   // kept equal to src/relay-detect.js (tests/relay-detect.test.mjs checks it)
+const ENDPOINTS = new Set(['hello', 'mux', 'webview', 'tcp']), SEGMENT = /^[A-Za-z0-9_-]{1,128}$/;
+/**
+ * What a path asks for: 'request' (/ with ?url=...), 'hello', 'mux', 'webview', 'tcp', or null. An address from an older relay carried a token as its first segment
+ * (/<token>/?url=, /<token>/mux ...): that segment is accepted and ignored, so a Proxy address saved before keeps working.
+ */
+export function relayRoute(pathname) {
+  const parts = String(pathname ?? '').split('/').slice(1);   // '/a/b' -> ['a', 'b']; '/' -> ['']
+  if (parts.length === 1) return parts[0] === '' ? 'request' : ENDPOINTS.has(parts[0]) ? parts[0] : SEGMENT.test(parts[0]) ? 'request' : null;
+  if (parts.length === 2 && SEGMENT.test(parts[0]) && !ENDPOINTS.has(parts[0])) return parts[1] === '' ? 'request' : ENDPOINTS.has(parts[1]) ? parts[1] : null;
+  return null;
+}
 
 
 /**
- * The relay as an http.Server (not listening yet). `token`: the path segment every request must carry; `origins`: the page origins allowed to use it; Upstream requests go through node:http(s), not fetch: fetch adds headers of its own (Sec-Fetch-Mode, Accept-Language ...) that the app
+ * The relay as an http.Server (not listening yet). `origins`: the page origins allowed to use it (a `token` option, from older versions, is ignored). Upstream requests go through node:http(s), not fetch: fetch adds headers of its own (Sec-Fetch-Mode, Accept-Language ...) that the app
  * never sent; here the target sees exactly the app's request.
  */
-export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 60000, ca: caOption = null, lookup = null } = {}) {
-  if (!token) throw new Error('createRelay needs a token');
+export function createRelay({ origins = DEFAULT_ORIGINS, timeoutMs = 60000, ca: caOption = null, lookup = null } = {}) {
   const ca = typeof caOption === 'function' ? caOption : () => caOption;   // a function is asked at every connection (caFromFiles: a changed --ca file takes effect without a restart)
   const allowed = new Set(origins.map(origin => origin.replace(/\/$/, '')));
   const identities = new Map();   // 'host:port' -> { key, cert } (PEM) and its id, the device's client identity for that destination, in memory only
@@ -72,18 +85,16 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
   const server = http.createServer(async (req, res) => {
     if (webview.owns(req)) return webview.serve(req, res);   // a WebView document (http://<label>.localhost:<port>/...): scripts/relay-webview.cjs, docs/NETWORK.md "WebView documents"
     const origin = req.headers.origin ?? '';
-    const url = new URL(req.url, 'http://relay.invalid');
-    if (url.pathname !== `/${token}/` && url.pathname !== `/${token}`) {
-      // an allowed page with another token (an address from before --new-token): say so, readable by the page (CORS) and with a code the lab reports; the token is never echoed
-      if (!allowed.has(origin) || !/^\/[A-Za-z0-9_-]{8,128}\/?$/.test(url.pathname)) return fail(res, 404, 'unknown path');
-      cors(origin, res, { 'x-apkweb-relay-error-code': TOKEN_CODE, 'x-apkweb-relay-error': 'the relay has another token: copy the Proxy address it printed at start-up', 'Access-Control-Expose-Headers': 'x-apkweb-relay-error-code, x-apkweb-relay-error' });
-      if (req.method === 'OPTIONS' && req.headers['access-control-request-method']) { res.setHeader('Access-Control-Allow-Methods', req.headers['access-control-request-method']); res.setHeader('Access-Control-Allow-Headers', req.headers['access-control-request-headers'] ?? ''); if (req.headers['access-control-request-private-network']) res.setHeader('Access-Control-Allow-Private-Network', 'true'); res.statusCode = 204; return res.end(); }
-      return fail(res, 404, 'unknown path');
-    }
+    const url = new URL(req.url, 'http://relay.invalid'), route = relayRoute(url.pathname);
+    if (route !== 'request' && route !== 'hello') return fail(res, 404, 'unknown path');
     if (!allowed.has(origin)) return fail(res, 403, `origin not allowed: ${origin || '(none)'}; start the relay with --origin ${origin || '<origin>'}`);
     if (req.method === 'OPTIONS' && req.headers['access-control-request-method']) {   // the browser's preflight
       cors(origin, res, { 'Access-Control-Allow-Methods': req.headers['access-control-request-method'], 'Access-Control-Allow-Headers': req.headers['access-control-request-headers'] ?? '', 'Access-Control-Max-Age': '600', ...(req.headers['access-control-request-private-network'] ? { 'Access-Control-Allow-Private-Network': 'true' } : {}) });
       res.statusCode = 204; return res.end();
+    }
+    if (route === 'hello') {   // the lab's detection (src/relay-detect.js): this is the APK Lab Relay, and what it has
+      cors(origin, res); res.statusCode = 200; res.setHeader('Content-Type', 'application/json; charset=utf-8'); res.setHeader('Cache-Control', 'no-store');
+      return res.end(JSON.stringify({ relay: RELAY_NAME, version: RELAY_VERSION, features: ['client-identity', 'mux', 'webview', 'tcp'] }));
     }
     const target = url.searchParams.get('url');
     let parsed; try { parsed = new URL(target ?? ''); } catch { cors(origin, res); return fail(res, 400, 'missing or invalid url parameter'); }
@@ -123,13 +134,13 @@ export function createRelay({ token, origins = DEFAULT_ORIGINS, timeoutMs = 6000
   });
   const sessions = new Set();   // the open channels, so close() ends them (a WebSocket is not an HTTP request the server would wait for)
   // WebView documents: one hop per request (the frame follows redirects itself, so the lab decides each one), with the relay's resolver, --ca roots and client identities
-  const webview = createWebViewRelay({ token, allowed, timeoutMs, port: () => server.address()?.port ?? 0,
+  const webview = createWebViewRelay({ allowed, timeoutMs, port: () => server.address()?.port ?? 0,
     upstream: (target, method, headers, body, { signal, timeoutMs: ms }) => send(target, method, headers, body, ms ?? timeoutMs, 0, identities, ca, { ...transport, signal, manualRedirects: true }) });
   server.on('upgrade', (req, socket) => {
-    const pathname = new URL(req.url, 'http://relay.invalid').pathname;
-    if (pathname === `/${token}/webview`) return webview.channel(req, socket);
-    if (pathname === `/${token}/mux`) return muxChannel({ req, socket, allowed, answer: exchange => relayAnswer({ ...exchange, identities, ca, timeoutMs, transport }), sessions });
-    return tunnel({ req, socket, token, allowed, timeoutMs, identities, ca });
+    const route = relayRoute(new URL(req.url, 'http://relay.invalid').pathname);
+    if (route === 'webview') return webview.channel(req, socket);
+    if (route === 'mux') return muxChannel({ req, socket, allowed, answer: exchange => relayAnswer({ ...exchange, identities, ca, timeoutMs, transport }), sessions });
+    return tunnel({ req, socket, route, allowed, timeoutMs, identities, ca });
   });
   const close = server.close.bind(server);   // an upgraded socket keeps the server open, so close() ends the channels and the kept-alive upstream connections first
   server.close = callback => { webview.close(); for (const socket of sessions) socket.destroy(); for (const agent of Object.values(agents)) agent.destroy(); return close(callback); };
@@ -193,7 +204,7 @@ async function relayAnswer({ method, params, headers: entries, body, length = 0,
   catch (error) { return { error: { code: error?.code ?? 'EFETCH', message: String(error?.message ?? error).replace(/[\r\n]+/g, ' ').slice(0, 300) } }; }
 }
 
-// ---- The parallel channel (/<token>/mux) -------------------------------------------------------------------------------------------------------------------------------------
+// ---- The parallel channel (/mux) --------------------------------------------------------------------------------------------------------------------------------------------
 // One WebSocket from the lab carries many exchanges at once, multiplexed by id; each runs here concurrently, through Node's HTTP client (keep-alive agents), decided by relayAnswer.
 // Text messages are JSON control messages, binary messages body bytes: [kind u8][id u32 big-endian][bytes] (kind 1: request body, lab -> relay; kind 2: response body, relay -> lab).
 //   relay -> lab  {"t":"hello","v":1,"window":262144,"maxBody":33554432,"frame":65536}       the first message: this relay has the channel (an older relay refuses the upgrade)
@@ -229,7 +240,7 @@ async function decodedBody(response) {
   if (response.readableEnded) decoder.end(); else response.pipe(decoder);   // a body of one chunk has ended already
   return decoder;
 }
-/** The channel's upgrade: the same origin and token rules as the per-request path (the path names the token). `answer(exchange)` decides an exchange (relayAnswer). */
+/** The channel's upgrade: the same origin rule as the per-request path. `answer(exchange)` decides an exchange (relayAnswer). */
 function muxChannel({ req, socket, allowed, answer, sessions, onExchange = () => {} }) {
   const origin = req.headers.origin ?? '';
   const refuse = (status, text, message) => { socket.end(`HTTP/1.1 ${status} ${text}\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n${message}`); };
@@ -315,10 +326,10 @@ function muxChannel({ req, socket, allowed, answer, sessions, onExchange = () =>
   say({ t: 'hello', v: MUX_VERSION, window: MUX_WINDOW, maxBody: MAX_BODY, frame: MUX_FRAME });
 }
 
-// ---- TCP tunnel (/<token>/tcp): a TCP stream for a socket of the lab whose conversation is not HTTP/1.1 (HTTP/2 with prior knowledge, as gRPC clients speak; MQTT; a database
-// protocol). The page opens a WebSocket here (ws://127.0.0.1:<port>/<token>/tcp?host=&port=&tls=0|1&alpn=), the relay connects to the target from this machine and copies the bytes
+// ---- TCP tunnel (/tcp): a TCP stream for a socket of the lab whose conversation is not HTTP/1.1 (HTTP/2 with prior knowledge, as gRPC clients speak; MQTT; a database
+// protocol). The page opens a WebSocket here (ws://127.0.0.1:<port>/tcp?host=&port=&tls=0|1&alpn=), the relay connects to the target from this machine and copies the bytes
 // both ways. First message (text JSON): {"connected":true,"alpn":...} or {"error":{"code","message"}}; then binary messages are the TCP bytes. tls=1: the relay does the TLS (the lab
-// hands the app's plaintext, as its fetch path does) with the ALPN list asked for, and reports the protocol the server chose. Same origin, token and private-address rules as above.
+// hands the app's plaintext, as its fetch path does) with the ALPN list asked for, and reports the protocol the server chose. Same origin rule as above.
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 function wsFrame(opcode, payload) {
   const n = payload.length, head = n < 126 ? 2 : n < 65536 ? 4 : 10, out = Buffer.alloc(head + n);
@@ -366,10 +377,10 @@ function parseIdentity(body) {
   const leaf = new X509Certificate(certs[0]); if (!leaf.checkPrivateKey(key)) throw new Error('the private key does not match the first certificate of the chain');
   return { key: pem('PRIVATE KEY', keyDer), cert: certs.map(der => pem('CERTIFICATE', der)).join(''), id: identityId(certs[0]) };
 }
-async function tunnel({ req, socket, token, allowed, timeoutMs, identities, ca = null }) {
+async function tunnel({ req, socket, route, allowed, timeoutMs, identities, ca = null }) {
   const url = new URL(req.url, 'http://relay.invalid'), origin = req.headers.origin ?? '';
   const refuse = (status, text, message) => { socket.end(`HTTP/1.1 ${status} ${text}\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n${message}`); };
-  if (url.pathname !== `/${token}/tcp`) return refuse(404, 'Not Found', 'unknown path');
+  if (route !== 'tcp') return refuse(404, 'Not Found', 'unknown path');
   if (!allowed.has(origin)) return refuse(403, 'Forbidden', `origin not allowed: ${origin || '(none)'}`);
   const key = req.headers['sec-websocket-key']; if (!key || String(req.headers.upgrade ?? '').toLowerCase() !== 'websocket') return refuse(400, 'Bad Request', 'a WebSocket upgrade is expected');
   const host = url.searchParams.get('host') ?? '', port = Number(url.searchParams.get('port')), secure = url.searchParams.get('tls') === '1', alpn = (url.searchParams.get('alpn') ?? '').split(',').map(p => p.trim()).filter(Boolean);
@@ -425,7 +436,7 @@ export function caFromFiles(files, { warn = message => console.warn(message), no
   return () => files.map(load).filter(Boolean);
 }
 
-// ---- settings kept between starts (the token and the port: the Proxy address), in the folder the APK Lab Relay desktop app uses -------------------------------------------
+// ---- settings kept between starts (the port of the Proxy address), in the folder the APK Lab Relay desktop app uses -------------------------------------------
 export function configDir(env = process.env, platform = process.platform, home = os.homedir()) {
   if (env.APKWEB_RELAY_CONFIG_DIR) return env.APKWEB_RELAY_CONFIG_DIR;
   if (platform === 'win32') return path.join(env.APPDATA || path.join(home, 'AppData', 'Roaming'), 'apk-lab-relay');
@@ -444,11 +455,12 @@ export function saveSettings(dir, settings) {
     writeFileSync(temporary, JSON.stringify({ ...loadSettings(dir), ...settings }, null, 2) + '\n', { mode: 0o600 }); renameSync(temporary, file); return true;
   } catch { return false; }
 }
-/** The token and port of this start: --token / --port, else the saved ones, else a new random token and 8787. `newToken` (--new-token) replaces the saved token. */
-export function resolveSettings(saved, { token = null, port = null, newToken = false } = {}) {
-  const kept = typeof saved.token === 'string' && TOKEN_PATTERN.test(saved.token) ? saved.token : null;
-  return { token: token ?? (newToken || !kept ? randomBytes(12).toString('hex') : kept), port: port ?? (Number.isInteger(saved.port) && saved.port >= 1 && saved.port <= 65535 ? saved.port : 8787), fresh: !token && (newToken || !kept) };
+/** The port of this start: --port, else the saved one, else 8787 (the port the lab looks for a relay on). A token saved by an older version is not read. */
+export function resolveSettings(saved, { port = null } = {}) {
+  return { port: port ?? (Number.isInteger(saved?.port) && saved.port >= 1 && saved.port <= 65535 ? saved.port : DEFAULT_PORT) };
 }
+/** The address for the lab's Proxy field of a relay on `port`; on DEFAULT_PORT the field stays empty (the lab finds the relay by itself). */
+export const proxyAddress = port => `http://127.0.0.1:${port}/?url={url}`;
 
 /** One upstream exchange over node:http(s), following redirects the way fetch does (at most 20; 303, and 301/302 after a POST, continue as GET without a body). */
 function send(url, method, headers, body, timeoutMs, hops = 0, identities = null, ca = null, transport = {}) {
@@ -477,37 +489,38 @@ function send(url, method, headers, body, timeoutMs, hops = 0, identities = null
 }
 
 function parseArguments(argv) {
-  const options = { port: null, origins: [], token: null, newToken: false, configDir: null, ca: [] };
+  const options = { port: null, origins: [], configDir: null, ca: [], ignored: [] };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '--port') options.port = Number(argv[++i]);
     else if (arg === '--origin') options.origins.push(argv[++i]);
-    else if (arg === '--token') options.token = argv[++i];
-    else if (arg === '--new-token' || arg === '--rotate-token') options.newToken = true;
+    else if (arg === '--token') { i++; options.ignored.push(arg); }   // older versions: the relay has no token any more
+    else if (arg === '--new-token' || arg === '--rotate-token') options.ignored.push(arg);
     else if (arg === '--config-dir') options.configDir = argv[++i];
     else if (arg === '--ca') options.ca.push(path.resolve(argv[++i]));   // a PEM file of CA certificates to trust besides the system ones (a server with an internal CA); read again when it changes
     else if (arg === '--allow-private') continue;   // older versions refused private destinations; every destination is reachable now
-    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--token <token>] [--new-token] [--config-dir <dir>] [--ca <ca.pem>]...\n  The token and the port are saved, so the Proxy address stays the same; --new-token makes a new one.'); process.exit(0); }
+    else if (arg === '--help' || arg === '-h') { console.log('node scripts/cors-relay.mjs [--port 8787] [--origin <lab origin>]... [--config-dir <dir>] [--ca <ca.pem>]...\n  On port 8787 the lab finds the relay by itself (leave Controls > Device > Proxy empty); on another port, put the address it prints there. --port is saved.'); process.exit(0); }
     else throw new Error(`unknown argument ${arg}`);
   }
   if (options.port !== null && (!Number.isInteger(options.port) || options.port < 1 || options.port > 65535)) throw new Error('--port must be 1-65535');
-  if (options.token !== null && !TOKEN_PATTERN.test(options.token ?? '')) throw new Error('--token: 8 to 128 letters, digits, _ or -');
   for (const file of options.ca) readFileSync(file);   // a missing file at start-up is an error (later, a file being rewritten keeps its last good copy)
   return options;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const options = parseArguments(process.argv.slice(2));
-  const dir = options.configDir ?? configDir(), settings = resolveSettings(loadSettings(dir), options), saved = saveSettings(dir, { token: settings.token, port: settings.port });
-  const { token, port } = settings, origins = options.origins.length ? options.origins : DEFAULT_ORIGINS;
-  const server = createRelay({ token, origins, ca: options.ca.length ? caFromFiles(options.ca) : null });
+  const dir = options.configDir ?? configDir(), { port } = resolveSettings(loadSettings(dir), options), saved = options.port === null || saveSettings(dir, { port });
+  const origins = options.origins.length ? options.origins : DEFAULT_ORIGINS;
+  const server = createRelay({ origins, ca: options.ca.length ? caFromFiles(options.ca) : null });
   server.on('error', error => { console.error(error.code === 'EADDRINUSE' ? `Port ${port} is already in use (another relay?); start with --port <another>` : `Could not start: ${error.message}`); process.exit(1); });
   server.listen(port, '127.0.0.1', () => {
     console.log(`APK Web Lab CORS relay on http://127.0.0.1:${port} (only this machine can reach it)`);
     console.log(`Allowed page origins: ${origins.join(', ')}`);
     console.log('Destinations: any (the internet, this machine and the local network)');
-    console.log(`Proxy field (Controls > Device): http://127.0.0.1:${port}/${token}/?url={url}`);
-    console.log(!saved ? `(the settings could not be saved in ${dir}: the address changes at the next start)` : settings.fresh ? 'A new address: paste it in the Proxy field once; it is saved and stays the same at the next starts (--new-token makes another).' : 'The same address as before (saved; --new-token makes another).');
+    if (port === DEFAULT_PORT) console.log(`Proxy field (Controls > Device): leave it empty, the lab finds this relay by itself ("Relay found at 127.0.0.1:${port} (automatic)"); as a custom proxy: ${proxyAddress(port)}`);
+    else console.log(`Proxy field (Controls > Device): ${proxyAddress(port)}   (the lab looks for a relay on port ${DEFAULT_PORT} only)`);
+    if (!saved) console.log(`(the port could not be saved in ${dir}: give --port again at the next start)`);
+    if (options.ignored.length) console.log(`${[...new Set(options.ignored)].join(', ')}: ignored, the relay needs no token any more`);
   });
   const stop = () => { server.close(); process.exit(0); };
   process.on('SIGINT', stop); process.on('SIGTERM', stop);

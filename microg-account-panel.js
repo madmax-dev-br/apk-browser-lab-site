@@ -11,5 +11,5 @@ export function googleAccountText({ running = false, loadedMicrog = false, check
   if (pending) return 'microG\'s sign-in screen is open on the device: type your Google email and password into Google\'s page there.';
   if (outcome?.ok) return `Google account added to microG: ${outcome.accountName}. It is kept with microG's data on this device (Clear microG data removes it).`;
   if (outcome && !outcome.ok) return outcome.error === 'canceled' ? 'Sign-in canceled in microG\'s screen.' : `The account was not added: ${outcome.error ?? 'microG did not answer with an account'}.`;
-  return relay ? 'Opens microG\'s sign-in screen on the device.' : 'Set the APK Lab Relay as the Proxy (Device > Network) first: Google\'s sign-in page loads on the device only through it.';
+  return relay ? 'Opens microG\'s sign-in screen on the device.' : 'Start the APK Lab Relay on this computer first (the lab finds it by itself; Device > Proxy shows it): Google\'s sign-in page loads on the device only through it.';
 }

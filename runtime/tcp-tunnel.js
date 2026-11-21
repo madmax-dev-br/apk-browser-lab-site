@@ -2,18 +2,24 @@
 // APK Lab Relay that runs on the user's computer (docs/NETWORK.md "TCP tunnel"). A browser cannot open TCP; the relay can: the page opens a WebSocket to the relay's tunnel endpoint
 // and the relay connects to the target and copies the bytes both ways. Without a relay configured such a socket fails as before, explicitly.
 //
-// Protocol (the relay's /<token>/tcp endpoint): ws://127.0.0.1:<port>/<token>/tcp?host=<name>&port=<n>&tls=<0|1>&alpn=<list>. The relay's first message is text JSON:
+// Protocol (the relay's /tcp endpoint): ws://127.0.0.1:<port>/tcp?host=<name>&port=<n>&tls=<0|1>&alpn=<list>. The relay's first message is text JSON:
 // {"connected":true,"alpn":"h2"} or {"error":{"code":"ECONNREFUSED","message":"..."}} (then it closes). After it every message is binary: the TCP bytes, in order. A close of
 // either side ends the stream (EOF). tls=1 asks the relay to do the TLS (the lab's SSLSocket hands the app's plaintext, as it does for fetch) and report the ALPN protocol the server
 // chose. VM-free; no process.*.
 
-/** The relay's tunnel endpoint for a device network: an explicit policy.tunnelUrl, or derived from an APK Lab Relay proxy URL (http(s)://host:port/<token>/?url={url}). Null when none. */
+/**
+ * The relay's tunnel endpoint for a device network: an explicit policy.tunnelUrl, or derived from an APK Lab Relay proxy URL. Null when none. An APK Lab Relay address is
+ * http://127.0.0.1:<port>/?url={url} (loopback, at the root: the relay has no token since 2026-11-20; what the page finds by itself, src/relay-detect.js) or, from an older relay,
+ * http(s)://host:port/<token>/?url={url}. Any other proxy (a relay of the user's own at the root of another host) has no tunnel.
+ */
 export function tunnelEndpoint(policy) {
   if (policy?.tunnelUrl) return String(policy.tunnelUrl);
   const proxy = String(policy?.proxyUrl ?? ''); if (!proxy.includes('{url}')) return null;
   let parsed; try { parsed = new URL(proxy.replace('{url}', 'x')); } catch { return null; }
+  const scheme = parsed.protocol === 'https:' ? 'wss:' : 'ws:';
+  if (parsed.pathname === '/' && ['127.0.0.1', 'localhost', '[::1]'].includes(parsed.hostname)) return `${scheme}//${parsed.host}/tcp`;
   const match = /^\/([A-Za-z0-9_-]{8,128})\/?$/.exec(parsed.pathname); if (!match) return null;
-  return `${parsed.protocol === 'https:' ? 'wss:' : 'ws:'}//${parsed.host}/${match[1]}/tcp`;
+  return `${scheme}//${parsed.host}/${match[1]}/tcp`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
 
 // Green-thread scheduler for the VM.
 //
@@ -83,6 +83,19 @@ export class Scheduler {
     if (ref !== undefined && ref !== null) { const waiters = this.rt.heap.get(ref.ref ?? ref)?.waiters; if (waiters) for (const waiter of waiters) waiter.notified = true; }
   }
 
+  /**
+   * A run that host code started on `thread` (APKRuntime.execute: interpreter.js runNested, vmcore/js/host-bridge.js runNested) ended while the thread waited inside it: a lab
+   * error (a network wait in a frame that cannot suspend, a budget, a watchdog) left the run in the middle of a Java wait, and the run's frames are gone. The thread was not
+   * waiting when the run began, so that wait is over with them; left in place it outlived its frames: the thread stayed parked between events (main-Looper messages were held
+   * back as for a waiting main thread, every later run of it was treated as a run on top of a wait and, on the WebAssembly core, could no longer suspend). Recorded, never silent.
+   */
+  dropAbandonedWait(thread, failure) {
+    if (thread.blocked === null && !thread.coreWait) return false;
+    const reason = thread.blocked?.reason ?? 'a wait of the core', why = ` (${failure?.details?.kind ?? failure?.name ?? 'error'})`;
+    this.rt.record(`SCHEDULER ${thread.name}: its wait (${reason}) ended with the run it was in, which stopped${why}; the thread no longer waits`);
+    thread.blocked = null; thread.state = 'runnable'; thread.timedOut = false; thread.blockKind = 'site'; if (thread.coreWait) thread.coreWait = null;
+    return true;
+  }
   /** Marks blocked threads whose condition holds (or whose deadline passed) runnable again; returns the earliest pending deadline. */
   wake() {
     const now = this.clock.now(); let earliest = Infinity;

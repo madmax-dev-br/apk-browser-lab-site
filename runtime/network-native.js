@@ -1,19 +1,19 @@
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
-import { throwNew } from './java-throw.js?v=ebd42d0a624c';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=ebd42d0a624c';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=ebd42d0a624c';
-import { Blocked } from './scheduler.js?v=ebd42d0a624c';
-import { captureBody } from './network-capture.js?v=ebd42d0a624c';
-import { OS_CONSTANTS } from './os-constants-data.js?v=ebd42d0a624c';
-import { openExchange, describeFailure } from './network-transport.js?v=ebd42d0a624c';
-import { WorkerExecutor } from './network-worker-executor.js?v=ebd42d0a624c';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=ebd42d0a624c';
-import { TransportAuthority } from './transport-ca.js?v=ebd42d0a624c';
-import { openWebSocketSession } from './websocket-bridge.js?v=ebd42d0a624c';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=ebd42d0a624c';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=ebd42d0a624c';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=ebd42d0a624c';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { throwNew } from './java-throw.js?v=a64e78a38c60';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=a64e78a38c60';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=a64e78a38c60';
+import { Blocked } from './scheduler.js?v=a64e78a38c60';
+import { captureBody } from './network-capture.js?v=a64e78a38c60';
+import { OS_CONSTANTS } from './os-constants-data.js?v=a64e78a38c60';
+import { openExchange, describeFailure } from './network-transport.js?v=a64e78a38c60';
+import { WorkerExecutor } from './network-worker-executor.js?v=a64e78a38c60';
+import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=a64e78a38c60';
+import { TransportAuthority } from './transport-ca.js?v=a64e78a38c60';
+import { openWebSocketSession } from './websocket-bridge.js?v=a64e78a38c60';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=a64e78a38c60';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=a64e78a38c60';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=a64e78a38c60';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=a64e78a38c60';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -34,7 +34,7 @@ import { ExchangeTrace, NetTrace } from './net-trace.js?v=ebd42d0a624c';
 const NET = 'Ldev/apkweb/net/NetBridge;', LINUX = 'Llibcore/io/Linux;', STRING = 'Ljava/lang/String;', INET = 'Ljava/net/InetAddress;', GAI = 'Landroid/system/GaiException;', ERRNO = 'Landroid/system/ErrnoException;';
 const C = OS_CONSTANTS, BOUNDARY = 'network-boundary';
 const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024;
-const NOT_A_RELAY = 'the Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/<token>/?url={url}), so it has no channel to open';
+const NOT_A_RELAY = 'the Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/?url={url}), so it has no channel to open';
 
 /** True for "a.b.c.d" and for IPv6 literals. */
 /** The host of the proxy a request goes through (Dispositivo › Proxy: a relay URL with {url}, or a prefix), for the network log; null without one. */
@@ -195,7 +195,7 @@ export class NetworkBridge {
   /** The trace says once per relay that the setting is on (and how exchanges go without the channel). */
   noteChannelSetting(endpoint) {
     const key = endpoint ?? '(none)'; if (this.channelNoted === key) return; this.channelNoted = key;
-    this.runtime?.record?.(endpoint ? `NET relay channel: on (Device > Parallel relay channel); the exchanges through the relay at ${endpointHost(endpoint)} share one WebSocket (/<token>/mux); while it is not open they go as separate requests`
+    this.runtime?.record?.(endpoint ? `NET relay channel: on (Device > Parallel relay channel); the exchanges through the relay at ${endpointHost(endpoint)} share one WebSocket (/mux); while it is not open they go as separate requests`
       : `NET relay channel: on, but NOT used: ${NOT_A_RELAY}; every exchange goes as a separate request`);
   }
   /** A state change of a channel (this realm's or the network worker's): open, unavailable (an older relay, none running), dropped. Said in the trace once per change. */

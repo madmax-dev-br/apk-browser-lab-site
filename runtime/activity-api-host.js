@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=ebd42d0a624c';
-import { APKError } from './apk-error.js?v=ebd42d0a624c';
-import { gcRoot } from './heap-gc.js?v=ebd42d0a624c';
+import { createHostRegistry } from './host-contract.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { gcRoot } from './heap-gc.js?v=a64e78a38c60';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -30,6 +30,17 @@ export function forcedOrientationOf(request, current) {
   if (PORTRAIT_REQUESTS.has(request)) return 'portrait';
   if (request === LOCKED) return current;
   return null;
+}
+
+/** The manifest names of the SCREEN_ORIENTATION_* requests that fix the orientation (the user rotating the device changes nothing while one is on top). */
+export const ORIENTATION_LOCK_NAMES = new Map([[0, 'landscape'], [1, 'portrait'], [5, 'nosensor'], [6, 'sensorLandscape'], [7, 'sensorPortrait'], [8, 'reverseLandscape'], [9, 'reversePortrait'], [11, 'userLandscape'], [12, 'userPortrait'], [14, 'locked']]);
+/**
+ * The lock a request puts on the page's Orientation control, or null when the device's rotation decides (unspecified, user, behind, sensor, fullSensor, fullUser, an unknown
+ * value). `current` is the orientation the display shows: LOCKED freezes it and NOSENSOR ignores the sensor, so both keep it. Returns { request, name, orientation }.
+ */
+export function orientationLockOf(request, current) {
+  const name = ORIENTATION_LOCK_NAMES.get(request); if (!name) return null;
+  return { request, name, orientation: forcedOrientationOf(request, current) ?? current };
 }
 
 export function createActivityApiHost(platform) {

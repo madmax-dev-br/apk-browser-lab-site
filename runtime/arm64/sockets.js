@@ -6,10 +6,10 @@
 // name nobody bound refuses the connection, as on a device). UDP has no path (the relay
 // tunnels TCP only): a UDP socket opens, every send fails with ENETUNREACH (recorded) and nothing arrives, as on a network that blocks UDP; QUIC stacks then fall back to TCP. A blocking call waits as a native thread wait (src/arm64/threads.js);
 // on the thread that runs Java the network cannot be waited for synchronously, so that call fails by name.
-import { APKError } from '../apk-error.js?v=ebd42d0a624c';
-import { BLOCKED } from './cpu.js?v=ebd42d0a624c';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=ebd42d0a624c';
-import { utf8 } from './text.js?v=ebd42d0a624c';
+import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { BLOCKED } from './cpu.js?v=a64e78a38c60';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=a64e78a38c60';
+import { utf8 } from './text.js?v=a64e78a38c60';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
@@ -34,21 +34,21 @@ export function addSockets(lib, { runtime } = {}) {
   };
   // ---- addresses
   const resolve = name => { if (/^\d+\.\d+\.\d+\.\d+$/.test(name)) return name; if (!names.has(name)) { const i = names.size + 1, ip = `198.18.${(i >> 8) & 255}.${i & 255}`; names.set(name, ip); byAddress.set(ip, name); runtime?.record?.(`NET native getaddrinfo ${name} -> ${ip} (placeholder; the relay resolves the name at connect)`); } return names.get(name); };
-  const writeSockaddr = (p, ptr, ip, port) => { p.memory.fill(ptr, 0, 16); p.memory.dv.setUint16(ptr, 2, true); p.memory.dv.setUint16(ptr + 2, port, false); ip.split('.').forEach((b, i) => { p.memory.u8[ptr + 4 + i] = Number(b); }); };
-  const readSockaddr = (p, ptr) => { const family = p.memory.dv.getUint16(ptr, true); if (family !== 2) unsupported(family === 10 ? 'an IPv6 address in connect()' : `address family ${family}`); return { ip: [...p.memory.bytes(ptr + 4, 4)].join('.'), port: p.memory.dv.getUint16(ptr + 2, false) }; };
+  const writeSockaddr = (p, ptr, ip, port) => { p.memory.fill(ptr, 0, 16); p.memory.setUint16(ptr, 2); p.memory.setUint16(ptr + 2, port, false); ip.split('.').forEach((b, i) => { p.memory.setByte(ptr + 4 + i, Number(b)); }); };
+  const readSockaddr = (p, ptr) => { const family = p.memory.uint16(ptr); if (family !== 2) unsupported(family === 10 ? 'an IPv6 address in connect()' : `address family ${family}`); return { ip: [...p.memory.bytes(ptr + 4, 4)].join('.'), port: p.memory.uint16(ptr + 2, false) }; };
   lib.getaddrinfo = (p, c) => {
     const node = n(c, 0) ? utf8.decode(p.memory.cString(n(c, 0))) : '127.0.0.1', service = n(c, 1) ? utf8.decode(p.memory.cString(n(c, 1))) : '0', hints = n(c, 2);
-    const socktype = hints ? p.memory.dv.getInt32(hints + 8, true) : 0, family = hints ? p.memory.dv.getInt32(hints + 4, true) : 0;
+    const socktype = hints ? p.memory.int32(hints + 8) : 0, family = hints ? p.memory.int32(hints + 4) : 0;
     if (family === 10) return 8;   // EAI_ADDRFAMILY: only IPv4 here
     const ip = resolve(node), port = Number(service) || { http: 80, https: 443 }[service] || 0, info = p.malloc(48), addr = p.malloc(16);
     writeSockaddr(p, addr, ip, port);
-    p.memory.fill(info, 0, 48); p.memory.dv.setInt32(info + 4, 2, true); p.memory.dv.setInt32(info + 8, socktype || 1, true); p.memory.dv.setInt32(info + 12, 6, true); p.memory.writeU32(info + 16, 16); p.memory.writePtr(info + 32, addr);   // bionic struct addrinfo: flags, family, socktype, protocol, addrlen @16, canonname @24, addr @32, next @40
+    p.memory.fill(info, 0, 48); p.memory.setInt32(info + 4, 2); p.memory.setInt32(info + 8, socktype || 1); p.memory.setInt32(info + 12, 6); p.memory.writeU32(info + 16, 16); p.memory.writePtr(info + 32, addr);   // bionic struct addrinfo: flags, family, socktype, protocol, addrlen @16, canonname @24, addr @32, next @40
     p.memory.writePtr(n(c, 3), info); return 0;
   };
   lib.freeaddrinfo = (p, c) => { let info = n(c, 0); while (info) { const next = p.memory.readPtr(info + 40); p.free(p.memory.readPtr(info + 32)); p.free(info); info = next; } };
   lib.gai_strerror = (p, c) => p.allocString(`getaddrinfo error ${s32(c, 0)}`);
-  lib.inet_pton = (p, c) => { if (s32(c, 0) !== 2) return 0; const parts = utf8.decode(p.memory.cString(n(c, 1))).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.u8[n(c, 2) + i] = b; }); return 1; };
-  lib.inet_ntop = (p, c) => { if (s32(c, 0) !== 2) return 0; const text = [...p.memory.bytes(n(c, 1), 4)].join('.'), bytes = new TextEncoder().encode(text); p.memory.copyIn(n(c, 2), bytes); p.memory.u8[n(c, 2) + bytes.length] = 0; return n(c, 2); };
+  lib.inet_pton = (p, c) => { if (s32(c, 0) !== 2) return 0; const parts = utf8.decode(p.memory.cString(n(c, 1))).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.setByte(n(c, 2) + i, b); }); return 1; };
+  lib.inet_ntop = (p, c) => { if (s32(c, 0) !== 2) return 0; const text = [...p.memory.bytes(n(c, 1), 4)].join('.'), bytes = new TextEncoder().encode(text); p.memory.copyIn(n(c, 2), bytes); p.memory.setByte(n(c, 2) + bytes.length, 0); return n(c, 2); };
   lib.inet_addr = (p, c) => { const parts = utf8.decode(p.memory.cString(n(c, 0))).split('.').map(Number); return parts.length === 4 ? (parts[0] | parts[1] << 8 | parts[2] << 16 | parts[3] << 24) >>> 0 : 0xffffffff; };
   lib.htons = lib.ntohs = (p, c) => ((n(c, 0) & 0xff) << 8) | ((n(c, 0) >> 8) & 0xff);
   lib.htonl = lib.ntohl = (p, c) => { const v = n(c, 0) >>> 0; return (((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v >>> 8) & 0xff00) | (v >>> 24)) >>> 0; };
@@ -63,7 +63,7 @@ export function addSockets(lib, { runtime } = {}) {
   lib.connect = (p, c) => {
     const o = objects.get(s32(c, 0)); if (!o) return fail(p, EBADF);
     if (o.kind === 'unix') return unixConnect(p, c, o);
-    if (o.kind === 'udp') { const family = p.memory.dv.getUint16(n(c, 1), true); if (family === 2) { const { ip, port } = readSockaddr(p, n(c, 1)); o.peer = `${byAddress.get(ip) ?? ip}:${port}`; } return 0; }   // UDP connect only sets the peer
+    if (o.kind === 'udp') { const family = p.memory.uint16(n(c, 1)); if (family === 2) { const { ip, port } = readSockaddr(p, n(c, 1)); o.peer = `${byAddress.get(ip) ?? ip}:${port}`; } return 0; }   // UDP connect only sets the peer
     if (!o.session) {
       const { ip, port } = readSockaddr(p, n(c, 1)), host = byAddress.get(ip) ?? ip, endpoint = tunnelEndpoint(runtime?.platform?.networkPolicy ?? runtime?.network?.policy);
       Object.assign(o, { host, port });
@@ -103,7 +103,7 @@ export function addSockets(lib, { runtime } = {}) {
   lib.shutdown = (p, c) => { const o = objects.get(s32(c, 0)); if (o?.kind === 'unix') { const how = s32(c, 1); if (how !== 0 && o.tx) o.tx.closed = true; if (how !== 1 && o.rx) o.rx.closed = true; T(p).schedulePump(); return 0; } o?.session?.close(); return 0; };
   // ---- Unix-domain stream sockets: each connected end reads one in-process byte queue and writes the other's
   const unixNames = new Map(), decoder = utf8;   // bound name ('@' + abstract name, or a path) -> socket
-  const unixName = (p, ptr, length) => { const family = p.memory.dv.getUint16(ptr, true); if (family !== 1) return null; const raw = p.memory.bytes(ptr + 2, Math.max(0, length - 2)); if (raw[0] === 0) return '@' + decoder.decode(raw.subarray(1)); const end = raw.indexOf(0); return decoder.decode(end >= 0 ? raw.subarray(0, end) : raw); };
+  const unixName = (p, ptr, length) => { const family = p.memory.uint16(ptr); if (family !== 1) return null; const raw = p.memory.bytes(ptr + 2, Math.max(0, length - 2)); if (raw[0] === 0) return '@' + decoder.decode(raw.subarray(1)); const end = raw.indexOf(0); return decoder.decode(end >= 0 ? raw.subarray(0, end) : raw); };
   const queue = () => ({ bytes: new Uint8Array(0), closed: false });
   const connectEnds = (a, b) => { const ab = queue(), ba = queue(); Object.assign(a, { tx: ab, rx: ba }); Object.assign(b, { tx: ba, rx: ab }); };
   const unixConnect = (p, c, o) => {
@@ -166,9 +166,9 @@ export function addSockets(lib, { runtime } = {}) {
   const objectOrFile = fd => objects.get(fd) ?? (fd >= 0 && fd < 1000 ? { kind: 'file' } : null);
   lib.poll = lib.__poll_chk = lib.ppoll = (p, c) => {
     const fds = n(c, 0), count = n(c, 1), timeout = s32(c, 2), deadline = timeout < 0 ? Infinity : T(p).now() + timeout;
-    const ready = () => { let k = 0; for (let i = 0; i < count; i++) { const at = fds + 8 * i, o = objectOrFile(p.memory.dv.getInt32(at, true)); const wanted = p.memory.dv.getInt16(at + 4, true) | POLLERR | POLLHUP, got = o ? events(o) & wanted : 32; p.memory.dv.setInt16(at + 6, got, true); if (got) k++; } return k; };
+    const ready = () => { let k = 0; for (let i = 0; i < count; i++) { const at = fds + 8 * i, o = objectOrFile(p.memory.int32(at)); const wanted = p.memory.int16(at + 4) | POLLERR | POLLHUP, got = o ? events(o) & wanted : 32; p.memory.setInt16(at + 6, got); if (got) k++; } return k; };
     if (ready() || timeout === 0) return ready();
-    const r = waitFor(p, c, () => ready() > 0, 'poll()', deadline, [...Array(count).keys()].some(i => objects.get(p.memory.dv.getInt32(fds + 8 * i, true))?.kind === 'tcp'), () => timerWake([...Array(count).keys()].map(i => p.memory.dv.getInt32(fds + 8 * i, true)))); if (r === BLOCKED) return BLOCKED; return ready();
+    const r = waitFor(p, c, () => ready() > 0, 'poll()', deadline, [...Array(count).keys()].some(i => objects.get(p.memory.int32(fds + 8 * i))?.kind === 'tcp'), () => timerWake([...Array(count).keys()].map(i => p.memory.int32(fds + 8 * i)))); if (r === BLOCKED) return BLOCKED; return ready();
   };
   lib.select = lib.pselect = (p, c) => {
     const nfds = s32(c, 0), sets = [n(c, 1), n(c, 2), n(c, 3)], tv = n(c, 4), deadline = tv ? T(p).now() + Number(p.memory.read64(tv)) * 1000 + Number(p.memory.read64(tv + 8)) / 1000 : Infinity;
