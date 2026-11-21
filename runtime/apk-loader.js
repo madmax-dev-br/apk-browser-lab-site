@@ -1,23 +1,24 @@
-import { createArm64Native } from './arm64/glue.js?v=af8ff7411a95';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=af8ff7411a95';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=af8ff7411a95';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=af8ff7411a95';
-import { inspectELF } from './native-inspector.js?v=af8ff7411a95';
-import { elfBuildId } from './elf-build-id.js?v=af8ff7411a95';
-import { crc32 } from './zip-entry.js?v=af8ff7411a95';
-import { resolveDevice } from './device-profile.js?v=af8ff7411a95';
-import { resourceProfileFor } from './device-configuration.js?v=af8ff7411a95';
-import { JniBridge } from './jni-host.js?v=af8ff7411a95';
-import { providerForApk } from './native-provider-variants.js?v=af8ff7411a95';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=af8ff7411a95';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=af8ff7411a95';
-import { AndroidResources } from './android-resources.js?v=af8ff7411a95';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=af8ff7411a95';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=af8ff7411a95';
-import { FrameworkProvider } from './framework-provider.js?v=af8ff7411a95';
-import { APKArchive } from './apk-archive.js?v=af8ff7411a95';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=af8ff7411a95';
-import { identityTraceLine } from './device-identity.js?v=af8ff7411a95';
+import { usesProcesses } from './system-programs.js?v=e3ff4f2e305f';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=e3ff4f2e305f';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=e3ff4f2e305f';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=e3ff4f2e305f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=e3ff4f2e305f';
+import { inspectELF } from './native-inspector.js?v=e3ff4f2e305f';
+import { elfBuildId } from './elf-build-id.js?v=e3ff4f2e305f';
+import { crc32 } from './zip-entry.js?v=e3ff4f2e305f';
+import { resolveDevice } from './device-profile.js?v=e3ff4f2e305f';
+import { resourceProfileFor } from './device-configuration.js?v=e3ff4f2e305f';
+import { JniBridge } from './jni-host.js?v=e3ff4f2e305f';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=e3ff4f2e305f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=e3ff4f2e305f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=e3ff4f2e305f';
+import { AndroidResources } from './android-resources.js?v=e3ff4f2e305f';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=e3ff4f2e305f';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=e3ff4f2e305f';
+import { FrameworkProvider } from './framework-provider.js?v=e3ff4f2e305f';
+import { APKArchive } from './apk-archive.js?v=e3ff4f2e305f';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=e3ff4f2e305f';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=e3ff4f2e305f';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -321,7 +322,8 @@ export async function prepareResources(archive, names, options, report, yieldCon
     }
     const trees = layoutOnly ? layouts : xmlTrees, errors = layoutOnly ? layoutErrors : xmlErrors;
     if (deferred.has(path) && (!layoutOnly || layoutSet.has(path))) parseDeferred(path);
-    if (!trees.has(path)) throw new APKError(`${layoutOnly ? 'Layout' : 'XML'} ${path} is not prepared: ${errors.get(path) ?? 'not found in APK compiled XML resources'}`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0, path });
+    // absentFile: the value names no compiled XML file of the APK at all (on Android AssetManager.openXmlBlockAsset fails: Resources.NotFoundException("File .. from xml type .. resource ID #0x.."))
+    if (!trees.has(path)) throw new APKError(`${layoutOnly ? 'Layout' : 'XML'} ${path} is not prepared: ${errors.get(path) ?? 'not found in APK compiled XML resources'}`, { kind: 'resource-unsupported', resourceId: Number(id) >>> 0, path, ...(errors.has(path) || archive.entries.has(path) ? {} : { absentFile: true }) });
     const tree = trees.get(path); nameFrameworkAttributes(tree, id => frameworkTable?.entries?.get(id >>> 0)?.[0]?.name ?? null);
     return tree;
   };
@@ -706,7 +708,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // (microG's authenticator and its login and consent screens)
   const ACCOUNT_TYPES=new Set(['Landroid/accounts/AbstractAccountAuthenticator;','Landroid/accounts/AccountAuthenticatorResponse;','Landroid/accounts/AccountAuthenticatorActivity;','Landroid/accounts/IAccountAuthenticator;','Landroid/accounts/IAccountAuthenticatorResponse;']);
   const appAuthenticator=files.some(file=>file.dex.types.some(type=>ACCOUNT_TYPES.has(type)));
-  const usesAccounts=appAuthenticator||(options.companionPackages?.length??0)>0||!!options.microg;
+  // the system's account chooser (ChooseTypeAndAccountActivity, in the same profile; a ListView of the layouts profile): an APK that calls AccountManager.newChooseAccountIntent
+  const appChoosesAccount=files.some(file=>file.dex.methodsNamed(['newChooseAccountIntent']).some(method=>method.owner==='Landroid/accounts/AccountManager;'));
+  const usesAccounts=appAuthenticator||appChoosesAccount||(options.companionPackages?.length??0)>0||!!options.microg;
   // the original color math (framework-aosp/profiles/color): ColorStateList applies android:lStar with it. A color state list of the APK that gives the attribute (its id in the
   // compiled XML's resource map; a file that cannot be read counts as giving it, which only loads more), or a companion package (its resources are not scanned at load)
   const LSTAR_ID=[0x47,0x06,0x01,0x01];   // android:lStar 0x01010647
@@ -715,7 +719,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   });
   const baseFrameworkFiles = framework ? [...framework.files] : []; let verifiedBaseFrameworkHash = null;
   const profiles=[
-    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
+    {name:'layouts',explicit:options.enableLayoutProfile,automatic:appChoosesAccount||appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables||usesMenuWidgets||usesProfileWidgets||usesProgressBars||usesProfileAttributes,reason:appChoosesAccount?'APK-calls-AccountManager.newChooseAccountIntent-(the-system-account-chooser-list)':appCompatActivity?'manifest-Activity-inherits-AppCompatActivity':usesWindowSurfaces?'APK-references-Dialog-or-WindowManager':usesSurfaceViews?'APK-uses-SurfaceView-or-TextureView':usesGravityDrawables?'APK-uses-Gravity-dependent-drawables':usesMenuWidgets?'APK-uses-Toolbar-or-menu-widgets':usesProfileWidgets?'APK-uses-a-layout-widget-of-the-layouts-profile':usesProgressBars?'APK-uses-a-progress-bar-layout-transition-or-view-overlay':'APK-layouts-or-styles-use-an-attribute-of-the-layouts-profile'},
     {name:'configuration',explicit:options.enableConfigurationProfile,automatic:usesConfiguration,reason:appUsesConfiguration?'APK-references-android.content.res.Configuration':'companion-package-installed'},
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
     {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
@@ -725,7 +729,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'invoke',explicit:options.enableInvokeProfile,automatic:usesInvoke,reason:'APK-references-java.lang.invoke'},
     {name:'net',explicit:options.enableNetProfile,automatic:usesNet,reason:'APK-references-android.net.UrlQuerySanitizer-MailTo-or-Credentials'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
-    {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
+    {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':appChoosesAccount?'APK-calls-AccountManager.newChooseAccountIntent':'companion-package-installed'},
     {name:'color',explicit:options.enableColorProfile,automatic:usesColorMath,reason:(options.companionPackages?.length??0)>0||!!options.microg?'companion-package-installed':'APK-color-state-list-gives-android:lStar'},
     {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
@@ -815,6 +819,12 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const provider=options.zlibProvider;zlibBackend=typeof provider==='function'?await provider():await provider.load();
     if(!zlibBackend?.module)fail('Invalid zlib provider');
   }
+  // The system programs of /system/bin (toybox, mksh, toolbox: src/system-programs.js), loaded when the app's code can start a process (Runtime.exec / ProcessBuilder).
+  let systemPrograms=options.systemPrograms??null;
+  if(!systemPrograms&&options.systemProgramsProvider&&usesProcesses([...program.types])){
+    const provider=options.systemProgramsProvider;systemPrograms=typeof provider==='function'?await provider():await provider.load();
+    if(!systemPrograms?.modules)fail('Invalid system programs provider');
+  }
   // ICU4C converters (Wasm) behind the original java.nio.charset coders (CharsetDecoderICU/EncoderICU); needed by anything that encodes/decodes through a Charset object.
   let icuConverterBackend=options.icuConverterBackend??null;
   if(!icuConverterBackend&&options.icuConverterProvider&&backendTypes.some(type=>type.startsWith('Ljava/nio/charset/')||type.startsWith('Ljava/util/zip/')||/^Ljava\/io\/(InputStreamReader|OutputStreamWriter|PrintStream|PrintWriter|FileReader|FileWriter|LineNumberReader|StreamTokenizer);/.test(type))){
@@ -852,9 +862,15 @@ export async function loadAPK(arrayBuffer, options = {}) {
     nativeLibraries: nativeLibraryDetails, resources: resources.environment, nativeBindings: framework?.nativeBindings, skia,
     platform: new AndroidPlatform({ device: options.device, resources: resources.environment,
       applicationName: manifest.applicationName, packageName: manifest.packageName, manifest, apkBytes: arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer) }) });
+  runtime.systemPrograms = systemPrograms;   // src/process-kernel.js runs them; without them (an app that cannot start a process) /system/bin still lists them
   runtime.launcherComponent = manifest.launcherComponent ?? null;   // the component the LAUNCHER filter is on: an <activity-alias> when the launcher entry is one (the launched instance's ActivityRecord component)
   // Canvas raster cache (src/skia-canvas-host.js): on by default; `rasterCache: false` switches it off for A/B comparison, `rasterCacheVerify: true` re-rasters every hit and fails on a difference.
   runtime.rasterCacheDisabled = options.rasterCache === false; runtime.rasterCacheVerify = options.rasterCacheVerify === true;
+  if (options.customIdentity) {   // "Custom device identity" (src/device-identity.js; CLAUDE.md, owner decision of 2026-11-21): only names the user typed, checked by the same rules as the page
+    const checked = checkCustomIdentity({ ...options.customIdentity, on: true });
+    if (!checked.value) throw new APKError(`Custom device identity refused: ${[...Object.entries(checked.errors).map(([key, error]) => `${key}: ${error}`), ...checked.problems].join('; ') || 'no field typed'}`, { kind: 'device-identity' });
+    runtime.customIdentity = customIdentityFor(checked.value, name => deviceProperty(runtime, name));   // read by every property lookup (deviceProperty): Build, SystemProperties, native code
+  }
   runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed
   if (loadImage) { runtime.loadImage = loadImage.status; if (companions.length) loadImage.status.companions = companions.map(c => c.packageName); }   // the summary's "Load image:" line (src/load-image.js loadImageText); the companion packages are APKs of their own, not in the image
   for (const companion of companions) {
@@ -896,7 +912,20 @@ export async function loadAPK(arrayBuffer, options = {}) {
   runtime.nativeVersionMismatch = options.nativeVersionMismatch === true;   // opt-in: serve the lab's React Native libraries to an app of another release (jni-host.js #requireVersions), reported
   if (options.arm64Native) runtime.arm64 = createArm64Native(runtime, { translate: options.arm64Translate !== false });   // arm64Translate: the translation tier for hot code (src/arm64/translate.js), on unless false   // the app's arm64-v8a libraries run in the ARM64 interpreter (docs/ARM64-NATIVE.md); off unless asked
   runtime.record(identityTraceLine(runtime));   // the device identity, fixed for every app (src/device-identity.js); its ABIs follow the ARM64 option just set
-  if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256, formatVersion(runtime.reactNativeVersion)), runtime.platform);
+  if (nativeLibraryProvider) {
+    let provider = providerForApk(nativeLibraryProvider, runtime.apkSha256, formatVersion(runtime.reactNativeVersion));
+    // React Native: with the ARM64 option on, an app that ships its own arm64-v8a React Native runs those libraries (all of them: React Native, its JS engine, fbjni, JSI, its
+    // app libraries) in the ARM64 process, as a device does; the lab's wasm32 build serves the others (src/native-provider-variants.js withoutReactNativeForArm64)
+    const arm64Sonames = names.filter(name => name.startsWith(ARM64_LIB_DIR) && name.endsWith('.so')).map(name => name.slice(ARM64_LIB_DIR.length));
+    if (runtime.arm64 && shipsArm64ReactNative(arm64Sonames)) {
+      const chosen = withoutReactNativeForArm64(provider, arm64Sonames); provider = chosen.provider; runtime.reactNativeNatives = 'arm64';
+      runtime.record(`React Native: the app's own arm64 libraries (lib/arm64-v8a, run in the ARM64 process; the lab's wasm32 build is not used for this app${chosen.left.length ? `: ${chosen.left.join(' ')} come from the app` : ''})`);
+    } else if (provider.get('libreactnative.so') && (runtime.reactNativeVersion || shipsArm64ReactNative(arm64Sonames))) {
+      runtime.reactNativeNatives = 'wasm32';
+      runtime.record(`React Native: the lab's wasm32 build ${provider.get('libreactnative.so').requires?.reactNative ?? '(release not recorded)'}${runtime.arm64 ? '' : ' (ARM64 native code off)'}`);
+    }
+    runtime.jni = new JniBridge(runtime, provider, runtime.platform);
+  }
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));
   const compose = program.types.some(t => t.startsWith('Landroidx/compose/') || t.startsWith('Lorg/jetbrains/compose/'));

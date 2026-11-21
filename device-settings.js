@@ -1,13 +1,14 @@
-import { coreMemorySetting } from './core-memory.js?v=af8ff7411a95';
-import { isMemoryStep } from './memory-budget.js?v=af8ff7411a95';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=af8ff7411a95';
-import { sanitizeHostMap } from './host-map.js?v=af8ff7411a95';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=af8ff7411a95';
-import { sanitizeLocation } from './runtime-permissions.js?v=af8ff7411a95';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=af8ff7411a95';
-import { sanitizeMicrogServices } from './microg-services.js?v=af8ff7411a95';
-import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=af8ff7411a95';
-import { tunnelEndpoint } from './tcp-tunnel.js?v=af8ff7411a95';
+import { coreMemorySetting } from './core-memory.js?v=e3ff4f2e305f';
+import { isMemoryStep } from './memory-budget.js?v=e3ff4f2e305f';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=e3ff4f2e305f';
+import { sanitizeHostMap } from './host-map.js?v=e3ff4f2e305f';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=e3ff4f2e305f';
+import { sanitizeLocation } from './runtime-permissions.js?v=e3ff4f2e305f';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=e3ff4f2e305f';
+import { sanitizeMicrogServices } from './microg-services.js?v=e3ff4f2e305f';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=e3ff4f2e305f';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=e3ff4f2e305f';
+import { checkCustomIdentity } from './device-identity.js?v=e3ff4f2e305f';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -53,6 +54,14 @@ export function relayChannelState(on, proxyRaw, detection = null) {
   if (!tunnelEndpoint({ proxyUrl: kept })) return { state: 'warn', text: 'Parallel relay channel on, but the custom Proxy is not an APK Lab Relay address (http://127.0.0.1:<port>/?url={url}): exchanges go as separate requests.' };
   return { state: 'on', text: 'Parallel relay channel on: the app\'s exchanges share one WebSocket to the relay, all at once. A relay without it (older than 0.4.0) gets separate requests, as before; Network shows CHANNEL or NO CHANNEL on each entry.' };
 }
+/** The "Custom device identity" block as stored: { on, manufacturer, brand, model, device, name, board, hardware }, the text as typed (trimmed, bounded) so a value with an
+ * error stays on screen with its reason; off and empty by default. Whether a load applies it is checkCustomIdentity(...).value (only a valid, typed identity). */
+export function sanitizeCustomIdentity(input) {
+  const { on, fields } = checkCustomIdentity(input && typeof input === 'object' ? input : null);
+  return { on, ...fields };
+}
+/** What the next load applies of `settings.customIdentity`: the typed names when the option is on and they are valid, else null (the lab's identity). */
+export const customIdentityForLoad = settings => checkCustomIdentity(settings?.customIdentity).value;
 // The engine a load uses when nothing names one: the WebAssembly core. `?engine=js` (the page) and `engine: 'js'` (the player) select the JavaScript VM;
 // scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
 export const DEFAULT_ENGINE = 'wasm';
@@ -80,7 +89,8 @@ export function sanitizeSettings(input = {}) {
   out.glesCpu = input.glesCpu === true;   // "OpenGL ES on the CPU" (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md): off by default (WebGL2 when the Worker has it, the CPU otherwise); read by the next load, recorded in the trace, never part of the device model the app sees
   out.loadImage = input.loadImage === true;   // "Load image" (src/load-image.js): off by default (docs/PERFORMANCE-STRATEGY.md, step 1: it did not pay on the large examples); read by the next load, never part of the device model the app sees
   out.microg = input.microg === true;   // "Com microG" (src/microg-device.js, docs/MICROG.md): off by default; read by the next load (the Worker installs the microG packages), never applied live
-  out.microgServices = sanitizeMicrogServices(input.microgServices);   // "microG services" (src/microg-services.js): each online service of microG off by default; read by the next load and sent live to a VM that runs microG (vm.setMicrogServices), never part of the device model
+  out.customIdentity = sanitizeCustomIdentity(input.customIdentity);   // "Custom device identity" (src/device-identity.js checkCustomIdentity): off by default, only what the user typed; read by the next load, never applied live
+  out.microgServices = sanitizeMicrogServices(input.microgServices);  // "microG services" (src/microg-services.js): each online service of microG off by default; read by the next load and sent live to a VM that runs microG (vm.setMicrogServices), never part of the device model
   if (typeof input.locale === 'string' && /^[a-z]{2}-[A-Z]{2}$/.test(input.locale)) out.locale = input.locale;
   if (typeof input.timeZone === 'string' && input.timeZone.length < 64) { try { if (input.timeZone) new Intl.DateTimeFormat('en-US', { timeZone: input.timeZone }); out.timeZone = input.timeZone; } catch { /* unknown zone: keep default */ } }
   if (input.battery && typeof input.battery === 'object') { out.battery.level = Math.min(100, Math.max(0, Math.round(Number(input.battery.level) || 0))); out.battery.charging = !!input.battery.charging; }
@@ -122,4 +132,4 @@ export { resolveDevice, checkCustomScreen };
 /** The part of the settings the running app's Configuration/device model reads (src/device-profile.js resolveDevice): a change of anything else (motion/still
  * resolution, renderer, time per event: side calls; memory, core memory, engine: next load) needs no exclusive 'device' VM operation. */
 export function vmDeviceModel(settings) { const { raster, eventSeconds, memoryMiB, coreMemory, engine, ...device } = deviceForVM(settings); return device; }
-export function deviceForVM(settings) { const { location, renderer, microg, microgServices, arm64Native, arm64Translate, glesCpu, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model
+export function deviceForVM(settings) { const { location, renderer, microg, microgServices, customIdentity, arm64Native, arm64Translate, glesCpu, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model

@@ -1,19 +1,19 @@
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { throwNew } from './java-throw.js?v=af8ff7411a95';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=af8ff7411a95';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=af8ff7411a95';
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
-import { captureBody } from './network-capture.js?v=af8ff7411a95';
-import { OS_CONSTANTS } from './os-constants-data.js?v=af8ff7411a95';
-import { openExchange, describeFailure } from './network-transport.js?v=af8ff7411a95';
-import { WorkerExecutor } from './network-worker-executor.js?v=af8ff7411a95';
-import { parseNetworkSecurityConfig, cleartextPermittedFor } from './network-security-config.js?v=af8ff7411a95';
-import { TransportAuthority } from './transport-ca.js?v=af8ff7411a95';
-import { openWebSocketSession } from './websocket-bridge.js?v=af8ff7411a95';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=af8ff7411a95';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=af8ff7411a95';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=af8ff7411a95';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { throwNew } from './java-throw.js?v=e3ff4f2e305f';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=e3ff4f2e305f';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=e3ff4f2e305f';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
+import { captureBody } from './network-capture.js?v=e3ff4f2e305f';
+import { OS_CONSTANTS } from './os-constants-data.js?v=e3ff4f2e305f';
+import { openExchange, describeFailure } from './network-transport.js?v=e3ff4f2e305f';
+import { WorkerExecutor } from './network-worker-executor.js?v=e3ff4f2e305f';
+import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=e3ff4f2e305f';
+import { TransportAuthority } from './transport-ca.js?v=e3ff4f2e305f';
+import { openWebSocketSession } from './websocket-bridge.js?v=e3ff4f2e305f';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=e3ff4f2e305f';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=e3ff4f2e305f';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=e3ff4f2e305f';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=e3ff4f2e305f';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -557,4 +557,11 @@ export function cleartextPermitted(runtime, host = null) {
   const byAttribute = declared !== undefined && declared !== null ? !(declared === false || declared === 'false' || Number(declared) === 0) : target < 28;
   const config = networkSecurityConfigOf(runtime, byAttribute);
   return config ? (host === null ? config.base : cleartextPermittedFor(config, host)) : byAttribute;
+}
+/** The trust part of the network security policy for `host` (null: the base config): { anchors, pins, domain, hasDomainConfigs } (src/network-security-config.js trustConfigFor). */
+export function trustPolicy(runtime, host = null) {
+  const manifest = runtime.platform.manifest ?? {}, target = Number(manifest.usesSdk?.targetSdkVersion ?? manifest.usesSdk?.minSdkVersion ?? 1), app = manifest.application ?? {};
+  const debuggable = app.debuggable === true || app.debuggable === 'true' || (Number.isInteger(app.debuggable) && app.debuggable !== 0);
+  const declared = app.usesCleartextTraffic, config = networkSecurityConfigOf(runtime, declared !== undefined && declared !== null ? !(declared === false || declared === 'false' || Number(declared) === 0) : target < 28);   // the same default as cleartextPermitted (one cached parse)
+  return { ...trustConfigFor(config, host, { targetSdk: target, debuggable }), hasDomainConfigs: !!config?.domains.length };
 }

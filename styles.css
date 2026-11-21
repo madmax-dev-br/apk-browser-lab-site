@@ -674,3 +674,4 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 
 .android-input::placeholder{color:var(--android-hint-color,#757575);opacity:1}
 .android-progress.android-progress-vm::-webkit-progress-bar,.android-progress.android-progress-vm::-webkit-progress-value{background:transparent}.android-progress.android-progress-vm::-moz-progress-bar{background:transparent}
+.lab-confirm{font:13px/1.5 system-ui,sans-serif}.lab-confirm-text{margin:0 0 14px;white-space:pre-line}.lab-confirm-actions{display:flex;justify-content:flex-end;gap:8px}

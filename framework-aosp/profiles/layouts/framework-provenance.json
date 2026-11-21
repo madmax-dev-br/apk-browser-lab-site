@@ -4,8 +4,8 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "7fafb58f8ef0812bc73a78afbd26f22bd36dc7b0d09dc936e0d6c581e581f955",
-  "bytes": 964520,
+  "sha256": "7a7ed67f8743c276ce2c349e3d9ec42106bae939e2442d9252112dc641c69295",
+  "bytes": 966868,
   "classes": [
     "Landroid/R$styleable;",
     "Landroid/animation/LayoutTransition$1;",
@@ -211,6 +211,7 @@
     "Landroid/view/ViewOverlay;",
     "Landroid/view/ViewGroupOverlay;",
     "Landroid/view/ViewOverlay$OverlayViewGroup;",
+    "Landroid/view/animation/ExtendAnimation;",
     "Landroid/view/inputmethod/InputConnection;",
     "Landroid/view/inputmethod/BaseInputConnection;",
     "Landroid/view/inputmethod/CompletionInfo$1;",
@@ -692,7 +693,7 @@
     "Ldev/apkweb/view/PendingIntentClickListener;",
     "Ldev/apkweb/view/XmlAnimations;"
   ],
-  "classCount": 684,
+  "classCount": 685,
   "algorithmPatches": [],
   "compiledSources": [
     {
@@ -2226,6 +2227,16 @@
       "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/ViewGroupOverlay.java?format=TEXT",
       "sha256": "a6977f207f7cab2707ca16391cd968f1ebe8eb0c68527121a67bceafc7cf5b0e",
       "bytes": 3561,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/view/animation/ExtendAnimation.java",
+      "localPath": "framework-aosp/upstream/android/view/animation/ExtendAnimation.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/ExtendAnimation.java?format=TEXT",
+      "sha256": "634aa76da0b785a513e2384e278279d6a0883e6af5cb881bbfc570dee4f41c56",
+      "bytes": 6693,
       "license": "Apache-2.0"
     }
   ],

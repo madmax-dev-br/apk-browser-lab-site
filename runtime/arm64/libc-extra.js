@@ -1,13 +1,15 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { formatC, variadic, vaList } from './libc.js?v=af8ff7411a95';
-import { addSockets } from './sockets.js?v=af8ff7411a95';
-import { addMoreLibc } from './libc-more.js?v=af8ff7411a95';
-import { addSyscalls } from './syscalls.js?v=af8ff7411a95';
-import { addSignals } from './signals.js?v=af8ff7411a95';
-import { utf8 } from './text.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { formatC, variadic, vaList } from './libc.js?v=e3ff4f2e305f';
+import { addSockets } from './sockets.js?v=e3ff4f2e305f';
+import { addMoreLibc } from './libc-more.js?v=e3ff4f2e305f';
+import { addSyscalls } from './syscalls.js?v=e3ff4f2e305f';
+import { addSignals } from './signals.js?v=e3ff4f2e305f';
+import { addTimers } from './timers.js?v=e3ff4f2e305f';
+import { utf8 } from './text.js?v=e3ff4f2e305f';
+import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=e3ff4f2e305f';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
 const decoder = utf8, encoder = new TextEncoder();
@@ -101,36 +103,43 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   lib.bsearch = (p, c) => { const key = n(c, 0), base = n(c, 1), size = n(c, 3), compare = n(c, 4); let lo = 0, hi = n(c, 2) - 1; while (lo <= hi) { const mid = (lo + hi) >> 1, r = Number(BigInt.asIntN(32, p.call(compare, [key, base + mid * size]))); if (r === 0) return base + mid * size; if (r < 0) hi = mid - 1; else lo = mid + 1; } return 0; };
   let seed = 1; lib.srand = (p, c) => { seed = n(c, 0) >>> 0; }; lib.rand = () => { seed = (Math.imul(seed, 1103515245) + 12345) >>> 0; return (seed >>> 1) & 0x7fffffff; };
   lib.random = lib.rand; lib.srandom = lib.srand; lib.lrand48 = lib.rand; lib.srand48 = lib.srand;
-  // ---- sscanf (the conversions libraries parse with: integers, floats, strings, characters, scansets, %n)
-  const scan = (p, input, format, out) => {
+  // ---- sscanf (the conversions libraries parse with: integers, floats, strings, characters, scansets, %n); scanFrom also says how much of the input the conversions read (fscanf)
+  const scan = (p, input, format, out) => scanFrom(p, input, format, out).count;
+  const scanFrom = (p, input, format, out) => { const state = { used: 0 }; const count = scanText(p, input, format, out, state); return { count, used: encoder.encode(input.slice(0, state.used)).length }; };
+  lib['lab:scan'] = scanFrom;   // not a C name: native code cannot import it (src/arm64/libc.js fscanf)
+  const scanText = (p, input, format, out, state) => {
     let i = 0, count = 0; const s = input;
     for (let f = 0; f < format.length; f++) {
       const ch = format[f];
       if (/\s/.test(ch)) { while (/\s/.test(s[i] ?? '')) i++; continue; }
-      if (ch !== '%') { if (s[i] !== ch) return count; i++; continue; }
-      const m = /^(\*)?(\d+)?(hh|h|ll|l|z|j|L)?([diouxXfFeEgGsc%n]|\[[^\]]*\])/.exec(format.slice(f + 1)); if (!m) return count;
+      if (ch !== '%') { if (s[i] !== ch) return (state.used = i, count); i++; continue; }
+      const m = /^(\*)?(\d+)?(hh|h|ll|l|z|j|L)?([diouxXfFeEgGsc%n]|\[[^\]]*\])/.exec(format.slice(f + 1)); if (!m) return (state.used = i, count);
       f += m[0].length; const [, skip, widthRaw, length, conv] = m, width = widthRaw ? Number(widthRaw) : Infinity;
-      if (conv === '%') { if (s[i] !== '%') return count; i++; continue; }
+      if (conv === '%') { if (s[i] !== '%') return (state.used = i, count); i++; continue; }
       if (conv === 'n') { if (!skip) p.memory.writeU32(Number(out.int()), new TextEncoder().encode(s.slice(0, i)).length); continue; }
       if (conv !== 'c' && !conv.startsWith('[')) while (/\s/.test(s[i] ?? '')) i++;
-      if (i >= s.length) return count || -1;
+      if (i >= s.length) return (state.used = i, count) || -1;
       let token;
       if (conv === 'c') { token = s.slice(i, i + (widthRaw ? width : 1)); i += token.length; if (!skip) p.memory.copyIn(Number(out.int()), encoder.encode(token)); count += skip ? 0 : 1; continue; }
       if (conv === 's' || conv.startsWith('[')) {
         const set = conv.startsWith('[') ? conv.slice(1, -1) : null, negate = set?.startsWith('^'), members = set ? (negate ? set.slice(1) : set) : '';
         const ok = c2 => set ? (negate ? !members.includes(c2) : members.includes(c2)) : !/\s/.test(c2);
-        let j = i; while (j < s.length && j - i < width && ok(s[j])) j++; token = s.slice(i, j); if (!token.length) return count; i = j;
+        let j = i; while (j < s.length && j - i < width && ok(s[j])) j++; token = s.slice(i, j); if (!token.length) return (state.used = i, count); i = j;
         if (!skip) { const ptr = Number(out.int()); p.memory.copyIn(ptr, encoder.encode(token)); p.memory.setByte(ptr + encoder.encode(token).length, 0); count++; } continue;
       }
       const re = /[diouxX]/.test(conv) ? (conv === 'x' || conv === 'X' ? /^[+-]?(0[xX])?[0-9a-fA-F]+/ : conv === 'o' ? /^[+-]?[0-7]+/ : conv === 'i' ? /^[+-]?(0[xX][0-9a-fA-F]+|0[0-7]*|[1-9]\d*)/ : /^[+-]?\d+/) : /^[+-]?(?:inf(?:inity)?|nan|(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/i;
-      const mm = re.exec(s.slice(i, i + (width === Infinity ? s.length : width))); if (!mm) return count; i += mm[0].length;
+      const mm = re.exec(s.slice(i, i + (width === Infinity ? s.length : width))); if (!mm) return (state.used = i, count); i += mm[0].length;
       if (skip) continue;
       const ptr = Number(out.int());
       if (/[diouxX]/.test(conv)) { const t = mm[0], radix = conv === 'x' || conv === 'X' ? 16 : conv === 'o' ? 8 : conv === 'i' ? (/^[+-]?0[xX]/.test(t) ? 16 : /^[+-]?0\d/.test(t) ? 8 : 10) : 10; const v = BigInt(parseInt(t, radix)); const bytes = length === 'll' || length === 'l' || length === 'z' || length === 'j' ? 8 : length === 'h' ? 2 : length === 'hh' ? 1 : 4; p.memory.write(ptr, BigInt.asUintN(bytes * 8, v), bytes); }
-      else { const v = parseFloat(mm[0].replace(/inf(inity)?/i, 'Infinity')); if (length === 'l' || length === 'L') p.memory.setFloat64(ptr, v); else p.memory.setFloat32(ptr, v); }
+      else {   // float, double (l) or long double (L, binary128), each rounded once from the token's exact value (src/arm64/strtod.js)
+        const parsed = parseCFloat(mm[0]);
+        if (length === 'L') { const { bits } = roundBinary(parsed, BINARY128); p.memory.write64(ptr, bits & 0xffffffffffffffffn); p.memory.write64(ptr + 8, bits >> 64n); }
+        else if (length === 'l') p.memory.setFloat64(ptr, bitsToNumber(roundBinary(parsed, BINARY64).bits, BINARY64)); else p.memory.setFloat32(ptr, bitsToNumber(roundBinary(parsed, BINARY32).bits, BINARY32));
+      }
       count++;
     }
-    return count;
+    state.used = i; return count;
   };
   lib.sscanf = (p, c) => BigInt.asUintN(64, BigInt(scan(p, str(p, x(c, 0)), str(p, x(c, 1)), variadic(c, 2))));
   lib.vsscanf = (p, c) => BigInt.asUintN(64, BigInt(scan(p, str(p, x(c, 0)), str(p, x(c, 1)), vaList(p.memory, n(c, 2)))));
@@ -277,5 +286,5 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
     p.free(lock.ptr); locks.delete(b); return 0;
   };
   void clock;
-  return addSyscalls(addSignals(addMoreLibc(addSockets(lib, { runtime }), { runtime }), { runtime }));
+  return addSyscalls(addTimers(addSignals(addMoreLibc(addSockets(lib, { runtime }), { runtime }), { runtime }), { runtime }));
 }

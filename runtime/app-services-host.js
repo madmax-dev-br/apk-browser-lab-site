@@ -1,11 +1,12 @@
-import { resolveIntentFields } from './intent-resolver.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { registerPackageValueFields } from './package-value-fields.js?v=af8ff7411a95';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=af8ff7411a95';
-import { nativeHeap } from './vm-debug-host.js?v=af8ff7411a95';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=af8ff7411a95';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=af8ff7411a95';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=af8ff7411a95';
+import { resolveIntentFields } from './intent-resolver.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { registerPackageValueFields } from './package-value-fields.js?v=e3ff4f2e305f';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=e3ff4f2e305f';
+import { nativeHeap } from './vm-debug-host.js?v=e3ff4f2e305f';
+import { debugHeapStats, processMappings, deviceMemory, MEMORY_INFO_FIELDS, NUM_CORE_HEAP, NUM_HEAP, HEAP } from './process-memory.js?v=e3ff4f2e305f';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=e3ff4f2e305f';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e3ff4f2e305f';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=e3ff4f2e305f';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -875,9 +876,10 @@ export function createAppServicesHost(platform) {
     put('processName', STRING, other ? pkgs().processOf(other) : processName()); put('pid', 'I', other ? other.pid : platform.virtualProcess.pid); put('uid', 'I', other ? other.uid : platform.virtualProcess.uid); put('importance', 'I', 100); put('importanceReasonCode', 'I', 0); put('pkgList', '[Ljava/lang/String;', packages);
     r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, info], 'virtual'); return list;
   });
+  // the device's memory (src/process-memory.js): its RAM, and what this app's process does not hold of it, as /proc/meminfo and sysinfo report them
   def(ACTIVITY_MANAGER, 'getMemoryInfo', `(${MEM_INFO})V`, (r, _m, [, info]) => {
-    const total = 4n * 1024n * 1024n * 1024n, put = (name, ftype, value) => r.storeField(r.object(info).fields, `${MEM_INFO}->${name}:${ftype}`, value);
-    put('totalMem', 'J', total); put('availMem', 'J', total / 2n); put('threshold', 'J', 200n * 1024n * 1024n); put('lowMemory', 'Z', 0);
+    const memory = deviceMemory(r), put = (name, ftype, value) => r.storeField(r.object(info).fields, `${MEM_INFO}->${name}:${ftype}`, value);
+    put('totalMem', 'J', BigInt(memory.total)); put('availMem', 'J', BigInt(memory.available)); put('threshold', 'J', BigInt(memory.threshold)); put('lowMemory', 'Z', memory.low ? 1 : 0);
   });
   // ---- running services, tasks, app tasks, process memory (Android 13): a normal app sees only its own process, services and tasks (since API 26 / 21) -------------------------------------
   const RUNNING_SERVICE = 'Landroid/app/ActivityManager$RunningServiceInfo;', RUNNING_TASK = 'Landroid/app/ActivityManager$RunningTaskInfo;', RECENT_TASK = 'Landroid/app/ActivityManager$RecentTaskInfo;', APP_TASK = 'Landroid/app/ActivityManager$AppTask;';
@@ -893,7 +895,11 @@ export function createAppServicesHost(platform) {
   for (const [name, ftype] of taskFields) if (taskOwner[name]) registry.instanceField(TASK_INFO, name, ftype, { reflect: true });
   for (const t of [RUNNING_TASK, RECENT_TASK]) { registry.instanceField(t, 'description', 'Ljava/lang/CharSequence;', { reflect: true }); registry.instanceField(t, 'id', 'I', { reflect: true }); }
   registry.instanceField(RUNNING_TASK, 'numRunning', 'I', { reflect: true }); registry.instanceField(RECENT_TASK, 'persistentId', 'I', { reflect: true }); registry.instanceField(RECENT_TASK, 'affiliatedTaskId', 'I', { reflect: true });
-  for (const [name, ftype] of [['dalvikPss', 'I'], ['dalvikPrivateDirty', 'I'], ['dalvikSharedDirty', 'I'], ['nativePss', 'I'], ['nativePrivateDirty', 'I'], ['nativeSharedDirty', 'I'], ['otherPss', 'I'], ['otherPrivateDirty', 'I'], ['otherSharedDirty', 'I']]) registry.instanceField(MEMORY_INFO, name, ftype, { reflect: true });
+  // Debug.MemoryInfo's fields (frameworks/base core/java/android/os/Debug.java, android-13.0.0_r1): nine figures for each of dalvik, native and other, hasSwappedOutPss, and
+  // otherStats, the nine figures of each "other" heap (NUM_OTHER_STATS + NUM_DVK_STATS = 32 of them)
+  const MEMORY_PREFIXES = ['dalvik', 'native', 'other'], memName = (prefix, field) => prefix + field[0].toUpperCase() + field.slice(1);
+  for (const prefix of MEMORY_PREFIXES) for (const field of MEMORY_INFO_FIELDS) registry.instanceField(MEMORY_INFO, memName(prefix, field), 'I', { reflect: true });
+  registry.instanceField(MEMORY_INFO, 'hasSwappedOutPss', 'Z', { reflect: true }); registry.instanceField(MEMORY_INFO, 'otherStats', '[I', { reflect: true });
   const putField = (r, ref, owner, name, ftype, value) => r.storeField(r.object(ref).fields, r.resolveField({ owner, name, type: ftype, key: `${owner}->${name}:${ftype}` }).key, value);   // stored under the declaring class
   const addTo = (r, list, item) => r.dispatch({ owner: 'Ljava/util/ArrayList;', name: 'add', parameters: [OBJECT], result: 'Z', signature: `(${OBJECT})Z` }, [list, item], 'virtual');
   const componentFor = (r, className) => { const c = r.allocate(COMPONENT_NAME_T); call(r, COMPONENT_NAME_T, '<init>', [STRING, STRING], 'V', [c, appPkg(), className], 'direct'); return c; };
@@ -934,16 +940,18 @@ export function createAppServicesHost(platform) {
   def(APP_TASK, 'finishAndRemoveTask', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.finishFrames(r, framesOf(task).reverse()); });
   def(APP_TASK, 'moveToFront', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.moveTaskToFront(r, task); });
   def(APP_TASK, 'setExcludeFromRecents', '(Z)V', (r, _m, [self, exclude]) => { const task = appTask(r, self); if (task) task.excludeFromRecents = !!exclude; });
-  // Debug.MemoryInfo of this process (ActivityManager.getProcessMemoryInfo, Debug.getMemoryInfo, Debug.getPss), in kB: the Java heap and the native heap (src/vm-debug-host.js nativeHeap)
-  // as the VM keeps them; other pids are not visible and read zero. The WebAssembly core counts its heap in bytes (the bytes in records); the JavaScript VM counts records, and its
-  // Java heap figure is the records at 64 bytes each, the figure this lab has always reported for it.
-  const javaHeapKb = r => Math.floor((r.engine === 'wasm' && r.wasm ? r.wasm.heapCounters().bytesNow : (r.heap?.size ?? 0) * 64) / 1024);
-  const nativeHeapKb = r => Math.floor(nativeHeap(r).allocated / 1024);
-  const MEMORY_FIELDS = ['dalvikPss', 'dalvikPrivateDirty', 'dalvikSharedDirty', 'nativePss', 'nativePrivateDirty', 'nativeSharedDirty', 'otherPss', 'otherPrivateDirty', 'otherSharedDirty'];
+  // Debug.MemoryInfo of this process (ActivityManager.getProcessMemoryInfo, Debug.getMemoryInfo, Debug.getPss), in kB, filled as android_os_Debug.cpp's getDirtyPagesPid fills it:
+  // load_maps sums the process's mappings per heap (src/process-memory.js: the native process's mappings and the VM's Java heap and native memory, the figures /proc/self/status,
+  // statm and smaps_rollup report). Other pids are not visible to an app and read zero (getMemoryInfo(pid) answers false).
+  const memoryMappings = r => { const procfs = platform.javaIo?.fs?.()?.procfs; if (!procfs?.memoryMappings) return processMappings(r); procfs.attachRuntime?.(r); return procfs.memoryMappings(); };
   const fillMemoryInfo = (r, info, own) => {
     const put = (name, value) => putField(r, info, MEMORY_INFO, name, 'I', value);
-    for (const name of MEMORY_FIELDS) put(name, 0);
-    if (own) { const java = javaHeapKb(r), native = nativeHeapKb(r); put('dalvikPss', java); put('dalvikPrivateDirty', java); put('nativePss', native); put('nativePrivateDirty', native); }
+    const stats = own ? debugHeapStats(memoryMappings(r)) : Array.from({ length: NUM_HEAP }, () => Object.fromEntries(MEMORY_INFO_FIELDS.map(f => [f, 0])));
+    [HEAP.DALVIK, HEAP.NATIVE, HEAP.UNKNOWN].forEach((heap, i) => { for (const field of MEMORY_INFO_FIELDS) put(memName(['dalvik', 'native', 'other'][i], field), stats[heap][field]); });
+    const other = r.newArray('[I', (NUM_HEAP - NUM_CORE_HEAP) * MEMORY_INFO_FIELDS.length);
+    r.array(other).elements = stats.slice(NUM_CORE_HEAP).flatMap(s => MEMORY_INFO_FIELDS.map(f => s[f]));
+    putField(r, info, MEMORY_INFO, 'otherStats', '[I', other);
+    putField(r, info, MEMORY_INFO, 'hasSwappedOutPss', 'Z', 0);   // no zram: swapped-out figures are swap sizes, and there is no swap
   };
   def(ACTIVITY_MANAGER, 'getProcessMemoryInfo', `([I)[${MEMORY_INFO}`, (r, _m, [, pids]) => {
     if (pids === null) r.throwJava('Ljava/lang/NullPointerException;', 'pids');
@@ -954,11 +962,64 @@ export function createAppServicesHost(platform) {
   const DEBUG_T = 'Landroid/os/Debug;';
   def(DEBUG_T, 'getMemoryInfo', `(${MEMORY_INFO})V`, (r, _m, [info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); fillMemoryInfo(r, info, true); }, { static: true });
   def(DEBUG_T, 'getMemoryInfo', `(I${MEMORY_INFO})Z`, (r, _m, [pid, info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); const own = pid === platform.virtualProcess.pid; fillMemoryInfo(r, info, own); return own ? 1 : 0; }, { static: true });   // false: the pid's smaps cannot be read
-  def(DEBUG_T, 'getPss', '()J', r => BigInt(javaHeapKb(r) + nativeHeapKb(r)), { static: true });   // the process's total PSS in kB, MemoryInfo.getTotalPss of this process
+  // Debug.getPss: android_os_Debug_getPssPid sums the Pss of /proc/self/smaps_rollup (the same mappings)
+  def(DEBUG_T, 'getPss', '()J', r => BigInt(debugHeapStats(memoryMappings(r)).slice(0, NUM_CORE_HEAP).reduce((sum, s) => sum + s.pss, 0)), { static: true });
+  def(DEBUG_T, 'getPss', '(I[J[J)J', (r, _m, [pid, outUssSwapPssRss, outMemtrack]) => {
+    if (pid !== platform.virtualProcess.pid) return 0n;
+    const stats = debugHeapStats(memoryMappings(r)).slice(0, NUM_CORE_HEAP), sum = f => stats.reduce((total, s) => total + s[f], 0);
+    if (outUssSwapPssRss !== null) { const a = r.array(outUssSwapPssRss).elements, values = [sum('privateDirty') + sum('privateClean'), 0, sum('rss')]; for (let i = 0; i < Math.min(a.length, 3); i++) a[i] = BigInt(values[i]); }
+    if (outMemtrack !== null) { const a = r.array(outMemtrack).elements; for (let i = 0; i < a.length; i++) a[i] = 0n; }   // no memtrack HAL
+    return BigInt(sum('pss'));
+  }, { static: true });
+  // MemoryInfo's own methods, as Debug.java computes them from the fields
   const memField = (r, self, name) => r.object(self).fields.get(`${MEMORY_INFO}->${name}:I`) ?? 0;
-  def(MEMORY_INFO, 'getTotalPss', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPss') + memField(r, self, 'nativePss') + memField(r, self, 'otherPss'));
-  def(MEMORY_INFO, 'getTotalPrivateDirty', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPrivateDirty') + memField(r, self, 'nativePrivateDirty') + memField(r, self, 'otherPrivateDirty'));
-  def(MEMORY_INFO, 'getTotalSharedDirty', '()I', (r, _m, [self]) => memField(r, self, 'dalvikSharedDirty') + memField(r, self, 'nativeSharedDirty') + memField(r, self, 'otherSharedDirty'));
+  const total = (r, self, field) => MEMORY_PREFIXES.reduce((sum, prefix) => sum + memField(r, self, memName(prefix, field)), 0);
+  const otherStat = (r, self, which, field) => { const ref = r.object(self).fields.get(`${MEMORY_INFO}->otherStats:[I`); return ref ? (r.array(ref).elements[which * MEMORY_INFO_FIELDS.length + MEMORY_INFO_FIELDS.indexOf(field)] ?? 0) : 0; };
+  const otherPrivate = (r, self, which) => otherStat(r, self, which, 'privateClean') + otherStat(r, self, which, 'privateDirty');
+  const OTHER = Object.fromEntries(Object.entries(HEAP).filter(([, heap]) => heap >= NUM_CORE_HEAP).map(([name, heap]) => [name, heap - NUM_CORE_HEAP]));   // Debug.MemoryInfo.OTHER_*
+  const swappedOutPss = (r, self) => total(r, self, 'swappedOutPss');
+  const totalPss = (r, self) => total(r, self, 'pss') + swappedOutPss(r, self);
+  const summary = {
+    javaHeap: (r, self) => memField(r, self, 'dalvikPrivateDirty') + otherPrivate(r, self, OTHER.ART),
+    nativeHeap: (r, self) => memField(r, self, 'nativePrivateDirty'),
+    code: (r, self) => ['SO', 'JAR', 'APK', 'TTF', 'DEX', 'OAT', 'DALVIK_OTHER_ZYGOTE_CODE_CACHE', 'DALVIK_OTHER_APP_CODE_CACHE'].reduce((sum, name) => sum + otherPrivate(r, self, OTHER[name]), 0),
+    stack: (r, self) => otherStat(r, self, OTHER.STACK, 'privateDirty'),
+    graphics: (r, self) => otherPrivate(r, self, OTHER.GL_DEV) + otherPrivate(r, self, OTHER.GRAPHICS) + otherPrivate(r, self, OTHER.GL),
+  };
+  summary.privateOther = (r, self) => total(r, self, 'privateClean') + total(r, self, 'privateDirty') - summary.javaHeap(r, self) - summary.nativeHeap(r, self) - summary.code(r, self) - summary.stack(r, self) - summary.graphics(r, self);
+  summary.system = (r, self) => totalPss(r, self) - total(r, self, 'privateClean') - total(r, self, 'privateDirty');
+  const MEMORY_STATS = [['summary.java-heap', summary.javaHeap], ['summary.native-heap', summary.nativeHeap], ['summary.code', summary.code], ['summary.stack', summary.stack],
+    ['summary.graphics', summary.graphics], ['summary.private-other', summary.privateOther], ['summary.system', summary.system], ['summary.total-pss', totalPss], ['summary.total-swap', (r, self) => total(r, self, 'swappedOut')]];
+  const intGetters = {
+    getTotalPss: totalPss, getTotalUss: (r, self) => total(r, self, 'privateClean') + total(r, self, 'privateDirty'), getTotalSwappablePss: (r, self) => total(r, self, 'swappablePss'),
+    getTotalRss: (r, self) => total(r, self, 'rss'), getTotalPrivateDirty: (r, self) => total(r, self, 'privateDirty'), getTotalSharedDirty: (r, self) => total(r, self, 'sharedDirty'),
+    getTotalPrivateClean: (r, self) => total(r, self, 'privateClean'), getTotalSharedClean: (r, self) => total(r, self, 'sharedClean'), getTotalSwappedOut: (r, self) => total(r, self, 'swappedOut'),
+    getTotalSwappedOutPss: swappedOutPss, getSummaryJavaHeap: summary.javaHeap, getSummaryNativeHeap: summary.nativeHeap, getSummaryCode: summary.code, getSummaryStack: summary.stack,
+    getSummaryGraphics: summary.graphics, getSummaryPrivateOther: summary.privateOther, getSummarySystem: summary.system, getSummaryTotalPss: totalPss,
+    getSummaryTotalSwap: (r, self) => total(r, self, 'swappedOut'), getSummaryTotalSwapPss: swappedOutPss,
+    getSummaryJavaHeapRss: (r, self) => memField(r, self, 'dalvikRss') + otherStat(r, self, OTHER.ART, 'rss'), getSummaryNativeHeapRss: (r, self) => memField(r, self, 'nativeRss'),
+    getSummaryCodeRss: (r, self) => ['SO', 'JAR', 'APK', 'TTF', 'DEX', 'OAT', 'DALVIK_OTHER_ZYGOTE_CODE_CACHE', 'DALVIK_OTHER_APP_CODE_CACHE'].reduce((sum, name) => sum + otherStat(r, self, OTHER[name], 'rss'), 0),
+    getSummaryStackRss: (r, self) => otherStat(r, self, OTHER.STACK, 'rss'),
+    getSummaryGraphicsRss: (r, self) => otherStat(r, self, OTHER.GL_DEV, 'rss') + otherStat(r, self, OTHER.GRAPHICS, 'rss') + otherStat(r, self, OTHER.GL, 'rss'),
+  };
+  intGetters.getSummaryUnknownRss = (r, self) => intGetters.getTotalRss(r, self) - intGetters.getSummaryJavaHeapRss(r, self) - intGetters.getSummaryNativeHeapRss(r, self) - intGetters.getSummaryCodeRss(r, self) - intGetters.getSummaryStackRss(r, self) - intGetters.getSummaryGraphicsRss(r, self);
+  for (const [name, fn] of Object.entries(intGetters)) def(MEMORY_INFO, name, '()I', (r, _m, [self]) => fn(r, self));
+  def(MEMORY_INFO, 'hasSwappedOutPss', '()Z', (r, _m, [self]) => r.object(self).fields.get(`${MEMORY_INFO}->hasSwappedOutPss:Z`) ? 1 : 0);
+  const otherIndex = (r, which) => { if (which < 0 || which >= NUM_HEAP - NUM_CORE_HEAP) r.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;', `length=${(NUM_HEAP - NUM_CORE_HEAP) * MEMORY_INFO_FIELDS.length}; index=${which * MEMORY_INFO_FIELDS.length}`); return which; };
+  for (const field of MEMORY_INFO_FIELDS) def(MEMORY_INFO, memName('getOther', field), '(I)I', (r, _m, [self, which]) => otherStat(r, self, otherIndex(r, which), field));
+  def(MEMORY_INFO, 'getOtherPrivate', '(I)I', (r, _m, [self, which]) => otherPrivate(r, self, otherIndex(r, which)));
+  // getOtherLabel (Debug.java's switch)
+  const OTHER_LABELS = ['Dalvik Other', 'Stack', 'Cursor', 'Ashmem', 'Gfx dev', 'Other dev', '.so mmap', '.jar mmap', '.apk mmap', '.ttf mmap', '.dex mmap', '.oat mmap', '.art mmap', 'Other mmap',
+    'EGL mtrack', 'GL mtrack', 'Other mtrack', '.Heap', '.LOS', '.Zygote', '.NonMoving', '.LinearAlloc', '.GC', '.ZygoteJIT', '.AppJIT', '.CompilerMetadata', '.IndirectRef', '.Boot vdex',
+    '.App dex', '.App vdex', '.App art', '.Boot art'];
+  def(MEMORY_INFO, 'getOtherLabel', `(I)${STRING}`, (_r, _m, [which]) => OTHER_LABELS[which] ?? '????', { static: true });
+  // getMemoryStat / getMemoryStats: the summary figures by name, as decimal strings (null for an unknown name)
+  def(MEMORY_INFO, 'getMemoryStat', `(${STRING})${STRING}`, (r, _m, [self, name]) => { const stat = MEMORY_STATS.find(([key]) => key === text(r, name)); return stat ? String(stat[1](r, self)) : null; });
+  def(MEMORY_INFO, 'getMemoryStats', '()Ljava/util/Map;', (r, _m, [self]) => {
+    const map = r.allocate('Ljava/util/HashMap;'); r.dispatch({ owner: 'Ljava/util/HashMap;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [map], 'direct');
+    for (const [key, fn] of MEMORY_STATS) r.dispatch({ owner: 'Ljava/util/HashMap;', name: 'put', parameters: [OBJECT, OBJECT], result: OBJECT, signature: `(${OBJECT}${OBJECT})${OBJECT}` }, [map, key, String(fn(r, self))], 'virtual');
+    return map;
+  });
   def(ACTIVITY_MANAGER, 'isLowRamDevice', '()Z', () => 0); def(ACTIVITY_MANAGER, 'getMemoryClass', '()I', () => 256); def(ACTIVITY_MANAGER, 'getLargeMemoryClass', '()I', () => 512);
   def(ACTIVITY_MANAGER, 'isBackgroundRestricted', '()Z', () => 0);
   def(ACTIVITY_MANAGER, 'getHistoricalProcessExitReasons', `(${STRING}II)Ljava/util/List;`, r => newEmptyList(r)); // a fresh virtual process has no exit history
@@ -1172,7 +1233,9 @@ export function createAppServicesHost(platform) {
   // Resources.openRawResource: the APK file behind a res/raw (or any file-based) resource id, as ART's AssetManager serves it.
   const rawEntry = (r, id) => {
     let value = platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
-    if (value.kind === 'unresolved' || typeof value.value !== 'string' || !r.apkEntries.has(value.value)) r.throwJava('Landroid/content/res/Resources$NotFoundException;', `Resource ID #0x${(id >>> 0).toString(16)}`);
+    if (value.kind === 'unresolved' || value.kind === 'bag') platform.resourceNotFound(r, id, value, `Resource ID #0x${(id >>> 0).toString(16)}`);   // Resources.openRawResource: getValue first
+    // ResourcesImpl.openRawResource: a value that is no file of the APK fails in AssetManager.openNonAsset, rethrown as NotFoundException("File <value.string> from resource ID #0x..")
+    if (typeof value.value !== 'string' || !r.apkEntries.has(value.value)) r.throwJava('Landroid/content/res/Resources$NotFoundException;', `File ${typeof value.value === 'string' ? value.value : '(null)'} from resource ID #0x${(id >>> 0).toString(16)}`);
     return value.value;
   };
   // Resources.openRawResourceFd: the same entry as a descriptor; a compressed entry is Resources.NotFoundException, as AssetManager's FileNotFoundException is wrapped on Android

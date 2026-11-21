@@ -1,17 +1,17 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=af8ff7411a95';
-import { Arm64Process } from './process.js?v=af8ff7411a95';
-import { tierSupported } from './translate.js?v=af8ff7411a95';
-import { createLibc } from './libc.js?v=af8ff7411a95';
-import { attachArm64Jni } from './jni.js?v=af8ff7411a95';
-import { ArtView } from './art-runtime.js?v=af8ff7411a95';
-import { registerNativeHeap, ARM64_WINDOW, ARM64_WINDOW_LIMIT } from '../unsafe-native.js?v=af8ff7411a95';
-import { installDirectBuffers } from '../direct-buffers.js?v=af8ff7411a95';
-import { APP_PID } from '../virtual-pids.js?v=af8ff7411a95';
-import { deviceProperty, devicePropertyNames } from '../device-identity.js?v=af8ff7411a95';
-import { BUCKET, inBucket } from '../time-breakdown.js?v=af8ff7411a95';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=e3ff4f2e305f';
+import { Arm64Process } from './process.js?v=e3ff4f2e305f';
+import { tierSupported } from './translate.js?v=e3ff4f2e305f';
+import { createLibc } from './libc.js?v=e3ff4f2e305f';
+import { attachArm64Jni } from './jni.js?v=e3ff4f2e305f';
+import { ArtView } from './art-runtime.js?v=e3ff4f2e305f';
+import { registerNativeHeap, ARM64_WINDOW, ARM64_WINDOW_LIMIT } from '../unsafe-native.js?v=e3ff4f2e305f';
+import { installDirectBuffers } from '../direct-buffers.js?v=e3ff4f2e305f';
+import { APP_PID } from '../virtual-pids.js?v=e3ff4f2e305f';
+import { deviceProperty, devicePropertyNames } from '../device-identity.js?v=e3ff4f2e305f';
+import { BUCKET, inBucket } from '../time-breakdown.js?v=e3ff4f2e305f';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
@@ -19,6 +19,7 @@ export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
 export function createArm64Native(runtime, { translate = true } = {}) {
   let process = null, lib = null;
   const entries = runtime.apkEntries ?? new Set();
+  const javaLoaded = new Set();   // the libraries Java loaded (System.load / loadLibrary): their JNI_OnLoad ran
   const written = new Map(), writtenPaths = new Map();   // libraries System.load'ed from a file the app wrote (an unpacked or downloaded .so), by soname, and their paths
   const has = soname => entries.has(ARM64_LIB_DIR + soname) || written.has(soname);
   const isAarch64Elf = bytes => bytes.length > 64 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46 && bytes[18] === 183;
@@ -37,7 +38,8 @@ export function createArm64Native(runtime, { translate = true } = {}) {
         assets: { read: name => entries.has('assets/' + name) ? runtime.apkReader('assets/' + name) : null, list: dir => [...new Set([...entries].filter(e => e.startsWith(`assets/${dir ? dir + '/' : ''}`) && !e.slice(`assets/${dir ? dir + '/' : ''}`.length).includes('/')).map(e => e.slice(e.lastIndexOf('/') + 1)))] } }),
       log: line => runtime.record(line),
       pid: runtime.platform?.virtualProcess?.pid ?? APP_PID, translate,
-      progress: cpu => runtime.monitor?.nativeProgress?.(() => `ARM64 native code at ${cpu.where(cpu.pc)}`),   // a long native run keeps the page's heartbeat alive, naming where it is
+      progress: cpu => runtime.monitor?.nativeProgress?.(() => `ARM64 native code at ${cpu.where(cpu.pc)}`, { synchronous: (cpu.nested ?? 0) > 0 }),   // a long native run keeps the page's heartbeat alive, naming where it is
+      watched: () => runtime.monitor?.watchesSynchronousNative?.() === true,   // a wall-clock limit watches a synchronous native call: the runaway guard stands aside (src/arm64/cpu.js)
       // the native threads' deadlines and timers read the VM clock, as Java's waits do: when the scheduler skips the clock to the next deadline (every thread waits), native
       // timeouts and sleeps move with it (on performance.now() they waited in real time while Java's time ran ahead, and the pump polled them all along)
       ...(runtime.platform?.clock ? { now: () => runtime.platform.clock.now() } : {}),
@@ -86,11 +88,14 @@ export function createArm64Native(runtime, { translate = true } = {}) {
       const soname = kind === 'load' ? text.slice(text.lastIndexOf('/') + 1) : `lib${text}.so`;
       if (kind === 'load' && !entries.has(ARM64_LIB_DIR + soname) && !written.has(soname)) { const bytes = unlinked && isAarch64Elf(unlinked) ? unlinked : fileElf(text); if (bytes) { written.set(soname, bytes); writtenPaths.set(soname, text); } }   // an AArch64 ELF file at that path
       if (!has(soname)) return false;
-      const proc = ensure(), already = proc.libraries.has(soname);
+      // ART's JavaVMExt::LoadNativeLibrary: JNI_OnLoad runs the first time Java loads a library, also when the dynamic linker already loaded it as another library's DT_NEEDED
+      // (dlopen then returns that handle): fbjni's JNI_OnLoad registers its own natives when Java loads "fbjni" after libreactnative pulled it in
+      const proc = ensure(), already = javaLoaded.has(soname);
       let loaded;
       try { loaded = proc.load(soname, { via: kind === 'load' ? 'System.load' : 'System.loadLibrary' }); }
       catch (error) { if (error?.details?.kind === 'arm64-dlopen') runtime.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${error.message}`); throw error; }
       if (already) return true;
+      javaLoaded.add(soname);
       const onLoad = loaded.exports.get('JNI_OnLoad');
       runtime.record(`JNI loaded ${soname} (arm64-v8a, interpreted${onLoad ? ', JNI_OnLoad' : ''})`);
       if (onLoad) {

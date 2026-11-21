@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=af8ff7411a95';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=af8ff7411a95';
+import { APKError } from './apk-runtime.js?v=e3ff4f2e305f';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e3ff4f2e305f';
 const RESOLVER = 'Landroid/content/ContentResolver;', URI = 'Landroid/net/Uri;', GLOBAL = 'Landroid/provider/Settings$Global;', OBSERVER = 'Landroid/database/ContentObserver;';
 const fail = message => { throw new APKError(message, { kind: 'virtual-content-provider-unsupported' }); };
 const keys = new Set();
@@ -114,7 +114,9 @@ export function createContentResolverHost(platform) {
       if (owner === 'Landroid/os/Process;') { const self = platform.packages?.multi ? platform.packages.callerEntry(runtime) : platform.virtualProcess; return name === 'myPid' ? self.pid : self.uid; }
       // android.text.format.DateFormat.DISALLOW_DUPLICATE_FIELD_IN_SKELETON (170233598): @EnabledSince(targetSdkVersion = CUR_DEVELOPMENT), so it is off for every released target SDK
       if (owner === 'Landroid/app/compat/CompatChanges;' && args[0] === 170233598n) return 0;
-      if (owner === 'Landroid/app/compat/CompatChanges;') { if (args[0] !== 150939131n) fail(`Unmodeled compatibility change ${args[0]}`); runtime.record('COMPAT ContentObserver flags disabled in explicit API28 virtual profile'); return 0; }
+      // any other change: CompatChanges.isChangeEnabled(id) is Compatibility.isChangeEnabled(id), answered by the process's AppCompatCallbacks (src/compat-callbacks-host.js)
+      if (owner === 'Landroid/app/compat/CompatChanges;' && args[0] !== 150939131n) return runtime.dispatch({ owner: 'Landroid/compat/Compatibility;', name: 'isChangeEnabled', parameters: ['J'], result: 'Z', signature: '(J)Z' }, runtime.argumentWords(['J'], [args[0]], {}), 'static');
+      if (owner === 'Landroid/app/compat/CompatChanges;') { runtime.record('COMPAT ContentObserver flags disabled in explicit API28 virtual profile'); return 0; }
       if (name === 'getContentResolver') { resolver ??= runtime.makeObject(RESOLVER); runtime.record(`CONTENT VM Settings provider, animator_duration_scale=${settings.get('animator_duration_scale')}; no host services`); return resolver; }
       if (owner === URI_BUILDER) {
         const state = runtime.object(args[0]).uriBuilder ??= { scheme: null, opaque: null, authority: null, path: null, query: null, fragment: null }, self = args[0], value = args[1] ?? null;

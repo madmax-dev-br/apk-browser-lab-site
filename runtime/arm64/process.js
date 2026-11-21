@@ -3,29 +3,32 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=af8ff7411a95';
-import { Arm64Memory } from './memory.js?v=af8ff7411a95';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=af8ff7411a95';
-import { NativeThreads } from './threads.js?v=af8ff7411a95';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=af8ff7411a95';
-import { APP_PID } from '../virtual-pids.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=e3ff4f2e305f';
+import { Arm64Memory } from './memory.js?v=e3ff4f2e305f';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=e3ff4f2e305f';
+import { NativeThreads } from './threads.js?v=e3ff4f2e305f';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=e3ff4f2e305f';
+import { APP_PID } from '../virtual-pids.js?v=e3ff4f2e305f';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);
-const HOST_STUBS = 65536;   // lab functions with a code stub (1 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)
+const HOST_STUBS = 65536, STUB_BYTES = 32;   // lab functions with a code stub (2 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
 export class Arm64Process {
   // `translate`: the translation tier (src/arm64/translate.js) for hot code; false runs every instruction in the interpreter
-  // `maxSteps`: the instructions one native call from Java (or one native thread) may run before the run ends as a runaway (the instruction budget). 5e10: libraries that
-  // unpack or decompress their own code at startup run several billion per thread (one measured startup: 22e9 over four decompression threads, 5.5e9 each);
-  // the wall-clock limits of the operation monitor still end a run that takes too long.
-  constructor({ readLibrary, host = {}, maxSteps = 5e10, log = () => {}, pid = APP_PID, queueTask = null, progress = undefined, translate = true, now = undefined } = {}) {
+  // `maxSteps`: the runaway guard of a native call made synchronously from Java (src/arm64/cpu.js runaway): the instructions it may run without returning when nothing else
+  // can stop it. Native threads and the parkable native calls of Java threads are preempted instead and never counted against it; a wall-clock limit that watches
+  // the run (`watched()`: the operation monitor, src/arm64/glue.js) replaces it. 5e10: libraries that unpack or decompress their own code at startup run several
+  // billion in one call (one measured startup: 22e9 over four decompression threads, 5.5e9 each).
+  constructor({ readLibrary, host = {}, maxSteps = 5e10, log = () => {}, pid = APP_PID, queueTask = null, progress = undefined, watched = undefined, translate = true, now = undefined } = {}) {
     this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE, translate });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
     this.cpu.progress = progress;   // (cpu) every 2^20 instructions of any thread (src/arm64/glue.js: the operation monitor's heartbeat)
-    this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const stub = this.stubIndex(address); if (stub >= 0) return `the lab's ${this.hostNames[stub]} (its stub +0x${((address - this.stubs.base) % 16).toString(16)})`; const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
+    this.cpu.watched = watched;   // () => true while a wall-clock limit watches a synchronous native call (src/arm64/glue.js: the operation monitor)
+    this.cpu.threadLabel = () => { const t = this.threads?.current; return t ? `native thread ${t.tid}${t.main ? ', the main thread' : t.java ? `, Java thread "${t.name ?? '?'}"` : ''}` : null; };
+    this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const stub = this.stubIndex(address); if (stub >= 0) return `the lab's ${this.hostNames[stub]} (its stub +0x${((address - this.stubs.base) % STUB_BYTES).toString(16)})`; const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
     this.memory.cpu = this.cpu; this.memory.activeCpu = () => this.activeCpu; this.memory.recentCalls = () => { const out = []; for (let i = 1; i <= 8; i++) { const index = this.recentHost[(this.recentAt - i) & 7]; if (index !== null && index !== undefined) out.push(index === 'svc' ? 'svc' : this.hostNames[index]); } return out.reverse(); };   // a fault names the instruction of the thread that is running
     this.readLibrary = readLibrary;   // soname -> Uint8Array of the app's library, or null
     this.log = log;
@@ -57,6 +60,43 @@ export class Arm64Process {
     if (name !== null) this.noteRegion(at, end, name, perms);
     return at;
   }
+  /**
+   * mmap's placement of a new mapping: without MAP_FIXED / MAP_FIXED_NOREPLACE a fresh region of the address space (the address argument is a hint, which Linux may ignore too);
+   * with them the mapping is at that address, as the kernel places it: the range must be page-aligned and in the process's address space, the pages it covers are replaced
+   * (zero-filled, their decoded code dropped, /proc/self/maps updated), and MAP_FIXED_NOREPLACE refuses a range that overlaps a mapping (EEXIST). A runtime that reserves a large
+   * PROT_NONE range and commits pieces of it at fixed addresses (a garbage collector's aligned heap segments) gets exactly those addresses. -> the address, or -errno.
+   */
+  placeMapping(address, length, flags, name = '', perms = 'rw-p') {
+    const FIXED = 0x10, FIXED_NOREPLACE = 0x100000, EINVAL = 22, ENOMEM = 12, EEXIST = 17;
+    if (!(flags & (FIXED | FIXED_NOREPLACE))) return this.mapRegion(length, 0x1000, name, perms);
+    if (address % 0x1000 || length <= 0) return -EINVAL;
+    const end = address + Math.ceil(length / 0x1000) * 0x1000;
+    if (address < ARM64_BASE + 0x1000 || end > ARM64_BASE + this.memory.maxBytes) return -ENOMEM;
+    if (!(flags & FIXED) && this.overlapsMapping(address, end)) return -EEXIST;
+    this.memory.ensure(end + 0x10000);
+    // a PROT_NONE mapping (a runtime decommitting part of its reservation) is zeroed when mprotect or a later fixed mapping makes it accessible (protectRegion): a decommit
+    // of a large range does not touch its pages
+    this.unmapRegion(address, end - address);
+    if (perms.slice(0, 3) !== '---') { this.memory.zero(address, end - address); if (name !== null) this.noteRegion(address, end, name, perms); }
+    else { this.memory.invalidateCode?.(address, end - address); this.regions.push({ start: address, end, name: name ?? '', perms, zeroPending: true }); }
+    if (end > this.nextMap) this.nextMap = end;   // the regions handed out later start above it
+    return address;
+  }
+  /** Does any mapping (a library segment or a region) overlap [start, end)? */
+  overlapsMapping(start, end) {
+    for (const lib of this.order) if (lib.base < end && lib.end > start) return true;
+    for (const r of this.regions) if (r.start < end && r.end > start) return true;
+    return false;
+  }
+  /** The anonymous private pages of [start, start + length) read as zero again (MADV_DONTNEED on a private anonymous mapping, as Linux drops them); file pages keep their data. */
+  discardPages(start, length) {
+    const end = start + Math.ceil(length / 0x1000) * 0x1000;
+    for (const r of this.regions) {
+      if (r.end <= start || r.start >= end || !r.perms.endsWith('p') || (r.name && !r.name.startsWith('['))) continue;
+      if (r.name === '[stack]') continue;
+      const from = Math.max(start, r.start), to = Math.min(end, r.end); if (to > from) this.memory.zero(from, to - from);
+    }
+  }
   /** Records a mapping for /proc/self/maps, page-aligned; one that continues the previous mapping with the same name and protection extends it, as the kernel merges VMAs. */
   noteRegion(start, end, name = '', perms = 'rw-p') {
     start = Math.floor(start / 0x1000) * 0x1000; end = Math.ceil(end / 0x1000) * 0x1000;
@@ -69,6 +109,27 @@ export class Arm64Process {
     for (const lib of this.order) if (address >= lib.base && address < lib.end) return true;
     for (const r of this.regions) if (address >= r.start && address < r.end) return true;
     return false;
+  }
+  /** mprotect: the protection of the mappings in the range changes (each split at the range's ends), as /proc/self/maps and /proc/self/statm show it; library segments keep their ELF flags. */
+  protectRegion(start, length, prot) {
+    start = Math.floor(start / 0x1000) * 0x1000; const end = start + Math.ceil(length / 0x1000) * 0x1000, out = [];
+    const rwx = `${prot & 1 ? 'r' : '-'}${prot & 2 ? 'w' : '-'}${prot & 4 ? 'x' : '-'}`, accessible = rwx !== '---';
+    for (const r of this.regions) {
+      if (r.end <= start || r.start >= end) { out.push(r); continue; }
+      if (r.start < start) out.push({ ...r, end: start });
+      const piece = { ...r, start: Math.max(r.start, start), end: Math.min(r.end, end), perms: rwx + (r.perms[3] ?? 'p') };
+      if (piece.zeroPending && accessible) { this.memory.zero(piece.start, piece.end - piece.start); delete piece.zeroPending; }
+      out.push(piece);
+      if (r.end > end) out.push({ ...r, start: end });
+    }
+    this.regions = out;
+  }
+  /** The page at `address`: null when unmapped, 'none' when its protection is PROT_NONE, 'accessible' otherwise (mincore). */
+  pageState(address) {
+    for (const lib of this.order) if (address >= lib.base && address < lib.end) return 'accessible';
+    let state = null;
+    for (const r of this.regions) if (address >= r.start && address < r.end) state = r.perms.slice(0, 3) === '---' ? 'none' : 'accessible';   // the last record of a page wins (a later mapping)
+    return state;
   }
   /** munmap: the range leaves /proc/self/maps (the address space itself is never reused). */
   unmapRegion(start, length) {
@@ -87,9 +148,11 @@ export class Arm64Process {
   usableSize(ptr) { return this.heap.sizes.get(Number(ptr)) ?? 0; }
   allocString(text) { const bytes = new TextEncoder().encode(text), ptr = this.malloc(bytes.length + 1); this.memory.copyIn(ptr, bytes); this.memory.setByte(ptr + bytes.length, 0); return ptr; }
   // ---- host entries
-  // A lab function's address is a 16-byte stub of real code in the process memory, LDR X16, #8; BR X16; .quad HOST_BASE + 16 * index (a veneer: X16 is the intra-procedure
-  // scratch register AAPCS64 gives the linker), as a libc function is code on a device: a library that reads a function's first instructions (a hooking or unwinding
-  // library relocating them into a trampoline) reads instructions, and one that patches them redirects the calls. Branching to the stub reaches the host entry.
+  // A lab function's address is a 32-byte stub of real code in the process memory, as a libc function is code on a device: MOVZ X16, #lo; MOVK X16, #mid, LSL #16;
+  // MOVK X16, #hi, LSL #32; BR X16 (X16: the intra-procedure scratch register AAPCS64 gives veneers) to HOST_BASE + 16 * index, then four NOPs. Every instruction is
+  // position-independent and there is no literal in it, so a hooking library that overwrites the first 16 or 20 bytes with its own branch and relocates them into a
+  // trampoline gets a trampoline that still reaches the lab function (a literal-pool veneer was overwritten together with its literal, and the relocated load read the
+  // hook's bytes). Reading the stub gives instructions; patching it redirects the calls.
   hostEntry(name, fn) {
     if (this.hostIndex.has(name)) return this.hostStub(this.hostIndex.get(name));
     const index = this.hostFns.length; this.hostFns.push(fn); this.hostIndex.set(name, index); this.hostNames.push(name);
@@ -97,18 +160,24 @@ export class Arm64Process {
   }
   hostStub(index) {
     if (index >= HOST_STUBS) return HOST_BASE + 16 * index;
-    this.stubs ??= { base: this.mapRegion(16 * HOST_STUBS, 0x1000), written: new Set() };
-    const at = this.stubs.base + 16 * index;
-    if (!this.stubs.written.has(index)) { this.stubs.written.add(index); this.memory.writeU32(at, 0x58000050); this.memory.writeU32(at + 4, 0xd61f0200); this.memory.write64(at + 8, BigInt(HOST_BASE + 16 * index)); }
+    this.stubs ??= { base: this.mapRegion(STUB_BYTES * HOST_STUBS, 0x1000), written: new Set() };
+    const at = this.stubs.base + STUB_BYTES * index, target = HOST_BASE + 16 * index, half = k => Math.floor(target / 2 ** (16 * k)) & 0xffff;
+    if (!this.stubs.written.has(index)) {
+      this.stubs.written.add(index);
+      [0xd2800010 | (half(0) << 5), 0xf2a00010 | (half(1) << 5), 0xf2c00010 | (half(2) << 5), 0xd61f0200, 0xd503201f, 0xd503201f, 0xd503201f, 0xd503201f].forEach((word, i) => this.memory.writeU32(at + 4 * i, word >>> 0));
+    }
     return at;
   }
   /** The lab function whose stub holds `address`, or -1. */
-  stubIndex(address) { const s = this.stubs; if (!s || address < s.base || address >= s.base + 16 * HOST_STUBS) return -1; const index = Math.floor((address - s.base) / 16); return s.written.has(index) ? index : -1; }
+  stubIndex(address) { const s = this.stubs; if (!s || address < s.base || address >= s.base + STUB_BYTES * HOST_STUBS) return -1; const index = Math.floor((address - s.base) / STUB_BYTES); return s.written.has(index) ? index : -1; }
   dispatchHost(cpu, index) {
     this.recentHost[this.recentAt++ & 7] = index;   // the last lab functions native code called, for fault reports
     const fn = index === 'svc' ? this.hostLibrary.__svc : this.hostFns[index]; if (!fn) throw new APKError(`ARM64 native code branched to an unknown host entry ${index}`, { kind: 'arm64-host' });
+    // A call that waits is retried with the registers it was made with: a lab function that moves its arguments (syscall(3) shifts them down one register, openat and
+    // __fgets_chk drop one) before it blocks must not leave them moved, or the retry reads its number or pointers from the wrong registers.
+    const x = cpu.x, a0 = x[0], a1 = x[1], a2 = x[2], a3 = x[3], a4 = x[4], a5 = x[5], a6 = x[6], a7 = x[7];
     const result = fn(this, cpu);
-    if (result === BLOCKED) return BLOCKED;   // the thread waits: the call is retried when it runs again
+    if (result === BLOCKED) { x[0] = a0; x[1] = a1; x[2] = a2; x[3] = a3; x[4] = a4; x[5] = a5; x[6] = a6; x[7] = a7; return BLOCKED; }   // the thread waits: the call is retried when it runs again
     if (result === undefined) return;
     if (typeof result === 'object' && result !== null && 'double' in result) { cpu.setD(0, result.double); return; }
     if (typeof result === 'object' && result !== null && 'float' in result) { cpu.setS(0, result.float); return; }

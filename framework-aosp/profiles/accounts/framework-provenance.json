@@ -4,9 +4,9 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "be33bae0641de76b64be7a470e76d191978e603f12b999527fbe03a45d827b34",
-  "bytes": 24880,
-  "methods": 223,
+  "sha256": "a95337cff7aab3530e4454e502024b6020d0cbe247bf288b30d319a38db43d31",
+  "bytes": 44464,
+  "methods": 403,
   "classes": [
     "Landroid/accounts/AbstractAccountAuthenticator$1;",
     "Landroid/accounts/AbstractAccountAuthenticator$2;",
@@ -19,6 +19,16 @@
     "Landroid/accounts/AccountAuthenticatorActivity;",
     "Landroid/accounts/AccountAuthenticatorResponse$1;",
     "Landroid/accounts/AccountAuthenticatorResponse;",
+    "Landroid/accounts/AuthenticatorDescription$1;",
+    "Landroid/accounts/AuthenticatorDescription;",
+    "Landroid/accounts/ChooseAccountTypeActivity$1;",
+    "Landroid/accounts/ChooseAccountTypeActivity$AccountArrayAdapter;",
+    "Landroid/accounts/ChooseAccountTypeActivity$AuthInfo;",
+    "Landroid/accounts/ChooseAccountTypeActivity$ViewHolder;",
+    "Landroid/accounts/ChooseAccountTypeActivity;",
+    "Landroid/accounts/ChooseTypeAndAccountActivity$$ExternalSyntheticLambda0;",
+    "Landroid/accounts/ChooseTypeAndAccountActivity$1;",
+    "Landroid/accounts/ChooseTypeAndAccountActivity;",
     "Landroid/accounts/IAccountAuthenticator$Default;",
     "Landroid/accounts/IAccountAuthenticator$Stub$Proxy;",
     "Landroid/accounts/IAccountAuthenticator$_Parcel;",
@@ -28,7 +38,7 @@
     "Landroid/accounts/IAccountAuthenticatorResponse$Stub;",
     "Landroid/accounts/IAccountAuthenticatorResponse$_Parcel;"
   ],
-  "classCount": 19,
+  "classCount": 29,
   "algorithmPatches": [],
   "sourceTransforms": [],
   "compiledSources": [
@@ -101,6 +111,36 @@
       "sha256": "cab0b158383c75608e09cb8ed917df1dbce8f38cbbcf219a803ecad2198400ba",
       "bytes": 668,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/ChooseTypeAndAccountActivity.java",
+      "localPath": "framework-aosp/upstream/android/accounts/ChooseTypeAndAccountActivity.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/ChooseTypeAndAccountActivity.java?format=TEXT",
+      "sha256": "bfec410cb792a942587dbd8efb1d99deedc3966ea0f7af746f12905c601defd3",
+      "bytes": 27368,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/ChooseAccountTypeActivity.java",
+      "localPath": "framework-aosp/upstream/android/accounts/ChooseAccountTypeActivity.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/ChooseAccountTypeActivity.java?format=TEXT",
+      "sha256": "f117e1027bcc22b2ed0a78d01b1a7fbbf3d92a194e0b8d3d370c1fb40c6a60e7",
+      "bytes": 8104,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/accounts/AuthenticatorDescription.java",
+      "localPath": "framework-aosp/upstream/android/accounts/AuthenticatorDescription.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AuthenticatorDescription.java?format=TEXT",
+      "sha256": "cc39d96615c93820f3fd77c3e2dc41ce036961296dc31d1e00d4edfb3e1c5bdb",
+      "bytes": 5471,
+      "license": "Apache-2.0"
     }
   ],
   "generatedSources": {
@@ -122,7 +162,7 @@
   },
   "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
   "compileOnlyDeclarationsPackaged": false,
-  "integrationStatus": "Original account authenticator classes (the authenticator side of IAccountAuthenticator); AccountManagerService is the lab's (src/account-sessions.js): it binds the authenticator's service as the system and calls it through the generated Proxy",
+  "integrationStatus": "Original account authenticator classes (the authenticator side of IAccountAuthenticator), AuthenticatorDescription and the system account chooser Activities (ChooseTypeAndAccountActivity, ChooseAccountTypeActivity; started by AccountManager.newChooseAccountIntent, run as Activities of the android package: src/system-activities.js); AccountManagerService is the lab's (src/account-sessions.js): it binds the authenticator's service as the system and calls it through the generated Proxy",
   "activationPolicy": "an installed package DEX references android.accounts.AbstractAccountAuthenticator, AccountAuthenticatorResponse or AccountAuthenticatorActivity (or a companion package is installed, or explicit loader option)",
   "correspondingSource": "source-bundle.zip",
   "licenses": [

@@ -1,7 +1,7 @@
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=af8ff7411a95';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=af8ff7411a95';
-import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=af8ff7411a95';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=e3ff4f2e305f';
+import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=e3ff4f2e305f';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md), or over the lab's CPU implementation of OpenGL ES 3.0 (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md) when the Worker has no

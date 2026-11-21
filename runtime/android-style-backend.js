@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=af8ff7411a95';
-import { APKError } from './apk-runtime.js?v=af8ff7411a95';
-import { ephemeronMap } from './heap-gc.js?v=af8ff7411a95';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=af8ff7411a95';
-import { sniffMime } from './bitmap-codec-host.js?v=af8ff7411a95';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=af8ff7411a95';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=e3ff4f2e305f';
+import { APKError } from './apk-runtime.js?v=e3ff4f2e305f';
+import { ephemeronMap } from './heap-gc.js?v=e3ff4f2e305f';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=e3ff4f2e305f';
+import { sniffMime } from './bitmap-codec-host.js?v=e3ff4f2e305f';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=e3ff4f2e305f';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const NO_DRAWABLE = Symbol('no drawable');   // loadFileDrawable: a file that is neither XML nor an image (Resources.getDrawable answers null)
@@ -18,7 +18,8 @@ add(RESOURCES, ['getAnimation(I)Landroid/content/res/XmlResourceParser;','getAni
 add(THEME, ['rebase()V','getKey()Landroid/content/res/Resources$ThemeKey;','applyStyle(IZ)V', 'setTo(Landroid/content/res/Resources$Theme;)V', 'getResources()Landroid/content/res/Resources;', 'resolveAttribute(ILandroid/util/TypedValue;Z)Z', 'obtainStyledAttributes([I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(I[I)Landroid/content/res/TypedArray;', 'obtainStyledAttributes(Landroid/util/AttributeSet;[III)Landroid/content/res/TypedArray;']);
 add(ASSETS, ['getPooledStringForCookie(II)Ljava/lang/CharSequence;']);
 add(XML, ['getPooledString(I)Ljava/lang/CharSequence;']);
-add('Landroid/view/ContextThemeWrapper;', ['getThemeResId()I']);
+// getThemeResId (@hide): ContextThemeWrapper and ContextImpl answer their mThemeResource (ContextImpl's is the theme getTheme chose), ContextWrapper asks its base
+for (const owner of ['Landroid/content/Context;', 'Landroid/content/ContextWrapper;', 'Landroid/app/ContextImpl;', 'Landroid/view/ContextThemeWrapper;']) add(owner, ['getThemeResId()I']);
 
 // ---- a value of a tag's attribute that no TypedArray getter of the attribute can read ---------------------------------------------------------------------------------------
 // TypedArray.java (android-13.0.0_r1) reads a value by its type: a getter given a type it does not take throws (UnsupportedOperationException, NumberFormatException,
@@ -133,11 +134,14 @@ export class AndroidStyleBackend {
     // A ContextWrapper super call delegates to its actual base. An Activity or
     // themed Context uses its own theme; inherited attributes are copied once.
     if (object.baseContext && (startType === 'Landroid/content/ContextWrapper;' || !object.themeResId)) return this.theme(runtime, object.baseContext);
-    const name = object.type.slice(1, -1).replaceAll('/', '.');
-    const declaration = this.platform.manifest?.activities?.find(activity => activity.name === name);
-    let id = object.themeResId || declaration?.theme || this.platform.manifest?.application?.theme;
+    // The manifest of the Context's own package: a Context of a second installed package (its ContextImpl, which an AppCompat Activity asks for its Theme in attachBaseContext,
+    // before ActivityThread sets the Activity's theme) takes its theme and targetSdkVersion from that package, never from the app's (whose style ids name other resources).
+    const entry = this.platform.packages?.contextEntry?.(runtime, context), manifest = entry && !entry.main ? entry.manifest : this.platform.manifest;
+    const name = object.type.slice(1, -1).replaceAll('/', '.'), plain = name.replace(/\$\$ldr\d+$/, '');
+    const declaration = manifest?.activities?.find(activity => activity.name === name || activity.name === plain);
+    let id = object.themeResId || declaration?.theme || manifest?.application?.theme;
     // No manifest theme: ContextImpl.getTheme asks the original Resources.selectDefaultTheme(0, targetSdkVersion).
-    if (!id) id = runtime.dispatch({ owner: RESOURCES, name: 'selectDefaultTheme', parameters: ['I', 'I'], result: 'I', signature: '(II)I' }, [0, Number(this.platform.manifest?.usesSdk?.targetSdkVersion ?? 1)], 'static');
+    if (!id) id = runtime.dispatch({ owner: RESOURCES, name: 'selectDefaultTheme', parameters: ['I', 'I'], result: 'I', signature: '(II)I' }, [0, Number(manifest?.usesSdk?.targetSdkVersion ?? 1)], 'static');
     if (!id) fail('Resources.selectDefaultTheme returned no theme');
     object.themeRef = this.createTheme(runtime); object.themeResId = Number(id) >>> 0;
     if (object.baseContext) { const base = this.theme(runtime, object.baseContext); if (base) this.copyTheme(runtime, object.themeRef, base); }
@@ -271,7 +275,7 @@ export class AndroidStyleBackend {
   obtainResourceArray(runtime, id) {
     if (!runtime.classes.has(TYPED_ARRAY)) fail('Original AOSP TypedArray DEX is required; no JS getter substitute is installed');
     let bag = this.platform.resources.resolve(id); while (bag.resolved) bag = bag.resolved;   // an <item type="array"> alias names another array
-    if (bag.kind !== 'bag') runtime.throwJava('Landroid/content/res/Resources$NotFoundException;', `Array resource ID #0x${(id >>> 0).toString(16)}`);
+    if (bag.kind !== 'bag') this.platform.resourceNotFound(runtime, id, bag, `Array resource ID #0x${(id >>> 0).toString(16)}`);   // ResourcesImpl.obtainTypedArray: getResourceArraySize < 0
     const resources = this.resourceObject(runtime), items = bag.items;
     const array = runtime.dispatch({ owner: TYPED_ARRAY, name: 'obtain', signature: '(Landroid/content/res/Resources;I)Landroid/content/res/TypedArray;', parameters: [RESOURCES, 'I'], result: TYPED_ARRAY }, [resources, items.length], 'static');
     const data = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mData', '[I')).elements, indices = runtime.array(this.get(runtime, array, TYPED_ARRAY, 'mIndices', '[I')).elements;
@@ -291,9 +295,9 @@ export class AndroidStyleBackend {
     if (!runtime.classes.has(COLOR)) fail('Original AOSP ColorStateList DEX is required');
     let type, data;
     if (suppliedValue) { type = this.get(runtime, suppliedValue, VALUE, 'type', 'I'); data = this.get(runtime, suppliedValue, VALUE, 'data', 'I'); }
-    else { let value = this.platform.resources.resolve(id); while (value.resolved) value = value.resolved; type = value.dataType; data = value.rawData; }
+    else { let value = this.platform.resources.resolve(id); while (value.resolved) value = value.resolved; if (value.kind === 'unresolved' || value.kind === 'bag') this.platform.resourceNotFound(runtime, id, value, `Resource ID #0x${(id >>> 0).toString(16)}`); type = value.dataType; data = value.rawData; }   // Resources.getColorStateList: getValue first
     if (type >= 28 && type <= 31) return runtime.dispatch({ owner: COLOR, name: 'valueOf', signature: '(I)Landroid/content/res/ColorStateList;', parameters: ['I'], result: COLOR }, [data | 0], 'static');
-    const tree = this.platform.resources.getXml(id);
+    const tree = this.platform.xmlResource(runtime, id, 'color state list');
     if (tree.name !== 'selector') fail(`Original color XML <${tree.name}> requires its own compiled color/shader implementation`, { resourceId: id });
     const parser = this.platform.xmlHost.create(runtime, tree, id);
     return runtime.dispatch({ owner: COLOR, name: 'createFromXml', signature: '(Landroid/content/res/Resources;Lorg/xmlpull/v1/XmlPullParser;Landroid/content/res/Resources$Theme;)Landroid/content/res/ColorStateList;', parameters: [RESOURCES, 'Lorg/xmlpull/v1/XmlPullParser;', THEME], result: COLOR }, [this.resourceObject(runtime), parser, theme || null], 'static');
@@ -329,7 +333,7 @@ export class AndroidStyleBackend {
     const fileDrawable = this.loadFileDrawable(runtime, id); if (fileDrawable !== null) return fileDrawable === NO_DRAWABLE ? null : fileDrawable;
     if (density && density !== 160) fail(`Drawable density override ${density} requires qualified resource selection; this profile is density 160`, { resourceId: id });
     let value = suppliedValue ? { dataType: this.get(runtime, suppliedValue, VALUE, 'type', 'I'), rawData: this.get(runtime, suppliedValue, VALUE, 'data', 'I') } : this.platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
-    if (value.kind === 'unresolved') fail(value.reason, { resourceId: id });
+    if (value.kind === 'unresolved' || value.kind === 'bag') this.platform.resourceNotFound(runtime, id, value, `Resource ID #0x${(id >>> 0).toString(16)}`);   // ResourcesImpl.getValueForDensity: no value
     let type, parameters = [], values = [], tree;
     // the type of the resource itself, app or framework (?attr/colorControlNormal of an AppCompat theme is ?android:attr/textColorSecondary, a framework color list: a TypedValue
     // supplied by TypedArray.getDrawable carries no type)
@@ -342,14 +346,14 @@ export class AndroidStyleBackend {
       runtime.record(`RESOURCE drawable ${id >>> 0} ${type} [color state list file, original ColorStateListDrawable]`); return drawable;
     }
     if (!(value.dataType >= 28 && value.dataType <= 31) && runtime.classes.has('Landroid/graphics/drawable/DrawableInflater;')) {
-      tree=this.platform.resources.getXml(id);
+      tree=this.platform.xmlResource(runtime,id,'drawable');
       const parser=this.platform.xmlHost.create(runtime,tree,id);this.platform.xmlHost.advance(runtime.object(parser));
       const owner='Landroid/graphics/drawable/Drawable;',parameters=[RESOURCES,'Lorg/xmlpull/v1/XmlPullParser;','Landroid/util/AttributeSet;','I',THEME];
       const drawable=runtime.dispatch({owner,name:'createFromXmlInnerForDensity',parameters,result:owner,signature:`(${parameters.join('')})${owner}`},[this.resourceObject(runtime),parser,parser,density,theme||null],'static');
       runtime.record(`RESOURCE drawable ${id>>>0} ${runtime.typeOf(drawable)} [original DrawableInflater tag/class factory]`);return prepareCpuAnimatedVector(runtime,drawable);
     }
     if (value.dataType >= 28 && value.dataType <= 31) { type = 'Landroid/graphics/drawable/ColorDrawable;'; parameters = ['I']; values = [value.rawData | 0]; }
-    else { tree = this.platform.resources.getXml(id); const classes = { vector: 'VectorDrawable', color: 'ColorDrawable', shape: 'GradientDrawable', ripple: 'RippleDrawable' }; if (!classes[tree.name]) fail(`Drawable <${tree.name}> requires its original compiled drawable implementation and drawing backend`, { resourceId: id }); type = `Landroid/graphics/drawable/${classes[tree.name]};`; }
+    else { tree = this.platform.xmlResource(runtime, id, 'drawable'); const classes = { vector: 'VectorDrawable', color: 'ColorDrawable', shape: 'GradientDrawable', ripple: 'RippleDrawable' }; if (!classes[tree.name]) fail(`Drawable <${tree.name}> requires its original compiled drawable implementation and drawing backend`, { resourceId: id }); type = `Landroid/graphics/drawable/${classes[tree.name]};`; }
     if (!runtime.classes.has(type)) fail(`Original AOSP ${type} DEX is unavailable`, { resourceId: id });
     const drawable = runtime.allocate(type); runtime.dispatch({ owner: type, name: '<init>', signature: `(${parameters.join('')})V`, parameters, result: 'V' }, [drawable, ...values], 'direct');
     if (tree) {
@@ -369,7 +373,7 @@ export class AndroidStyleBackend {
     if (owner === ASSETS) { const text = this.poolStrings.get(args[1])?.get(args[2]); if (text === undefined) fail(`Missing original pooled string cookie=${args[1]} index=${args[2]}`); return text; }
     if (owner === XML) { const text = runtime.object(receiver).pooledStrings?.get(args[1]); if (text === undefined) fail('Missing compiled XML pooled string'); return text; }
     if (owner === RESOURCES) {
-      if(name==='getAnimation')return this.platform.xmlHost.create(runtime,this.platform.resources.getXml(args[1]),args[1]);
+      if(name==='getAnimation')return this.platform.xmlHost.create(runtime,this.platform.xmlResource(runtime,args[1],'xml type anim'),args[1]);
       if(name==='getAnimatorCache'||name==='getStateListAnimatorCache'){const object=runtime.object(receiver),property=name==='getAnimatorCache'?'originalAnimatorCache':'originalStateListAnimatorCache',type='Landroid/content/res/ConfigurationBoundResourceCache;';if(!object[property]){if(!runtime.classes.has(type))fail('Original ConfigurationBoundResourceCache source is required');const value=runtime.allocate(type);runtime.dispatch({owner:type,name:'<init>',parameters:[],result:'V',signature:'()V'},[value],'direct');object[property]=value;}return object[property];}
       if(name==='getDrawableInflater'){
         const type='Landroid/graphics/drawable/DrawableInflater;',object=runtime.object(receiver);
@@ -386,7 +390,7 @@ export class AndroidStyleBackend {
       if (name === 'obtainTypedArray') return this.obtainResourceArray(runtime, args[1]);
       if (name === 'obtainAttributes' && method.parameters[0] === RESOURCES) return this.obtain(runtime, args[1], args[2], args[3], 0, 0, 0, !empty(args[1]));
       if (name === 'loadComplexColor' || name === 'loadColorStateList' || name === 'getColorStateList') return this.loadColor(runtime, name.startsWith('get') ? args[1] : args[2], name.startsWith('get') ? args[2] : args[3], name.startsWith('get') ? null : args[1]);
-      if (name === 'getValue' || name === 'getValueForDensity') { const id = args[1] >>> 0, out = name === 'getValue' ? args[2] : args[3], resolve = !!(name === 'getValue' ? args[3] : args[4]); const table = (id >>> 24) === 1 ? this.platform.resources.frameworkTable || this.platform.resources.table : this.platform.resources.table; const raw = table.selectVariant(id); let value = resolve ? this.platform.resources.resolve(id) : raw; if (!value) fail(`Raw resource unavailable 0x${id.toString(16)}`); while (value.resolved) value = value.resolved; if (value.kind === 'unresolved') fail(value.reason); this.typedValue(runtime, out, { ...value, resourceId: id }); return; }
+      if (name === 'getValue' || name === 'getValueForDensity') { const id = args[1] >>> 0, out = name === 'getValue' ? args[2] : args[3], resolve = !!(name === 'getValue' ? args[3] : args[4]); const table = (id >>> 24) === 1 ? this.platform.resources.frameworkTable || this.platform.resources.table : this.platform.resources.table; const raw = table.selectVariant(id); let value = resolve ? this.platform.resources.resolve(id) : raw; if (!value) this.platform.resourceNotFound(runtime, id, this.platform.resources.resolve(id), `Resource ID #0x${id.toString(16)}`); while (value.resolved) value = value.resolved; if (value.kind === 'unresolved' || value.kind === 'bag') this.platform.resourceNotFound(runtime, id, value, `Resource ID #0x${id.toString(16)}`);   /* ResourcesImpl.getValue: no value, or a bag (AssetManager2::GetResource with may_be_bag false: "a complex map type"), is NotFoundException */ this.typedValue(runtime, out, { ...value, resourceId: id }); return; }
       if (name === 'getAssets') return this.assetObject(runtime); if (name === 'newTheme') return this.createTheme(runtime); return this.obtain(runtime, null, args[1], args[2], 0, 0, 0, false); }
     if (owner === THEME) {
       const object = runtime.object(receiver);
@@ -409,7 +413,12 @@ export class AndroidStyleBackend {
     }
     if (name === 'getDrawable') return this.loadDrawable(runtime, args[1], this.theme(runtime, receiver));
     if (name === 'getTheme') return this.theme(runtime, receiver, owner);
-    if (name === 'getThemeResId') { const original=this.originalThemeMethod(runtime,receiver,owner,name,[],'I');return original.handled?original.value:runtime.object(receiver).themeResId??0; }
+    if (name === 'getThemeResId') {
+      const original = this.originalThemeMethod(runtime, receiver, owner, name, [], 'I'); if (original.handled) return original.value;
+      const object = runtime.object(receiver);
+      if (object.baseContext && !runtime.isSubtype(runtime.typeOf(receiver), 'Landroid/view/ContextThemeWrapper;')) return runtime.dispatch({ owner: 'Landroid/content/Context;', name, parameters: [], result: 'I', signature: '()I' }, [object.baseContext], 'virtual');   // ContextWrapper: mBase.getThemeResId()
+      return object.themeResId ?? 0;
+    }
     if (name === 'setTheme') {
       const original=this.originalThemeMethod(runtime,receiver,owner,name,['I'],'V',[args[1]]);if(original.handled)return original.value;
       const object=runtime.object(receiver);if(object.themeResId===args[1])return;object.themeResId=args[1];

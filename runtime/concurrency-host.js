@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
-import { Blocked, VMThread } from './scheduler.js?v=af8ff7411a95';
-import { Invoke } from './interpreter.js?v=af8ff7411a95';
-import { GC_ROOTS } from './heap-gc.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
+import { Blocked, VMThread } from './scheduler.js?v=e3ff4f2e305f';
+import { Invoke } from './interpreter.js?v=e3ff4f2e305f';
+import { GC_ROOTS } from './heap-gc.js?v=e3ff4f2e305f';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -585,7 +585,7 @@ export function createConcurrencyHost(platform) {
   }
   type(WORKER, OBJECT, [RUNNABLE], { allocatable: true });
   def(WORKER, 'run', '()V', (r, _m, [self]) => {
-    const o = r.object(self); if (o.periodic) { o.periodic(); return; }
+    const o = r.object(self); if (o.periodic) return o.periodic();
     if (o.worker?.worker.inEntry) return;   // reached from the factory's Thread.run on the worker's own thread (startWorker): the green thread drives the loop next
     throw new APKError('A ThreadPoolExecutor worker is driven by its green thread, not run directly', { kind: 'worker-run' });
   });
@@ -697,7 +697,14 @@ export function createConcurrencyHost(platform) {
     platform.queueTask(fire, delayMs, [futureTask, self]); return futureTask;
   };
   // A recurring task runs its body, then re-arms itself; a one-shot is the FutureTask itself.
-  const runnableFor = (r, futureTask, f, self, fire) => { const s = r.object(futureTask).schedule; if (s.period === 0) return futureTask; const task = r.allocate(WORKER); r.object(task).held = [futureTask, self, f.runnable]; r.object(task).periodic = () => { const wasNew = f.state === 'new'; if (!wasNew) return; try { vcall(r, f.runnable, RUNNABLE, 'run', [], 'V'); } catch (error) { if (!error?.value) throw error; f.state = 'failed'; f.failure = error.value; return; } if (f.state === 'new' && !pool(r, self).shutdown) platform.queueTask(fire, s.period > 0 ? s.period : -s.period, [futureTask, self, f.runnable]); }; return task; };
+  const runnableFor = (r, futureTask, f, self, fire) => { const s = r.object(futureTask).schedule; if (s.period === 0) return futureTask; const task = r.allocate(WORKER); r.object(task).held = [futureTask, self, f.runnable]; r.object(task).periodic = () => {
+    if (f.state !== 'new') return undefined;
+    // the body runs as a Java call of this worker's run() (an Invoke continuation), not nested in host code: a body that waits (a network exchange, a lock) parks the worker
+    // like any other Java wait; nested, its wait sat on the JavaScript stack and a network wait there ended the app ("cannot suspend")
+    return new Invoke({ owner: RUNNABLE, name: 'run', parameters: [], result: 'V', signature: '()V' }, [f.runnable], 'virtual',
+      () => { if (f.state === 'new' && !pool(r, self).shutdown) platform.queueTask(fire, s.period > 0 ? s.period : -s.period, [futureTask, self, f.runnable]); return undefined; },
+      error => { if (!error?.value) throw error; f.state = 'failed'; f.failure = error.value; return undefined; });
+  }; return task; };
   const ms = (r, t, unit) => Number(vcall(r, unit, UNIT, 'toMillis', ['J'], 'J', [t]));
   def(STPE, 'schedule', `(${RUNNABLE}J${UNIT})Ljava/util/concurrent/ScheduledFuture;`, (r, _m, [self, c, t, u]) => scheduled(r, self, c, ms(r, t, u), 0, () => ({ callable: null, runnable: c, result: null, value: null, state: 'new' })));
   def(STPE, 'schedule', `(${CALLABLE}J${UNIT})Ljava/util/concurrent/ScheduledFuture;`, (r, _m, [self, c, t, u]) => scheduled(r, self, c, ms(r, t, u), 0, () => ({ callable: c, runnable: null, state: 'new' })));

@@ -69,14 +69,21 @@ export class VirtualFileSystem {
   stat(path) { const node = this.node(path); return node ? { type: node.type, size: node.type === 'file' && !node.generate ? node.size : 0, mtime: node.mtime, mode: node.mode } : null; }
   refresh(node) { if (node?.generate) { const bytes = node.generate(); node.buf = bytes; node.size = bytes.length; node.mtime = this.now(); } return node; }
   denied(path) { return this.node(path)?.denyOpen ?? null; }
-  node(path) { const p = this.canonical(path); return this.nodes.get(p) ?? this.procNode(p); }
+  /** The node at `path`, following symbolic links (`type: 'link'`, `target`: the image's /system/bin links, /proc/mounts, links the device's programs make). */
+  node(path) {
+    let p = this.canonical(path), node = this.nodes.get(p) ?? this.procNode(p);
+    for (let hops = 0; node?.type === 'link' && hops < 40; hops++) { p = this.canonical(node.target.startsWith('/') ? node.target : `${this.parentOf(p)}/${node.target}`); node = this.nodes.get(p) ?? this.procNode(p); }
+    return node?.type === 'link' ? null : node;
+  }
+  /** The node at `path` itself, a symbolic link included (lstat, readlink). */
+  lnode(path) { const p = this.canonical(path); return this.nodes.get(p) ?? this.procNode(p); }
   /**
    * A node of the app's /proc (src/procfs.js, the model the ARM64 libc reads too): a generated file, a directory, or for a link (fd/<n>) the node of the file it names
    * (an unlinked one included: its descriptor keeps it). /proc/self/mem and anything the model does not have are null here (ENOENT for Java).
    */
   procNode(p) {
     if (!this.procfs || !p.startsWith('/proc/')) return null;
-    const entry = this.procfs.lookup(p); if (!entry) return null;
+    const entry = this.procfs.lookup(p); if (!entry) return this.procfs.kernel?.javaProcNode(p) ?? null;   // another process of the app's uid (src/process-kernel.js)
     if (entry.dir) return { type: 'dir', mode: 0o555, mtime: this.now(), procNames: entry.dir, path: p };
     if (entry.file) return { type: 'file', buf: new Uint8Array(0), size: 0, mtime: this.now(), mode: 0o444, generate: entry.file, path: p };
     if (entry.link) { const target = entry.link.node ?? this.nodes.get(this.canonical(entry.link.path)); if (target) return target; const bytes = entry.link.bytes?.(); return bytes ? { type: 'file', buf: bytes, size: bytes.length, mtime: this.now(), mode: 0o444, path: entry.link.path } : null; }
@@ -105,7 +112,7 @@ export class VirtualFileSystem {
   list(path) {
     const p = this.canonical(path), node = this.node(p); if (!node) return null; if (node.type !== 'dir') return null;
     if (node.procNames) return [...node.procNames];
-    if (p === '/proc' && this.procfs) return [...new Set([...this.procfs.rootNames(), ...this.#children(p)])];   // hidepid: the app's own process only
+    if (p === '/proc' && this.procfs) return [...new Set([...this.procfs.rootNames(), ...this.#children(p)])];   // hidepid: the processes of the app's uid only
     return this.#children(p);
   }
   #children(p) {

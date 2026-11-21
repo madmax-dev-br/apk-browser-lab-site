@@ -1,41 +1,41 @@
-import { procFdFile } from './libcore-io-native.js?v=af8ff7411a95';
-import STATIC_SHIMS from './shim-static-methods.js?v=af8ff7411a95';
-import { VMClock } from './vm-clock.js?v=af8ff7411a95';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=af8ff7411a95';
-import { OperationMonitor } from './operation-monitor.js?v=af8ff7411a95';
-import { ExecutionProfile } from './execution-profile.js?v=af8ff7411a95';
-import { SamplingProfiler } from './sampling-profiler.js?v=af8ff7411a95';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=af8ff7411a95';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=af8ff7411a95';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=af8ff7411a95';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=af8ff7411a95';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=af8ff7411a95';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=af8ff7411a95';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=af8ff7411a95';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=af8ff7411a95';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=af8ff7411a95';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=af8ff7411a95';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=af8ff7411a95';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { invokePolymorphic } from './method-handles.js?v=af8ff7411a95';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=af8ff7411a95';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=af8ff7411a95';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=af8ff7411a95';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=af8ff7411a95';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=af8ff7411a95';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=af8ff7411a95';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=af8ff7411a95';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=af8ff7411a95';
+import { procFdFile } from './libcore-io-native.js?v=e3ff4f2e305f';
+import STATIC_SHIMS from './shim-static-methods.js?v=e3ff4f2e305f';
+import { VMClock } from './vm-clock.js?v=e3ff4f2e305f';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=e3ff4f2e305f';
+import { OperationMonitor } from './operation-monitor.js?v=e3ff4f2e305f';
+import { ExecutionProfile } from './execution-profile.js?v=e3ff4f2e305f';
+import { SamplingProfiler } from './sampling-profiler.js?v=e3ff4f2e305f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e3ff4f2e305f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e3ff4f2e305f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e3ff4f2e305f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e3ff4f2e305f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e3ff4f2e305f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e3ff4f2e305f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e3ff4f2e305f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e3ff4f2e305f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e3ff4f2e305f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e3ff4f2e305f';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=e3ff4f2e305f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { invokePolymorphic } from './method-handles.js?v=e3ff4f2e305f';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e3ff4f2e305f';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e3ff4f2e305f';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=e3ff4f2e305f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e3ff4f2e305f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e3ff4f2e305f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e3ff4f2e305f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e3ff4f2e305f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=e3ff4f2e305f';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=af8ff7411a95';
-import { ProcessStartPending } from './package-registry.js?v=af8ff7411a95';
-import { bootClassLacksMember } from './boot-class-members.js?v=af8ff7411a95';
-export { APKError } from './apk-error.js?v=af8ff7411a95';
-import { BinaryReader } from './binary-reader.js?v=af8ff7411a95';
-import { recordCollection } from './runtime-stats.js?v=af8ff7411a95';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=af8ff7411a95';
-import { scrollsItself } from './scrolling-view.js?v=af8ff7411a95';
+import { Scheduler, Blocked } from './scheduler.js?v=e3ff4f2e305f';
+import { ProcessStartPending } from './package-registry.js?v=e3ff4f2e305f';
+import { bootClassLacksMember } from './boot-class-members.js?v=e3ff4f2e305f';
+export { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { BinaryReader } from './binary-reader.js?v=e3ff4f2e305f';
+import { recordCollection } from './runtime-stats.js?v=e3ff4f2e305f';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=e3ff4f2e305f';
+import { scrollsItself } from './scrolling-view.js?v=e3ff4f2e305f';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1144,7 +1144,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
   'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
-  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal', 'textColorFailures', 'avdRtState', 'textRasterScale',
+  'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal', 'textColorFailures', 'avdRtState', 'textRasterScale', 'platformTrust',
 ]);
 export class APKRuntime {
   constructor(dex, { apkEntries = new Set(), apkReader = null, apkEntryRange = null, launcherActivity = null, unsupportedFeatures = [], nativeLibraries = [], apiLevel = 33, platform = null, resources = null, nativeBindings = new Map(), skia = null, icuBreakBackend = null, sqliteBackend = null, tzdata = null, zlibBackend = null, icuConverterBackend = null, maxCallDepth = 2048, maxHeapObjects = 262144, maxInstructionsPerEvent = 100000000, maxEventWallMs = 0, tolerateMissingVoid = false, tolerateMissing = tolerateMissingVoid ? 'void' : 'off', engine = 'js' } = {}) {
@@ -1868,6 +1868,7 @@ export class APKRuntime {
     this.dispatch({owner,name:'setTargetSdkVersion',parameters:['I'],result:'V',signature:'(I)V'},[receiver,target],'virtual');
     const graphics='Landroid/graphics/Compatibility;';
     if(this.dex.bootClasses?.has(graphics))this.dispatch({owner:graphics,name:'setTargetSdkVersion',parameters:['I'],result:'V',signature:'(I)V'},[target],'static');
+    this.platform?.installCompatCallbacks?.(this,target);   // AppCompatCallbacks.install(disabledCompatChanges), as handleBindApplication does right after (src/compat-callbacks-host.js)
     this.frameworkRuntimeConfigured=true;
   }
   launch(activity, options = {}) {
@@ -3645,12 +3646,19 @@ export class APKRuntime {
       obj.list = name === 'singletonList' ? [args[0]] : name === 'unmodifiableList' ? this.collectionValues(this.object(args[0])) : [];
       obj.readOnly = true; return value;
     }
-    if (method.owner === 'Ljava/lang/Enum;' && name === 'valueOf') {   // Enum.valueOf(Class, String): the constant of that name among the enum class's ACC_ENUM static fields
+    // Enum.valueOf(Class, String), as libcore's: the constant of that name among the enum's values() (Class.enumConstantDirectory over getEnumConstantsShared). An
+    // optimized enum may keep its constants only in the values() array, with no static field per constant; a class without values() falls back to its ACC_ENUM statics.
+    if (method.owner === 'Ljava/lang/Enum;' && name === 'valueOf') {
       if (isNull(args[0]) || isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', isNull(args[0]) ? 'enumClass == null' : 'name == null');
       const type = this.object(args[0]).classType, cls = type && this.classes.get(type);
       if (!cls || !this.isSubtype(type, 'Ljava/lang/Enum;')) this.throwJava('Ljava/lang/ClassCastException;', `${(type ?? '').slice(1, -1).replaceAll('/', '.')} is not an enum type`);
       this.initialize(type);
-      const wanted = this.stringCharacters(args[1]);
+      const wanted = this.stringCharacters(args[1]), named = value => !isNull(value) && value && typeof value === 'object' && this.object(value).enumName !== undefined && this.stringCharacters(this.object(value).enumName) === wanted;
+      if (cls.methods?.has(`values()[${type}`)) {
+        const all = this.dispatch({ owner: type, name: 'values', parameters: [], result: `[${type}`, signature: `()[${type}` }, [], 'static');
+        for (const value of isNull(all) ? [] : this.array(all).elements) if (named(value)) return value;
+        this.throwJava('Ljava/lang/IllegalArgumentException;', `No enum constant ${type.slice(1, -1).replaceAll('/', '.').replaceAll('$', '.')}.${wanted}`);
+      }
       for (const entry of cls.staticFields) {
         if (!(entry.flags & 0x4000)) continue;
         const field = cls.dex.field(entry.index), value = this.readStatic(field);   // readStatic, not the static table: on the WebAssembly core a DEX class's statics live in its metaspace

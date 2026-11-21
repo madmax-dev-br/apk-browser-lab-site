@@ -1,8 +1,9 @@
-import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
-import { networkOf } from './network-native.js?v=af8ff7411a95';
-import { installTlsSockets, TRUST_KEY, KEYS_KEY } from './tls-socket-host.js?v=af8ff7411a95';
+import { createHostRegistry, doubleBits, bitsDouble } from './host-contract.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
+import { networkOf } from './network-native.js?v=e3ff4f2e305f';
+import { installTlsSockets, TRUST_KEY, KEYS_KEY } from './tls-socket-host.js?v=e3ff4f2e305f';
+import { platformTrust, keyStoreManager } from './platform-trust.js?v=e3ff4f2e305f';
 
 // java.net.IDN and the javax.net.ssl surface (TrustManagerFactory, KeyManagerFactory, SSLContext) for libraries that probe the platform at launch (OkHttp's Platform.get(),
 // host name normalisation). java.security.Security / Provider / KeyStore and the providers (Conscrypt, the Android Keystore) are the original libcore and Conscrypt
@@ -67,15 +68,14 @@ export function createSecurityHost(platform) {
   idn('toUnicode', s => toUnicode(s));
 
   // ---- TLS surface: javax.net.ssl / java.security.KeyStore / Conscrypt (com.android.org.conscrypt) as an Android 9+ app sees them ------------------------
-  // OkHttp's Platform.get() reflects on Conscrypt's OpenSSLSocketImpl and builds a TrustManagerFactory/SSLContext when the client is created. The device trust
-  // store (AndroidCAStore) is not available here: the default TrustManager trusts exactly one authority, the lab transport CA (src/transport-ca.js) -- the chains an SSLSocket over a
-  // virtual HTTP socket presents -- and, like Conscrypt's TrustManagerImpl, rejects every other chain with "Trust anchor for certification path not found." (fail closed).
-  // TLS itself is never done in the VM: network access goes through the lab's fetch bridge (src/tls-socket-host.js explains the SSLSocket model).
+  // OkHttp's Platform.get() reflects on Conscrypt's OpenSSLSocketImpl and builds a TrustManagerFactory/SSLContext when the client is created. The default TrustManager is the
+  // platform's (src/platform-trust.js: Conscrypt's TrustManagerImpl over the AOSP CA set, per the network security config); it also accepts the lab transport CA's chains
+  // (src/transport-ca.js), the ones an SSLSocket over a virtual HTTP socket presents (the Java SSLSocket's TLS is the browser's fetch: src/tls-socket-host.js explains the model).
+  // A native TLS stack in an app's .so does its own TLS over the raw TCP tunnel and verifies the server's real chain through these classes (Chromium's X509Util, for one).
   const TM = 'Ljavax/net/ssl/TrustManager;', KM = 'Ljavax/net/ssl/KeyManager;', X509TM = 'Ljavax/net/ssl/X509TrustManager;', TMF = 'Ljavax/net/ssl/TrustManagerFactory;', KMF = 'Ljavax/net/ssl/KeyManagerFactory;';
   const SSL_CONTEXT = 'Ljavax/net/ssl/SSLContext;', SSL_SOCKET_FACTORY = 'Ljavax/net/ssl/SSLSocketFactory;', SSL_SOCKET = 'Ljavax/net/ssl/SSLSocket;', KEYSTORE = 'Ljava/security/KeyStore;', SECURE_RANDOM = 'Ljava/security/SecureRandom;';
   const X509 = 'Ljava/security/cert/X509Certificate;', CERT = 'Ljava/security/cert/Certificate;', LIST = 'Ljava/util/List;', INPUT_STREAM = 'Ljava/io/InputStream;', CHARS = '[C', BYTES = '[B';
   const LAB = 'Ldev/apkweb/net/', TMI = LAB + 'LabTrustManager;', OSFI = LAB + 'LabSslSocketFactory;', EXT = 'Landroid/net/http/X509TrustManagerExtensions;';
-  const NO_ANCHOR = 'java.security.cert.CertPathValidatorException: Trust anchor for certification path not found.';
   type(TM); type(KM); type(X509TM, OBJECT, [TM]); registry.interfaces.set(TM, []); registry.interfaces.set(KM, []); registry.interfaces.set(X509TM, [TM]);
   // javax.net.ssl.X509KeyManager (interface, extends KeyManager) and X509ExtendedKeyManager (libcore: abstract class implementing it; its two engine methods answer null by default):
   // Conscrypt's KeyManagerImpl extends the latter, and apps implement either for their mTLS identity.
@@ -88,26 +88,41 @@ export function createSecurityHost(platform) {
   const array = (r, element, items) => { const a = r.newArray(`[${element}`, items.length); r.array(a).elements = items; return a; };
   const algorithm = (r, name, accepted, what) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'algorithm == null'); const wanted = r.stringCharacters(name); if (!accepted.some(a => a.toLowerCase() === wanted.toLowerCase())) r.throwJava('Ljava/security/NoSuchAlgorithmException;', `${wanted} ${what} not available`); return wanted; };
 
-  // Conscrypt's TrustManagerImpl: an X509TrustManager whose only anchor is the lab transport CA.
-  const checkChain = (r, chain, client = false) => {
-    if (chain === null || r.array(chain).elements.length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null or zero-length certificate chain');
-    if (!client && sockets.isLabChain(r, chain)) return;
-    r.throwJava('Ljava/security/cert/CertificateException;', NO_ANCHOR);
-  };
+  // The default X509TrustManager (src/platform-trust.js): the network security config's RootTrustManager over Conscrypt's original TrustManagerImpl and the AndroidCAStore
+  // (the AOSP system CA set in /system/etc/security/cacerts), or over the KeyStore given to TrustManagerFactory.init. A chain made by the lab transport CA (an SSLSocket over a
+  // virtual HTTP socket, whose real TLS the browser did) is accepted for servers as before; every other chain -- a native TLS stack's real one -- is the original's decision.
+  const IMPL_KEY = TMI + '->impl:Lcom/android/org/conscrypt/TrustManagerImpl;', EXT_KEY = EXT + '->mTrustManager:Ljavax/net/ssl/X509TrustManager;';
+  const trustOf = (r, self) => platformTrust(r, r.object(self).fields.get(IMPL_KEY) ?? null);
+  const nonEmpty = (r, chain) => { if (chain === null || chain === 0 || r.array(chain).elements.length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null or zero-length certificate chain'); };
+  const authTypeOf = (r, authType) => { if (authType === null || authType === 0 || r.stringCharacters(authType).length === 0) r.throwJava('Ljava/lang/IllegalArgumentException;', 'null or zero-length authentication type'); return authType; };
   const asList = (r, chain) => r.dispatch({ owner: 'Ljava/util/Arrays;', name: 'asList', parameters: ['[Ljava/lang/Object;'], result: LIST, signature: `([Ljava/lang/Object;)${LIST}` }, r.argumentWords(['[Ljava/lang/Object;'], [chain], {}), 'static');
-  def(TMI, 'getAcceptedIssuers', `()[${X509}`, r => { const ca = sockets.authorityCertificate(r); if (ca instanceof Blocked) return ca; return array(r, X509, ca === null ? [] : [ca]); });
-  def(TMI, 'checkServerTrusted', `([${X509}${STRING})V`, (r, _m, [, chain]) => checkChain(r, chain));
-  def(TMI, 'checkClientTrusted', `([${X509}${STRING})V`, (r, _m, [, chain]) => checkChain(r, chain, true));
-  def(TMI, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => { checkChain(r, chain); return asList(r, chain); });
-  // X509TrustManagerExtensions wraps the platform's TrustManagerImpl; for any other TrustManager Android reflects on checkServerTrusted(chain, authType, host) and, finding none, throws -- clients (OkHttp) then build their own chain cleaner
+  const serverTrusted = (r, self, chain, authType, host) => {
+    nonEmpty(r, chain); authTypeOf(r, authType);
+    if (sockets.isLabChain(r, chain)) return asList(r, chain);
+    return trustOf(r, self).server(chain, authType, host);
+  };
+  def(TMI, 'getAcceptedIssuers', `()[${X509}`, (r, _m, [self]) => {
+    const ca = sockets.authorityCertificate(r); if (ca instanceof Blocked) return ca;
+    return array(r, X509, [...(ca === null ? [] : [ca]), ...trustOf(r, self).acceptedIssuers()]);
+  });
+  def(TMI, 'checkServerTrusted', `([${X509}${STRING})V`, (r, _m, [self, chain, authType]) => {
+    nonEmpty(r, chain); authTypeOf(r, authType);
+    if (sockets.isLabChain(r, chain)) return;
+    trustOf(r, self).serverWithoutHost(chain, authType);
+  });
+  def(TMI, 'checkClientTrusted', `([${X509}${STRING})V`, (r, _m, [self, chain, authType]) => { nonEmpty(r, chain); authTypeOf(r, authType); trustOf(r, self).client(chain, authType); });
+  def(TMI, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [self, chain, authType, host]) => serverTrusted(r, self, chain, authType, host));
+  def(TMI, 'isUserAddedCertificate', `(${X509})Z`, (r, _m, [self, cert]) => trustOf(r, self).isUserAdded(cert) ? 1 : 0);
+  // X509TrustManagerExtensions wraps the platform's trust manager; for any other TrustManager Android reflects on checkServerTrusted(chain, authType, host) and, finding none, throws -- clients (OkHttp) then build their own chain cleaner
   def(EXT, '<init>', `(${X509TM})V`, (r, _m, [self, manager]) => {
     if (manager === null) r.throwJava('Ljava/lang/NullPointerException;', null);
     if (!r.isSubtype(r.object(manager).type, TMI)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Required method checkServerTrusted(X509Certificate[], String, String) missing');
-    r.object(self).delegate = manager;
+    r.storeField(r.object(self).fields, EXT_KEY, manager);
   });
-  def(EXT, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [, chain]) => { checkChain(r, chain); return asList(r, chain); });
-  def(EXT, 'isUserAddedCertificate', `(${X509})Z`, () => 0);
-  def(EXT, 'isSameTrustConfiguration', `(${STRING}${STRING})Z`, () => 1);
+  const wrapped = (r, self) => r.object(self).fields.get(EXT_KEY);
+  def(EXT, 'checkServerTrusted', `([${X509}${STRING}${STRING})${LIST}`, (r, _m, [self, chain, authType, host]) => serverTrusted(r, wrapped(r, self), chain, authType, host));
+  def(EXT, 'isUserAddedCertificate', `(${X509})Z`, (r, _m, [self, cert]) => trustOf(r, wrapped(r, self)).isUserAdded(cert) ? 1 : 0);
+  def(EXT, 'isSameTrustConfiguration', `(${STRING}${STRING})Z`, (r, _m, [self, a, b]) => trustOf(r, wrapped(r, self)).sameConfiguration(a === null ? null : r.stringCharacters(a), b === null ? null : r.stringCharacters(b)) ? 1 : 0);
 
   // Conscrypt socket classes: only the reflective surface OkHttp inspects at start-up; sockets cannot be created (see the header comment).
   // Conscrypt's OpenSSLSocketFactoryImpl: createSocket returns an SSLSocket over a virtual HTTP socket (src/tls-socket-host.js) -- the browser's fetch does the TLS.
@@ -138,7 +153,12 @@ export function createSecurityHost(platform) {
   def(TMF, 'getDefaultAlgorithm', `()${STRING}`, () => 'PKIX', { static: true });
   def(TMF, 'getInstance', `(${STRING})${TMF}`, (r, _m, [name]) => { const ref = r.allocate(TMF); r.object(ref).algorithm = algorithm(r, name, ['PKIX', 'X509'], 'TrustManagerFactory'); return ref; }, { static: true });
   def(TMF, 'getAlgorithm', `()${STRING}`, (r, _m, [self]) => r.object(self).algorithm);
-  def(TMF, 'init', `(${KEYSTORE})V`, (r, _m, [self]) => { r.object(self).managers = [r.allocate(TMI)]; });
+  // init(KeyStore): one LabTrustManager; with an app's KeyStore its TrustManagerImpl is built now, over that KeyStore's certificates (src/platform-trust.js).
+  def(TMF, 'init', `(${KEYSTORE})V`, (r, _m, [self, keyStore]) => {
+    const manager = r.allocate(TMI);
+    if (keyStore !== null && keyStore !== 0 && keyStore !== undefined) r.storeField(r.object(manager).fields, IMPL_KEY, keyStoreManager(r, keyStore));
+    r.object(self).managers = [manager]; (r.hostStaticValues ??= []).push(manager);
+  });
   def(TMF, 'getTrustManagers', `()[${TM}`, (r, _m, [self]) => { const o = r.object(self); if (!o.managers) r.throwJava('Ljava/lang/IllegalStateException;', 'TrustManagerFactory is not initialized'); return array(r, TM, [...o.managers]); });
   def(KMF, 'getDefaultAlgorithm', `()${STRING}`, () => 'PKIX', { static: true });
   def(KMF, 'getInstance', `(${STRING})${KMF}`, (r, _m, [name]) => { const ref = r.allocate(KMF); r.object(ref).algorithm = algorithm(r, name, ['PKIX', 'X509'], 'KeyManagerFactory'); return ref; }, { static: true });

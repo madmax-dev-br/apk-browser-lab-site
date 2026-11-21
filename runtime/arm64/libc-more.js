@@ -1,12 +1,13 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { BLOCKED } from './cpu.js?v=af8ff7411a95';
-import { formatC, variadic } from './libc.js?v=af8ff7411a95';
-import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=af8ff7411a95';
-import { restrictedNetlink } from './netlink.js?v=af8ff7411a95';
-import { utf8 } from './text.js?v=af8ff7411a95';
+import { deviceMemory, bootUptimeMs } from '../process-memory.js?v=e3ff4f2e305f';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { BLOCKED } from './cpu.js?v=e3ff4f2e305f';
+import { formatC, variadic } from './libc.js?v=e3ff4f2e305f';
+import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=e3ff4f2e305f';
+import { restrictedNetlink } from './netlink.js?v=e3ff4f2e305f';
+import { utf8 } from './text.js?v=e3ff4f2e305f';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -34,7 +35,13 @@ export function addMoreLibc(lib, { runtime } = {}) {
   const vector = (p, c, op) => { const fd = c.x[0], iov = n(c, 1), count = n(c, 2); let total = 0; for (let i = 0; i < count; i++) { const base = p.memory.readPtr(iov + 16 * i), len = p.memory.readPtr(iov + 16 * i + 8); if (!len) continue; c.x[0] = fd; c.x[1] = BigInt(base); c.x[2] = BigInt(len); const r = op(p, c); if (r === BLOCKED) return BLOCKED; const k = Number(BigInt.asIntN(64, BigInt(r))); if (k < 0) return total || r; total += k; if (k < len) break; } return total; };
   lib.readv = (p, c) => vector(p, c, lib.read); lib.writev = (p, c) => vector(p, c, lib.write);
   lib.__pread_chk = lib.__pread64_chk = (p, c) => lib.pread(p, c); lib.__pwrite_chk = lib.__pwrite64_chk = lib.pwrite64 ? (p, c) => lib.pwrite64(p, c) : notProvided('pwrite');
-  lib.__fgets_chk = (p, c) => { c.x[1] = c.x[2]; c.x[2] = c.x[3]; return lib.fgets(p, c); };
+  // bionic's __fgets_chk(dst, supplied_size, stream, dst_len): fgets(dst, supplied_size, stream), its arguments already in place; aborts when supplied_size exceeds the buffer
+  lib.__fgets_chk = (p, c) => {
+    const size = Number(BigInt.asIntN(32, c.x[1])), length = n(c, 3);
+    if (size < 0) throw new APKError(`FORTIFY: fgets: buffer size ${size} < 0 (bionic aborts the process here)`, { kind: 'arm64-abort' });
+    if (size > length) throw new APKError(`FORTIFY: fgets: prevented ${size}-byte write into ${length}-byte buffer (bionic aborts the process here)`, { kind: 'arm64-abort' });
+    return lib.fgets(p, c);
+  };
   lib.__umask_chk = lib.umask = () => 0o022;
   lib.__FD_SET_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.setByte(set + (fd >> 3), p.memory.byte(set + (fd >> 3)) | (1 << (fd & 7))); };
   lib.__FD_CLR_chk = (p, c) => { const fd = s32(c, 0), set = n(c, 1); p.memory.setByte(set + (fd >> 3), p.memory.byte(set + (fd >> 3)) & (~(1 << (fd & 7)))); };
@@ -81,7 +88,13 @@ export function addMoreLibc(lib, { runtime } = {}) {
   // ---- time
   lib.ctime = (p, c) => { const d = new Date(Number(BigInt.asIntN(64, p.memory.read64(n(c, 0)))) * 1000); return p.allocString(d.toUTCString() + '\n'); };
   lib.strptime = (p, c) => { const s = str(p, x(c, 0)), f = str(p, x(c, 1)), tm = n(c, 2); const re = f.replace(/%([YmdHMSjy%])/g, (_, k) => k === 'Y' ? '(\\d{4})' : k === '%' ? '%' : k === 'j' ? '(\\d{1,3})' : '(\\d{1,2})').replace(/%[a-zA-Z]/g, '(\\S+)'); const m = new RegExp('^' + re).exec(s); if (!m) return 0; const keys = [...f.matchAll(/%([a-zA-Z%])/g)].map(k => k[1]).filter(k => k !== '%'); keys.forEach((k, i) => { const v = Number(m[i + 1]); const at = { S: 0, M: 1, H: 2, d: 3, m: 4, Y: 5, y: 5, j: 7 }[k]; if (at === undefined) return; p.memory.writeU32(tm + 4 * at, k === 'm' ? v - 1 : k === 'Y' ? v - 1900 : k === 'y' ? (v < 69 ? v + 100 : v) : k === 'j' ? v - 1 : v); }); return n(c, 0) + encoder.encode(m[0]).length; };
-  lib.sysinfo = (p, c) => { p.memory.fill(n(c, 0), 0, 112); p.memory.write64(n(c, 0), BigInt(Math.floor(performance.now() / 1000))); p.memory.write64(n(c, 0) + 32, 4n << 30n); p.memory.write64(n(c, 0) + 40, 2n << 30n); p.memory.writeU32(n(c, 0) + 104, 1); return 0; };
+  // sysinfo: uptime (the VM clock since boot), totalram / freeram (the device's memory and what the app's process does not hold of it: src/process-memory.js, as
+  // ActivityManager.getMemoryInfo and /proc/meminfo give them), procs (this one process), mem_unit 1; no shared, buffer or swap memory, no load averages kept
+  lib.sysinfo = (p, c) => {
+    const at = n(c, 0), memory = deviceMemory(runtime); p.memory.fill(at, 0, 112);
+    p.memory.write64(at, BigInt(Math.floor(bootUptimeMs(runtime?.platform) / 1000))); p.memory.write64(at + 32, BigInt(memory.total)); p.memory.write64(at + 40, BigInt(memory.available));
+    p.memory.setUint16(at + 80, 1); p.memory.writeU32(at + 104, 1); return 0;
+  };
   // ---- floating-point environment (round to nearest, no traps, no flags kept)
   lib.feclearexcept = lib.fetestexcept = lib.feraiseexcept = lib.fegetround = () => 0; lib.fesetround = (p, c) => n(c, 0) === 0 ? 0 : 1; lib.fegetenv = lib.fesetenv = lib.feholdexcept = lib.feupdateenv = (p, c) => { if (n(c, 0)) p.memory.fill(n(c, 0), 0, 8); return 0; };
   lib.lrint = lib.llrint = (p, c) => BigInt.asUintN(64, BigInt(Math.round(c.getD(0)))); lib.lrintf = lib.llrintf = (p, c) => BigInt.asUintN(64, BigInt(Math.round(c.getS(0))));
@@ -93,7 +106,9 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.sigwait = () => 0;   // the sigset_t functions, sigaction64 and sigprocmask64: src/arm64/signals.js
   lib.posix_fadvise = lib.mlock = lib.munlock = () => 0;   // mincore: src/arm64/libc.js (residency of mapped pages)
   lib.mremap = (p, c) => { const old = n(c, 0), oldSize = n(c, 1), size = n(c, 2), at = p.mapRegion(size, 0x1000); p.memory.copyIn(at, p.memory.bytes(old, Math.min(oldSize, size)).slice()); return at; };
-  lib.memfd_create = (p, c) => { const path = `/memfd/${str(p, x(c, 0))}-${Date.now()}`; c.x[0] = BigInt(p.allocString(path)); c.x[1] = 0o102n; return lib.open(p, c); };
+  // memfd_create: an anonymous file, held in the VM file system under /memfd (the directory is made on first use: without it the file was never created, and the
+  // descriptor read and mapped as empty)
+  lib.memfd_create = (p, c) => { const path = `/memfd/${str(p, x(c, 0))}-${Date.now()}-${(p.memfds = (p.memfds ?? 0) + 1)}`; lib['memfd-dir']?.(); c.x[0] = BigInt(p.allocString(path)); c.x[1] = 0o102n; return lib.open(p, c); };
   lib.truncate = (p, c) => { c.x[0] = BigInt(lib.open(p, { x: [x(c, 0), 2n] })); return lib.ftruncate(p, c); };
   lib.fstatat = lib.fstatat64 = lib.newfstatat = (p, c) => { c.x[0] = c.x[1]; c.x[1] = c.x[2]; return lib.stat(p, c); };
   lib.faccessat = (p, c) => { c.x[0] = c.x[1]; return lib.access(p, c); };
@@ -101,9 +116,8 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.renameat = (p, c) => { c.x[0] = c.x[1]; c.x[1] = c.x[3]; return lib.rename(p, c); };
   lib.link = lib.symlink = lib.symlinkat = lib.linkat = (p) => fail(p, 1);   // EPERM: the app's data directory does not take links here
 
-  // ---- running another program (popen / system through /system/bin/sh, posix_spawn, exec*): the virtual device's file system holds no executables, so these fail as a
-  // device does when the program is not there (ENOENT) or not executable (EACCES), the same rule as java.lang.ProcessBuilder (src/process-native.js). A program that
-  // exists and is executable would need a CPU to run on: an explicit error, never a pretended success.
+  // ---- running another program: the definitions below are replaced by src/arm64/processes.js (fork, the exec family, system, posix_spawn over the lab's process kernel and the
+  // device's /system/bin programs); they stay for a libc made without it.
   const ENV_PATH = () => String(runtime?.platform?.environment?.PATH ?? '/system/bin:/system/xbin');
   const programErrno = program => {
     const fs = runtime?.platform?.javaIo?.fs?.(); if (!fs) return 2;
@@ -124,7 +138,7 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.posix_spawn = (p, c) => { const path = str(p, x(c, 1)), errno = programErrno(path.includes('/') ? path : `./${path}`); record('posix_spawn', path, errno); return errno; };   // returns the error number
   lib.posix_spawnp = (p, c) => { const path = str(p, x(c, 1)), errno = programErrno(path); record('posix_spawnp', path, errno); return errno; };
   for (const name of ['posix_spawnattr_init', 'posix_spawnattr_destroy', 'posix_spawnattr_setflags', 'posix_spawnattr_setsigmask', 'posix_spawnattr_setsigdefault', 'posix_spawn_file_actions_init', 'posix_spawn_file_actions_destroy', 'posix_spawn_file_actions_adddup2', 'posix_spawn_file_actions_addclose', 'posix_spawn_file_actions_addopen']) lib[name] = () => 0;
-  for (const name of ['fork', 'vfork', 'pclose', 'waitpid', 'wait', 'ptrace', 'timer_create', 'timer_settime', 'timer_delete', 'inotify_init1', 'inotify_add_watch', 'splice', 'sendfile', 'sendfile64', 'alarm']) lib[name] = notProvided(name);
+  for (const name of ['inotify_init1', 'inotify_add_watch', 'splice', 'sendfile', 'sendfile64']) lib[name] = notProvided(name);
   // ---- libz.so checksums (zlib crc32.c / adler32.c): crc32 / crc32_z (the reflected CRC-32, polynomial 0xedb88320), adler32 / adler32_z, and their _combine forms. A NULL buffer
   // answers the initial value (0 for crc32, 1 for adler32), as zlib does. zlib's stream functions (inflate, deflate ...) are not provided by the lab and fail by name.
   const CRC_TABLE = new Uint32Array(256).map((_, i) => { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });

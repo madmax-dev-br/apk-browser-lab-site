@@ -187,6 +187,11 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .cp-core legend{padding:0 6px;font-size:14px;font-weight:500;color:var(--ink)}
 .cp-core-grid{grid-template-columns:minmax(0,1fr) 104px;gap:10px 12px;font-size:14px;color:var(--soft)}
 .cp-core .cp-button{margin-top:12px}
+/* "Custom device identity" (Device): the typed names, each with its error under it; the fields dim while the option is off (they stay editable) */
+.cp-custom-identity .cp-field input{width:100%;min-width:0;font-family:var(--mono);font-size:12px}
+.cp-custom-identity .cp-id-error{font-size:12px;line-height:1.4}
+.cp-custom-identity[data-state=off] .cp-field{opacity:.6}
+.cp-custom-identity .cp-field input[aria-invalid=true]{border-color:var(--warn)}
 .vm-memory-hint{margin-left:6px;font-size:12px;font-style:normal;font-weight:500;color:var(--amber-ink)}
 .app-data-row .cp-note{margin:0 0 10px}
 #device-status{margin:14px 0 12px}

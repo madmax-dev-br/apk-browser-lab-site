@@ -1,6 +1,6 @@
-import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
+import { createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
 
 // android.app.Activity public API (API 33) that the platform's Activity model does not carry itself, ported from android-13.0.0_r1 Activity.java and its Window.Callback /
 // KeyEvent.Callback / ComponentCallbacks2 / View.OnCreateContextMenuListener default bodies, plus the Context methods an Activity inherits and the lab has no other owner for.
@@ -606,6 +606,11 @@ export function createActivityApiHost(platform) {
     return { packageName: entry.main ? platform.packageName : entry.name, className: type.slice(1, -1).replace(/\$\$ldr\d+$/, '').replaceAll('/', '.') };
   };
   def(ACTIVITY, 'getCallingPackage', `()${STRING}`, (r, _m, [self]) => callerOf(r, self)?.packageName ?? null);
+  // ActivityRecord.launchedFromUid / launchedFromPackage (hidden Activity API the system's own Activities read): the package whose start made this Activity; an Activity the device
+  // launched itself (the launcher, the page) has none recorded: Process.INVALID_UID and null
+  const launchedFrom = (r, self) => { const intent = frameOf(r, self)?.intent; return intent && typeof intent === 'object' ? r.object(intent).launchedFrom ?? null : null; };
+  def(ACTIVITY, 'getLaunchedFromUid', '()I', (r, _m, [self]) => launchedFrom(r, self)?.uid ?? -1);
+  def(ACTIVITY, 'getLaunchedFromPackage', `()${STRING}`, (r, _m, [self]) => launchedFrom(r, self)?.packageName ?? null);
   def(ACTIVITY, 'getCallingActivity', `()${COMPONENT}`, (r, _m, [self]) => {
     const caller = callerOf(r, self); if (!caller) return null;
     return construct(r, COMPONENT, [STRING, STRING], [caller.packageName, caller.className]);

@@ -39118,5 +39118,45 @@
     "sha256": "24a925faae707fe84a7090712b77239001a980512f022cee096c6f18d15a9ccc",
     "bytes": 1339,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/ChooseTypeAndAccountActivity.java",
+    "localPath": "framework-aosp/upstream/android/accounts/ChooseTypeAndAccountActivity.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/ChooseTypeAndAccountActivity.java?format=TEXT",
+    "sha256": "bfec410cb792a942587dbd8efb1d99deedc3966ea0f7af746f12905c601defd3",
+    "bytes": 27368,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/ChooseAccountTypeActivity.java",
+    "localPath": "framework-aosp/upstream/android/accounts/ChooseAccountTypeActivity.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/ChooseAccountTypeActivity.java?format=TEXT",
+    "sha256": "f117e1027bcc22b2ed0a78d01b1a7fbbf3d92a194e0b8d3d370c1fb40c6a60e7",
+    "bytes": 8104,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/accounts/AuthenticatorDescription.java",
+    "localPath": "framework-aosp/upstream/android/accounts/AuthenticatorDescription.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/accounts/AuthenticatorDescription.java?format=TEXT",
+    "sha256": "cc39d96615c93820f3fd77c3e2dc41ce036961296dc31d1e00d4edfb3e1c5bdb",
+    "bytes": 5471,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/view/animation/ExtendAnimation.java",
+    "localPath": "framework-aosp/upstream/android/view/animation/ExtendAnimation.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/view/animation/ExtendAnimation.java?format=TEXT",
+    "sha256": "634aa76da0b785a513e2384e278279d6a0883e6af5cb881bbfc570dee4f41c56",
+    "bytes": 6693,
+    "license": "Apache-2.0"
   }
 ]

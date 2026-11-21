@@ -1,14 +1,14 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=af8ff7411a95';
-import { staticRetentionLines } from './heap-gc.js?v=af8ff7411a95';
-import { overrideSummaryLines } from './method-overrides.js?v=af8ff7411a95';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=af8ff7411a95';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=af8ff7411a95';
-import { hostMapSummaryLines } from './host-map.js?v=af8ff7411a95';
-import { attributeGap } from './worker-task-log.js?v=af8ff7411a95';
-import { loadImageText } from './load-image.js?v=af8ff7411a95';
-import { identityText } from './device-identity.js?v=af8ff7411a95';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=e3ff4f2e305f';
+import { staticRetentionLines } from './heap-gc.js?v=e3ff4f2e305f';
+import { overrideSummaryLines } from './method-overrides.js?v=e3ff4f2e305f';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=e3ff4f2e305f';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=e3ff4f2e305f';
+import { hostMapSummaryLines } from './host-map.js?v=e3ff4f2e305f';
+import { attributeGap } from './worker-task-log.js?v=e3ff4f2e305f';
+import { loadImageText } from './load-image.js?v=e3ff4f2e305f';
+import { identityText } from './device-identity.js?v=e3ff4f2e305f';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -256,7 +256,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     if (busiest?.length) out.push(`busiest methods: ${busiest.slice(0, 5).join(', ')}`);
   });
   if (out.length <= 1) return [];
-  part(() => out.push(`Device identity (fixed, the same for every app): ${identityText(runtime)}`));   // src/device-identity.js; last, the summary leads with what went wrong
+  part(() => out.push(`Device identity (${runtime?.customIdentity ? 'CUSTOM, typed by the user in the Device panel' : 'fixed, the same for every app'}): ${identityText(runtime)}`));   // src/device-identity.js; a custom identity is marked as such (CLAUDE.md, 2026-11-21); last, the summary leads with what went wrong
   return [...out, '== end of summary =='];
 }
 

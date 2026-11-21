@@ -1,7 +1,7 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=af8ff7411a95';
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
-import { sfntStyle, tagToInt } from './sfnt.js?v=af8ff7411a95';
-import { hasSystemFamily } from './system-fonts.js?v=af8ff7411a95';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=e3ff4f2e305f';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
+import { sfntStyle, tagToInt } from './sfnt.js?v=e3ff4f2e305f';
+import { hasSystemFamily } from './system-fonts.js?v=e3ff4f2e305f';
 
 export { sfntStyle };
 
@@ -150,7 +150,7 @@ export function createTypefaceBuilderHost(platform) {
   };
   const resourcePath = (r, resources, id) => {
     let resolved; try { resolved = platform.resources?.resolve(id) ?? { kind: 'unresolved' }; } catch { resolved = { kind: 'unresolved' }; }
-    if (resolved.kind === 'unresolved' || resolved.kind === 'bag') r.throwJava(NOT_FOUND, `Resource ID #0x${(id >>> 0).toString(16)}`);
+    if (resolved.kind === 'unresolved' || resolved.kind === 'bag') platform.resourceNotFound(r, id, resolved, `Resource ID #0x${(id >>> 0).toString(16)}`);   // Resources.getFont / getFont(TypedValue): getValue first
     return resolved.kind === 'string' ? resolved.value : null;
   };
   const readResource = (r, resources, id) => {

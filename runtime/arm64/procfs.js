@@ -5,7 +5,7 @@
 //   mem         the process's memory at the file offset = address (src/arm64/libc.js reads and writes it; an unmapped address is EIO)
 //   task/       its threads: the main thread, the Java threads that called native code, the threads native code created (src/arm64/threads.js), each with its comm
 //   fd/         its own descriptors beside Java's
-import { processComm } from '../procfs.js?v=af8ff7411a95';
+import { processComm } from '../procfs.js?v=e3ff4f2e305f';
 
 const hex = (value, width = 8) => value.toString(16).padStart(width, '0');
 export const threadComm = processComm;   // ART's SetThreadName applies the same rule to thread names
@@ -20,26 +20,31 @@ export function createProcfs({ runtime = null, fs = () => null, fdFile = () => n
   };
   // a thread's comm: what it set (pthread_setname_np, prctl PR_SET_NAME), else what ART set (the process name for the main thread, the Java name for a Java thread), else its creator's (clone copies it)
   const commOf = (p, t) => t.comm ?? (t.main ? processComm(processName()) : t.java ? processComm(t.name ?? 'Thread') : t.parent ? commOf(p, t.parent) : processComm(processName()));
-  const maps = p => {
-    const lines = [];
-    // show_map_vma: start-end perms offset major:minor inode, then the name padded to column 73 (the lab's files have no device or inode numbers)
-    const add = (start, end, perms, offset, name) => { const head = `${hex(start)}-${hex(end)} ${perms} ${hex(offset)} 00:00 0 `; lines.push({ start, end, text: name ? head.padEnd(73, ' ') + name : head.trimEnd() }); };
+  // the mappings as { start, end, perms, offset, name }: what maps prints, and what the memory figures count (src/process-memory.js)
+  const mappings = p => {
+    const out = [];
     for (const lib of p.order) {
       for (const s of lib.elf?.segments ?? []) {
         if (s.type !== 1) continue;
         const start = Math.floor((lib.base + s.vaddr) / 0x1000) * 0x1000, end = Math.ceil((lib.base + s.vaddr + s.memsz) / 0x1000) * 0x1000;
-        add(start, end, `${s.flags & 4 ? 'r' : '-'}${s.flags & 2 ? 'w' : '-'}${s.flags & 1 ? 'x' : '-'}p`, Math.floor(s.offset / 0x1000) * 0x1000, lib.path ?? lib.name);
+        out.push({ start, end, perms: `${s.flags & 4 ? 'r' : '-'}${s.flags & 2 ? 'w' : '-'}${s.flags & 1 ? 'x' : '-'}p`, offset: Math.floor(s.offset / 0x1000) * 0x1000, name: lib.path ?? lib.name });
       }
     }
-    for (const region of p.regions ?? []) add(region.start, region.end, region.perms, 0, region.name);
-    lines.sort((a, b) => a.start - b.start);
+    for (const region of p.regions ?? []) out.push({ start: region.start, end: region.end, perms: region.perms, offset: 0, name: region.name ?? '' });
+    return out.sort((a, b) => a.start - b.start);
+  };
+  const maps = p => {
+    const lines = [];
+    // show_map_vma: start-end perms offset major:minor inode, then the name padded to column 73 (the lab's files have no device or inode numbers)
+    const add = (start, end, perms, offset, name) => { const head = `${hex(start)}-${hex(end)} ${perms} ${hex(offset)} 00:00 0 `; lines.push({ start, end, text: name ? head.padEnd(73, ' ') + name : head.trimEnd() }); };
+    for (const m of mappings(p)) add(m.start, m.end, m.perms, m.offset, m.name);
     return lines.map(l => l.text).join('\n') + '\n';
   };
   /** Attaches the process `p` to the app's /proc model (at process start, src/arm64/glue.js; again at a lookup if it was not). */
   const attach = p => {
     const model = shared(); if (!model || attached === p) return model;
     attached = p;
-    model.attachNative({ maps: () => maps(p), threads: () => threadsOf(p), currentTid: () => p.threads?.current?.tid ?? p.pid, commOf: t => commOf(p, t), fdFile, fdList }, line => runtime?.record?.(line));
+    model.attachNative({ maps: () => maps(p), mappings: () => mappings(p).map(m => ({ ...m, size: m.end - m.start })), threads: () => threadsOf(p), currentTid: () => p.threads?.current?.tid ?? p.pid, commOf: t => commOf(p, t), fdFile, fdList }, line => runtime?.record?.(line));
     return model;
   };
   /** The libc's view of a path: { data } a file, { names } a directory, { link, deleted, bytes } a link, { mem }, { missing } a /proc path of this process that does not exist; null when the path is not one. */

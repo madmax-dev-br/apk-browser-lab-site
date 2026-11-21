@@ -8,7 +8,7 @@
 // code a library writes, decrypts or patches at run time is decoded again before it runs. The same pages carry the translation tier's regions (src/arm64/translate.js):
 // dropping a page drops its translations.
 
-import { decodeBitMasks, ror, ones } from './cpu.js?v=af8ff7411a95';
+import { decodeBitMasks, ror, ones } from './cpu.js?v=e3ff4f2e305f';
 
 const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 const bit = (word, n) => (word >>> n) & 1, field = (word, lo, width) => (word >>> lo) & ((1 << width) - 1);

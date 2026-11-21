@@ -4,8 +4,8 @@
 // the thread stacks by src/arm64/process.js. An access outside it (the first page of the window included, so NULL plus a small offset) is a segmentation fault: it
 // stops the run with an error naming the address and the instruction, as SIGSEGV would end the process.
 // `u8` and `dv` are views of the buffer itself, indexed by address - base: code outside this file uses the methods, which take addresses.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { Arm64Tier, tierSupported } from './translate.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { Arm64Tier, tierSupported } from './translate.js?v=e3ff4f2e305f';
 
 export class Arm64Memory {
   // The address space is one resizable ArrayBuffer grown in place: the operating system backs its pages only when they are touched, so a large reservation (a runtime that
@@ -18,6 +18,7 @@ export class Arm64Memory {
     this.cpu = null;   // set by the process: names the faulting instruction
     this.base = base;   // the lowest address the buffer holds (the process's window, src/arm64/process.js; 0 for a bare memory)
     this.tier = undefined;   // the translation tier, made by the first CPU that asks (translationTier)
+    this.watchLow = Infinity; this.watchHigh = -Infinity;   // the span of the watched ranges (watch)
     if (translate && bytes % 65536 === 0 && tierSupported()) {
       for (const limit of [maxBytes, 4 * 1024 ** 3, 2 * 1024 ** 3]) {
         try {
@@ -70,24 +71,53 @@ export class Arm64Memory {
   write(address, value, bytes) {
     const at = this.check(address, bytes, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, bytes);
     switch (bytes) {
-      case 1: this.u8[at] = Number(value & 0xffn); return; case 2: this.dv.setUint16(at, Number(value & 0xffffn), true); return;
-      case 4: this.dv.setUint32(at, Number(value & 0xffffffffn), true); return; case 8: this.dv.setBigUint64(at, BigInt.asUintN(64, value), true); return;
+      case 1: this.u8[at] = Number(value & 0xffn); break; case 2: this.dv.setUint16(at, Number(value & 0xffffn), true); break;
+      case 4: this.dv.setUint32(at, Number(value & 0xffffffffn), true); break; case 8: this.dv.setBigUint64(at, BigInt.asUintN(64, value), true); break;
       default: this.dv.setBigUint64(at, BigInt.asUintN(64, value), true); this.dv.setBigUint64(at + 8, BigInt.asUintN(64, value >> 64n), true);
     }
+    if (at < this.watchHigh && at + bytes > this.watchLow) this.watched(at, bytes);
   }
   read64(address) { return this.read(address, 8); } write64(address, value) { this.write(address, BigInt(value), 8); }
-  readU32(address) { return this.dv.getUint32(this.check(address, 4, 'read'), true); } writeU32(address, value) { const at = this.check(address, 4, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, 4); this.dv.setUint32(at, value >>> 0, true); }
+  readU32(address) { return this.dv.getUint32(this.check(address, 4, 'read'), true); } writeU32(address, value) { const at = this.check(address, 4, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, 4); this.dv.setUint32(at, value >>> 0, true); this.after(at, 4); }
   readPtr(address) { return Number(this.read(address, 8)); } writePtr(address, value) { this.write(address, BigInt(value), 8); }
   // single values for the lab's own functions (libc and the rest): typed reads and writes at an address, little-endian unless `little` is false (network byte order)
-  byte(address) { return this.u8[this.check(address, 1, 'read')]; } setByte(address, value) { const at = this.check(address, 1, 'write'); this.written(address, 1); this.u8[at] = value; }
-  int16(address) { return this.dv.getInt16(this.check(address, 2, 'read'), true); } setInt16(address, value) { const at = this.check(address, 2, 'write'); this.written(address, 2); this.dv.setInt16(at, value, true); }
-  uint16(address, little = true) { return this.dv.getUint16(this.check(address, 2, 'read'), little); } setUint16(address, value, little = true) { const at = this.check(address, 2, 'write'); this.written(address, 2); this.dv.setUint16(at, value, little); }
-  int32(address) { return this.dv.getInt32(this.check(address, 4, 'read'), true); } setInt32(address, value) { const at = this.check(address, 4, 'write'); this.written(address, 4); this.dv.setInt32(at, value, true); }
-  float32(address) { return this.dv.getFloat32(this.check(address, 4, 'read'), true); } setFloat32(address, value) { const at = this.check(address, 4, 'write'); this.written(address, 4); this.dv.setFloat32(at, value, true); }
-  float64(address) { return this.dv.getFloat64(this.check(address, 8, 'read'), true); } setFloat64(address, value) { const at = this.check(address, 8, 'write'); this.written(address, 8); this.dv.setFloat64(at, value, true); }
+  byte(address) { return this.u8[this.check(address, 1, 'read')]; } setByte(address, value) { const at = this.check(address, 1, 'write'); this.written(address, 1); this.u8[at] = value; this.after(at, 1); }
+  int16(address) { return this.dv.getInt16(this.check(address, 2, 'read'), true); } setInt16(address, value) { const at = this.check(address, 2, 'write'); this.written(address, 2); this.dv.setInt16(at, value, true); this.after(at, 2); }
+  uint16(address, little = true) { return this.dv.getUint16(this.check(address, 2, 'read'), little); } setUint16(address, value, little = true) { const at = this.check(address, 2, 'write'); this.written(address, 2); this.dv.setUint16(at, value, little); this.after(at, 2); }
+  int32(address) { return this.dv.getInt32(this.check(address, 4, 'read'), true); } setInt32(address, value) { const at = this.check(address, 4, 'write'); this.written(address, 4); this.dv.setInt32(at, value, true); this.after(at, 4); }
+  float32(address) { return this.dv.getFloat32(this.check(address, 4, 'read'), true); } setFloat32(address, value) { const at = this.check(address, 4, 'write'); this.written(address, 4); this.dv.setFloat32(at, value, true); this.after(at, 4); }
+  float64(address) { return this.dv.getFloat64(this.check(address, 8, 'read'), true); } setFloat64(address, value) { const at = this.check(address, 8, 'write'); this.written(address, 8); this.dv.setFloat64(at, value, true); this.after(at, 8); }
   written(address, length) { if (this.decodeCache !== undefined) this.decodeCache.writtenAt(address - this.base, length); }
+  // Watched ranges (MAP_SHARED mappings, src/arm64/libc.js): a write into one is reported to onWrite(address, length) once it is done, so the file and the other mappings of
+  // it see it at once, as one page of memory mapped twice does on a device. The translation tier's stores to watched pages leave to the interpreter, which reports them.
+  watch(address, length) {
+    const at = address - this.base; this.watchLow = Math.min(this.watchLow, at); this.watchHigh = Math.max(this.watchHigh, at + length);
+    (this.watchedPages ??= []).push([Math.floor(at / 4096), Math.ceil((at + length) / 4096)]); this.tier?.watch(Math.floor(at / 4096), Math.ceil((at + length) / 4096));
+  }
+  after(at, length) { if (at < this.watchHigh && at + length > this.watchLow) this.watched(at, length); }
+  watched(at, length) { this.onWrite?.(at + this.base, length); }
+  /** Bytes written into a watched range on behalf of another mapping of the same file: no report back (the caller is the report). */
+  mirror(address, bytes) { const at = this.check(address, bytes.length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, bytes.length); this.u8.set(bytes, at); }
   bytes(address, length) { const at = this.check(address, length, 'read'); return this.u8.subarray(at, at + length); }
-  copyIn(address, data) { const at = this.check(address, data.length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, data.length); this.u8.set(data, at); }
-  fill(address, value, length) { const at = this.check(address, length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, length); this.u8.fill(value, at, at + length); }
+  copyIn(address, data) { const at = this.check(address, data.length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, data.length); this.u8.set(data, at); this.after(at, data.length); }
+  /**
+   * Zero-fills `length` bytes at `address` (a fresh anonymous mapping over existing pages: MAP_FIXED, MADV_DONTNEED). Pages that were never written already read as zero and are
+   * left untouched, so zeroing a large reserved range does not back it: only the 64 KiB chunks that hold a nonzero byte are cleared.
+   */
+  zero(address, length) {
+    const at = this.check(address, length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, length);
+    const CHUNK = 65536, end = at + length;
+    let i = at;
+    for (; i < end && i % 8; i++) this.u8[i] = 0;
+    for (; i + 8 <= end; i += CHUNK) {
+      const words = Math.min(CHUNK, end - i) >>> 3, view = new BigUint64Array(this.u8.buffer, i, words);
+      let dirty = false; for (let k = 0; k < words; k++) if (view[k] !== 0n) { dirty = true; break; }
+      if (dirty) view.fill(0n);
+      if (words * 8 < CHUNK) { i += words * 8; break; }
+    }
+    for (; i < end; i++) this.u8[i] = 0;
+    this.after(at, length);
+  }
+  fill(address, value, length) { const at = this.check(address, length, 'write'); if (this.decodeCache !== undefined) this.decodeCache.writtenAt(at, length); this.u8.fill(value, at, at + length); this.after(at, length); }
   cString(address, limit = 1 << 20) { const at = this.check(address, 1, 'read'); let end = at; while (this.u8[end] !== 0) { end++; if (end - at > limit || end >= this.size) this.fault(address, end - at, 'unterminated string read'); } return this.u8.subarray(at, end); }
 }

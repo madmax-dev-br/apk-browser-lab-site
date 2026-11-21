@@ -218,6 +218,13 @@ export class AndroidResources {
     return `resource ${hex} belongs to package 0x${packageId.toString(16).padStart(2, '0')}, which is not loaded (only the app package and the android framework package are; shared-library and feature-split resource packages are not)`;
   }
   /**
+   * The `absence` of an unresolved lookup: what kind of absence absentReason describes: 'entry' (a package of this table has no entry for the id: AssetManager2 finds nothing, Resources throws NotFoundException),
+   * 'framework' (an android framework id the lab's framework data lacks), 'package' (a shared library the table names, which the lab does not load) or 'unknown' (a package
+   * id no table names, as View.NO_ID (-1) has: nothing on a device defines it either, NotFoundException). An unresolved lookup also carries 'variant' (entries,
+   * none for the device configuration: NotFoundException on Android too) or 'selection' (no configuration selector was given). src/android-platform.js resourceNotFound reads it.
+   */
+  absentKind(id) { const packageId = (Number(id) >>> 0) >>> 24; return packageId === 1 ? 'framework' : this.packages.some(pkg => pkg.id === packageId) ? 'entry' : this.libraries.has(packageId) ? 'package' : 'unknown'; }
+  /**
    * AssetManager2::ResolveReference (android-13.0.0_r1): while the value is a TYPE_REFERENCE to a resource, take that resource's value, one resource per iteration and at most
    * kMaxIterations (20) of them. A style / array / plurals / attr resource (a bag) is represented as a reference to itself. Returns the final value and `ref`, the id of the last
    * resource that was read (TypedValue.resourceId; 0 when the value was not a reference). A reference to a resource that cannot be read ends the walk: the value stays the last
@@ -344,13 +351,13 @@ export class AndroidResources {
     if (!id) return { id, kind: 'null', value: null };
     if (visited.has(id) || visited.size >= 64) return { id, kind: 'unresolved', value: null, reason: 'Cyclic/excessive resource reference chain' };
     const variants = this.entries.get(id);
-    if (!variants) return this.options.resolveExternal?.(id) ?? { id, kind: 'unresolved', value: null, reason: this.absentReason(id) };
-    const selected = this.selectVariant(id);
-    if (!selected || !variants.includes(selected)) return { id, kind: 'unresolved', value: null, reason: typeof this.options.chooseConfiguration === 'function' ? 'No compatible resource variant for the explicit device configuration' : 'No unqualified resource variant; explicit configuration selection required', variants: variants.map((entry) => entry.config) };
+    if (!variants) return this.options.resolveExternal?.(id) ?? { id, kind: 'unresolved', value: null, reason: this.absentReason(id), absence: this.absentKind(id), absent: this.absentKind(id) === 'entry' }   // absent: an id of a loaded package that none of its installed tables defines;
+    const selected = this.selectVariant(id), chooser = typeof this.options.chooseConfiguration === 'function';
+    if (!selected || !variants.includes(selected)) return { id, kind: 'unresolved', value: null, reason: chooser ? 'No compatible resource variant for the explicit device configuration' : 'No unqualified resource variant; explicit configuration selection required', absence: chooser ? 'variant' : 'selection', absent: false, variants: variants.map((entry) => entry.config) };
     if (selected.kind !== 'reference') return { ...selected };
     const chain = new Set(visited); chain.add(id);
     const resolved = this.resolve(selected.reference, chain);
-    return { ...selected, kind: resolved.kind, value: resolved.value, reference: selected.reference, resolved, reason: resolved.reason };
+    return { ...selected, kind: resolved.kind, value: resolved.value, reference: selected.reference, resolved, reason: resolved.reason, ...(resolved.absence ? { absence: resolved.absence, absent: resolved.absent } : {}) };
   }
   parseLayout(bytes) {
     const r = new Reader(bytes), root = r.chunk(0);

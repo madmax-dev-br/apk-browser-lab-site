@@ -1,4 +1,4 @@
-import { APKError } from './apk-runtime.js?v=af8ff7411a95';
+import { APKError } from './apk-runtime.js?v=e3ff4f2e305f';
 const PARSER = 'Landroid/content/res/XmlBlock$Parser;', PULL = 'Lorg/xmlpull/v1/XmlPullParser;', ATTRS = 'Landroid/util/AttributeSet;', RES_PARSER = 'Landroid/content/res/XmlResourceParser;';
 const ANDROID = 'http://schemas.android.com/apk/res/android';
 const methods = [
@@ -48,7 +48,8 @@ export class AndroidXmlHost {
     if (method.owner === 'Landroid/util/Xml;') { const value = args[0]; if (!value || !runtime.object(value).events) fail('asAttributeSet requires the real prepared binary parser'); return value; }
     if (method.owner === 'Landroid/content/res/Resources;' && name === 'getAttributeSetSourceResId') return args[0]?.ref ? runtime.object(args[0]).resourceId || 0 : 0;
     // Resources.getLayout is what LayoutInflater and MenuInflater parse: the tags of such a tree are Views, LayoutParams and menu entries (markLayout).
-    if (method.owner === 'Landroid/content/res/Resources;') { this.parsingLayout = name === 'getLayout'; try { return this.create(runtime, this.platform.resources.getXml(args[1]), args[1]); } finally { this.parsingLayout = false; } }
+    // ResourcesImpl.loadXmlResourceParser first reads the id's value: none is Resources.NotFoundException("Resource ID #0x.."), a value that is not a file path "... type #0x.. is not valid"
+    if (method.owner === 'Landroid/content/res/Resources;') { const tree = this.platform.xmlResource(runtime, args[1], `xml type ${{ getLayout: 'layout', getAnimation: 'anim' }[name] ?? 'xml'}`); this.parsingLayout = name === 'getLayout'; try { return this.create(runtime, tree, args[1]); } finally { this.parsingLayout = false; } }
     const parser = runtime.object(args[0]);
     if (name === 'getPooledString') { const text = parser.pooledStrings?.get(args[1]); if (text === undefined) fail(`pool index ${args[1]} is not prepared`); return text; }
     if (name === 'close') { parser.closed = true; return; }

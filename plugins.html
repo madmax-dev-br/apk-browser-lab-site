@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=af8ff7411a95">
-  <link rel="stylesheet" href="./lab-tokens.css?v=af8ff7411a95">
+  <link rel="stylesheet" href="./site-pages.css?v=e3ff4f2e305f">
+  <link rel="stylesheet" href="./lab-tokens.css?v=e3ff4f2e305f">
 </head>
 <body>
   <header class="topbar">
@@ -1268,6 +1268,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
           <li><a href="#ex-recarregar">Reload button next to the device</a></li>
           <li><a href="#ex-dica">Tip on a component</a></li>
           <li><a href="#ex-nota">Note that scrolls with an item</a></li>
+          <li><a href="#ex-di">Dependency injection inspector</a></li>
         </ul>
 
         <h3 id="ex-tela-atual">Current screen</h3>
@@ -1669,6 +1670,179 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
   item: visible ? `y ${e.bounds.top} dp in the window · ${Math.round(e.rect.y)} px on the page` : 'off screen',
 }, { id: 'where' }));</code></pre></div>
         <figure class="ex-shot anim"><img src="./plugin-examples/ex-nota.gif" width="520" height="672" loading="lazy" decoding="async" alt="The Note that scrolls with an item example running in the lab, in the approvals example app"><figcaption>The note pinned to the order “Monitor para QA” after scrolling the list (here <code>ITEM = { text: 'Monitor para QA' }</code>): the list scrolls down and back, and the note follows the item.</figcaption></figure>
+      
+        <h3 id="ex-di">Dependency injection inspector</h3>
+        <p>Finds which dependency injection libraries the app ships (Koin, Dagger / Hilt, Kodein, Toothpick, kotlin-inject, Metro, Guice) and lists what their containers hold right now: each binding, its kind (single, factory, scoped), whether the instance was already created, and its class and handle. <b>DI window</b> opens the full table in a window with a filter and an "only created" switch; <b>Rescan DI</b> reads again. Read-only: it never calls a container, so nothing is created by looking. Also in the repository as <code>docs/plugins/di-inspector.js</code>.</p>
+        <div class="code" data-name="Dependency injection inspector"><pre><code>// Dependency injection inspector (a plugin for Controls › Plugins: paste this file as the plugin's code).
+// Finds which DI libraries the open app ships and lists what their containers hold right now: Koin (definitions, singletons created, scoped values), Dagger / Hilt
+// (DoubleCheck and SingleCheck providers, created or not, and the generated components), Kodein (singletons and multitons), Toothpick (scopes and bindings) and
+// kotlin-inject / Metro / Guice (components found). Read-only: it reads the fields the objects already have (lab.instances, lab.inspect, lab.field); it never calls
+// a container (no koin.get, no component method), so nothing is created by looking. A minified app keeps the library's classes but may rename their fields: the
+// plugin finds the parts by their types, not by field names. Button "DI window" opens the full table in a window with a filter.
+const LIMIT = 400;   // objects read per library
+const libs = [
+  { id: 'koin', name: 'Koin', marker: 'org.koin.core.Koin' },
+  { id: 'dagger', name: 'Dagger / Hilt', marker: 'dagger.internal.DoubleCheck' },
+  { id: 'kodein', name: 'Kodein', marker: 'org.kodein.di.DI' },
+  { id: 'toothpick', name: 'Toothpick', marker: 'toothpick.Toothpick' },
+  { id: 'kinject', name: 'kotlin-inject', marker: 'me.tatarka.inject.annotations.Component' },
+  { id: 'metro', name: 'Metro', marker: 'dev.zacsweers.metro.DependencyGraph' },
+  { id: 'guice', name: 'Guice', marker: 'com.google.inject.Injector' },
+];
+const short = type =&gt; String(type ?? '').replace(/^.*[.$](?=[^.$]+$)/, '');
+const typeOf = value =&gt; value &amp;&amp; typeof value === 'object' ? value.$type ?? value.$kind ?? 'object' : typeof value;
+const describe = value =&gt; {
+  if (value === null || value === undefined) return '—';
+  if (typeof value !== 'object') return String(value).slice(0, 120);
+  if (value.$kind === 'enum') return value.name;
+  if (value.$kind) return `${value.$kind}${value.size !== undefined ? ` (${value.size})` : ''}`;
+  return value.$type ?? 'object';
+};
+/** Every object in an inspect result, depth first: [{ path, value }]. */
+function walk(value, path = [], out = [], seen = new Set()) {
+  if (!value || typeof value !== 'object' || out.length &gt; 5000) return out;
+  if (value.$handle) { if (seen.has(value.$handle)) return out; seen.add(value.$handle); }
+  out.push({ path, value });
+  if (value.fields) for (const [name, field] of Object.entries(value.fields)) walk(field, [...path, name], out, seen);
+  if (Array.isArray(value.items)) value.items.forEach((item, i) =&gt; walk(item, [...path, i], out, seen));
+  if (Array.isArray(value.entries)) value.entries.forEach(([key, item], i) =&gt; walk(item, [...path, `[${typeof key === 'object' ? describe(key) : key}]`], out, seen));
+  return out;
+}
+async function present(className) {
+  try { const found = await lab.classes(className, { limit: 5 }); return (found.items ?? []).find(item =&gt; item.className === className) ?? null; } catch { return null; }
+}
+async function allInstances(className, max = LIMIT) {
+  const items = []; let after = 0;
+  for (let page = 0; page &lt; 40 &amp;&amp; items.length &lt; max; page++) {
+    let result; try { result = await lab.instances(className, { limit: Math.min(50, max - items.length), after }); } catch { break; }
+    items.push(...(result.items ?? [])); if (result.done || result.next === null || result.next === undefined) break; after = result.next;
+  }
+  return items;
+}
+async function inspectMany(handles, options) {
+  const out = [];
+  for (let i = 0; i &lt; handles.length; i += 40) {
+    const results = await lab.batch(handles.slice(i, i + 40).map(handle =&gt; ['inspect', handle, options]));
+    for (const result of results) out.push(result.ok ? result.value : null);
+  }
+  return out;
+}
+
+// ---- Koin: Koin -&gt; InstanceRegistry -&gt; map of IndexKey ("type:qualifier:scope") to InstanceFactory (Single / Factory / Scoped), whose BeanDefinition says the kind
+async function readKoin() {
+  const rows = [], koins = await allInstances('org.koin.core.Koin', 4);
+  for (const koin of koins) {
+    const tree = await lab.inspect(koin.handle, { depth: 3, maxItems: 2000, maxFields: 50, maxString: 300 });
+    const maps = walk(tree).filter(({ value }) =&gt; value.$kind === 'map' &amp;&amp; (value.entries ?? []).some(([, item]) =&gt; /InstanceFactory/.test(item?.$type ?? '')));
+    for (const { value: map } of maps) {
+      const entries = (map.entries ?? []).slice(0, LIMIT);
+      const factories = await inspectMany(entries.map(([, item]) =&gt; item.$handle).filter(Boolean), { depth: 2, maxFields: 30, maxItems: 20, maxString: 200 });
+      entries.forEach(([key, item], i) =&gt; {
+        const factory = factories[i], kindName = /Single/.test(item.$type) ? 'single' : /Scoped/.test(item.$type) ? 'scoped' : /Factory/.test(item.$type) ? 'factory' : short(item.$type);
+        let instance = null, created = kindName === 'factory' ? 'per call' : 'not yet';
+        for (const [name, field] of Object.entries(factory?.fields ?? {})) {
+          if (/BeanDefinition/.test(field?.$type ?? '')) continue;
+          if (kindName === 'single' &amp;&amp; field &amp;&amp; typeof field === 'object' &amp;&amp; field.$type &amp;&amp; !/^kotlin\.jvm\.functions|Function|Lambda|\$\$/.test(field.$type)) { instance = field; created = 'created'; }
+          if (kindName === 'scoped' &amp;&amp; field?.$kind === 'map') { created = `${field.size} scope(s)`; instance = (field.entries ?? [])[0]?.[1] ?? null; }
+          void name;
+        }
+        rows.push({ library: 'Koin', container: short(koin.className), key: typeof key === 'string' ? key : describe(key), kind: kindName, state: created, instance: instance ? describe(instance) : '—', handle: instance?.$handle ?? '' });
+      });
+    }
+  }
+  return rows;
+}
+// ---- Dagger / Hilt: each scoped binding is a DoubleCheck (or SingleCheck) provider; its instance field holds the object once created, a sentinel before
+async function readDagger() {
+  const rows = [];
+  for (const provider of ['dagger.internal.DoubleCheck', 'dagger.internal.SingleCheck']) {
+    const found = await allInstances(provider);
+    const trees = await inspectMany(found.map(item =&gt; item.handle), { depth: 1, maxFields: 10, maxString: 200 });
+    trees.forEach((tree, i) =&gt; {
+      const fields = Object.values(tree?.fields ?? {}), held = fields.find(field =&gt; field &amp;&amp; typeof field === 'object' &amp;&amp; field.$type &amp;&amp; field.$type !== 'java.lang.Object' &amp;&amp; !/Provider|Factory_|_Factory|MembersInjector|^javax\.inject/.test(field.$type));
+      const inner = fields.find(field =&gt; /Provider|Factory/.test(field?.$type ?? ''));
+      rows.push({ library: 'Dagger / Hilt', container: short(provider), key: inner ? short(inner.$type) : '—', kind: provider.endsWith('DoubleCheck') ? 'scoped (DoubleCheck)' : 'single-check', state: held ? 'created' : 'not yet', instance: held ? describe(held) : '—', handle: held?.$handle ?? found[i].handle });
+    });
+  }
+  try {
+    const components = await lab.classes('/^Dagger[A-Za-z0-9_$]*Component$|_HiltComponents_|^Hilt_|_Impl$/', { limit: 60, initialized: true });
+    for (const item of components.items ?? []) if (/Dagger|Hilt/.test(item.className)) rows.push({ library: 'Dagger / Hilt', container: 'component class', key: item.className, kind: 'generated', state: item.status, instance: '—', handle: '' });
+  } catch { /* a regex the VM refused: the providers above still list the objects */ }
+  return rows;
+}
+// ---- Kodein: singletons and multitons keep their instance in a holder field
+async function readKodein() {
+  const rows = [];
+  for (const binding of ['org.kodein.di.bindings.Singleton', 'org.kodein.di.bindings.Multiton', 'org.kodein.di.bindings.EagerSingleton']) {
+    const found = await allInstances(binding);
+    const trees = await inspectMany(found.map(item =&gt; item.handle), { depth: 2, maxFields: 20, maxString: 200 });
+    trees.forEach((tree, i) =&gt; {
+      const objects = walk(tree).slice(1).map(({ value }) =&gt; value).filter(value =&gt; value.$type &amp;&amp; !/^org\.kodein|^kotlin\.|^java\.lang\.(Object|Class)$|Function|Lambda/.test(value.$type));
+      rows.push({ library: 'Kodein', container: short(binding), key: describe(tree?.fields?.createdType ?? tree?.fields?.type ?? Object.values(tree?.fields ?? {}).find(field =&gt; /TypeToken/.test(field?.$type ?? ''))), kind: short(binding).toLowerCase(), state: objects.length ? 'created' : 'not yet', instance: objects.length ? describe(objects[0]) : '—', handle: objects[0]?.$handle ?? found[i].handle });
+    });
+  }
+  return rows;
+}
+// ---- Toothpick: scopes and the bindings each holds
+async function readToothpick() {
+  const rows = [], scopes = await allInstances('toothpick.ScopeImpl', 100);
+  const trees = await inspectMany(scopes.map(item =&gt; item.handle), { depth: 2, maxFields: 30, maxItems: 200, maxString: 200 });
+  trees.forEach((tree, i) =&gt; {
+    const maps = walk(tree).filter(({ value }) =&gt; value.$kind === 'map');
+    for (const { value: map } of maps) for (const [key, item] of map.entries ?? []) rows.push({ library: 'Toothpick', container: `scope ${describe(tree?.fields?.name)}`, key: describe(key), kind: short(item?.$type), state: '—', instance: describe(item), handle: item?.$handle ?? scopes[i].handle });
+  });
+  return rows;
+}
+async function readComponents(lib) {
+  const pattern = { kinject: '/^Inject[A-Za-z0-9_$]*Component$/', metro: '/\\$\\$Metro|MetroGraph/', guice: '/Injector|Module$/' }[lib.id];
+  const found = await lab.classes(pattern, { limit: 60 }).catch(() =&gt; ({ items: [] }));
+  return (found.items ?? []).map(item =&gt; ({ library: lib.name, container: 'class', key: item.className, kind: 'generated', state: item.status, instance: '—', handle: '' }));
+}
+
+let rows = [], detected = [], appName = null;
+let running = null;   // one scan at a time: 'ready' and Refresh can fire while one runs
+function scan() { running ??= scanOnce().finally(() =&gt; { running = null; }); return running; }
+async function scanOnce() {
+  lab.ui.text('Scanning…', { id: 'status' });
+  detected = [];
+  for (const lib of libs) { const cls = await present(lib.marker); if (cls) detected.push({ ...lib, status: cls.status }); }
+  const screen = await lab.screen(); appName = lab.info.packageName ?? screen.packageName ?? null;
+  lab.ui.kv({ app: appName ?? '—', activity: screen.activity ?? '—', 'DI libraries': detected.map(lib =&gt; `${lib.name} (${lib.status})`).join(', ') || 'none found' }, { id: 'summary' });
+  rows = [];
+  for (const lib of detected) {
+    try {
+      if (lib.id === 'koin') rows.push(...await readKoin());
+      else if (lib.id === 'dagger') rows.push(...await readDagger());
+      else if (lib.id === 'kodein') rows.push(...await readKodein());
+      else if (lib.id === 'toothpick') rows.push(...await readToothpick());
+      else rows.push(...await readComponents(lib));
+    } catch (error) { rows.push({ library: lib.name, container: '—', key: `could not read: ${error.message}`, kind: '—', state: '—', instance: '—', handle: '' }); }
+  }
+  const seen = new Set(); rows = rows.filter(row =&gt; { const key = [row.library, row.container, row.kind, row.key, row.handle].join('|'); if (seen.has(key)) return false; seen.add(key); return true; });   // a map reached by two paths is read once
+  const created = rows.filter(row =&gt; row.state === 'created').length;
+  lab.ui.text(`${rows.length} bindings / objects, ${created} created · ${new Date().toLocaleTimeString()}`, { id: 'status' });
+  lab.ui.table(rows.slice(0, 500).map(row =&gt; [row.library, row.kind, row.state, row.key, row.instance]), ['Library', 'Kind', 'State', 'Binding', 'Instance'], { id: 'bindings' });
+  return rows;
+}
+const escape = text =&gt; String(text ?? '').replace(/[&amp;&lt;&gt;"']/g, ch =&gt; ({ '&amp;': '&amp;amp;', '&lt;': '&amp;lt;', '&gt;': '&amp;gt;', '"': '&amp;quot;', "'": '&amp;#39;' })[ch]);
+function windowHtml() {
+  const order = { created: 0 }, sorted = [...rows].sort((a, b) =&gt; (order[a.state] ?? 1) - (order[b.state] ?? 1) || a.library.localeCompare(b.library) || a.key.localeCompare(b.key));
+  const head = '&lt;tr&gt;&lt;th&gt;Library&lt;/th&gt;&lt;th&gt;Kind&lt;/th&gt;&lt;th&gt;State&lt;/th&gt;&lt;th&gt;Binding&lt;/th&gt;&lt;th&gt;Instance&lt;/th&gt;&lt;th&gt;Handle&lt;/th&gt;&lt;/tr&gt;';
+  const body = sorted.map(row =&gt; `&lt;tr data-created="${row.state === 'created'}" data-text="${escape(Object.values(row).join(' ').toLowerCase())}"&gt;&lt;td class="n"&gt;${escape(row.library)}${row.container &amp;&amp; row.container !== row.library &amp;&amp; row.container !== 'Koin' ? `&lt;br&gt;&lt;small&gt;${escape(row.container)}&lt;/small&gt;` : ''}&lt;/td&gt;&lt;td class="n"&gt;${escape(row.kind)}&lt;/td&gt;&lt;td class="n ${row.state === 'created' ? 'on' : ''}"&gt;${escape(row.state)}&lt;/td&gt;&lt;td&gt;${escape(row.key.replace(/::_root_$/, ''))}&lt;/td&gt;&lt;td&gt;${escape(row.instance)}&lt;/td&gt;&lt;td class="n"&gt;&lt;code&gt;${escape(row.handle)}&lt;/code&gt;&lt;/td&gt;&lt;/tr&gt;`).join('');
+  const libsText = detected.length ? detected.map(lib =&gt; `${escape(lib.name)} &lt;small&gt;(${escape(lib.status)})&lt;/small&gt;`).join(' · ') : 'no DI library found';
+  const created = rows.filter(row =&gt; row.state === 'created').length;
+  return `&lt;style&gt;body{font:13px system-ui,sans-serif;margin:0;padding:12px;color:#ddd;background:#16181d}.bar{display:flex;gap:12px;align-items:center;margin:8px 0}input[type=search]{flex:1;padding:6px 8px;background:#22252c;color:#eee;border:1px solid #3a3f4a;border-radius:6px}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:4px 6px;border-bottom:1px solid #2c3039;vertical-align:top;word-break:break-word}td.n,th{white-space:nowrap}th{position:sticky;top:0;background:#1d2027}td.on{color:#7ee08a}code{font-size:11px;color:#9aa}small{color:#999}&lt;/style&gt;
+&lt;div&gt;&lt;b&gt;${escape(appName ?? 'app')}&lt;/b&gt; — ${libsText}&lt;/div&gt;
+&lt;div class="bar"&gt;&lt;input id="q" type="search" placeholder="Filter (library, type, state…)" autofocus&gt;&lt;label&gt;&lt;input id="c" type="checkbox"&gt; only created (${created})&lt;/label&gt;&lt;span id="count"&gt;${rows.length} rows&lt;/span&gt;&lt;/div&gt;
+&lt;table&gt;&lt;thead&gt;${head}&lt;/thead&gt;&lt;tbody&gt;${body}&lt;/tbody&gt;&lt;/table&gt;
+&lt;script&gt;const q=document.getElementById('q'),c=document.getElementById('c'),rows=[...document.querySelectorAll('tbody tr')],count=document.getElementById('count');function apply(){const t=q.value.toLowerCase().trim();let n=0;for(const r of rows){const show=(!t||r.dataset.text.includes(t))&amp;&amp;(!c.checked||r.dataset.created==='true');r.hidden=!show;if(show)n++;}count.textContent=n+' of '+rows.length+' rows';}q.addEventListener('input',apply);c.addEventListener('change',apply);&lt;/script&gt;`;
+}
+await lab.button({ id: 'rescan', label: 'Rescan DI' }, () =&gt; scan());
+await lab.button({ id: 'window', label: 'DI window' }, async () =&gt; { if (!rows.length) await scan(); await lab.modal.open({ title: `Dependency injection — ${appName ?? 'app'}`, size: 'full', html: windowHtml() }); });
+lab.on('refresh', () =&gt; scan());
+lab.on('ready', () =&gt; scan());
+await scan();</code></pre></div>
       </section>
 
       <nav class="see-also" aria-label="Keep reading">
@@ -1678,6 +1852,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=af8ff7411a95"></script>
+  <script type="module" src="./site-pages.js?v=e3ff4f2e305f"></script>
 </body>
 </html>

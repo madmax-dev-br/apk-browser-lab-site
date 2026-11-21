@@ -1,7 +1,7 @@
-import { APP_PID, SYSTEM_SERVER_PID } from './virtual-pids.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
+import { APP_PID, SYSTEM_SERVER_PID } from './virtual-pids.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
 
 /**
  * Thrown by a host method that needs another package's process while that process starts on the main thread (ensureProcess off the main thread): the Java call site that
@@ -10,8 +10,9 @@ import { Blocked } from './scheduler.js?v=af8ff7411a95';
 export class ProcessStartPending extends Error {
   constructor(blocked) { super(blocked.reason); this.name = 'ProcessStartPending'; this.blocked = blocked; }
 }
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=af8ff7411a95';
-import { AndroidResources } from './android-resources.js?v=af8ff7411a95';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=e3ff4f2e305f';
+import { AndroidResources } from './android-resources.js?v=e3ff4f2e305f';
+import { isSystemActivityCode } from './system-activities.js?v=e3ff4f2e305f';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -97,10 +98,18 @@ export function createPackageRegistry(platform) {
     return null;
   };
   /**
-   * The process that makes a call to a system service (the uid a system service sees as Binder.getCallingUid): the package whose code runs; with no package code on the stack, the
-   * caller of the transaction this thread serves, else the app.
+   * Whether the code running on this thread is one of the system's own Activities (src/system-activities.js: the account chooser of the "android" package): its nearest frame of a class that
+   * is not plain framework code is a system Activity class. On a device that code runs in the system's process as uid 1000, so its calls to system services are the system's.
    */
-  const serviceCaller = runtime => codeEntry(runtime) ?? (inTransaction(runtime) ? callingIdentity(runtime).entry : main);
+  const systemUiCode = runtime => {
+    for (const method of runtime.captureStack?.() ?? []) { const owner = method?.owner; if (!owner) continue; if (isSystemActivityCode(owner)) return true; if (entryOfClass(runtime, owner)) return false; }
+    return false;
+  };
+  /**
+   * The process that makes a call to a system service (the uid a system service sees as Binder.getCallingUid): the package whose code runs (the system for its own Activities); with no
+   * package code on the stack, the caller of the transaction this thread serves, else the app.
+   */
+  const serviceCaller = runtime => systemUiCode(runtime) ? system : codeEntry(runtime) ?? (inTransaction(runtime) ? callingIdentity(runtime).entry : main);
   /** The package a Context belongs to: the ContextImpl at the end of its baseContext chain records it; the app's contexts record none. */
   const contextEntry = (runtime, context) => {
     if (!companions.size) return main;
@@ -386,7 +395,7 @@ export function createPackageRegistry(platform) {
     NOT_HANDLED,
     get multi() { return companions.size > 0; },
     main, entries, companions: () => [...companions.values()], byName, byUid, install, refs,
-    system, callerByName, inTransaction, codeEntry, serviceCaller,
+    system, callerByName, inTransaction, codeEntry, serviceCaller, systemUiCode,
     callerEntry, contextEntry, entryOfClass, withCaller, enterCaller, leaveCaller, bindThreadCaller, callingIdentity, callingPackage, clearCallingIdentity, restoreCallingIdentity,
     loaderOf, readingLoader, typeIn, newContext, resourceValue, resourcesEnvironment, packageResources, hasResources, baseContext, application, ensureProcess, applicationInfoFor, processOf, metaData,
     detailsOf, exported, providerFor, providerInstance, providerOwner, providerOwners,

@@ -1,8 +1,9 @@
-import { procFdFile } from './libcore-io-native.js?v=af8ff7411a95';
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
-import { Invoke } from './interpreter.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=af8ff7411a95';
+import { procFdFile } from './libcore-io-native.js?v=e3ff4f2e305f';
+import { processCpuMs } from './process-memory.js?v=e3ff4f2e305f';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
+import { Invoke } from './interpreter.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=e3ff4f2e305f';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -479,8 +480,8 @@ export function createSystemServicesHost(platform) {
   def(LOGGER, 'getLevel', `()${LEVEL}`, (r, _m, [self]) => { const v = r.object(self).logger.level; return v === null ? null : levelOf(r, Object.keys(levels).find(k => levels[k] === v)); });
   def(LOGGER, 'setUseParentHandlers', '(Z)V', (r, _m, [self, value]) => { lg(r, self).useParent = !!value; });
 
-  // ---- java.lang.System.getenv: environment of a zygote-forked Android 13 app process ----------------------------
-  const ENV = { ANDROID_ROOT: '/system', ANDROID_DATA: '/data', ANDROID_STORAGE: '/storage', ANDROID_ASSETS: '/system/app', ANDROID_ART_ROOT: '/apex/com.android.art', ANDROID_I18N_ROOT: '/apex/com.android.i18n', ANDROID_TZDATA_ROOT: '/apex/com.android.tzdata', ANDROID_RUNTIME_ROOT: '/apex/com.android.runtime', EXTERNAL_STORAGE: '/sdcard', ASEC_MOUNTPOINT: '/mnt/asec', PATH: '/product/bin:/apex/com.android.runtime/bin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin', ANDROID_BOOTLOGO: '1' };
+  // ---- java.lang.System.getenv: environment of a zygote-forked Android 13 app process (system/core rootdir/init.environ.rc; PATH is bionic's _PATH_DEFPATH, which init sets) --
+  const ENV = { ANDROID_ROOT: '/system', ANDROID_DATA: '/data', ANDROID_STORAGE: '/storage', ANDROID_ASSETS: '/system/app', ANDROID_ART_ROOT: '/apex/com.android.art', ANDROID_I18N_ROOT: '/apex/com.android.i18n', ANDROID_TZDATA_ROOT: '/apex/com.android.tzdata', ANDROID_RUNTIME_ROOT: '/apex/com.android.runtime', EXTERNAL_STORAGE: '/sdcard', ASEC_MOUNTPOINT: '/mnt/asec', PATH: '/product/bin:/apex/com.android.runtime/bin:/apex/com.android.art/bin:/system_ext/bin:/system/bin:/system/xbin:/odm/bin:/vendor/bin:/vendor/xbin', ANDROID_BOOTLOGO: '1' };
   platform.environment = ENV;   // the process environment libcore's Linux.getenv/environ report
   def('Ljava/lang/System;', 'getenv', '(Ljava/lang/String;)Ljava/lang/String;', (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null'); return ENV[r.stringCharacters(name)] ?? null; }, { static: true });
 
@@ -539,14 +540,14 @@ export function createSystemServicesHost(platform) {
 
   // ---- android.os.Process (android-13.0.0_r1 Process.java) ----------------------------------------------------------
   const PROCESS = 'Landroid/os/Process;';
-  const threadPriorities = new Map(); // tid -> nice value; the single-threaded VM has no scheduler, so priorities are recorded, never enforced
+  const threadPriorities = platform.threadPriorities ??= new Map(); // tid -> nice value; the single-threaded VM has no scheduler, so priorities are recorded, never enforced (/proc/self/stat reads the main thread's)
   for (const [name, value] of Object.entries({ THREAD_PRIORITY_DEFAULT: 0, THREAD_PRIORITY_LOWEST: 19, THREAD_PRIORITY_BACKGROUND: 10, THREAD_PRIORITY_FOREGROUND: -2, THREAD_PRIORITY_DISPLAY: -4, THREAD_PRIORITY_URGENT_DISPLAY: -8, THREAD_PRIORITY_AUDIO: -16, THREAD_PRIORITY_URGENT_AUDIO: -19, THREAD_PRIORITY_MORE_FAVORABLE: -1, THREAD_PRIORITY_LESS_FAVORABLE: 1, SYSTEM_UID: 1000, FIRST_APPLICATION_UID: 10000, LAST_APPLICATION_UID: 19999, ROOT_UID: 0 }))
     registry.staticField(PROCESS, name, 'I', () => value);
   // Process.myProcessName() (API 33): the app's process name, android:process on <application> (":x" is package-private) or the package name.
   def(PROCESS, 'myProcessName', '()Ljava/lang/String;', () => { const process = platform.manifest?.application?.process, pkg = platform.packageName; return process ? (process.startsWith(':') ? pkg + process : process) : pkg; }, { static: true });
   def(PROCESS, 'myUserHandle', '()Landroid/os/UserHandle;', r => r.dispatch({ owner: 'Landroid/os/UserHandle;', name: 'of', parameters: ['I'], result: 'Landroid/os/UserHandle;', signature: '(I)Landroid/os/UserHandle;' }, [0], 'static'), { static: true });   // the single user (0)
   def(PROCESS, 'is64Bit', '()Z', r => r.arm64 ? 1 : 0, { static: true }); // the VM's native word is wasm32 (Build.SUPPORTED_ABIS = wasm32), so VMRuntime.is64Bit() is false
-  const processStart = platform.clock.now(); // the virtual process starts when the VM is created; uptime/elapsed clocks both count from VM creation (SystemClock bridge uses platform.clock.now())
+  const processStart = platform.processStartMs ??= platform.clock.now(); // the virtual process starts when the VM is created; uptime/elapsed clocks both count from VM creation (SystemClock bridge uses platform.clock.now()); /proc/self/stat's starttime
   for (const name of ['getStartUptimeMillis', 'getStartElapsedRealtime', 'getStartRequestedUptimeMillis', 'getStartRequestedElapsedRealtime']) def(PROCESS, name, '()J', () => BigInt(Math.floor(processStart)), { static: true });
   // ---- android.text.TextUtils: the framework DEX carries only the span/ellipsis half of TextUtils; the plain string helpers apps call are reimplemented here from the AOSP bodies
   // (android-13.0.0_r1 TextUtils.java: join, isDigitsOnly, split, concat, getTrimmedLength, htmlEncode). isEmpty/equals stay VM bridges.
@@ -634,7 +635,7 @@ export function createSystemServicesHost(platform) {
   def(PROCESS, 'setThreadPriority', '(I)V', (_r, _m, [priority]) => { if (priority < -20 || priority > 19) _r.throwJava('Ljava/lang/IllegalArgumentException;', 'Priority ' + priority + ' out of range'); threadPriorities.set(platform.virtualProcess.pid, priority); }, { static: true });
   def(PROCESS, 'setThreadPriority', '(II)V', (r, _m, [tid, priority]) => { if (priority < -20 || priority > 19) r.throwJava('Ljava/lang/IllegalArgumentException;', 'Priority ' + priority + ' out of range'); threadPriorities.set(tid, priority); }, { static: true });
   def(PROCESS, 'getThreadPriority', '(I)I', (_r, _m, [tid]) => threadPriorities.get(tid) ?? 0, { static: true });
-  def(PROCESS, 'getElapsedCpuTime', '()J', () => BigInt(Math.floor(platform.clock.now())), { static: true });
+  def(PROCESS, 'getElapsedCpuTime', '()J', r => BigInt(Math.floor(processCpuMs(r))), { static: true });   // the process's CPU time (src/process-memory.js), as /proc/self/stat's utime
   def(PROCESS, 'isApplicationUid', '(I)Z', (_r, _m, [uid]) => { const app = uid % 100000; return app >= 10000 && app <= 19999 ? 1 : 0; }, { static: true });
   def(PROCESS, 'killProcess', '(I)V', (r, _m, [pid]) => { throw new APKError(`Process.killProcess(${pid}): the app terminated its own virtual process`, { kind: 'process-killed', pid }); }, { static: true });
 

@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
-import { BUILD_FIELD_PROPERTIES, deviceProperty } from './device-identity.js?v=af8ff7411a95';
+import { createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
+import { BUILD_FIELD_PROPERTIES, deviceProperty } from './device-identity.js?v=e3ff4f2e305f';
 
 // android.os.Build / Build.VERSION, as android-13.0.0_r1 Build.java computes them from system properties. The properties are the device's (src/device-identity.js: the
 // build.prop of the lab's Android 13 user image, released with release keys, plus what a test sets): each identity field reads the property Build.java names for it

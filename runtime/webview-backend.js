@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { networkOf } from './network-native.js?v=af8ff7411a95';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=af8ff7411a95';
-import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=af8ff7411a95';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=af8ff7411a95';
-import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=af8ff7411a95';
-import { endpointHost } from './relay-mux.js?v=af8ff7411a95';
-import { siteOf } from './cookie-host.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { networkOf } from './network-native.js?v=e3ff4f2e305f';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=e3ff4f2e305f';
+import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=e3ff4f2e305f';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=e3ff4f2e305f';
+import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=e3ff4f2e305f';
+import { endpointHost } from './relay-mux.js?v=e3ff4f2e305f';
+import { siteOf } from './cookie-host.js?v=e3ff4f2e305f';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and
@@ -54,6 +54,20 @@ export function decideNavigation(text, { labOrigin = '', online = true, allowed 
     return { ok: false, code: WEBVIEW_ERRORS.HOST_LOOKUP, description: `net::ERR_NAME_NOT_RESOLVED (${url.hostname} is not in the allowed hosts of the virtual device)`, refusal: 'allowlist' };
   }
   return { ok: true, url: url.href };
+}
+
+/**
+ * Pages that refuse to be shown inside another page (X-Frame-Options DENY / CSP frame-ancestors 'none'): Google's sign-in, which microG's login screen (LoginActivity: the embedded setup page)
+ * and Google's own OAuth pages load. An Android WebView is not a frame, so on a device the page loads as the WebView's own document; the lab shows a WebView as a frame of the lab page,
+ * and only the APK Lab Relay can give such a page what a WebView gives it (the relay serves it to the frame as the WebView's document, docs/NETWORK.md). Without the relay the load fails
+ * explicitly, naming that, instead of the browser's own refusal inside the frame.
+ */
+export const FRAME_REFUSING_HOSTS = Object.freeze(['accounts.google.com']);
+/** The explicit failure of a page of FRAME_REFUSING_HOSTS without the relay, or null for any other URL. */
+export function needsRelayAsTopLevel(url, relayReason = 'no APK Lab Relay runs as the device\'s Proxy') {
+  let host; try { host = new URL(url).hostname.toLowerCase(); } catch { return null; }
+  if (!FRAME_REFUSING_HOSTS.includes(host)) return null;
+  return { code: WEBVIEW_ERRORS.CONNECT, description: `net::ERR_BLOCKED_BY_RESPONSE (${host} refuses to be shown inside another page (X-Frame-Options / CSP frame-ancestors). An Android WebView is not a frame and shows it as its own document; the lab can only do that through the APK Lab Relay as the device's Proxy, and ${relayReason}: start the relay (tools/cors-relay.mjs) and load again. Google's sign-in needs the relay.)` };
 }
 
 /** The title Chromium gives a document that sets none: its URL as it is displayed (the http scheme is left out, a file is its name). */
@@ -164,11 +178,22 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
     platform.requestDraw?.(r, self);
   };
   /** A main-frame load that failed: Android's callbacks (host.failLoad), and the error page as the WebView's document. */
-  const fail = (r, self, state, url, code, description, { started = false, shown = url } = {}) => {
+  const fail = (r, self, state, url, code, description, { started = false, shown = url, labNote = null } = {}) => {
     backend.failPending(r, self, state);
     const h = host(); h.failLoad(r, self, state, url, code, description, { started, shown });
     state.bridge = newBridge(state.loadId, { silent: true, url });
-    show(r, self, state, { kind: 'dataBase', url, baseUrl: 'about:blank', data: errorDocument(url, description), mime: 'text/html', encoding: null, headers: new Map() });
+    // labNote: what the lab could not do, said on the error page too (the device's own error page names only the net error)
+    const page = errorDocument(url, description), data = labNote ? page.replace('</body>', `<p>${escapeHtml(labNote)}</p></body>`) : page;
+    show(r, self, state, { kind: 'dataBase', url, baseUrl: 'about:blank', data, mime: 'text/html', encoding: null, headers: new Map() });
+  };
+  const labNoteOf = refused => refused.description.replace(/^net::\S+ \((.*)\)$/s, '$1');
+  /** A page that refuses to be framed, without the relay (needsRelayAsTopLevel): the load fails with that reason (trace, network log, the WebView's error page and onReceivedError). */
+  const refuseFramed = (r, self, state, shown, refused) => {
+    r.record(`NET WebView ${shown}: NOT loaded: ${refused.description}`);
+    try { networkOf(r).logRefusal?.({ api: 'WebView', method: 'GET', url: shown, host: new URL(shown).hostname, reason: 'needs-relay' }); } catch { /* no network log */ }
+    const labNote = labNoteOf(refused);
+    host().postMain(r, () => { if (!state.destroyed) fail(r, self, state, shown, refused.code, refused.description, { started: state.bridge?.committed, labNote }); }, [self, state.client, state.chrome]);
+    signal();
   };
   /** One explicit way for everything the lab cannot do to a document of another origin: strict mode stops with the named error, the tolerant modes leave a STUB-WEBVIEW line (once per API). */
   const opaque = (r, state, api, what) => {
@@ -232,6 +257,8 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       if (stale()) return;
       const bridge = state.bridge;
       if (!ok) {   // as before the relay mode: framed by URL, opaque
+        const refused = needsRelayAsTopLevel(request.url, `the relay's WebView channel is not available (${channel.reason ?? 'no answer'})`);
+        if (refused) { refuseFramed(r, self, state, shown, refused); return; }
         bridge.scriptable = false; bridge.relay = false;
         h.postMain(r, () => { if (!stale()) commit(r, self, state, ''); }, [self, state.client, state.chrome]);
         show(r, self, state, request); signal(); return;
@@ -413,6 +440,9 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
         if (decision.blank) request = { ...request, kind: 'dataBase', baseUrl: 'about:blank', data: BLANK_DOCUMENT, mime: 'text/html', encoding: null, callbackUrl: 'about:blank' };
         // a remote page with an APK Lab Relay as the device's Proxy: the relay serves it to the frame and the device decides each of its requests (relay mode, below)
         else if (/^https?:/i.test(decision.url) && !(labOrigin && sameOrigin(decision.url, labOrigin))) relayChannel = relayFor(r);
+        // a page that refuses to be framed, with no relay to serve it as the WebView's own document: refused here, as the policy's refusals are
+        const refused = relayChannel ? null : needsRelayAsTopLevel(decision.url);
+        if (refused) { record(display); r.record(`NET WebView ${display}: NOT loaded: ${refused.description}`); fail(r, self, state, display, refused.code, refused.description, { labNote: labNoteOf(refused) }); return; }
       } else if (request.kind === 'dataBase' && request.baseUrl !== 'about:blank') {
         try { new URL(request.baseUrl); }   // the base only has to be an absolute URL: nothing is fetched from it
         catch { record(request.baseUrl); fail(r, self, state, request.baseUrl, WEBVIEW_ERRORS.BAD_URL, 'net::ERR_INVALID_URL'); return; }

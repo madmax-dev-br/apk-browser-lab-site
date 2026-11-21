@@ -10,12 +10,13 @@
 // netlink.js); AF_PACKET and raw IP sockets need CAP_NET_RAW, which an app does not have (EPERM). The same functions serve the raw system calls (src/arm64/syscalls.js):
 // socket, socketpair, bind, listen, accept/accept4, connect, getsockname, getpeername, sendto, recvfrom, setsockopt, getsockopt, shutdown, sendmsg, recvmsg, sendmmsg,
 // recvmmsg, with the kernel's flags (MSG_DONTWAIT, MSG_PEEK, MSG_TRUNC, SOCK_NONBLOCK) and errno values.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { createRouteSocket, restrictedNetlink } from './netlink.js?v=af8ff7411a95';
-import { deviceInterfaces } from '../libcore-io-native.js?v=af8ff7411a95';
-import { BLOCKED } from './cpu.js?v=af8ff7411a95';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=af8ff7411a95';
-import { utf8 } from './text.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { createRouteSocket, restrictedNetlink } from './netlink.js?v=e3ff4f2e305f';
+import { createJavaSockets } from './java-sockets.js?v=e3ff4f2e305f';
+import { deviceInterfaces, allocateFd, release } from '../libcore-io-native.js?v=e3ff4f2e305f';
+import { BLOCKED } from './cpu.js?v=e3ff4f2e305f';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=e3ff4f2e305f';
+import { utf8 } from './text.js?v=e3ff4f2e305f';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
@@ -25,16 +26,21 @@ const MSG_PEEK = 2, MSG_TRUNC = 0x20, MSG_DONTWAIT = 0x40, MSG_WAITFORONE = 0x10
 export function addSockets(lib, { runtime } = {}) {
   const n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i])), x = (c, i) => c.x[i];
   const objects = new Map(); let nextFd = 1000;
+  // fork (src/arm64/processes.js): the child's descriptors are the parent's open descriptions (a pipe or socket shared by both: each descriptor counts in `refs`)
+  lib.__socketTable = () => ({ objects, nextFd });
+  lib.__adoptSockets = from => { const table = from.__socketTable(); for (const [fd, o] of table.objects) { o.refs = (o.refs ?? 1) + 1; objects.set(fd, o); } nextFd = table.nextFd; };
   { const files = lib.__ownsFd; lib.__ownsFd = fd => objects.has(fd) || !!files?.(fd); }
   const names = new Map(), byAddress = new Map();
   const fail = (p, errno) => { p.memory.writeU32(p.errnoAddress, errno); return 0xffffffffffffffffn; };
   const unsupported = what => { throw new APKError(`ARM64 native code: ${what} is not provided by the lab`, { kind: 'arm64-network' }); };
   const T = p => p.threads;
+  // the sockets and pipes Java opened (src/arm64/java-sockets.js): objects of kind 'java' over libcore's open description, found by their descriptor number
+  const javaSockets = createJavaSockets(runtime), javaOf = fd => objects.has(fd) ? null : javaSockets.of(fd), lookup = fd => objects.get(fd) ?? javaOf(fd);
   // ---- readiness, shared by read/recv, poll, select and epoll
   const expirations = o => { const now = o.now ? o.now() : performance.now(); if (now < o.next) return 0; return o.interval ? 1 + Math.floor((now - o.next) / o.interval) : 1; };   // o.now: the native threads' clock (timerfd_create)
-  const readable = o => o.kind === 'unix' ? (o.listening ? o.backlog.length > 0 : !!o.rx && (o.rx.bytes.length > 0 || o.rx.closed)) : o.kind === 'tcp' ? (o.session && (o.session.queue.length > 0 || o.session.closed || !!o.session.error)) : o.kind === 'pipe-read' ? (o.pipe.bytes.length > 0 || o.pipe.closed) : o.kind === 'eventfd' ? o.count > 0n : o.kind === 'timerfd' ? expirations(o) > 0 : o.kind === 'netlink' ? o.route.datagrams.length > 0 : o.kind === 'unixdgram' ? o.queue.length > 0 : o.kind === 'file' ? true : false;
-  const writable = o => o.kind === 'udp' || o.kind === 'netlink' || o.kind === 'unixdgram' ? true : o.kind === 'unix' ? !!o.tx && !o.tx.closed : o.kind === 'tcp' ? !!o.session?.connected && !o.session.closed : o.kind === 'pipe-write' ? true : o.kind === 'eventfd' ? true : o.kind === 'file' ? true : false;
-  const events = o => (readable(o) ? POLLIN : 0) | (writable(o) ? POLLOUT : 0) | (o.kind === 'tcp' && o.session?.error ? POLLERR : 0) | (o.kind === 'tcp' && o.session?.closed ? POLLHUP : 0);
+  const readable = o => o.kind === 'java' ? !!(javaSockets.revents(o, POLLIN) & (POLLIN | POLLHUP | POLLERR)) : o.kind === 'unix' ? (o.listening ? o.backlog.length > 0 : !!o.rx && (o.rx.bytes.length > 0 || o.rx.closed)) : o.kind === 'tcp' ? (o.session && (o.session.queue.length > 0 || o.session.closed || !!o.session.error)) : o.kind === 'pipe-read' ? (o.pipe.bytes.length > 0 || o.pipe.closed) : o.kind === 'eventfd' ? o.count > 0n : o.kind === 'timerfd' ? expirations(o) > 0 : o.kind === 'netlink' ? o.route.datagrams.length > 0 : o.kind === 'unixdgram' ? o.queue.length > 0 : o.kind === 'file' ? true : false;
+  const writable = o => o.kind === 'java' ? !!(javaSockets.revents(o, POLLOUT) & POLLOUT) : o.kind === 'udp' || o.kind === 'netlink' || o.kind === 'unixdgram' ? true : o.kind === 'unix' ? !!o.tx && !o.tx.closed : o.kind === 'tcp' ? !!o.session?.connected && !o.session.closed : o.kind === 'pipe-write' ? true : o.kind === 'eventfd' ? true : o.kind === 'file' ? true : false;
+  const events = o => o.kind === 'java' ? javaSockets.revents(o, POLLIN | POLLOUT) : (readable(o) ? POLLIN : 0) | (writable(o) ? POLLOUT : 0) | (o.kind === 'tcp' && o.session?.error ? POLLERR : 0) | (o.kind === 'tcp' && o.session?.closed ? POLLHUP : 0);
   const waitFor = (p, c, ready, what, deadline = Infinity, network = true, wakeAt = null) => {
     if (ready()) return true;
     if (network && !T(p).canSuspend(c) && T(p).current.main) throw new APKError(`ARM64 native code waits for ${what} on the thread that runs Java: the network cannot be waited for there (use a native thread)`, { kind: 'arm64-network' });
@@ -55,8 +61,32 @@ export function addSockets(lib, { runtime } = {}) {
   };
   lib.freeaddrinfo = (p, c) => { let info = n(c, 0); while (info) { const next = p.memory.readPtr(info + 40); p.free(p.memory.readPtr(info + 32)); p.free(info); info = next; } };
   lib.gai_strerror = (p, c) => p.allocString(`getaddrinfo error ${s32(c, 0)}`);
-  lib.inet_pton = (p, c) => { if (s32(c, 0) !== 2) return 0; const parts = utf8.decode(p.memory.cString(n(c, 1))).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.setByte(n(c, 2) + i, b); }); return 1; };
-  lib.inet_ntop = (p, c) => { if (s32(c, 0) !== 2) return 0; const text = [...p.memory.bytes(n(c, 1), 4)].join('.'), bytes = new TextEncoder().encode(text); p.memory.copyIn(n(c, 2), bytes); p.memory.setByte(n(c, 2) + bytes.length, 0); return n(c, 2); };
+  // inet_pton / inet_ntop for AF_INET and AF_INET6 (RFC 5952 text: the longest run of zero groups as "::", a v4-mapped or compatible address with its IPv4 tail, as bionic prints them)
+  const v4Text = bytes => [...bytes].join('.');
+  const v6Text = bytes => {
+    const groups = []; for (let i = 0; i < 16; i += 2) groups.push((bytes[i] << 8) | bytes[i + 1]);
+    if (groups.slice(0, 5).every(g => g === 0) && (groups[5] === 0xffff || (groups[5] === 0 && groups[6] !== 0))) return (groups[5] === 0xffff ? '::ffff:' : '::') + v4Text(bytes.subarray(12));
+    let best = -1, length = 0; for (let i = 0; i < 8; ) { if (groups[i] !== 0) { i++; continue; } let k = i; while (k < 8 && groups[k] === 0) k++; if (k - i > length && k - i > 1) { best = i; length = k - i; } i = k; }
+    const hex = groups.map(g => g.toString(16)); if (best < 0) return hex.join(':');
+    return hex.slice(0, best).join(':') + '::' + hex.slice(best + length).join(':');
+  };
+  const parseV4 = text => { const parts = text.split('.'); if (parts.length !== 4 || parts.some(v => !/^\d{1,3}$/.test(v) || Number(v) > 255)) return null; return parts.map(Number); };
+  const parseV6 = text => {
+    let tail = []; const lastColon = text.lastIndexOf(':'); if (text.includes('.')) { tail = parseV4(text.slice(lastColon + 1)); if (!tail) return null; text = text.slice(0, lastColon + 1) + '0:0'; }
+    const halves = text.split('::'); if (halves.length > 2) return null;
+    const groups = half => half === '' ? [] : half.split(':'); const head = groups(halves[0]), rest = halves.length === 2 ? groups(halves[1]) : [];
+    if ([...head, ...rest].some(g => !/^[0-9a-fA-F]{1,4}$/.test(g))) return null;
+    const missing = 8 - head.length - rest.length; if (halves.length === 1 ? missing !== 0 : missing < 1) return null;
+    const all = [...head, ...Array(halves.length === 2 ? missing : 0).fill('0'), ...rest].map(g => parseInt(g, 16)), out = [];
+    for (const g of all) out.push(g >> 8, g & 255); if (tail.length) out.splice(12, 4, ...tail); return out;
+  };
+  lib.inet_pton = (p, c) => { const family = s32(c, 0), text = utf8.decode(p.memory.cString(n(c, 1))); if (family !== 2 && family !== 10) { p.memory.writeU32(p.errnoAddress, EAFNOSUPPORT); return -1; } const bytes = family === 2 ? parseV4(text) : parseV6(text); if (!bytes) return 0; bytes.forEach((b, i) => { p.memory.setByte(n(c, 2) + i, b); }); return 1; };
+  lib.inet_ntop = (p, c) => {
+    const family = s32(c, 0); if (family !== 2 && family !== 10) { p.memory.writeU32(p.errnoAddress, EAFNOSUPPORT); return 0; }
+    const text = family === 2 ? v4Text(p.memory.bytes(n(c, 1), 4)) : v6Text(p.memory.bytes(n(c, 1), 16)), bytes = new TextEncoder().encode(text);
+    if (bytes.length + 1 > n(c, 3)) { p.memory.writeU32(p.errnoAddress, 28); return 0; }   // ENOSPC
+    p.memory.copyIn(n(c, 2), bytes); p.memory.setByte(n(c, 2) + bytes.length, 0); return n(c, 2);
+  };
   lib.inet_addr = (p, c) => { const parts = utf8.decode(p.memory.cString(n(c, 0))).split('.').map(Number); return parts.length === 4 ? (parts[0] | parts[1] << 8 | parts[2] << 16 | parts[3] << 24) >>> 0 : 0xffffffff; };
   lib.htons = lib.ntohs = (p, c) => ((n(c, 0) & 0xff) << 8) | ((n(c, 0) >> 8) & 0xff);
   lib.htonl = lib.ntohl = (p, c) => { const v = n(c, 0) >>> 0; return (((v & 0xff) << 24) | ((v & 0xff00) << 8) | ((v >>> 8) & 0xff00) | (v >>> 24)) >>> 0; };
@@ -85,11 +115,12 @@ export function addSockets(lib, { runtime } = {}) {
     if (o.kind === 'unixdgram') { const target = dgramTarget(p, n(c, 1), n(c, 2), 'connect'); if (typeof target === 'bigint') return target; o.peer = target; return 0; }
     if (o.kind === 'udp') { const family = p.memory.uint16(n(c, 1)); if (family === 2) { const { ip, port } = readSockaddr(p, n(c, 1)); o.peer = `${byAddress.get(ip) ?? ip}:${port}`; } return 0; }   // UDP connect only sets the peer
     if (!o.session) {
-      const { ip, port } = readSockaddr(p, n(c, 1)), host = byAddress.get(ip) ?? ip, endpoint = tunnelEndpoint(runtime?.platform?.networkPolicy ?? runtime?.network?.policy);
+      const policy = runtime?.platform?.networkPolicy ?? runtime?.network?.policy, { ip, port } = readSockaddr(p, n(c, 1)), host = byAddress.get(ip) ?? ip, endpoint = tunnelEndpoint(policy);
       Object.assign(o, { host, port });
       if (!endpoint) { runtime?.record?.(`NET native connect ${host}:${port}: no relay configured (a browser cannot open TCP): ECONNREFUSED`); return fail(p, ECONNREFUSED); }
       runtime?.record?.(`NET native connect ${host}:${port} through the relay tunnel`);
-      o.session = openTunnelSession({ endpoint, host, port, signal: () => T(p).schedulePump() });
+      const Socket = policy?.WebSocket ?? globalThis.WebSocket;   // the realm's WebSocket, or the one the network policy names (as java.net.Socket's tunnel takes it: src/network-native.js)
+      o.session = openTunnelSession({ endpoint, host, port, create: url => new Socket(url), signal: () => T(p).schedulePump() });
       if (o.nonblocking) return fail(p, EINPROGRESS);
     }
     const r = waitFor(p, c, () => o.session.connected || !!o.session.error, `the connection to ${o.host}:${o.port}`);
@@ -98,7 +129,12 @@ export function addSockets(lib, { runtime } = {}) {
   };
   // ---- the data path of every socket kind: what send/sendto/sendmsg/write give, what recv/recvfrom/recvmsg/read take
   /** Sends `bytes` on socket `o`: the count sent, or fail(errno). */
-  const sendData = (p, o, bytes, to = null) => {
+  const sendData = (p, o, bytes, to = null, c = null) => {
+    if (o.kind === 'java') {
+      const r = javaSockets.send(o, bytes);
+      if (r.wait) { if (!c) return fail(p, EAGAIN); const got = waitFor(p, c, r.wait, r.what, Infinity, r.network); if (got === BLOCKED) return BLOCKED; return sendData(p, o, bytes, to, c); }
+      return r.errno ? fail(p, r.errno) : r.count;
+    }
     if (o.kind === 'udp') return udpSend(p, o);
     if (o.kind === 'unixdgram') {   // to the address given, else the connected peer; a datagram longer than the receive queue's room is EMSGSIZE on a device (not reached here)
       const target = to ?? o.peer; if (!target) return fail(p, ENOTCONN); if (target.closed) return fail(p, ECONNREFUSED);
@@ -119,6 +155,11 @@ export function addSockets(lib, { runtime } = {}) {
    * than `max` is cut, the rest discarded, as the kernel does), or fail(errno), or BLOCKED (the thread waits; the call is made again).
    */
   const recvData = (p, c, o, max, flags) => {
+    if (o.kind === 'java') {
+      const r = javaSockets.recv(o, max, flags);
+      if (r.wait) { const got = waitFor(p, c, r.wait, r.what, Infinity, r.network); if (got === BLOCKED) return BLOCKED; return recvData(p, c, o, max, flags); }
+      return r.errno ? fail(p, r.errno) : r;
+    }
     if (o.kind === 'udp') return udpReceive(p, c, o, flags);
     if (o.kind === 'tcp' && !o.session) return fail(p, ENOTCONN);
     if (o.kind === 'unix' && !o.rx) return fail(p, ENOTCONN);
@@ -144,6 +185,7 @@ export function addSockets(lib, { runtime } = {}) {
   const settled = r => r === BLOCKED || typeof r === 'bigint';   // a wait, or fail()'s value
   /** The address of the other end, as recvfrom/recvmsg/accept/getpeername give it: [bytes, length] (a netlink message comes from the kernel, port 0). */
   const peerAddress = o => {
+    if (o.kind === 'java') return new Uint8Array(0);   // a connected stream gives no source address (msg_namelen 0)
     if (o.kind === 'netlink') { const b = new Uint8Array(12); b[0] = 16; return b; }   // struct sockaddr_nl: AF_NETLINK, pid 0, groups 0
     if (o.kind === 'unix') return unixAddress(o.peerName ?? null);
     if (o.kind === 'unixdgram') return unixAddress(o.lastFrom !== undefined ? o.lastFrom : o.peer?.name ?? null);   // recvfrom: the sender's name; getpeername: the connected peer's
@@ -156,13 +198,13 @@ export function addSockets(lib, { runtime } = {}) {
   };
   /** Writes `address` to (ptr, lenPtr) as the kernel does: at most *lenPtr bytes, and *lenPtr becomes the address's whole length. */
   const putAddress = (p, ptr, lenPtr, address) => { if (!ptr || !lenPtr) return; const room = p.memory.readU32(lenPtr); p.memory.copyIn(ptr, address.subarray(0, Math.min(room, address.length))); p.memory.writeU32(lenPtr, address.length); };
-  const socketOf = (p, fd) => objects.get(fd) ?? null;
-  lib.send = (p, c) => { const o = socketOf(p, s32(c, 0)); return o ? sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2))) : fail(p, EBADF); };
+  const socketOf = (p, fd) => lookup(fd) ?? null;
+  lib.send = (p, c) => { const o = socketOf(p, s32(c, 0)); return o ? sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)), null, c) : fail(p, EBADF); };
   lib.sendto = (p, c) => {   // the destination of a connected stream socket is ignored (Linux: EISCONN only for some kinds); a UDP datagram has nowhere to go anyway
     const o = socketOf(p, s32(c, 0)); if (!o) return fail(p, EBADF);
     if (o.kind === 'udp' && n(c, 4) && p.memory.uint16(n(c, 4)) === 2) { const { ip, port } = readSockaddr(p, n(c, 4)); o.peer ??= `${byAddress.get(ip) ?? ip}:${port}`; }
     if (o.kind === 'unixdgram' && n(c, 4)) { const target = dgramTarget(p, n(c, 4), n(c, 5), 'sendto'); if (typeof target === 'bigint') return target; return sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)), target); }
-    return sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)));
+    return sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)), null, c);
   };
   lib.recv = (p, c) => lib.recvfrom(p, { x: [c.x[0], c.x[1], c.x[2], c.x[3], 0n, 0n], where: c.where });
   lib.recvfrom = (p, c) => {
@@ -173,11 +215,11 @@ export function addSockets(lib, { runtime } = {}) {
   };
   // struct msghdr (arm64): msg_name @0, msg_namelen @8, msg_iov @16, msg_iovlen @24, msg_control @32, msg_controllen @40, msg_flags @48; struct iovec: base @0, len @8
   const iovecs = (p, msg) => { const iov = p.memory.readPtr(msg + 16), count = Number(p.memory.read64(msg + 24)), out = []; for (let i = 0; i < count; i++) out.push({ base: p.memory.readPtr(iov + 16 * i), length: Number(p.memory.read64(iov + 16 * i + 8)) }); return out; };
-  const sendMessage = (p, o, msg) => {
+  const sendMessage = (p, o, msg, c = null) => {
     if (Number(p.memory.read64(msg + 40)) > 0) unsupported(`ancillary data in sendmsg on a ${o.kind} socket (SCM_RIGHTS / SCM_CREDENTIALS)`);
     const parts = iovecs(p, msg).map(v => p.memory.bytes(v.base, v.length)), bytes = new Uint8Array(parts.reduce((k, b) => k + b.length, 0)); let at = 0; for (const b of parts) { bytes.set(b, at); at += b.length; }
     const name = p.memory.readPtr(msg); if (o.kind === 'unixdgram' && name) { const target = dgramTarget(p, name, p.memory.readU32(msg + 8), 'sendmsg'); if (typeof target === 'bigint') return target; return sendData(p, o, bytes, target); }
-    return sendData(p, o, bytes);
+    return sendData(p, o, bytes, null, c);
   };
   const recvMessage = (p, c, o, msg, flags) => {
     const vectors = iovecs(p, msg), r = recvData(p, c, o, vectors.reduce((k, v) => k + v.length, 0), flags); if (settled(r)) return r;
@@ -186,7 +228,7 @@ export function addSockets(lib, { runtime } = {}) {
     p.memory.write64(msg + 40, 0n); p.memory.writeU32(msg + 48, r.length > r.bytes.length ? MSG_TRUNC : 0);   // no ancillary data; MSG_TRUNC for a cut datagram
     return flags & MSG_TRUNC ? r.length : r.bytes.length;
   };
-  lib.sendmsg = (p, c) => { const o = socketOf(p, s32(c, 0)); return o ? sendMessage(p, o, n(c, 1)) : fail(p, EBADF); };
+  lib.sendmsg = (p, c) => { const o = socketOf(p, s32(c, 0)); return o ? sendMessage(p, o, n(c, 1), c) : fail(p, EBADF); };
   lib.recvmsg = (p, c) => { const o = socketOf(p, s32(c, 0)); return o ? recvMessage(p, c, o, n(c, 1), s32(c, 2)) : fail(p, EBADF); };
   // struct mmsghdr: a msghdr and msg_len @56, 64 bytes. The count of messages done; an error only when the first one fails. recvmmsg waits for the first message only
   // (what MSG_WAITFORONE asks); the rest are the ones already there.
@@ -214,6 +256,7 @@ export function addSockets(lib, { runtime } = {}) {
   const SOL_SOCKET = 1, SO_TYPE = 3, SO_ERROR = 4, SO_SNDBUF = 7, SO_RCVBUF = 8, SO_ACCEPTCONN = 30, SO_PROTOCOL = 38, SO_DOMAIN = 39, BUFFER_DEFAULT = 212992;
   lib.setsockopt = (p, c) => {
     const o = socketOf(p, s32(c, 0)); if (!o) return fail(p, EBADF);
+    if (o.kind === 'java') { if (n(c, 4) > 0 && !n(c, 3)) return fail(p, 14); const r = javaSockets.setsockopt(o, s32(c, 1), s32(c, 2), p.memory.bytes(n(c, 3), n(c, 4)).slice()); return r?.errno ? fail(p, r.errno) : 0; }
     const level = s32(c, 1), name = s32(c, 2), length = n(c, 4); if (length > 0 && !n(c, 3)) return fail(p, 14);   // EFAULT
     let bytes = p.memory.bytes(n(c, 3), length).slice();
     if (level === SOL_SOCKET && (name === SO_SNDBUF || name === SO_RCVBUF) && length >= 4) { const v = new DataView(bytes.buffer); v.setInt32(0, Math.min(2 * v.getInt32(0, true), 0x7fffffff), true); }   // the kernel doubles the size asked for
@@ -222,6 +265,7 @@ export function addSockets(lib, { runtime } = {}) {
   };
   lib.getsockopt = (p, c) => {
     const o = socketOf(p, s32(c, 0)); if (!o) return fail(p, EBADF);
+    if (o.kind === 'java') { const value = javaSockets.getsockopt(o, s32(c, 1), s32(c, 2)); if (value.errno) return fail(p, value.errno); const lenPtr = n(c, 4); if (lenPtr) { const room = p.memory.readU32(lenPtr); if (n(c, 3)) p.memory.copyIn(n(c, 3), value.subarray(0, Math.min(room, value.length))); p.memory.writeU32(lenPtr, Math.min(room, value.length)); } return 0; }
     const level = s32(c, 1), name = s32(c, 2), out = n(c, 3), lenPtr = n(c, 4), int = v => { const b = new Uint8Array(4); new DataView(b.buffer).setInt32(0, v, true); return b; };
     let value = o.options?.get(`${level}:${name}`) ?? null;
     if (level === SOL_SOCKET) {
@@ -236,6 +280,7 @@ export function addSockets(lib, { runtime } = {}) {
   };
   lib.getsockname = (p, c) => {
     const o = socketOf(p, s32(c, 0)); if (!o) return fail(p, EBADF);
+    if (o.kind === 'java') { const r = javaSockets.sockname(o); if (r.errno) return fail(p, r.errno); putAddress(p, n(c, 1), n(c, 2), r); return 0; }
     let address;
     if (o.kind === 'netlink') { address = new Uint8Array(12); address[0] = 16; new DataView(address.buffer).setUint32(4, o.route.pid, true); }
     else if (o.kind === 'unix' || o.kind === 'unixdgram') address = unixAddress(o.name ?? null);
@@ -248,10 +293,11 @@ export function addSockets(lib, { runtime } = {}) {
   };
   lib.getpeername = (p, c) => {
     const o = socketOf(p, s32(c, 0)); if (!o) return fail(p, EBADF);
+    if (o.kind === 'java') { const r = javaSockets.peername(o); if (r.errno) return fail(p, r.errno); putAddress(p, n(c, 1), n(c, 2), r); return 0; }
     if (o.kind === 'tcp' ? !o.session : o.kind === 'unix' ? !o.rx : o.kind === 'udp' || o.kind === 'unixdgram' ? !o.peer : false) return fail(p, ENOTCONN);
     putAddress(p, n(c, 1), n(c, 2), o.kind === 'unixdgram' ? unixAddress(o.peer.name ?? null) : peerAddress(o)); return 0;
   };
-  lib.shutdown = (p, c) => { const o = objects.get(s32(c, 0)); if (!o) return fail(p, EBADF); if (s32(c, 1) < 0 || s32(c, 1) > 2) return fail(p, EINVAL); if (o?.kind === 'unix') { const how = s32(c, 1); if (how !== 0 && o.tx) o.tx.closed = true; if (how !== 1 && o.rx) o.rx.closed = true; T(p).schedulePump(); return 0; } o?.session?.close(); return 0; };
+  lib.shutdown = (p, c) => { const o = lookup(s32(c, 0)); if (!o) return fail(p, EBADF); if (s32(c, 1) < 0 || s32(c, 1) > 2) return fail(p, EINVAL); if (o.kind === 'java') { const r = javaSockets.shutdown(o, s32(c, 1)); return r?.errno ? fail(p, r.errno) : 0; } if (o?.kind === 'unix') { const how = s32(c, 1); if (how !== 0 && o.tx) o.tx.closed = true; if (how !== 1 && o.rx) o.rx.closed = true; T(p).schedulePump(); return 0; } o?.session?.close(); return 0; };
   // ---- Unix-domain stream sockets: each connected end reads one in-process byte queue and writes the other's
   const unixNames = new Map(), decoder = utf8;   // bound name ('@' + abstract name, or a path) -> socket
   const unixName = (p, ptr, length) => { const family = p.memory.uint16(ptr); if (family !== 1) return null; const raw = p.memory.bytes(ptr + 2, Math.max(0, length - 2)); if (raw[0] === 0) return '@' + decoder.decode(raw.subarray(1)); const end = raw.indexOf(0); return decoder.decode(end >= 0 ? raw.subarray(0, end) : raw); };
@@ -305,16 +351,16 @@ export function addSockets(lib, { runtime } = {}) {
   // read/write/close/fcntl on these fds; everything else goes to the file implementation
   const base = { read: lib.read, write: lib.write, close: lib.close, fcntl: lib.fcntl };
   lib.read = (p, c) => {
-    const o = objects.get(s32(c, 0)); if (!o) return base.read(p, c);
-    if (o.kind === 'tcp' || o.kind === 'unix' || o.kind === 'unixdgram' || o.kind === 'netlink' || o.kind === 'udp') { const r = recvData(p, c, o, n(c, 2), 0); if (settled(r)) return r; p.memory.copyIn(n(c, 1), r.bytes); return r.bytes.length; }
+    const o = lookup(s32(c, 0)); if (!o) return base.read(p, c);
+    if (o.kind === 'tcp' || o.kind === 'unix' || o.kind === 'unixdgram' || o.kind === 'netlink' || o.kind === 'udp' || o.kind === 'java') { const r = recvData(p, c, o, n(c, 2), 0); if (settled(r)) return r; p.memory.copyIn(n(c, 1), r.bytes); return r.bytes.length; }
     if (o.kind === 'pipe-read') { if (!readable(o)) { if (o.nonblocking) return fail(p, EAGAIN); const r = waitFor(p, c, () => readable(o), 'a pipe', Infinity, false); if (r === BLOCKED) return BLOCKED; } const take = Math.min(o.pipe.bytes.length, n(c, 2)); p.memory.copyIn(n(c, 1), o.pipe.bytes.subarray(0, take)); o.pipe.bytes = o.pipe.bytes.slice(take); return take; }
     if (o.kind === 'timerfd') { if (!expirations(o)) { if (o.nonblocking) return fail(p, EAGAIN); const r = waitFor(p, c, () => expirations(o) > 0, 'a timerfd', Infinity, false, () => o.next); if (r === BLOCKED) return BLOCKED; } const count = expirations(o); o.next = o.interval ? o.next + count * o.interval : Infinity; p.memory.write64(n(c, 1), BigInt(count)); return 8; }
     if (o.kind === 'eventfd') { if (o.count === 0n) { if (o.nonblocking) return fail(p, EAGAIN); const r = waitFor(p, c, () => o.count > 0n, 'an eventfd', Infinity, false); if (r === BLOCKED) return BLOCKED; } const value = o.semaphore ? 1n : o.count; o.count -= value; p.memory.write64(n(c, 1), value); return 8; }
     return fail(p, EINVAL);
   };
   lib.write = (p, c) => {
-    const o = objects.get(s32(c, 0)); if (!o) return base.write(p, c);
-    if (o.kind === 'tcp' || o.kind === 'unix' || o.kind === 'unixdgram' || o.kind === 'netlink' || o.kind === 'udp') return sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)));
+    const o = lookup(s32(c, 0)); if (!o) return base.write(p, c);
+    if (o.kind === 'tcp' || o.kind === 'unix' || o.kind === 'unixdgram' || o.kind === 'netlink' || o.kind === 'udp' || o.kind === 'java') return sendData(p, o, p.memory.bytes(n(c, 1), n(c, 2)), null, c);
     if (o.kind === 'pipe-write') { if (o.pipe.closed) return fail(p, EPIPE); const add = p.memory.bytes(n(c, 1), n(c, 2)), next = new Uint8Array(o.pipe.bytes.length + add.length); next.set(o.pipe.bytes); next.set(add, o.pipe.bytes.length); o.pipe.bytes = next; T(p).schedulePump(); pumpMain(p); return add.length; }
     if (o.kind === 'eventfd') { o.count += p.memory.read64(n(c, 1)); T(p).schedulePump(); pumpMain(p); return 8; }
     return fail(p, EINVAL);
@@ -324,7 +370,17 @@ export function addSockets(lib, { runtime } = {}) {
     if (o.kind === 'unixdgram') { o.closed = true; if (o.name && unixNames.get(o.name) === o) unixNames.delete(o.name); }
     objects.delete(fd); return 0; };
   // F_DUPFD / F_DUPFD_CLOEXEC, F_GETFD / F_SETFD (FD_CLOEXEC), F_GETFL / F_SETFL (O_NONBLOCK; the access mode stays), anything else fails by name
+  const javaEntry = fd => runtime.libcoreIo.table.get(fd);
+  const javaDup = (o, minimum, cloexec) => { const number = allocateFd(runtime, o.desc, Math.max(0, minimum), cloexec); return number; };
   lib.fcntl = (p, c) => {
+    { const fd = s32(c, 0), j = javaOf(fd); if (j) {   // a descriptor Java opened: the flags of libcore's entry and description
+      const cmd = s32(c, 1), entry = javaEntry(fd);
+      if (cmd === 0 || cmd === 1030) { const number = javaDup(j, n(c, 2), cmd === 1030); return number < 0 ? fail(p, 24) : number; }   // EMFILE
+      if (cmd === 1) return entry.cloexec ? 1 : 0; if (cmd === 2) { entry.cloexec = !!(n(c, 2) & 1); return 0; }
+      if (cmd === 3) return (j.desc.acc & 3) | (j.desc.nonblock ? O_NONBLOCK : 0);
+      if (cmd === 4) { j.desc.nonblock = !!(n(c, 2) & O_NONBLOCK); return 0; }
+      throw new APKError(`ARM64 native code called fcntl command ${cmd} on a descriptor Java opened: not provided by the lab`, { kind: 'arm64-network' });
+    } }
     const o = objects.get(s32(c, 0)); if (!o) return base.fcntl(p, c); const cmd = s32(c, 1);
     if (cmd === 0 || cmd === 1030) { const fd = nextFd++; o.refs = (o.refs ?? 1) + 1; objects.set(fd, o); return fd; }
     if (cmd === 1) return o.cloexec ? 1 : 0; if (cmd === 2) { o.cloexec = !!(n(c, 2) & 1); return 0; }
@@ -334,19 +390,26 @@ export function addSockets(lib, { runtime } = {}) {
   };
   { const own = { dup: lib.dup, dup3: lib.dup3 };   // dup / dup2 / dup3 of a socket, pipe, eventfd, timerfd or epoll descriptor: one open description under two numbers
     const dupTo = (p, oldFd, newFd, flags) => { const o = objects.get(oldFd); if (oldFd === newFd) return flags === null ? newFd : fail(p, EINVAL); if (objects.has(newFd)) lib.close(p, { x: [BigInt(newFd)] }); o.refs = (o.refs ?? 1) + 1; objects.set(newFd, o); return newFd; };
-    lib.dup = (p, c) => { const o = objects.get(s32(c, 0)); if (!o) return own.dup(p, c); const fd = nextFd++; o.refs = (o.refs ?? 1) + 1; objects.set(fd, o); return fd; };
-    lib.dup2 = (p, c) => objects.has(s32(c, 0)) ? dupTo(p, s32(c, 0), s32(c, 1), null) : own.dup(p, c);
-    lib.dup3 = (p, c) => objects.has(s32(c, 0)) ? dupTo(p, s32(c, 0), s32(c, 1), s32(c, 2)) : own.dup3(p, c); }
+    const javaDupTo = (p, oldFd, newFd, flags) => {   // dup2 / dup3 onto an exact number of libcore's table (closing what was there)
+      const j = javaOf(oldFd); if (newFd < 0 || newFd >= 1024) return fail(p, EBADF); if (oldFd === newFd) return flags === null ? newFd : fail(p, EINVAL);
+      const table = runtime.libcoreIo.table; if (table.has(newFd)) release(runtime, newFd); else if (objects.has(newFd)) lib.close(p, { x: [BigInt(newFd)] });
+      table.set(newFd, { desc: j.desc, cloexec: !!((flags ?? 0) & 0o2000000) }); j.desc.refs++; return newFd;
+    };
+    lib.dup = (p, c) => { { const j = javaOf(s32(c, 0)); if (j) { const number = javaDup(j, 3, false); return number < 0 ? fail(p, 24) : number; } } const o = objects.get(s32(c, 0)); if (!o) return own.dup(p, c); const fd = nextFd++; o.refs = (o.refs ?? 1) + 1; objects.set(fd, o); return fd; };
+    lib.dup2 = (p, c) => objects.has(s32(c, 0)) ? dupTo(p, s32(c, 0), s32(c, 1), null) : javaOf(s32(c, 0)) ? javaDupTo(p, s32(c, 0), s32(c, 1), null) : own.dup(p, c);
+    lib.dup3 = (p, c) => objects.has(s32(c, 0)) ? dupTo(p, s32(c, 0), s32(c, 1), s32(c, 2)) : javaOf(s32(c, 0)) ? javaDupTo(p, s32(c, 0), s32(c, 1), s32(c, 2)) : own.dup3(p, c); }
   // ioctl on sockets: FIONREAD, FIONBIO, and the interface queries of struct ifreq (name[16], then the answer @16) over the device's interfaces. SIOCGIFHWADDR is denied
   // to apps targeting API 30+ (Android 11: no hardware addresses). Another request fails by name.
   { const own = lib.ioctl;
     lib.ioctl = (p, c) => {
-      const o = objects.get(s32(c, 0)); if (!o) return own(p, c);
+      const o = lookup(s32(c, 0)); if (!o) return own(p, c);
       const request = n(c, 1) >>> 0, arg = n(c, 2);
+      if (o.kind === 'java' && request === 0x541b) { p.memory.writeU32(arg, javaSockets.available(o)); return 0; }   // FIONREAD: what Java's available() sees
+      if (o.kind === 'java' && request === 0x5421) { o.desc.nonblock = p.memory.readU32(arg) !== 0; return 0; }   // FIONBIO
       if (request === 0x541b) { const count = o.kind === 'unixdgram' ? o.queue[0]?.bytes.length ?? 0 : o.kind === 'unix' ? o.rx?.bytes.length ?? 0 : o.kind === 'tcp' ? (o.session?.queue ?? []).reduce((k, b) => k + b.length, 0) : o.kind === 'pipe-read' ? o.pipe.bytes.length : o.kind === 'netlink' ? o.route.datagrams[0]?.length ?? 0 : 0; p.memory.writeU32(arg, count); return 0; }   // FIONREAD
       if (request === 0x5421) { o.nonblocking = p.memory.readU32(arg) !== 0; return 0; }   // FIONBIO
       const IFREQ = { 0x8913: 'flags', 0x8921: 'mtu', 0x8933: 'index', 0x8915: 'addr', 0x891b: 'netmask', 0x8919: 'broadcast', 0x8927: 'hwaddr' }, what = IFREQ[request];
-      if (!what || !['tcp', 'udp', 'unix', 'unixdgram', 'netlink'].includes(o.kind)) throw new APKError(`ARM64 native code called ioctl 0x${request.toString(16)} on a ${o.kind} descriptor: not provided by the lab`, { kind: 'arm64-network' });
+      if (!what || !['tcp', 'udp', 'unix', 'unixdgram', 'netlink'].includes(o.kind) && !(o.kind === 'java' && o.desc.kind === 'socket')) throw new APKError(`ARM64 native code called ioctl 0x${request.toString(16)} on a ${o.kind} descriptor: not provided by the lab`, { kind: 'arm64-network' });
       const raw = p.memory.bytes(arg, 16), end = raw.indexOf(0), name = utf8.decode(raw.subarray(0, end < 0 ? 16 : end)), face = deviceInterfaces(runtime).find(f => f.name === name);
       if (!face) return fail(p, ENODEV);
       const at = arg + 16, inet = bytes => { p.memory.fill(at, 0, 16); p.memory.setUint16(at, 2); bytes.forEach((b, i) => { p.memory.setByte(at + 4 + i, b); }); return 0; }, v4 = face.addresses.find(a => a.addr.length === 4);
@@ -359,14 +422,15 @@ export function addSockets(lib, { runtime } = {}) {
       return v4.broadcast ? inet(v4.broadcast) : fail(p, 99);
     }; }
   // ---- poll / select / epoll
-  const objectOrFile = fd => objects.get(fd) ?? (fd >= 0 && fd < 1000 ? { kind: 'file' } : null);
+  const objectOrFile = fd => lookup(fd) ?? (fd >= 0 && fd < 1000 ? { kind: 'file' } : null);
+  const networkFd = fd => { const o = lookup(fd); return o?.kind === 'tcp' || (o?.kind === 'java' && javaSockets.network(o)); };   // a wait for it is a wait for the network
   const timespecMs = (p, ptr) => ptr ? Number(p.memory.read64(ptr)) * 1000 + Number(p.memory.read64(ptr + 8)) / 1e6 : -1;   // NULL: no timeout
   lib.ppoll = (p, c) => { const ms = timespecMs(p, n(c, 2)); return lib.poll(p, { x: [c.x[0], c.x[1], BigInt(ms < 0 ? -1 : Math.ceil(ms))], where: c.where }); };   // the signal mask: the lab delivers signals between calls (src/arm64/signals.js)
   lib.poll = lib.__poll_chk = (p, c) => {
     const fds = n(c, 0), count = n(c, 1), timeout = s32(c, 2), deadline = timeout < 0 ? Infinity : T(p).now() + timeout;
     const ready = () => { let k = 0; for (let i = 0; i < count; i++) { const at = fds + 8 * i, o = objectOrFile(p.memory.int32(at)); const wanted = p.memory.int16(at + 4) | POLLERR | POLLHUP, got = o ? events(o) & wanted : 32; p.memory.setInt16(at + 6, got); if (got) k++; } return k; };
     if (ready() || timeout === 0) return ready();
-    const r = waitFor(p, c, () => ready() > 0, 'poll()', deadline, [...Array(count).keys()].some(i => objects.get(p.memory.int32(fds + 8 * i))?.kind === 'tcp'), () => timerWake([...Array(count).keys()].map(i => p.memory.int32(fds + 8 * i)))); if (r === BLOCKED) return BLOCKED; return ready();
+    const r = waitFor(p, c, () => ready() > 0, 'poll()', deadline, [...Array(count).keys()].some(i => networkFd(p.memory.int32(fds + 8 * i))), () => timerWake([...Array(count).keys()].map(i => p.memory.int32(fds + 8 * i)))); if (r === BLOCKED) return BLOCKED; return ready();
   };
   lib.pselect = (p, c) => { const ms = timespecMs(p, n(c, 4)); return selectUntil(p, c, ms < 0 ? Infinity : T(p).now() + ms); };
   lib.select = (p, c) => { const tv = n(c, 4); return selectUntil(p, c, tv ? T(p).now() + Number(p.memory.read64(tv)) * 1000 + Number(p.memory.read64(tv + 8)) / 1000 : Infinity); };   // struct timeval
@@ -384,7 +448,7 @@ export function addSockets(lib, { runtime } = {}) {
     const out = n(c, 1), max = s32(c, 2), timeout = s32(c, 3), deadline = timeout < 0 ? Infinity : T(p).now() + timeout;
     const collect = write => { let k = 0; for (const [fd, w] of e.watched) { if (k >= max) break; const o = objectOrFile(fd); const got = o ? events(o) & (w.events | POLLERR | POLLHUP) : 0; if (got) { if (write) { p.memory.writeU32(out + 16 * k, got); p.memory.write64(out + 16 * k + 8, w.data); } k++; } } return k; };   // struct epoll_event on arm64: 16 bytes (events, pad, data)
     if (collect(false) || timeout === 0) return collect(true);
-    const r = waitFor(p, c, () => collect(false) > 0, 'epoll_wait()', deadline, [...e.watched.keys()].some(fd => objects.get(fd)?.kind === 'tcp'), () => timerWake(e.watched.keys())); if (r === BLOCKED) return BLOCKED; return collect(true);
+    const r = waitFor(p, c, () => collect(false) > 0, 'epoll_wait()', deadline, [...e.watched.keys()].some(fd => networkFd(fd)), () => timerWake(e.watched.keys())); if (r === BLOCKED) return BLOCKED; return collect(true);
   };
   // ---- timerfd: a descriptor that becomes readable when its (monotonic or realtime) timer expires; read gives the expirations since the last read
   lib.timerfd_create = (p, c) => { const fd = nextFd++; objects.set(fd, { kind: 'timerfd', clock: s32(c, 0), now: () => T(p).now(), next: Infinity, interval: 0, nonblocking: !!(n(c, 1) & O_NONBLOCK) }); return fd; };

@@ -6,9 +6,9 @@
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js; code reaches it through the 16-byte stub src/arm64/process.js gives each one): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { executeNeon } from './neon.js?v=af8ff7411a95';
-import { DecodeCache } from './decode-cache.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { executeNeon } from './neon.js?v=e3ff4f2e305f';
+import { DecodeCache } from './decode-cache.js?v=e3ff4f2e305f';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -50,7 +50,11 @@ export class Arm64Cpu {
     this.vbuf = new Uint8Array(32 * 16); this.vview = new DataView(this.vbuf.buffer);
     this.n = false; this.z = false; this.c = false; this.v = false;
     this.pc = 0; this.tpidr = 0n; this.fpcr = 0n; this.fpsr = 0n; this.steps = 0; this.exclusive = null;
-    this.budgetFrom = 0;   // cpu.steps when the budget's count began: the outermost call from JavaScript (a JNI call), or the thread's start
+    // The runaway guard (runaway()): a device has no instruction budget. Code that can be preempted (a native thread in its slices, a Java thread's native call that parks
+    // between quanta: src/arm64/threads.js) is never stopped by an instruction count; a call made synchronously from JavaScript (nested > 0: the main thread's native
+    // methods, JNI_OnLoad, a call nested in a JNI callback) cannot be preempted, and when no wall-clock limit watches it (`watched()`, the operation monitor: the main
+    // thread's event cap, the operation budget) maxSteps instructions without returning end it, as the only thing that can.
+    this.budgetFrom = 0;   // cpu.steps when the outermost synchronous call from JavaScript began
     // the translation tier (src/arm64/translate.js): hot code runs as WebAssembly over this memory; the vector registers then live in the tier's register-file slot
     const tier = translate ? memory?.translationTier?.() : null;
     if (tier) { const slot = tier.attach(this); if (slot >= 0) { this.tier = tier; this.tierSlot = slot; } }
@@ -89,13 +93,22 @@ export class Arm64Cpu {
 
   // ---- running
   /** Calls the function at `address` with integer arguments in X0..X7 (and doubles in D0..D7 when `floats` gives them) and returns X0 (and D0/S0 on request). */
+  // A CPU whose own run is parked (`parked`: a Java thread's native call preempted at any instruction, or suspended in a lab function it will retry with its argument
+  // registers, src/arm64/threads.js) keeps its whole context across a call made on it meanwhile; otherwise the call keeps only what AAPCS64 asks of a callee (the code
+  // that called the lab function expects the caller-saved registers to change).
   call(address, args = [], options = {}) {
+    const context = this.parked === true ? this.saveContext() : null;
     const saved = this.beginCall(address, args, options);
     this.nested = (this.nested ?? 0) + 1;   // inside a call made from JavaScript a wait cannot suspend the thread: the waiting host function runs the other threads itself
-    let outcome; try { outcome = this.run(RETURN_SENTINEL); } finally { this.nested--; }
+    let outcome; try { outcome = this.run(RETURN_SENTINEL); } finally { this.nested--; if (context !== null && outcome !== 'done') this.restoreContext(context); }
     if (outcome !== 'done') throw new APKError(`ARM64 interpreter: a native call ended as '${outcome}' (pc 0x${this.pc.toString(16)})`, { kind: 'arm64-threads' });
-    return this.endCall(saved, options.returns);
+    const result = this.endCall(saved, options.returns);
+    if (context !== null) this.restoreContext(context);
+    return result;
   }
+  /** The whole register context (general registers, SP, PC, flags, vector registers, FPCR/FPSR, TPIDR); the exclusive monitor is cleared on restore, as an exception return clears it. */
+  saveContext() { return { x: this.x.slice(), pc: this.pc, nzcv: this.nzcv(), v: this.vbuf.slice(), fpcr: this.fpcr, fpsr: this.fpsr, tpidr: this.tpidr }; }
+  restoreContext(c) { for (let i = 0; i < 32; i++) this.x[i] = c.x[i]; this.pc = c.pc; this.setNzcv(c.nzcv); this.vbuf.set(c.v); this.fpcr = c.fpcr; this.fpsr = c.fpsr; this.tpidr = c.tpidr; this.exclusive = null; }
   /** The first half of call(): the arguments in place, pc at the function and X30 at the sentinel; run(RETURN_SENTINEL) executes it (a thread that can park continues it later), endCall ends it. */
   beginCall(address, args = [], { floats = [] } = {}) {
     if (!((this.nested ?? 0) > 0)) this.budgetFrom = this.steps;   // each outermost native call has the whole budget (a long-lived thread's earlier calls do not use it up)
@@ -124,9 +137,9 @@ export class Arm64Cpu {
         continue;
       }
       if (--left < 0) return 'yield';
-      if ((++this.steps & 0xfffff) === 0) {   // every 2^20 instructions: the budget, and the progress report (the Worker's heartbeat names the native code while it runs)
-        if (this.steps - this.budgetFrom > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps} instructions in one native call or thread) exceeded at pc 0x${this.pc.toString(16)} (${this.where(this.pc)})`, { kind: 'arm64-budget', pc: this.pc, steps: this.steps - this.budgetFrom });
+      if ((++this.steps & 0xfffff) === 0) {   // every 2^20 instructions: the progress report (the Worker's heartbeat names the native code while it runs; the monitor's limits), the runaway guard
         if (this.progress !== undefined) this.progress(this);
+        if (this.steps - this.budgetFrom > this.maxSteps && (this.nested ?? 0) > 0 && this.watched?.() !== true) this.runaway();
       }
       const at = this.pc, step = cache.get(this, at);   // decoded once per address (src/arm64/decode-cache.js)
       this.pc += 4;
@@ -135,6 +148,12 @@ export class Arm64Cpu {
       if (tier !== undefined && this.pc !== at + 4 && this.pc < HOST_BASE && this.pc !== stopAt) left -= tier.enter(this, stopAt, left);
     }
     return 'done';
+  }
+  /** The runaway guard: a synchronous native call ran maxSteps instructions without returning, nothing can preempt it and no wall-clock limit watches it. */
+  runaway() {
+    const steps = this.steps - this.budgetFrom, who = this.threadLabel?.();
+    throw new APKError(`ARM64 interpreter: runaway guard: a native call made synchronously from Java${who ? ` (${who})` : ''} ran ${steps} instructions without returning (instruction budget ${this.maxSteps}), at pc 0x${this.pc.toString(16)} (${this.where(this.pc)}); `
+      + 'a synchronous call cannot be preempted and no wall-clock limit of the operation monitor watches this run (no operation budget, not inside a main-thread event), so this count is what ends it', { kind: 'arm64-budget', pc: this.pc, steps, thread: who ?? null });
   }
   /** `address` as library+offset when the process can name it (Arm64Cpu.describe is set by src/arm64/process.js). */
   where(address) { return this.describe?.(address) ?? `0x${address.toString(16)}`; }

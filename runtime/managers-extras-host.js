@@ -1,4 +1,4 @@
-import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
+import { createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
 
 // The system-manager methods an ordinary app calls that the first host passes left out, for a one-user, unmanaged, unlocked phone without fingerprint hardware or thermal HAL
 // (android-13.0.0_r1 UserManager / UserManagerService, KeyguardManager / PhoneWindowManager, PowerManager / ThermalManagerService, FingerprintManager):
@@ -29,6 +29,8 @@ export function createManagersExtrasHost(platform) {
   };
 
   // ---- UserManager
+  // UserManager.get(Context) (hidden; the system's own Activities use it): the Context's user service
+  def(USER_STATIC, 'get', '(Landroid/content/Context;)Landroid/os/UserManager;', (r, _m, [context]) => call(r, context, 'Landroid/content/Context;', 'getSystemService', ['Ljava/lang/String;'], 'Ljava/lang/Object;', ['user']), { static: true });
   def(USER_STATIC, 'supportsMultipleUsers', '()Z', () => 1, { static: true }); def(USER_STATIC, 'isHeadlessSystemUserMode', '()Z', () => 0, { static: true });
   def(USER, 'getUserCount', '()I', () => 1); def(USER, 'getUserName', `()${STRING}`, () => 'Owner');
   def(USER, 'getUserProfiles', `()${LIST}`, r => { const list = r.allocate('Ljava/util/ArrayList;'); r.dispatch({ owner: 'Ljava/util/ArrayList;', name: '<init>', parameters: [], result: 'V', signature: '()V' }, [list], 'direct'); call(r, list, 'Ljava/util/ArrayList;', 'add', ['Ljava/lang/Object;'], 'Z', [userHandle(r)]); return list; });

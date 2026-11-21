@@ -1,7 +1,7 @@
-import { floatBits } from './host-contract.js?v=af8ff7411a95';
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=af8ff7411a95';
-import { createAccountStore } from './account-store.js?v=af8ff7411a95';
+import { floatBits } from './host-contract.js?v=e3ff4f2e305f';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=e3ff4f2e305f';
+import { createAccountStore } from './account-store.js?v=e3ff4f2e305f';
 
 // Software system services of an API 33 phone with no SIM, no accounts, no device admin, no role holders and no usage access (android-13.0.0_r1 sources of each manager and
 // of the system service behind it): AppOpsManager, UsageStatsManager, CaptioningManager, TextClassificationManager, RoleManager, DevicePolicyManager, SubscriptionManager,
@@ -568,7 +568,9 @@ export function createSystemManagersHost(platform) {
   /** The package a call comes from (Binder.getCallingUid of AccountManagerService): a companion's code on the stack (or its transaction) is that companion, else the app. */
   let lastRuntime = null;
   // (the process that calls AccountManagerService: the package whose code runs, not the caller of a transaction that code serves; src/package-registry.js serviceCaller)
-  const callerEntry = r => (lastRuntime = r, platform.packages?.multi ? platform.packages.serviceCaller(r) : null) ?? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true };
+  // the system's own Activities (the account chooser, src/system-activities.js) call as the system (uid 1000), with or without a companion package
+  const callerEntry = r => (lastRuntime = r, platform.packages?.systemUiCode?.(r) ? platform.packages.system : platform.packages?.multi ? platform.packages.serviceCaller(r) : null) ?? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true };
+  const isSystem = entry => entry?.systemServer === true;
   const gcListeners = gcRoot(new Set());   // the registered listeners stay alive while registered, as the service holds them
   const accounts = () => platform.accounts ??= createAccountStore({
     packages: () => [{ entry: platform.packages?.main ?? { name: pkg(), manifest: platform.manifest }, environment: () => platform.resources },
@@ -584,10 +586,15 @@ export function createSystemManagersHost(platform) {
   const callerOptions = (r, entry) => ({ targetSdk: Number(entry.manifest?.usesSdk?.targetSdkVersion ?? platform.targetSdk ?? 33), getAccounts: entry.main !== false && holds(r, 'android.permission.GET_ACCOUNTS'), privileged: entry.main !== false && holds(r, 'android.permission.GET_ACCOUNTS_PRIVILEGED') });
   const visibleAccounts = (r, type = null, packageName = null) => {
     const entry = packageName ? (platform.packages?.byName?.(packageName) ?? callerEntry(r)) : callerEntry(r);
-    return accounts().accounts.filter(a => (type === null || a.type === type) && accounts().visibleTo(a, entry.name, callerOptions(r, entry)));
+    // the system sees every account (AccountManagerService.getAccountsAsUser for SYSTEM_UID: no visibility filter)
+    return accounts().accounts.filter(a => (type === null || a.type === type) && (isSystem(entry) || accounts().visibleTo(a, entry.name, callerOptions(r, entry))));
   };
-  /** The authenticator's packages only: "uid N cannot <verb> accounts of type: T", the service's SecurityException. */
-  const ownerOnly = (r, a, verb) => { const entry = callerEntry(r); if (!accounts().owns(entry.name, a.type)) denied(r, `uid ${entry.uid ?? uid()} cannot ${verb} accounts of type: ${a.type ?? ''}`); return entry; };
+  /** The authenticator's packages only (or the system): "uid N cannot <verb> accounts of type: T", the service's SecurityException. */
+  const ownerOnly = (r, a, verb) => { const entry = callerEntry(r); if (!isSystem(entry) && !accounts().owns(entry.name, a.type)) denied(r, `uid ${entry.uid ?? uid()} cannot ${verb} accounts of type: ${a.type ?? ''}`); return entry; };
+  /** The installed package `name` as the account service sees it (its targetSdk and permissions), or null when no such package is installed. */
+  const packageEntry = name => platform.packages?.byName?.(name) ?? (name === pkg() ? platform.packages?.main ?? { name: pkg(), manifest: platform.manifest, main: true } : null);
+  /** AccountManagerService.resolveAccountVisibility of account `a` for installed package `name`. */
+  const visibilityFor = (r, a, name) => { const target = packageEntry(name); return target ? accounts().visibility(a, name, callerOptions(r, target)) : 3; };
   const changed = r => {   // LOGIN_ACCOUNTS_CHANGED: the registered OnAccountsUpdateListeners hear the accounts they may see, on the main Looper
     for (const { listener, type, owner } of accounts().listeners) {
       platform.queueTask(() => { const list = accounts().accounts.filter(a => (type === null || type.includes(a.type)) && accounts().visibleTo(a, owner.name, callerOptions(r, owner))); call(r, listener, LISTENER, 'onAccountsUpdated', [`[${ACCOUNT}`], 'V', [array(r, ACCOUNT, list.map(a => newAccount(r, a)))]); }, 0, [listener]);
@@ -596,7 +603,46 @@ export function createSystemManagersHost(platform) {
   def(ACCOUNT_MANAGER, 'getAccounts', `()[${ACCOUNT}`, r => array(r, ACCOUNT, visibleAccounts(r).map(a => newAccount(r, a))));
   def(ACCOUNT_MANAGER, 'getAccountsByType', `(${STRING})[${ACCOUNT}`, (r, _m, [, type]) => array(r, ACCOUNT, visibleAccounts(r, nullish(type) ? null : text(r, type)).map(a => newAccount(r, a))));
   def(ACCOUNT_MANAGER, 'getAccountsByTypeForPackage', `(${STRING}${STRING})[${ACCOUNT}`, (r, _m, [, type, packageName]) => { const name = requireText(r, packageName, 'packageName'); return array(r, ACCOUNT, visibleAccounts(r, nullish(type) ? null : text(r, type), name).map(a => newAccount(r, a))); });
-  def(ACCOUNT_MANAGER, 'getAuthenticatorTypes', `()[${AUTHENTICATOR}`, r => array(r, AUTHENTICATOR, []));
+  // RegisteredServicesCache's authenticators of every installed package (AccountManagerService.getAuthenticatorTypes): type, package, label, icon, small icon, preferences, customTokens
+  def(ACCOUNT_MANAGER, 'getAuthenticatorTypes', `()[${AUTHENTICATOR}`, r => array(r, AUTHENTICATOR, accounts().authenticators().map(a =>
+    construct(r, AUTHENTICATOR, [STRING, STRING, 'I', 'I', 'I', 'I', 'Z'], [a.type, a.packageName, a.labelId | 0, a.iconId | 0, a.smallIconId | 0, a.prefId | 0, a.customTokens ? 1 : 0]))));
+  // the system's calls for a package (the account chooser, src/system-activities.js): AccountManagerService refuses them to any other caller
+  def(ACCOUNT_MANAGER, 'getAccountsForPackage', `(${STRING}I)[${ACCOUNT}`, (r, _m, [, packageName, forUid]) => {
+    const caller = callerEntry(r); if (!isSystem(caller)) denied(r, `getAccountsForPackage() called from unauthorized uid ${caller.uid ?? uid()} with uid=${forUid}`);
+    const name = requireText(r, packageName, 'packageName'), target = packageEntry(name);
+    // getAccountsAsUserForPackage(..., includeUserManagedNotVisible = true): the accounts the package sees and the ones the user may still choose for it
+    return array(r, ACCOUNT, (target ? accounts().accounts.filter(a => accounts().owns(name, a.type) || accounts().visibility(a, name, callerOptions(r, target)) !== 3) : []).map(a => newAccount(r, a)));
+  });
+  def(ACCOUNT_MANAGER, 'getAccountsAndVisibilityForPackage', `(${STRING}${STRING})${MAP}`, (r, _m, [, packageName, accountType]) => {
+    const caller = callerEntry(r), type = nullish(accountType) ? null : text(r, accountType);
+    if (!isSystem(caller) && !(type !== null && accounts().owns(caller.name, type))) denied(r, `getAccountsAndVisibilityForPackage() called from unauthorized uid ${caller.uid ?? uid()}`);
+    const name = requireText(r, packageName, 'packageName'), out = construct(r, 'Ljava/util/HashMap;');
+    if (!packageEntry(name)) return out;   // an unknown package: an empty map
+    for (const a of accounts().accounts) if (type === null || a.type === type) call(r, out, 'Ljava/util/HashMap;', 'put', [OBJECT, OBJECT], OBJECT, [newAccount(r, a), callStatic(r, 'Ljava/lang/Integer;', 'valueOf', ['I'], 'Ljava/lang/Integer;', [visibilityFor(r, a, name)])]);
+    return out;
+  });
+  // AccountManager.newChooseAccountIntent (both overloads): the system's account chooser, the component config_chooseTypeAndAccountActivity names, with the request in its extras
+  // (ChooseTypeAndAccountActivity's EXTRA_* keys)
+  const chooseAccountIntent = (r, selected, allowable, types, description, tokenType, features, options) => {
+    const resources = callStatic(r, 'Landroid/content/res/Resources;', 'getSystem', [], 'Landroid/content/res/Resources;');
+    const id = call(r, resources, 'Landroid/content/res/Resources;', 'getIdentifier', [STRING, STRING, STRING], 'I', ['config_chooseTypeAndAccountActivity', 'string', 'android']);
+    const flat = text(r, call(r, resources, 'Landroid/content/res/Resources;', 'getString', ['I'], STRING, [id]));
+    const component = callStatic(r, COMPONENT, 'unflattenFromString', [STRING], COMPONENT, [flat]), intent = construct(r, INTENT);
+    call(r, intent, INTENT, 'setClassName', [STRING, STRING], INTENT, [call(r, component, COMPONENT, 'getPackageName', [], STRING), call(r, component, COMPONENT, 'getClassName', [], STRING)]);
+    const list = nullish(allowable) ? null : construct(r, 'Ljava/util/ArrayList;', ['Ljava/util/Collection;'], [allowable]);
+    call(r, intent, INTENT, 'putExtra', [STRING, 'Ljava/io/Serializable;'], INTENT, ['allowableAccounts', list]);
+    call(r, intent, INTENT, 'putExtra', [STRING, `[${STRING}`], INTENT, ['allowableAccountTypes', nullish(types) ? null : types]);
+    call(r, intent, INTENT, 'putExtra', [STRING, BUNDLE], INTENT, ['addAccountOptions', nullish(options) ? null : options]);
+    call(r, intent, INTENT, 'putExtra', [STRING, 'Landroid/os/Parcelable;'], INTENT, ['selectedAccount', nullish(selected) ? null : selected]);
+    call(r, intent, INTENT, 'putExtra', [STRING, STRING], INTENT, ['descriptionTextOverride', nullish(description) ? null : description]);
+    call(r, intent, INTENT, 'putExtra', [STRING, STRING], INTENT, ['authTokenType', nullish(tokenType) ? null : tokenType]);
+    call(r, intent, INTENT, 'putExtra', [STRING, `[${STRING}`], INTENT, ['addAccountRequiredFeatures', nullish(features) ? null : features]);
+    return intent;
+  };
+  def(ACCOUNT_MANAGER, 'newChooseAccountIntent', `(${ACCOUNT}Ljava/util/ArrayList;[${STRING}Z${STRING}${STRING}[${STRING}${BUNDLE})${INTENT}`,
+    (r, _m, [selected, allowable, types, , description, tokenType, features, options]) => chooseAccountIntent(r, selected, allowable, types, description, tokenType, features, options), { static: true });
+  def(ACCOUNT_MANAGER, 'newChooseAccountIntent', `(${ACCOUNT}Ljava/util/List;[${STRING}${STRING}${STRING}[${STRING}${BUNDLE})${INTENT}`,
+    (r, _m, [selected, allowable, types, description, tokenType, features, options]) => chooseAccountIntent(r, selected, allowable, types, description, tokenType, features, options), { static: true });
   const known = (r, a) => accounts().find(a.name, a.type);
   def(ACCOUNT_MANAGER, 'addAccountExplicitly', `(${ACCOUNT}${STRING}${BUNDLE})Z`, (r, _m, [, account, password, extras]) => {
     const a = accountOf(r, account); ownerOnly(r, a, 'explicitly add');
@@ -628,8 +674,7 @@ export function createSystemManagersHost(platform) {
     if (entry.name !== name) ownerOnly(r, a, 'get visibility of');
     const stored = known(r, a); if (!stored) return 0;
     if (name.startsWith('android:accounts:')) return stored.visibility.get(name) ?? 0;
-    const target = platform.packages?.byName?.(name) ?? entry;
-    return accounts().visibleTo(stored, name, callerOptions(r, target)) ? (stored.visibility.get(name) === 2 ? 2 : 1) : (stored.visibility.get(name) === 4 ? 4 : 3);
+    return visibilityFor(r, stored, name);
   });
   def(ACCOUNT_MANAGER, 'addOnAccountsUpdatedListener', `(${LISTENER}${HANDLER}Z)V`, (r, _m, [, listener, , immediately]) => {
     if (nullish(listener)) iae(r, 'the listener is null');

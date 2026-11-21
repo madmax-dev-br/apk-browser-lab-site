@@ -1,8 +1,9 @@
-import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
-import { createHostRegistry, floatBits, doubleBits, bitsFloat, bitsDouble } from './host-contract.js?v=af8ff7411a95';
-import { isInterfaceName } from './webview-bridge.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { Invoke } from './interpreter.js?v=af8ff7411a95';
+import { gcRoot } from './heap-gc.js?v=e3ff4f2e305f';
+import { createHostRegistry, floatBits, doubleBits, bitsFloat, bitsDouble } from './host-contract.js?v=e3ff4f2e305f';
+import { isInterfaceName } from './webview-bridge.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { Invoke } from './interpreter.js?v=e3ff4f2e305f';
+import { deviceProperty } from './device-identity.js?v=e3ff4f2e305f';
 
 // android.webkit.WebView and its public companions for the browser VM (design: docs/APK-REAL-TASKS.md, task 33).
 //
@@ -102,8 +103,9 @@ export function createWebViewHost(platform) {
   const newState = () => ({ settings: null, client: null, chrome: null, url: null, originalUrl: null, title: '', progress: 100, loading: false, scroll: { x: 0, y: 0 }, contentHeight: 0, findListener: null, nextFind: 1, history: [], index: -1, interfaces: new Map(), loadId: 0, destroyed: false, paused: false, id: null });
   const stateOf = (r, self) => { const o = r.object(self); if (!o.webview) r.throwJava('Ljava/lang/IllegalStateException;', 'WebView used before its constructor ran'); return o.webview; };
   let nextId = 1;
+  // the WebView's default user agent names the device as Chromium's does: Build.VERSION.RELEASE, Build.MODEL and Build.ID (the device identity, src/device-identity.js, custom or the lab's)
   const settingsContext = (r) => ({ targetSdk: platform.targetSdk ?? 34, hasInternet: platform.hasPermission?.('android.permission.INTERNET') ?? true,
-    userAgent: `Mozilla/5.0 (Linux; Android ${platform.device?.release ?? '13'}; ${platform.device?.model ?? 'Android SDK built for x86_64'} Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36` });
+    userAgent: `Mozilla/5.0 (Linux; Android ${deviceProperty(r, 'ro.build.version.release') ?? '13'}; ${deviceProperty(r, 'ro.product.model') ?? 'unknown'} Build/${deviceProperty(r, 'ro.build.id') ?? 'unknown'}; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.144 Mobile Safari/537.36` });
   const settingsOf = (r, self) => {
     const state = stateOf(r, self);
     if (!state.settings) { const ref = r.allocate(SETTINGS), o = r.object(ref), context = settingsContext(r); o.values = new Map(SETTINGS_TABLE.map(([name, , value]) => [name, typeof value === 'function' ? value(context) : value])); o.owner = self; state.settings = ref; }

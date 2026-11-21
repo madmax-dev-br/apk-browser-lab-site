@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=af8ff7411a95';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=af8ff7411a95';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=af8ff7411a95';
-import { HandleTable } from './handles.js?v=af8ff7411a95';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=af8ff7411a95';
-import { coreImports } from './boundary-imports.js?v=af8ff7411a95';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=af8ff7411a95';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=af8ff7411a95';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=af8ff7411a95';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=af8ff7411a95';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=af8ff7411a95';
-import { timedExports, timedBridge } from './core-timing.js?v=af8ff7411a95';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=af8ff7411a95';
-import { Blocked } from '../../runtime/scheduler.js?v=af8ff7411a95';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=af8ff7411a95';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=af8ff7411a95';
-import { PaintRecords } from './paint-record.js?v=af8ff7411a95';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=e3ff4f2e305f';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=e3ff4f2e305f';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=e3ff4f2e305f';
+import { HandleTable } from './handles.js?v=e3ff4f2e305f';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=e3ff4f2e305f';
+import { coreImports } from './boundary-imports.js?v=e3ff4f2e305f';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=e3ff4f2e305f';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=e3ff4f2e305f';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=e3ff4f2e305f';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=e3ff4f2e305f';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=e3ff4f2e305f';
+import { timedExports, timedBridge } from './core-timing.js?v=e3ff4f2e305f';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=e3ff4f2e305f';
+import { Blocked } from '../../runtime/scheduler.js?v=e3ff4f2e305f';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=e3ff4f2e305f';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=e3ff4f2e305f';
+import { PaintRecords } from './paint-record.js?v=e3ff4f2e305f';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -171,6 +171,7 @@ export class WasmEngine {
       return info;
     };
     rt.onMethodHooksChanged = () => engine.syncRouting();
+    this.syncRouting();   // hooks installed before the core attached (an interceptor the runtime set while loading the APK: src/direct-buffers.js) are routed too
   }
   /** Routes every hooked key's laid-out record (a class not laid out yet is routed when it is: installRouting) and gives the unhooked ones their kind back. */
   syncRouting() {

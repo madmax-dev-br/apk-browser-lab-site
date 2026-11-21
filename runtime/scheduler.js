@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
 
 // Green-thread scheduler for the VM.
 //
@@ -43,7 +43,8 @@ export const QUANTUM = 20000;   // instructions a thread runs before another run
 const IO_BOOST_WALL_FACTOR = 8;   // a boost also ends this many times ioBoostMs of wall time after its wake-up
 const IO_BOOST_SHARE = 4;
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
-const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
+const QUIET_IDLE_LIMIT = 50000;
+const MAIN_NESTED_SKIP_LIMIT_MS = 10 * 60 * 1000;   // virtual time a deadline-less nested wait of the main thread may skip (checkEndlessMainWait)  // consecutive clock skips with no host event in between
 export class Scheduler {
   constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; this.suspendedMain = null; }   // suspendedMain: the main thread's event suspended in its wait (vmcore/js/host-bridge.js suspendable)
   get clock() { return this.rt.platform.clock; }
@@ -257,6 +258,18 @@ export class Scheduler {
     const siteOf = t => { const site = t.nestedSites?.at(-1); return site ? name(site) : 'a host call that ran Java'; };
     throw new APKError(`Deadlock in nested host calls: ${thread.name} waits (${blocked.reason}${what ? ` of ${String(what).replace(/^L|;$/g, '').replaceAll('/', '.')}` : ''}) inside ${siteOf(thread)} for ${holder.name}, whose run is suspended beneath it on the JavaScript stack inside ${siteOf(holder)}: ${holder.name} goes on only once the run of ${thread.name} returns, and that run returns only once ${holder.name} goes on (threads: ${this.describe()})`, { kind: 'cooperative-deadlock', waiter: thread.name, holder: holder.name, reason: blocked.reason });
   }
+  /**
+   * The main thread waiting without a deadline in a nested host call (it cannot return to the event loop: a native frame or host code is beneath it) while the only work left
+   * is threads that sleep and wake on timers: the clock is skipped from one timer to the next, the other threads run their periodic loops, and the wait never ends -- a
+   * hang of the page and of the event pump. Once MAIN_NESTED_SKIP_LIMIT_MS of virtual time has been skipped in such a wait (an Android device declares an ANR after 5 s
+   * of a blocked main thread and ends a process whose Application.onCreate does not finish), the run ends with an explicit report naming the wait and the threads.
+   */
+  checkEndlessMainWait(thread, blocked, skipStart, started) {
+    if (thread !== this.main || Number.isFinite(blocked.deadline) || this.stats.skippedMs - skipStart <= MAIN_NESTED_SKIP_LIMIT_MS) return;
+    let what = ''; try { const target = blocked.blocker ?? thread.blocker; if (target) what = ` on a ${String(this.rt.typeOf(target)).replace(/^L|;$/g, '').replaceAll('/', '.')}`; } catch { /* not inspectable */ }
+    const active = this.threads.filter(t => t !== thread && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 6).map(t => `${t.name} (${t.state === 'runnable' ? 'runnable' : t.blocked.reason})`);
+    throw new APKError(`Main thread wait that cannot end: main waits (${blocked.reason}${what}, no deadline) inside a nested host call, and in ${Math.round((this.stats.skippedMs - skipStart) / 1000)} s of virtual time (${Math.round(performance.now() - started)} ms of host time) only timer-driven threads ran (${active.join(', ') || 'none'}); nothing else can wake it. On a device the main thread would be reported as not responding (ANR)`, { kind: 'cooperative-deadlock', wait: blocked.reason });
+  }
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
   idle(earliest, why) {
     const platform = this.rt.platform;
@@ -326,7 +339,7 @@ export class Scheduler {
       thread.blocked = blocked; thread.state = 'blocked'; thread.nestedBlock = true; this.waitingNested.add(thread);
       let timedOut = false;
       try {
-        let idleRounds = 0;
+        let idleRounds = 0; const skipStart = this.stats.skippedMs, started = performance.now();
         const pins = this.rt.wasm?.pins, mark = pins?.length ?? 0;
         for (;;) {
           if (pins && pins.length > mark) pins.length = mark;   // a finished turn's handles (CoreThreads.waitFor: the pins of a host call that waits do not grow with every turn)
@@ -337,6 +350,7 @@ export class Scheduler {
           if (next) { this.rt.runThreads(); this.serviceEvents(); idleRounds = 0; continue; }
           this.idle(earliest, `${thread.name} is waiting (${blocked.reason}) and cannot be woken: the threads that could do it are suspended below this host call`);
           if (++idleRounds > 100000) throw new APKError(`Deadlock: ${thread.name} waited ${idleRounds} idle rounds (${blocked.reason})`, { kind: 'cooperative-deadlock' });
+          this.checkEndlessMainWait(thread, blocked, skipStart, started);
         }
       } finally { this.waitingNested.delete(thread); thread.nestedBlock = false; this.rt.thread = thread; }
       thread.state = 'runnable'; thread.blocked = null;

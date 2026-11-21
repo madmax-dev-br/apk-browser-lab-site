@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=af8ff7411a95") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=af8ff7411a95">
-  <link rel="stylesheet" href="./lab-theme.css?v=af8ff7411a95">
-  <meta name="apk-browser-build" content="af8ff7411a95">
+  <style>@import url("./styles.css?v=e3ff4f2e305f") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=e3ff4f2e305f">
+  <link rel="stylesheet" href="./lab-theme.css?v=e3ff4f2e305f">
+  <meta name="apk-browser-build" content="e3ff4f2e305f">
 </head>
 <body>
   <header class="topbar">
@@ -83,6 +83,19 @@
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
                 <div class="cp-microg-open"><button id="dev-microg-settings" class="cp-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-describedby="dev-microg-settings-summary">microG settings…</button><span id="dev-microg-settings-summary" class="cp-microg-settings-summary" role="status">services: all off</span></div>
               </div>
+              <fieldset class="cp-core cp-custom-identity" id="dev-id">
+                <legend>Custom device identity <em id="dev-id-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></legend>
+                <label class="cp-check" for="dev-id-on"><input id="dev-id-on" type="checkbox" aria-describedby="dev-id-status"><span>Use a custom identity<small>Off (default): the device keeps the lab's own identity. On: the names you type here replace the lab's product names everywhere the device reports them, as on a device whose build had those names: android.os.Build, the ro.product.* system properties and their ro.product.system.* copies, the fingerprint and ro.build.description (rebuilt by the build's own rules), getprop, adb devices -l and native code. The build itself (type, tags, Android release, SDK level, build id, security patch) stays the lab's. An empty field keeps the lab's value, shown greyed in it. The lab never fills these fields in. The page, the execution log and the diagnostics summary mark the identity as custom. Applies when the APK is opened again.</small></span></label>
+                <label class="cp-field" for="dev-id-manufacturer"><span>Manufacturer<small>ro.product.manufacturer, Build.MANUFACTURER: any printable text, at most 91 bytes</small></span><input id="dev-id-manufacturer" data-identity-field="manufacturer" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-manufacturer-error"><span id="dev-id-manufacturer-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-brand"><span>Brand<small>ro.product.brand, Build.BRAND, the first part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-brand" data-identity-field="brand" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-brand-error"><span id="dev-id-brand-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-model"><span>Model<small>ro.product.model, Build.MODEL (also in the WebView's user agent and adb devices -l): any printable text, at most 91 bytes</small></span><input id="dev-id-model" data-identity-field="model" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-model-error"><span id="dev-id-model-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-device"><span>Device<small>ro.product.device, Build.DEVICE, ro.build.product, the third part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-device" data-identity-field="device" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-device-error"><span id="dev-id-device-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-name"><span>Product name<small>ro.product.name, Build.PRODUCT, the second part of the fingerprint, ro.build.description and ro.build.flavor: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-name" data-identity-field="name" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-name-error"><span id="dev-id-name-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-board"><span>Board (optional)<small>ro.product.board, Build.BOARD: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-board" data-identity-field="board" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-board-error"><span id="dev-id-board-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <label class="cp-field" for="dev-id-hardware"><span>Hardware (optional)<small>ro.hardware and ro.boot.hardware, Build.HARDWARE: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-hardware" data-identity-field="hardware" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-hardware-error"><span id="dev-id-hardware-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                <p id="dev-id-status" class="cp-note" role="status"></p>
+                <button id="dev-id-reset" class="cp-button" type="button">Reset to the lab's identity</button>
+              </fieldset>
               <p id="dev-identity" class="cp-note" role="status">Identity (fixed, the same for every app): Android 13 (API 33), user build, release-keys.</p>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
               <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
@@ -326,7 +339,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=af8ff7411a95"></script>
+  <script type="module" src="./app.js?v=e3ff4f2e305f"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

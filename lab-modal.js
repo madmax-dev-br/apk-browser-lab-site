@@ -60,5 +60,23 @@ export function createModalHost({ doc = globalThis.document, win = globalThis.wi
     doc.body.append(scrim); doc.body?.classList?.add('lab-modal-open'); open.set(id, modal); close.focus?.();
     return modal;
   }
-  return { open: openModal, closeAll: () => { for (const modal of [...open.values()]) modal.close('code'); }, get count() { return open.size; } };
+  /**
+   * A yes/no question in the page's own modal (the native confirm() is blocked or dismissed at once by some embedded browsers, so a click on "Uninstall" seemed to do nothing).
+   * options: { title, message, confirmLabel, cancelLabel, danger }. Resolves true only when the confirm button is pressed; Esc, the close button or the scrim resolve false.
+   */
+  function ask({ title = 'Confirm', message = '', confirmLabel = 'OK', cancelLabel = 'Cancel', danger = false } = {}) {
+    return new Promise(resolve => {
+      let answer = false;
+      const box = doc.createElement('div'), text = doc.createElement('p'), row = doc.createElement('div'), no = doc.createElement('button'), yes = doc.createElement('button');
+      box.className = 'lab-confirm'; text.className = 'lab-confirm-text'; text.textContent = String(message ?? ''); row.className = 'lab-confirm-actions';
+      no.type = 'button'; no.className = 'cp-button'; no.textContent = cancelLabel;
+      yes.type = 'button'; yes.className = `cp-button${danger ? ' danger' : ' primary'}`; yes.textContent = confirmLabel;
+      row.append(no, yes); box.append(text, row);
+      const modal = openModal({ title, size: 'small', content: box, onClose: () => resolve(answer) });
+      no.addEventListener('click', () => modal.close('user'));
+      yes.addEventListener('click', () => { answer = true; modal.close('user'); });
+      yes.focus?.();
+    });
+  }
+  return { open: openModal, ask, closeAll: () => { for (const modal of [...open.values()]) modal.close('code'); }, get count() { return open.size; } };
 }

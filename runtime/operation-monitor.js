@@ -1,7 +1,7 @@
-import { TimeBreakdown } from './time-breakdown.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { gcBlockReason } from './heap-gc.js?v=af8ff7411a95';
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
+import { TimeBreakdown } from './time-breakdown.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { gcBlockReason } from './heap-gc.js?v=e3ff4f2e305f';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -18,7 +18,7 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.hostCount = 0; this.active = false;
+    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.nativeSteps = 0; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.hostCount = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
@@ -64,6 +64,10 @@ export class OperationMonitor {
     if (!this.active) return;
     const now = performance.now();
     if (this.sink !== null && now - this.lastBeat >= this.intervalMs) this.beat(now, 'tick');
+    this.checkBudget(now);
+  }
+  /** The operation wall budget (tick, and nativeProgress for a synchronous native call, which reaches no tick until it returns). */
+  checkBudget(now) {
     const op = this.op;
     if (op !== null && this.budgetMs > 0 && !op.expired && now - op.start > this.budgetMs) {
       // Only main-thread work fails the operation. A background thread that overruns is preempted (its slice ends at the next quantum and it keeps running in later rounds), never the reason the app dies.
@@ -85,11 +89,12 @@ export class OperationMonitor {
     if (now - op.start > this.hardCapMs) return false;
     const instructions = this.instructions();
     if (op.soft === undefined && op.events * 1000 / Math.max(1, now - op.start) > 100) return false;   // thousands of tiny events per second: a pump that spins, not a long event that works
-    if (op.soft === undefined) { op.soft = { checkAt: now + 2000, instructions, events: op.events, stalls: 0 }; this.beat(now, 'soft'); return true; }
+    if (op.soft === undefined) { op.soft = { checkAt: now + 2000, instructions, native: this.nativeSteps, events: op.events, stalls: 0 }; this.beat(now, 'soft'); return true; }
     if (now < op.soft.checkAt) return true;
-    // Progress is long-running events that execute instructions (a first composition: tens of events in 20 s). A pump that runs thousands of tiny events (a self-rescheduling loop) is spinning, not progressing.
-    const advanced = instructions - op.soft.instructions, events = op.events - op.soft.events;
-    op.soft.instructions = instructions; op.soft.events = op.events; op.soft.checkAt = now + 2000;
+    // Progress is long-running events that execute instructions (a first composition: tens of events in 20 s), Java or native (a long native call reports every 2^20 of its
+    // instructions: nativeProgress). A pump that runs thousands of tiny events (a self-rescheduling loop) is spinning, not progressing.
+    const advanced = instructions - op.soft.instructions + (this.nativeSteps - op.soft.native), events = op.events - op.soft.events;
+    op.soft.instructions = instructions; op.soft.native = this.nativeSteps; op.soft.events = op.events; op.soft.checkAt = now + 2000;
     if (advanced >= 100000 && events < 400) { op.soft.stalls = 0; this.beat(now, 'soft'); return true; }
     return ++op.soft.stalls < 2;   // two windows (4 s) of no real progress: expire with the report
   }
@@ -128,12 +133,26 @@ export class OperationMonitor {
    * Native code reports progress (the ARM64 interpreter, every 2^20 instructions: it makes no host call while it computes): the main-thread watchdog, and a heartbeat when due whose
    * host call names the native code (`where()`: library and offset), so a long native run is shown working, not taken for a Worker that stopped answering.
    */
-  nativeProgress(where) {
+  // `synchronous`: the native code runs inside a call made synchronously from Java (it cannot be preempted and reaches no scheduler tick until it returns), so the operation's wall
+  // budget is checked here too; a native thread's slice or a preemptible call is not what overran (its slice ends and the main thread's work goes on).
+  nativeProgress(where, { synchronous = false } = {}) {
     const now = performance.now();
+    this.nativeSteps += 0x100000;
     if (this.mainEvent) this.watchMain(now);
-    if (this.sink === null || now - this.lastBeat < this.intervalMs) return;
+    const beat = this.sink !== null && now - this.lastBeat >= this.intervalMs, budget = synchronous && this.active;
+    if (!beat && !budget) return;
     const previous = this.rt.hostCall; this.rt.hostCall = where();
-    try { this.beat(now, 'native'); } finally { this.rt.hostCall = previous; }
+    try { if (beat) this.beat(now, 'native'); if (budget) this.checkBudget(now); } finally { this.rt.hostCall = previous; }
+  }
+  /**
+   * Does a wall-clock limit watch a synchronous native call of the thread that runs now (src/arm64/cpu.js: the runaway guard applies only where none does)? On the main
+   * thread: inside an event its cap does (watchMain), during an operation with a wall budget the budget does (checkBudget from nativeProgress). A background Java thread's
+   * synchronous call (nested in a JNI callback) is not ended by either (the budget only preempts background work), so the guard stays.
+   */
+  watchesSynchronousNative() {
+    const rt = this.rt, main = rt.scheduler?.main;
+    if (rt.thread !== null && rt.thread !== undefined && rt.thread !== main) return false;
+    return (this.mainEvent !== null && this.mainEvent !== undefined) || (this.op !== null && this.budgetMs > 0);
   }
   /** A long host-side phase (a collection) reports progress: heartbeat when due, labelled, without the operation-budget check (the phase cannot be abandoned half way). */
   pulse(label) {

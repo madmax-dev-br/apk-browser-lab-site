@@ -20,9 +20,9 @@
 //  - Invalidation: a page's translations and decoded instructions go when the page is written by the interpreter or a lab function (src/arm64/decode-cache.js), when it is
 //    mprotect'ed or unmapped, and translated stores to such a page leave the translated code before storing, so the interpreter's write drops them first. Code written or
 //    unpacked at run time is decoded again before it runs.
-import { decodeBitMasks } from './cpu.js?v=af8ff7411a95';
-import { DecodeCache } from './decode-cache.js?v=af8ff7411a95';
-import { Code, OP, SIMD, T, V, moduleBytes } from './wasm-emit.js?v=af8ff7411a95';
+import { decodeBitMasks } from './cpu.js?v=e3ff4f2e305f';
+import { DecodeCache } from './decode-cache.js?v=e3ff4f2e305f';
+import { Code, OP, SIMD, T, V, moduleBytes } from './wasm-emit.js?v=e3ff4f2e305f';
 
 const PAGE = 4096, SLOT = 1024, MAX_SLOTS = 4096;
 // slot layout (bytes from the slot's start)
@@ -546,6 +546,22 @@ function atomic(e, word) {   // LSE: LDADD, LDCLR, LDEOR, LDSET, LDSMAX, LDSMIN,
   return OK;
 }
 
+// ---- FMOV (general): a bit copy between a general register and a vector register (no rounding, no NaN handling: exact in WebAssembly). Code that keeps doubles NaN-boxed in
+// general registers (a JavaScript engine's values) moves them through these at every arithmetic step. To a vector register the rest of the register is cleared (S, D forms);
+// the D[1] forms read or write the upper half only. Register 31 is XZR, as for the interpreter.
+function fmovGeneral(e, word) {
+  const rd = word & 31, rn = field(word, 5, 5), base = (word & 0xfffffc00) >>> 0;
+  if (base === 0x1e260000) { e.get(P_S).mem(OP.i64_load32_u, 1, vreg(rn)).setx(rd); return OK; }   // FMOV Wd, Sn
+  if (base === 0x9e660000) { e.get(P_S).mem(OP.i64_load, 1, vreg(rn)).setx(rd); return OK; }   // FMOV Xd, Dn
+  if (base === 0x9eae0000) { e.get(P_S).mem(OP.i64_load, 1, vreg(rn) + 8).setx(rd); return OK; }   // FMOV Xd, Vn.D[1]
+  if (base === 0x1e270000 || base === 0x9e670000) {   // FMOV Sd, Wn / FMOV Dd, Xn
+    e.get(P_S).v128(ZERO).simd(SIMD.v128_store, 1, vreg(rd));
+    e.get(P_S).x(rn); if (base === 0x1e270000) e.i64(M32).op(OP.i64_and); e.mem(OP.i64_store, 1, vreg(rd)); return OK;
+  }
+  if (base === 0x9eaf0000) { e.get(P_S).x(rn).mem(OP.i64_store, 1, vreg(rd) + 8); return OK; }   // FMOV Vd.D[1], Xn
+  return undefined;
+}
+
 // ---- Advanced SIMD: the integer vector forms with an exact WebAssembly SIMD counterpart (src/arm64/neon.js and Arm64Cpu.simdVector are the reference). Vector
 // registers live in the CPU's slot of the state memory; a 64-bit (Q = 0) result clears the upper half, as the interpreter's setLanes and vWriteBig do. Floating
 // point, scalar forms, widening / narrowing / pairwise / across-lanes forms and the rest return null: the interpreter.
@@ -563,6 +579,7 @@ const THREE_SAME = {   // `${u}${opcode}`: the operator by lane size
 };
 function simdData(e, word) {
   const top = field(word, 24, 8);
+  const fmov = fmovGeneral(e, word); if (fmov !== undefined) return fmov;
   if ((top & 0b01011111) === 0b00011110 || (top & 0b01011111) === 0b00011111) return null;   // scalar floating point: the interpreter
   const q = bit(word, 30), u = bit(word, 29), rd = word & 31, rn = field(word, 5, 5), rm = field(word, 16, 5), top5 = field(word, 24, 5);
   if (bit(word, 31)) return null;
@@ -829,10 +846,11 @@ export class Arm64Tier {
     const buffer = this.state.buffer; this.bytes = new Uint8Array(buffer); this.i32 = new Int32Array(buffer); this.big = new BigUint64Array(buffer); this.f64 = new Float64Array(buffer);
     this.sizeGlobal = new WebAssembly.Global({ value: 'i64', mutable: true }, BigInt(memory.size));
     this.imports = { m: { g: memory.wasmMemory, s: this.state, z: this.sizeGlobal } };
-    this.entries = new Map(); this.heat = new Map(); this.pages = new Map(); this.free = []; this.nextSlot = 0; this.bailWords = new Map();
+    this.entries = new Map(); this.heat = new Map(); this.pages = new Map(); this.free = []; this.nextSlot = 0; this.bailWords = new Map(); this.watchedPages = new Set();
     this.released = new FinalizationRegistry(index => this.free.push(index));
     this.counters = { regions: 0, blocks: 0, instructions: 0, failed: 0, compileMs: 0, bytes: 0, entries: 0, executed: 0, invalidated: 0 };
     const cache = memory.decodeCache; if (cache) for (const page of cache.pages.keys()) this.mark(page);
+    for (const [first, end] of memory.watchedPages ?? []) this.watch(first, end);
   }
   /** A register-file slot for `cpu` (its vector registers become a view of it), or -1 when every slot is taken. */
   attach(cpu) {
@@ -845,9 +863,11 @@ export class Arm64Tier {
   }
   resized() { this.sizeGlobal.value = BigInt(this.memory.size); }
   mark(page) { if (page >= 0 && page < this.bitmapBytes - 16) this.bytes[page] = 1; }
+  /** Pages whose stores the interpreter must see (src/arm64/memory.js watch): translated stores to them leave first, whether or not they hold code. */
+  watch(first, end) { for (let page = first; page < end; page++) { this.watchedPages.add(page); this.mark(page); } }
   /** The page's decoded instructions were dropped (a write, mprotect, munmap): its translations go too. */
   dropPage(page) {
-    if (page >= 0 && page < this.bitmapBytes - 16) this.bytes[page] = 0;
+    if (page >= 0 && page < this.bitmapBytes - 16) this.bytes[page] = this.watchedPages.has(page) ? 1 : 0;
     const regions = this.pages.get(page); if (!regions) return;
     for (const region of [...regions]) this.kill(region);
     this.pages.delete(page);

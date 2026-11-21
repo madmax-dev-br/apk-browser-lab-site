@@ -4,12 +4,13 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=af8ff7411a95';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=af8ff7411a95';
-import { ART_BLOCKED } from './signals.js?v=af8ff7411a95';
+import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=e3ff4f2e305f';
+import { ART_BLOCKED } from './signals.js?v=e3ff4f2e305f';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 const PUMP_MS = 4;   // the delay of the next background pump while native threads can run
+export const JAVA_NATIVE_QUANTUM = 1 << 18;   // instructions a Java thread's parkable native call runs before the thread is preempted (continueFromJava)
 // bionic's pthread_internal_t (android-13.0.0_r1 bionic/libc/bionic/pthread_internal.h, arm64): pthread_t is the address of this record, and TLS_SLOT_THREAD_ID (tp + 8) holds it.
 // The fields the lab fills: tid, the cached pid, pthread_attr_t (flags, stack_base, stack_size, guard_size, sched_policy, sched_priority), start_routine and its argument, and
 // alternate_signal_stack (the mapping bionic gives every thread for its signal handlers: SIGNAL_STACK_SIZE with a guard page at its bottom, installed with sigaltstack).
@@ -55,7 +56,7 @@ export class NativeThreads {
       // its own interpreter state and stack (as a created thread): a native call of this Java thread can park it in a wait (callFromJava) while other Java threads call native code
       const stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000, `[anon:stack_and_tls:${this.nextTid}]`), tp = region + stackSize + 0x100; p.initThreadTls(tp);
       const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
-      cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.nested = 0;
+      cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.watched = p.cpu.watched; cpu.threadLabel = p.cpu.threadLabel; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.nested = 0;
       record = { tid: this.nextTid++, cpu, ownCpu: true, state: 'running', tp, errno: tp - 0xf0, keys: new Map(), java: true, name: javaThread.name ?? null, stack: { base: region, size: stackSize } };
       record.sigmask = ART_BLOCKED; (this.javaByTid ??= new Map()).set(record.tid, record);
       this.javaRecords.set(javaThread, record); this.log(`ARM64 native thread ${record.tid} is Java thread "${record.name ?? '?'}"`);
@@ -78,11 +79,19 @@ export class NativeThreads {
       return this.continueFromJava(javaThread, record, saved, options, park);
     });
   }
+  // The call runs in quanta of JAVA_NATIVE_QUANTUM instructions: at the end of one the Java thread parks, ready at once, so the scheduler gives the other threads, the events
+  // and the page their turn and resumes it, as a device's scheduler preempts a thread that computes; a long native computation on a background Java thread never holds the VM.
   continueFromJava(javaThread, record, saved, options, park) {
     const cpu = record.cpu; let outcome;
-    record.inCall = true; record.parkable = true; record.state = 'running';
-    try { outcome = cpu.run(RETURN_SENTINEL); } catch (error) { record.inCall = false; throw error; } finally { record.parkable = false; }
+    record.inCall = true; record.parkable = true; record.state = 'running'; cpu.parked = false;
+    try { outcome = cpu.run(RETURN_SENTINEL, JAVA_NATIVE_QUANTUM); } catch (error) { record.inCall = false; throw error; } finally { record.parkable = false; }
     if (outcome === 'done') { record.inCall = false; record.state = 'running'; return cpu.endCall(saved, options.returns); }
+    cpu.parked = true;   // preempted or waiting: a call made on this CPU before it resumes keeps its context (src/arm64/cpu.js call)
+    if (outcome === 'yield') {
+      record.preemptions = (record.preemptions ?? 0) + 1;
+      return park({ ready: () => true, delayMs: 0, what: 'a native call preempted at the end of its quantum', preempted: true,
+        resume: () => this.asJavaThread(javaThread, () => this.continueFromJava(javaThread, record, saved, options, park)) });
+    }
     if (outcome !== 'blocked') { record.inCall = false; throw new APKError(`ARM64 interpreter: a native call of Java thread "${record.name ?? '?'}" ended as '${outcome}' (pc 0x${cpu.pc.toString(16)})`, { kind: 'arm64-threads' }); }
     const until = Math.min(record.deadline ?? Infinity, record.wakeAt?.() ?? Infinity);
     return park({ ready: () => record.ready?.() === true || this.now() >= until, delayMs: until - this.now(), what: record.what ?? 'a native wait',
@@ -92,7 +101,7 @@ export class NativeThreads {
     const p = this.process, stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000, `[anon:stack_and_tls:${this.nextTid}]`), tp = region + stackSize + 0x100;
     p.initThreadTls(tp);
     const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
-    cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.x[0] = BigInt(arg); cpu.x[30] = BigInt(this.exitEntry); cpu.pc = Number(start); cpu.nested = 0;
+    cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.watched = p.cpu.watched; cpu.threadLabel = p.cpu.threadLabel; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.x[0] = BigInt(arg); cpu.x[30] = BigInt(this.exitEntry); cpu.pc = Number(start); cpu.nested = 0;
     const thread = { tid: this.nextTid++, cpu, state: 'runnable', tp, errno: tp - 0xf0, keys: new Map(), waiters: [], result: 0n, stack: { base: region, size: stackSize }, start: Number(start), arg: Number(arg), sigmask: this.current.sigmask ?? ART_BLOCKED, parent: this.current };   // a new thread inherits its creator's signal mask
     this.threads.set(thread.tid, thread); this.log(`ARM64 native thread ${thread.tid} started at 0x${Number(start).toString(16)}`);
     const self = this.selfOf(thread);
@@ -106,11 +115,14 @@ export class NativeThreads {
   // `wakeAt()`: the earliest time the condition may turn true by time alone (a timer), when it does not wait for another thread
   wait(cpu, ready, { what, deadline = Infinity, wakeAt = null } = {}) {
     if (ready()) return true;
-    if (this.canSuspend(cpu)) { Object.assign(this.current, { state: 'waiting', ready, deadline, what, wakeAt }); return BLOCKED; }
+    // a thread that waits is not a runaway: a long-lived thread (an event loop, a garbage collector's worker) gets the whole instruction budget again for its next stretch of
+    // work, as an outermost native call does (src/arm64/cpu.js beginCall); the budget still ends a thread that computes without ever waiting
+    if (this.canSuspend(cpu)) { Object.assign(this.current, { state: 'waiting', ready, deadline, what, wakeAt }); return BLOCKED; }   // a suspended thread is preemptible: no instruction budget counts it (src/arm64/cpu.js runaway)
     const caller = this.current;
     for (;;) {
       if (ready()) return true;
       if (this.now() >= deadline) return false;
+      if (this.signalFor(caller)) { this.process.signals.deliver(this.process, caller); if (ready()) return true; }   // a timer or a signal for the waiting thread: its handler runs inside the wait, as a signal interrupts a blocking call
       const progressed = this.runOthers(caller);
       if (ready()) return true;
       if (!progressed) {
@@ -122,17 +134,19 @@ export class NativeThreads {
     }
   }
   /** The earliest time a waiting thread other than `caller` is woken by time alone (its deadline or timer). */
-  nextTimer(caller) { let at = Infinity; for (const t of this.threads.values()) if (t !== caller && !t.main && t.state === 'waiting') at = Math.min(at, t.deadline, t.wakeAt?.() ?? Infinity); return at; }
+  nextTimer(caller) { let at = Math.min(this.process.kernelNextTimer?.() ?? Infinity, this.process.timerDeadline?.() ?? Infinity); for (const t of this.threads.values()) if (t !== caller && !t.main && t.state === 'waiting') at = Math.min(at, t.deadline, t.wakeAt?.() ?? Infinity); return at; }
   /** Runs one slice of every other thread that can run; true when any of them ran. */
   runOthers(caller) {
-    let progressed = false;
+    let progressed = this.process.kernelPump?.() === true;   // the other processes (src/process-kernel.js): a child this thread waits for, or that writes the pipe it reads
     for (const thread of [...this.threads.values()]) {
       if (thread === caller || thread.main || thread.state === 'done') continue;
-      if (thread.state === 'waiting') { if (thread.ready() || this.now() >= thread.deadline || this.now() >= (thread.wakeAt?.() ?? Infinity)) thread.state = 'runnable'; else continue; }
+      if (thread.state === 'waiting') { if (thread.ready() || this.now() >= thread.deadline || this.now() >= (thread.wakeAt?.() ?? Infinity) || this.signalFor(thread)) thread.state = 'runnable'; else continue; }
       progressed = this.slice(thread) || progressed;
     }
     return progressed;
   }
+  /** A timer of the process is due, or a signal waits that this thread takes (src/arm64/timers.js, src/arm64/signals.js): it runs for the handler. */
+  signalFor(thread) { const p = this.process; return this.now() >= (p.timerDeadline?.() ?? Infinity) || p.signals?.deliverable?.(p, thread) === true; }
   slice(thread) {
     const previous = this.current, p = this.process; this.current = thread; p.activeCpu = thread.cpu; thread.state = 'running';
     try {
@@ -172,8 +186,8 @@ export class NativeThreads {
     let earliest = Infinity, waiting = false;
     for (const t of this.threads.values()) {
       if (t.main || t.state === 'done') continue;
-      if (active || t.state !== 'waiting') return PUMP_MS;
-      waiting = true; earliest = Math.min(earliest, t.deadline ?? Infinity, t.wakeAt?.() ?? Infinity);
+      if (active || t.state !== 'waiting' || this.signalFor(t)) return PUMP_MS;
+      waiting = true; earliest = Math.min(earliest, t.deadline ?? Infinity, t.wakeAt?.() ?? Infinity, this.process.timerDeadline?.() ?? Infinity);
     }
     if (!waiting || earliest === Infinity) return null;
     return Math.max(PUMP_MS, Math.ceil(earliest - this.now()));
@@ -215,12 +229,20 @@ export class NativeThreads {
     const mem = this.process.memory, cmd = op & 0x7f;
     if (cmd === 0 || cmd === 9) {   // FUTEX_WAIT / FUTEX_WAIT_BITSET
       const t = this.current;
-      if (!t.futex || t.futex.address !== address) { if (mem.readU32(address) !== (value >>> 0)) { mem.writeU32(this.process.errnoAddress, 11); return -1; } t.futex = { address, woken: false }; (this.futexWaiters ??= []).push(t); }
-      const deadline = timeoutPtr ? this.now() + Number(mem.read64(timeoutPtr)) * 1000 + Number(mem.read64(timeoutPtr + 8)) / 1e6 : Infinity;
-      const got = this.wait(cpu, () => t.futex.woken || mem.readU32(address) !== (value >>> 0), { what: `a futex at 0x${address.toString(16)}`, deadline });
+      // the deadline is fixed at the first entry (a suspended wait is retried when the thread runs again: a relative timeout computed again would never expire). FUTEX_WAIT's
+      // timeout is relative; FUTEX_WAIT_BITSET's is absolute, on CLOCK_MONOTONIC (the native threads' clock) or with FUTEX_CLOCK_REALTIME (256) on the wall clock
+      if (!t.futex || t.futex.address !== address) {
+        if (mem.readU32(address) !== (value >>> 0)) { mem.writeU32(this.process.errnoAddress, 11); return -1; }
+        const span = timeoutPtr ? Number(mem.read64(timeoutPtr)) * 1000 + Number(mem.read64(timeoutPtr + 8)) / 1e6 : null, wall = this.process.hostLibrary?.__wallMs;
+        const deadline = span === null ? Infinity : cmd === 0 ? this.now() + span : op & 256 ? this.now() + (span - (wall ? wall() : Date.now())) : span;
+        t.futex = { address, woken: false, deadline }; (this.futexWaiters ??= []).push(t);
+      }
+      const deadline = t.futex.deadline;
+      const changed = () => t.futex.woken || mem.readU32(address) !== (value >>> 0);
+      const got = this.wait(cpu, () => changed() || this.now() >= deadline, { what: `a futex at 0x${address.toString(16)}`, deadline });
       if (got === BLOCKED) return BLOCKED;
-      const woken = t.futex.woken; this.futexWaiters = this.futexWaiters.filter(w => w !== t); t.futex = null;
-      if (!woken && got === false) { mem.writeU32(this.process.errnoAddress, 110); return -1; }
+      const woken = changed(); this.futexWaiters = this.futexWaiters.filter(w => w !== t); t.futex = null;
+      if (!woken) { mem.writeU32(this.process.errnoAddress, 110); return -1; }   // ETIMEDOUT
       return 0;
     }
     if (cmd === 1 || cmd === 10) {   // FUTEX_WAKE / FUTEX_WAKE_BITSET

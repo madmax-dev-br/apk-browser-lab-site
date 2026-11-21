@@ -2,7 +2,7 @@
 // Editor and the framework's SQLiteDatabase). The section only says what there is and has one button; the data opens in a modal (src/lab-modal.js) with two tabs, SharedPreferences
 // and SQLite, each a row of its files or databases above the editor of the chosen one: a SharedPreferences file as a table of typed keys to edit, remove and add; a database as its
 // tables, a page of rows whose cells are edited in place (by rowid), rows added and removed, and a SQL console. A change answers a fresh snapshot, which the page renders.
-import { formatBytes } from './shared-files-panel.js?v=af8ff7411a95';
+import { formatBytes } from './shared-files-panel.js?v=e3ff4f2e305f';
 
 export const PREF_TYPES = ['string', 'int', 'long', 'float', 'boolean', 'set'];
 const PAGE = 100;
@@ -22,6 +22,8 @@ export function cellValue(textValue, columnType = '') {
 }
 
 export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, ready = () => true, render = () => {}, report = () => {} }) {
+  // A yes/no in the page's own modal when the host provides one (native confirm() is blocked by some embedded browsers).
+  const askUser = message => (modals?.ask ? modals.ask({ title: 'Delete?', message, confirmLabel: 'Delete', danger: true }) : Promise.resolve(globalThis.confirm?.(message) ?? false));
   const note = $('appdata-note'), summary = $('appdata-summary'), openButton = $('appdata-open');
   let overview = null, loading = null, view = null, lastTab = 'prefs';
   const el = (tag, props = {}, ...children) => { const node = doc.createElement(tag); for (const [key, value] of Object.entries(props)) { if (key === 'class') { if (value) node.className = value; } else if (key === 'text') node.textContent = value; else if (key.startsWith('on')) node.addEventListener(key.slice(2), value); else if (value !== null && value !== undefined && value !== false) node.setAttribute(key, value === true ? '' : value); } node.append(...children.filter(Boolean)); return node; };
@@ -108,7 +110,7 @@ export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, r
         let type = entry.type; const typeBox = typeSelect(type), valueBox = el('td'); let input = valueInput(type, entry.value); valueBox.append(input);
         typeBox.addEventListener('change', () => { type = typeBox.value; const next = valueInput(type, type === 'set' ? [] : type === 'boolean' ? false : ''); input.replaceWith(next); input = next; });
         const save = el('button', { type: 'button', class: 'cp-button', text: 'Save', onclick: () => apply([{ key: entry.key, type, value: readValue(type, input) }], `${entry.key} saved.`) });
-        const remove = el('button', { type: 'button', class: 'cp-button danger', text: 'Delete', onclick: () => { if (confirm(`Delete the key ${entry.key}?`)) apply([{ key: entry.key, remove: true }], `${entry.key} deleted.`); } });
+        const remove = el('button', { type: 'button', class: 'cp-button danger', text: 'Delete', onclick: async () => { if (await askUser(`Delete the key ${entry.key}?`)) apply([{ key: entry.key, remove: true }], `${entry.key} deleted.`); } });
         return el('tr', {}, el('th', { scope: 'row', text: entry.key }), el('td', {}, typeBox), valueBox, el('td', { class: 'appdata-actions' }, save, remove));
       });
       const newKey = el('input', { type: 'text', placeholder: 'new key', 'aria-label': 'New key', spellcheck: 'false' }); let newType = 'string'; const newTypeBox = typeSelect(newType), newValueCell = el('td'); let newInput = valueInput(newType, ''); newValueCell.append(newInput);
@@ -157,7 +159,7 @@ export function createAppDataPanel({ $, doc = globalThis.document, vm, modals, r
       input.addEventListener('blur', () => finish(false), { once: true });
     }
     async function removeRow(row) {
-      if (!confirm('Delete this row?')) return;
+      if (!await askUser('Delete this row?')) return;
       try { const result = await ask({ op: 'edit-row', db: name, table: current.name, change: { ...rowKey(row), remove: true } }); status.textContent = `${result.changes} ${result.changes === 1 ? 'row' : 'rows'} deleted.`; await load(); await showTable(current.name); }
       catch (error) { status.textContent = String(error?.message ?? error); }
     }

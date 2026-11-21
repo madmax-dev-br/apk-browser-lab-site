@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { throwNew } from './java-throw.js?v=af8ff7411a95';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=af8ff7411a95';
-import { networkOf, isIpLiteral } from './network-native.js?v=af8ff7411a95';
-import { Blocked } from './scheduler.js?v=af8ff7411a95';
-import { installUdp } from './udp-native.js?v=af8ff7411a95';
-import { createLoopback } from './loopback-socket.js?v=af8ff7411a95';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=af8ff7411a95';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { throwNew } from './java-throw.js?v=e3ff4f2e305f';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=e3ff4f2e305f';
+import { networkOf, isIpLiteral } from './network-native.js?v=e3ff4f2e305f';
+import { Blocked } from './scheduler.js?v=e3ff4f2e305f';
+import { installUdp } from './udp-native.js?v=e3ff4f2e305f';
+import { createLoopback } from './loopback-socket.js?v=e3ff4f2e305f';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=e3ff4f2e305f';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=e3ff4f2e305f';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -29,6 +29,7 @@ export function state(runtime) {
   const std = (name, acc) => ({ kind: 'std', name, acc, offset: 0, append: false, ownerTag: 0n, refs: 1 });
   const io = runtime.libcoreIo = { table: new Map([[0, { desc: std('stdin', C.O_RDONLY), cloexec: false }], [1, { desc: std('stdout', C.O_WRONLY), cloexec: false }], [2, { desc: std('stderr', C.O_WRONLY), cloexec: false }]]), umask: 0o077, lines: new Map() };
   // the app's /proc (src/procfs.js) lists Java's descriptors in fd/ and resolves their links
+  runtime.platform?.javaIo?.fs?.()?.procfs?.attachRuntime?.(runtime);
   runtime.platform?.javaIo?.fs?.()?.procfs?.attachJava({ file: n => javaFdFile(runtime, n), list: () => [...io.table.keys()] }, line => runtime.record?.(line));
   return io;
 }
@@ -87,14 +88,14 @@ export function lookup(fs, path) {
     if (cursor === '/') return { error: 'ENOENT', path: canonical };
   }
 }
-const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : node.type === 'fifo' ? C.S_IFIFO : C.S_IFREG) | (node.mode & 0o7777);
+const modeOf = (runtime, node) => (node.type === 'dir' ? C.S_IFDIR : node.type === 'fifo' ? C.S_IFIFO : node.type === 'link' ? 0o120000 : C.S_IFREG) | (node.mode & 0o7777);
 export const inode = node => node.ino ??= ++inodeCounter;
 function makeStat(runtime, node, std = false) {
-  const uid = runtime.platform.virtualProcess.uid, sec = Math.floor(node.mtime / 1000), ns = (node.mtime % 1000) * 1_000_000;
+  const uid = node.uid ?? runtime.platform.virtualProcess.uid, gid = node.gid ?? uid, sec = Math.floor(node.mtime / 1000), ns = Math.floor((node.mtime % 1000) * 1_000_000);   // the image's files are root's (src/system-image.js); the app's own are its uid's
   const TS = 'Landroid/system/StructTimespec;', spec = () => construct(runtime, TS, ['J', 'J'], [BigInt(sec), BigInt(ns)]);
   const size = node.type === 'file' ? node.size : 0, mode = std ? C.S_IFCHR | 0o620 : modeOf(runtime, node);
   return construct(runtime, 'Landroid/system/StructStat;', ['J', 'J', 'I', 'J', 'I', 'I', 'J', 'J', TS, TS, TS, 'J', 'J'],
-    [std ? 0xfn : 0xfd00n, std ? 3n : BigInt(inode(node)), mode, node.type === 'dir' ? 2n : 1n, uid, uid, std ? 0x103n : 0n, BigInt(size), spec(), spec(), spec(), 4096n, BigInt(Math.ceil(size / 512))]);
+    [std ? 0xfn : 0xfd00n, std ? 3n : BigInt(inode(node)), mode, node.type === 'dir' ? 2n : 1n, uid, gid, std ? 0x103n : 0n, BigInt(size), spec(), spec(), spec(), 4096n, BigInt(Math.ceil(size / 512))]);
 }
 
 // ---- file descriptors -------------------------------------------------------------------------------------------------------------------------
@@ -512,7 +513,11 @@ export function createLibcoreIoNativeBindings() {
     return 1;
   });
   const statPath = name => (runtime, [, path]) => makeStat(runtime, mutate(runtime, name, path).node);
-  L('stat(Ljava/lang/String;)Landroid/system/StructStat;', statPath('stat')); L('lstat(Ljava/lang/String;)Landroid/system/StructStat;', statPath('lstat'));   // the virtual filesystem has no symbolic links
+  L('stat(Ljava/lang/String;)Landroid/system/StructStat;', statPath('stat'));
+  L('lstat(Ljava/lang/String;)Landroid/system/StructStat;', (runtime, [, path]) => {   // a symbolic link (the image's /system/bin links) is reported itself; anything else as stat
+    const text = path === null ? null : runtime.stringCharacters(path), link = text === null ? null : files(runtime).lnode(text);
+    return link?.type === 'link' ? makeStat(runtime, { ...link, size: link.size ?? link.target.length }) : statPath('lstat')(runtime, [null, path]);
+  });
   L('mkdir(Ljava/lang/String;I)V', (runtime, [, path, mode]) => {
     const fs = files(runtime), name = requireString(runtime, path), found = lookup(fs, name);
     if (found.node) err(runtime, 'mkdir', 'EEXIST');
@@ -535,6 +540,7 @@ export function createLibcoreIoNativeBindings() {
   L('fchmod(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, mode]) => { const desc = entryOf(runtime, 'fchmod', fdRef).desc; if (desc.kind === 'std') err(runtime, 'fchmod', 'EINVAL'); desc.node.mode = mode & 0o7777; });
   L('realpath(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => mutate(runtime, 'realpath', path).path);
   L('readlink(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => { const text = path === null ? null : runtime.stringCharacters(path), link = text === null ? null : (state(runtime), files(runtime).procfs?.readlink(files(runtime).canonical(text))); if (link) return link;   // procfs links (src/procfs.js): fd/<n>, exe
+    { const node = text === null ? null : files(runtime).lnode(text); if (node?.type === 'link') return node.target; }   // a symbolic link of the file system
     mutate(runtime, 'readlink', path); err(runtime, 'readlink', 'EINVAL'); });   // exists, but no path is a symbolic link here
   L('umaskImpl(I)I', (runtime, [, mask]) => { const st = state(runtime), old = st.umask; st.umask = mask & 0o777; return old; });
   L('strerror(I)Ljava/lang/String;', (runtime, [, errno]) => STRERROR[errno] ?? `Unknown error ${errno}`);
@@ -567,7 +573,8 @@ export function createLibcoreIoNativeBindings() {
   add(FIS, 'available0()I', (runtime, [self]) => {
     const fdRef = runtime.object(self).fields.get(`${FIS}->fd:${FD}`), number = fdNumber(runtime, fdRef), entry = state(runtime).table.get(number);
     if (!entry) throwNew(runtime, 'Ljava/io/IOException;', 'Stream Closed');
-    const desc = entry.desc; if (desc.kind !== 'file') return 0;
+    const desc = entry.desc; if (desc.kind === 'pipe') return Math.min(0x7fffffff, desc.pipe.size);   // FIONREAD on a pipe: the bytes in it (ProcessPipeInputStream drains them when the process exits)
+    if (desc.kind !== 'file') return 0;
     return Math.max(0, Math.min(0x7fffffff, desc.node.size - desc.offset));
   });
   add(FIS, 'skip0(J)J', (runtime, [self, n]) => {
@@ -863,4 +870,32 @@ export function deviceInterfaces(runtime) {
     { name: 'lo', index: 1, flags: IFF_UP | IFF_LOOPBACK | IFF_RUNNING, mtu: 65536, mac: [0, 0, 0, 0, 0, 0], addresses: [{ addr: [127, 0, 0, 1], mask: [255, 0, 0, 0], broadcast: null }, { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], broadcast: null }] },
     { name: 'wlan0', index: 2, flags: online ? IFF_UP | IFF_BROADCAST | IFF_RUNNING | IFF_MULTICAST : IFF_BROADCAST | IFF_MULTICAST, mtu: 1500, mac: [2, 0, 0, 0, 0, 0], addresses: online ? [{ addr: [10, 0, 2, 15], mask: [255, 255, 255, 0], broadcast: [10, 0, 2, 255] }] : [] },
   ];
+}
+
+// ---- the process's socket and pipe descriptors seen from native code (the ARM64 libc, src/arm64/java-descriptors.js): one open description, the state Java uses
+/** poll(2) events of a socket or pipe description: readiness from the very buffers Java's reads take from. */
+export function descriptorRevents(desc, events) {
+  const { POLLIN, POLLOUT, POLLERR, POLLHUP } = C;
+  if (desc.kind === 'pipe') {
+    const pipe = desc.pipe;
+    if ((desc.acc & C.O_ACCMODE) === C.O_RDONLY) return (pipe.chunks.length > 0 ? POLLIN : 0) | (pipe.writers === 0 ? POLLHUP : 0);
+    return pipe.readers === 0 ? POLLERR : (events & POLLOUT && pipe.size < 65536 ? POLLOUT : 0);
+  }
+  if (desc.kind !== 'socket') return 0;
+  const loop = loopback.revents(desc, events); if (loop !== null) return loop;
+  let result = 0;
+  if ((desc.queue?.length ?? 0) > 0 || (desc.http && desc.http.readable())) result |= POLLIN;
+  if (desc.pendingError || (desc.http && desc.http.error !== null && !desc.http.errorDelivered)) result |= POLLERR;
+  if (events & POLLOUT && (desc.type !== C.SOCK_STREAM || desc.connected) && !desc.http?.writeShut) result |= POLLOUT;
+  if (desc.http && (desc.http.closed || (desc.http.eof && desc.http.writeShut))) result |= POLLHUP;
+  return result;
+}
+/** shutdown(2) of a connected socket description, as Os.shutdown does it. */
+export function shutdownDescriptor(runtime, desc, how) { desc.http?.shutdown(how, C.SHUT_RD, C.SHUT_WR); loopback.shutdown(runtime, desc, how); }
+/** Bytes a read would get now (FIONREAD), as Os.ioctlInt answers it. */
+export function descriptorAvailable(desc) {
+  if (desc.kind === 'pipe') return Math.min(0x7fffffff, desc.pipe.size);
+  if (desc.loop) return loopback.available(desc);
+  if (desc.http) { desc.http.pump(); return Math.min(desc.http.available, 0x7fffffff); }
+  return desc.queue?.[0]?.data.length ?? 0;
 }

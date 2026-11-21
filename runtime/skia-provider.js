@@ -1,12 +1,12 @@
-import {APKError} from './apk-runtime.js?v=af8ff7411a95';
-import {PathApproxProvider} from './path-approx-provider.js?v=af8ff7411a95';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=af8ff7411a95';
-import {createFontFallback} from './font-fallback.js?v=af8ff7411a95';
-import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=af8ff7411a95';
-import {loadMinikin} from './minikin-provider.js?v=af8ff7411a95';
-import {createMinikinText} from './minikin-text.js?v=af8ff7411a95';
-import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=af8ff7411a95';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=af8ff7411a95';
+import {APKError} from './apk-runtime.js?v=e3ff4f2e305f';
+import {PathApproxProvider} from './path-approx-provider.js?v=e3ff4f2e305f';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=e3ff4f2e305f';
+import {createFontFallback} from './font-fallback.js?v=e3ff4f2e305f';
+import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=e3ff4f2e305f';
+import {loadMinikin} from './minikin-provider.js?v=e3ff4f2e305f';
+import {createMinikinText} from './minikin-text.js?v=e3ff4f2e305f';
+import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=e3ff4f2e305f';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=e3ff4f2e305f';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){

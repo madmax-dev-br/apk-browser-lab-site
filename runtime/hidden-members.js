@@ -1,6 +1,6 @@
-import TABLES from './hidden-member-tables.js?v=af8ff7411a95';
-import { APKError } from './apk-error.js?v=af8ff7411a95';
-import { constantField } from './framework-constants.js?v=af8ff7411a95';
+import TABLES from './hidden-member-tables.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=e3ff4f2e305f';
+import { constantField } from './framework-constants.js?v=e3ff4f2e305f';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with

@@ -33,7 +33,10 @@ export function declaredAuthenticators(entry, environment) {
     const attribute = name => { let found = environment.getAttribute?.(root, name) ?? root?.attributes?.find(a => a.name === name) ?? null; while (found?.resolved) found = found.resolved; return found ? found.value ?? found.rawValue ?? found.data ?? null : null; };   // android:accountType="@string/...": the string it refers to
     const type = attribute('accountType'); if (typeof type !== 'string' || !type) continue;
     const custom = attribute('customTokens');
-    out.push({ type, packageName: entry.name, service: detail.name, customTokens: custom === true || custom === 'true' || custom === -1 || custom === 1 });
+    // the resource ids AuthenticatorDescription carries (label, icon, smallIcon, accountPreferences): a reference attribute's id, else 0 (not given)
+    const idOf = name => { const found = environment.getAttribute?.(root, name) ?? root?.attributes?.find(a => a.name === name) ?? null; return found?.kind === 'reference' && Number.isInteger(found.reference) ? found.reference : 0; };
+    out.push({ type, packageName: entry.name, service: detail.name, customTokens: custom === true || custom === 'true' || custom === -1 || custom === 1,
+      labelId: idOf('label'), iconId: idOf('icon'), smallIconId: idOf('smallIcon'), prefId: idOf('accountPreferences') });
   }
   return out;
 }
@@ -104,13 +107,18 @@ export function createAccountStore({ packages, sameSigners = (a, b) => a === b, 
     /** Forgets the accounts in memory and reads the files again (after the device data was restored into the VFS). */
     reload() { accounts.length = 0; readFiles(); },
     /** resolveAccountVisibility for package `caller` (its targetSdk and whether it holds GET_ACCOUNTS / GET_ACCOUNTS_PRIVILEGED). */
-    visibleTo(account, caller, { targetSdk = 33, getAccounts = false, privileged = false } = {}) {
-      if (store.owns(caller, account.type)) return true;
+    visibleTo(account, caller, options = {}) { return store.owns(caller, account.type) || isVisible(store.visibility(account, caller, options)); },
+    /**
+     * AccountManagerService.resolveAccountVisibility: the value stored for the package; else, for the authenticator's packages, a privileged package or (below targetSdk 26) one holding
+     * GET_ACCOUNTS, the legacy-visible default (USER_MANAGED_VISIBLE unless set); else the legacy-not-visible default (USER_MANAGED_NOT_VISIBLE unless set): an account the user may still
+     * choose for the package (the system's account chooser) but that the package cannot list by itself.
+     */
+    visibility(account, caller, { targetSdk = 33, getAccounts = false, privileged = false } = {}) {
       const own = account.visibility.get(caller);
-      if (own !== undefined && own !== VISIBILITY.UNDEFINED) return isVisible(own);
-      if (privileged) return true;
-      if (targetSdk < 26) { const legacy = account.visibility.get(LEGACY_VISIBLE) ?? VISIBILITY.UNDEFINED; return getAccounts && legacy !== VISIBILITY.NOT_VISIBLE && legacy !== VISIBILITY.USER_MANAGED_NOT_VISIBLE; }
-      return isVisible(account.visibility.get(LEGACY_NOT_VISIBLE) ?? VISIBILITY.NOT_VISIBLE);
+      if (own !== undefined && own !== VISIBILITY.UNDEFINED) return own;
+      const legacy = key => { const value = account.visibility.get(key); return value !== undefined && value !== VISIBILITY.UNDEFINED ? value : null; };
+      if (store.owns(caller, account.type) || privileged || (targetSdk < 26 && getAccounts)) return legacy(LEGACY_VISIBLE) ?? VISIBILITY.USER_MANAGED_VISIBLE;
+      return legacy(LEGACY_NOT_VISIBLE) ?? VISIBILITY.USER_MANAGED_NOT_VISIBLE;
     },
   };
   readFiles();
