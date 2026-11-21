@@ -16,6 +16,12 @@ export class VMClock {
     if (this.frozenAt === null) return performance.now() + this.skew;
     this.reads++; return Math.min(performance.now(), this.frozenAt + this.reads * 0.001) + this.skew;
   }
+  /** now() for the VM's own bookkeeping (the runtime's GC statistics): the same timeline, without the per-read tick of a frozen frame, so reading it does not move the app's clock. */
+  peek() {
+    if (this.base !== undefined) return this.base + this.skew + this.nanoReads * 0.001;
+    if (this.frozenAt === null) return performance.now() + this.skew;
+    return Math.min(performance.now(), this.frozenAt + this.reads * 0.001) + this.skew;
+  }
   /** Starts an event: time stands still (apart from per-read ticks) until thaw(). Nested calls keep the outer start. */
   freeze() { if (this.frozenAt === null) { this.frozenAt = performance.now(); this.reads = 0; return true; } return false; }
   thaw() { this.frozenAt = null; this.reads = 0; }

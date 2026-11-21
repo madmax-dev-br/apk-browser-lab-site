@@ -12,9 +12,9 @@
 // on Android. Colours the page draws itself (a background colour, text and hint colours, a progress tint, the window background) are transformed in the snapshot (snapshot());
 // what the VM rasterizes is transformed when its recording is replayed (src/skia-canvas-host.js, options.forceDark per layer: layerOptions()). When no window has force dark
 // nothing here runs past a field read, and nothing is recorded differently.
-import { transformColor, nodeTransform, USAGE_BACKGROUND } from './force-dark.js?v=75ac67a1c845';
-import { getVectorGraphics } from './vector-native.js?v=75ac67a1c845';
-import { renderNodeByHandle } from './rendernode-native.js?v=75ac67a1c845';
+import { transformColor, nodeTransform, USAGE_BACKGROUND } from './force-dark.js?v=ebd42d0a624c';
+import { getVectorGraphics } from './vector-native.js?v=ebd42d0a624c';
+import { renderNodeByHandle } from './rendernode-native.js?v=ebd42d0a624c';
 
 const CONTEXT = 'Landroid/content/Context;', RESOURCES = 'Landroid/content/res/Resources;', CONFIGURATION = 'Landroid/content/res/Configuration;', TA = 'Landroid/content/res/TypedArray;';
 const TEXT = 'Landroid/widget/TextView;', NODE = 'Landroid/graphics/RenderNode;';

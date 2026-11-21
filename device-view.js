@@ -1,8 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=75ac67a1c845';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=75ac67a1c845';
-import { isTrustedRasterURL } from './raster-cache.js?v=75ac67a1c845';
+import { updateWebViewSlot } from './webview-slot.js?v=ebd42d0a624c';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=ebd42d0a624c';
+import { isTrustedRasterURL } from './raster-cache.js?v=ebd42d0a624c';
+import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=ebd42d0a624c';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -287,11 +288,14 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       const rect = element.getBoundingClientRect(), scale = rect.width / (element.offsetWidth || rect.width) || 1, at = pressed && Number.isFinite(pointer?.clientX) ? { x: (pointer.clientX - rect.left) / scale, y: (pointer.clientY - rect.top) / scale } : {};
       state.pendingFocus.push({ id: view.id, pressed, ...at }); flushPendingInputs();
     });
-    // RecyclerView (and other lists scrolled by the VM, not by DOM overflow): the wheel becomes View.scrollBy in the original RecyclerView code.
-    if (view.type?.endsWith('RecyclerView;') || view.type?.endsWith('/ListView;')) { element.dataset.listScroll = 'true'; element.addEventListener('wheel', event => {
-      if (element._session !== state.viewSession || !state.runtime) return; event.preventDefault();
-      const rect = element.getBoundingClientRect(), scale = rect.width / (element.offsetWidth || rect.width) || 1, unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.offsetHeight : 1, previous = state.pendingScrollBys.get(view.id) ?? { dx: 0, dy: 0 };
-      state.pendingScrollBys.set(view.id, { dx: previous.dx + event.deltaX * unit / scale, dy: previous.dy + event.deltaY * unit / scale }); flushPendingInputs();
+    // A View that scrolls itself (src/scrolling-view.js: a RecyclerView, a NestedScrollView, a ViewPager, an original ScrollView / HorizontalScrollView / list, any subclass):
+    // the wheel or a trackpad scroll is an ACTION_SCROLL generic motion event from SOURCE_MOUSE, which enters the window at its root and reaches the View under the pointer
+    // (ViewGroup.dispatchGenericPointerEvent), whose own onGenericMotionEvent scrolls it. The innermost such element under the pointer queues it, once; a pinch (ctrl + wheel)
+    // stays the browser's zoom.
+    if (view.selfScroll) { element.dataset.listScroll = 'true'; element.addEventListener('wheel', event => {
+      if (element._session !== state.viewSession || !state.runtime || event.defaultPrevented || event.ctrlKey) return; event.preventDefault();
+      const rect = element.getBoundingClientRect(), scale = rect.width / (element.offsetWidth || rect.width) || 1, unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.offsetHeight : 1;
+      queueWheel({ ownerViewId: view.id, action: 8, x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale, dx: event.deltaX * unit / scale, dy: event.deltaY * unit / scale, t: event.timeStamp });
     }, { passive: false }); }
     if (kind === 'scroll') element.addEventListener('scroll', () => {
       if (session !== state.viewSession || !state.runtime || state.lastAPKError) return;
@@ -434,12 +438,25 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     // A child with Z>0 has its Skia shadow raster drawn by the parent, beneath the child and before its content (HWUI order).
     const children = view.canvasChildrenCaptured || !renderChildren ? [] : (view.children || []).flatMap(child => { const body = createView(child, kind, !!view.laidOut, view.clipChildren !== false), shadow = shadowElement(child); return shadow ? [shadow, body] : [body]; });
     const padding = view.padding || {};
+    // The children move with the group's scroll position (View.mScrollX / mScrollY: ViewGroup.drawChild draws each child translated by -scroll), as a NestedScrollView,
+    // HorizontalScrollView or ViewPager scrolls; a DOM ScrollView ('scroll') scrolls its own overflow instead. A View that scrolls itself always has the layer (no reparenting of
+    // its children when it starts to scroll); another group gets it the first time it has a scroll position, and keeps it. Its children are clipped to its bounds, as
+    // ViewGroup clipToPadding (the default) clips them to the padded box, which the padding layer below does when there is a padding. Children the VM drew into the group's
+    // own Canvas, or that the native overlay of a Compose AndroidView places (renderChildren false), are already where the scroll puts them.
+    const scrolled = renderChildren && !view.canvasChildrenCaptured && kind !== 'scroll' && !!view.laidOut && (!!view.selfScroll || !!view.scrollX || !!view.scrollY || !!element._scrollLayer);
+    let childNodes = children;
+    if (scrolled) {
+      const layer = element._scrollLayer ||= document.createElement('div'), sx = Number.isFinite(view.scrollX) ? view.scrollX : 0, sy = Number.isFinite(view.scrollY) ? view.scrollY : 0;
+      layer.className = 'android-scroll-layer'; const css = `position:absolute;inset:0${sx || sy ? `;transform:translate(${-sx}px,${-sy}px)` : ''}`; if (layer._css !== css) { layer.style.cssText = css; layer._css = css; }
+      reconcileChildren(layer, children); childNodes = [layer];
+      if (view.clipToPadding !== false && !element.style.clipPath) element.style.clipPath = 'inset(0)';
+    }
     if (kind !== 'scroll' && view.laidOut && view.clipToPadding !== false && Object.values(padding).some(value => value > 0)) {
       // dispatchDraw clips only children, preserving the parent's background.
       const layer = element._childLayer ||= document.createElement('div');
       layer.className = 'android-child-layer'; layer.style.cssText = `position:absolute;inset:0;clip-path:inset(${padding.top || 0}px ${padding.right || 0}px ${padding.bottom || 0}px ${padding.left || 0}px)`;
-      reconcileChildren(layer, children); reconcileChildren(element, [element._contentLayer, layer, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
-    } else reconcileChildren(element, [element._contentLayer, ...children, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+      reconcileChildren(layer, childNodes); reconcileChildren(element, [element._contentLayer, layer, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+    } else reconcileChildren(element, [element._contentLayer, ...childNodes, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
   }
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('The Canvas capture did not return a content image.');
   // The View's own Canvas content (its onDraw) goes under its children, as View.draw orders it (onDraw, then dispatchDraw, then the foreground): the content layer is the
@@ -563,10 +580,15 @@ function echoEdit(control, op) {
 }
 const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvents (the press ripple animates under them); ?pointerClicks=semantic on the player frame selects the OnClick path
   const pointerClicks = () => deviceState.pointerClicks ?? POINTER_CLICKS_DEFAULT;   // ?pointerClicks=real|semantic on the player frame overrides it (validation runs both)
-/** Mouse/touch/pen on a Compose view -> VM pointer samples (real MotionEvents). Overlay controls are descendants, so their events bubble here too. */
+/**
+ * Mouse/touch/pen on a View that takes real pointer input (a Compose view, an original list, a View that scrolls itself) -> VM pointer samples (real MotionEvents). Overlay
+ * controls are descendants, so their events bubble here too. Bound elements nest; a gesture is sent once, by the outermost bound element that takes it (src/pointer-claim.js):
+ * every sample enters the window at its root, as on Android. With skipControls, a press on a View control inside keeps the control's own click; it becomes a gesture only when
+ * the pointer moves past DRAG_SLOP before it lifts (DOWN where it went down, then the moves), and the click the browser fires after such a drag is not delivered.
+ */
 function bindPointerInput(host, owner, { skipControls = false } = {}) {
   host._composeOwner = owner;   // refreshed on every render: width/height/ids may change
-  if (host._pointerBound) return; host._pointerBound = true;
+  if (host._pointerBound) return; host._pointerBound = true; host._pointerOptions = { skipControls }; host.dataset.pointerHost = 'true';
   const session = state.viewSession, local = event => {
     const rect = host.getBoundingClientRect(), width = host.offsetWidth || host._composeOwner.width || rect.width, scale = rect.width / width || 1;
     return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
@@ -577,22 +599,46 @@ function bindPointerInput(host, owner, { skipControls = false } = {}) {
     const point = local(event); state.pendingPointers.push({ ownerViewId: host._composeOwner.ownerViewId, action, x: point.x, y: point.y, t: event.timeStamp });
     flushPendingInputs();
   };
-  let active = null;
-  // Move/up/cancel are tracked on the whole frame window while a gesture is active: pointer capture on the (re-rendered) host element would be lost on DOM updates.
-  const track = event => { if (event.pointerId === active) send(2, event); };
-  const finish = (action, event) => { if (event.pointerId !== active) return; active = null; win.removeEventListener('pointermove', track, true); win.removeEventListener('pointerup', onUp, true); win.removeEventListener('pointercancel', onCancel, true); send(action, event); };
+  let active = null, pending = null;
+  // Move/up/cancel are tracked on the whole frame window while a gesture is active (or while a press on a control may become one): pointer capture on the (re-rendered) host
+  // element would be lost on DOM updates.
+  const track = event => {
+    if (pending && event.pointerId === pending.pointerId) {
+      const from = local(pending), to = local(event); if (Math.hypot(to.x - from.x, to.y - from.y) < DRAG_SLOP) return;
+      const down = pending; pending = null; active = down.pointerId; host._swallowClick = true; markTouch(down); send(0, down);
+    }
+    if (event.pointerId === active) send(2, event);
+  };
+  const stop = () => { win.removeEventListener('pointermove', track, true); win.removeEventListener('pointerup', onUp, true); win.removeEventListener('pointercancel', onCancel, true); };
+  const finish = (action, event) => {
+    if (pending && event.pointerId === pending.pointerId) { pending = null; stop(); return; }   // the press stayed on its control: the control's own click
+    if (event.pointerId !== active) return; active = null; stop(); send(action, event);
+    if (host._swallowClick) setTimeout(() => { host._swallowClick = false; }, 0);   // the click that follows this pointerup is dispatched in the same task
+  };
   const onUp = event => finish(1, event), onCancel = event => finish(3, event), win = host.ownerDocument?.defaultView ?? globalThis;
-  host.style.touchAction = 'none';   // Compose owns touch panning inside its view
+  host.style.touchAction = 'none';   // the app owns touch panning inside its view (also [data-pointer-host] in styles.css: a re-render resets the inline style)
+  // A press on a control that turned into a drag: the browser still clicks the control when the pointer lifts on it; on Android the drag cancelled the control's touch.
+  host.addEventListener('click', event => { if (!host._swallowClick) return; host._swallowClick = false; event.stopPropagation(); event.preventDefault(); }, true);
   host.addEventListener('pointerdown', event => {
-    if (active !== null || event.button > 0) return;
-    // Interim: taps on clickable controls keep the semantic OnClick path until the press ripple (RippleHostView/RenderNode recording) runs under real MotionEvents;
-    // gestures that semantics cannot express (slider drags, touch scrolling and flings, anything on non-clickable content) are real pointer input.
-    if (!pointerClicks() && event.target.closest?.('button,textarea,input,[role=button],[role=switch],[role=checkbox]')) return;
-    if (skipControls) { const control = event.target.closest?.('button,input,[data-kind="check"],[data-clickable="true"]'); if (control && control !== host && host.contains(control)) return; }   // a View control inside a list row is clicked through its own element
-    active = event.pointerId; markTouch(event);
+    if (active !== null || pending !== null || event.button > 0) return;
+    // Interim: in the semantic pointer mode, taps on clickable controls keep the semantic OnClick path; gestures that semantics cannot express (slider drags, touch scrolling
+    // and flings, anything on non-clickable content) are real pointer input.
+    const options = { pointerClicks: pointerClicks() };
+    if (gestureHost(host, event.target, options) !== host) return;   // not this element's to take, or an outer bound element sends it
+    const kind = claimKind(host, event.target, options); host._swallowClick = false;
     win.addEventListener('pointermove', track, true); win.addEventListener('pointerup', onUp, true); win.addEventListener('pointercancel', onCancel, true);
+    if (kind === 'deferred') { pending = event; return; }   // a View control inside a list row is clicked through its own element, unless the press turns into a drag
+    active = event.pointerId; markTouch(event);
     send(0, event);
   });
+}
+/** A wheel / trackpad scroll sample (ACTION_SCROLL) for the VM: consecutive samples of the same View that have not been sent yet add up into one. */
+function queueWheel(sample) {
+  if (!state.runtime || state.lastAPKError) return;
+  const last = state.pendingPointers.at(-1);
+  if (last && last.action === 8 && last.ownerViewId === sample.ownerViewId) { last.dx += sample.dx; last.dy += sample.dy; last.x = sample.x; last.y = sample.y; last.t = sample.t; }
+  else { if (state.pendingPointers.length >= 512) return; state.pendingPointers.push(sample); }
+  flushPendingInputs();
 }
 /** A mark where the finger went down, at once (the app's own press ripple only shows when the VM's next frame arrives). */
 function markTouch(event) {

@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=75ac67a1c845';
+import { APKError } from './apk-error.js?v=ebd42d0a624c';
 
 // Green-thread scheduler for the VM.
 //
@@ -45,7 +45,7 @@ const IO_BOOST_SHARE = 4;
 const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run that cannot return to the event pump before that run yields to it (hostEventsStarved)
 const QUIET_IDLE_LIMIT = 50000;  // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; }
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; this.suspendedMain = null; }   // suspendedMain: the main thread's event suspended in its wait (vmcore/js/host-bridge.js suspendable)
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -223,7 +223,7 @@ export class Scheduler {
    * One level only: a host task served that way that blocks parks main again, and the queue waits until main is back in its Looper (serving the next one on top of it nested one
    * JavaScript run per queued task until the stack overflowed: "RangeError: Maximum call stack size exceeded" in the event pump).
    */
-  mainParked() { const main = this.main; return main !== null && (main.state === 'blocked' || this.waitingNested.has(main)); }
+  mainParked() { const main = this.main; return main !== null && (main.state === 'blocked' || this.waitingNested.has(main) || this.suspendedMain !== null); }   // a suspended event is main's until it resumes, even once its wait is over
   /** The delay until an event that may be served now: while main is parked only the lab's host tasks count. */
   servableEventDelay() { const platform = this.rt.platform; return this.mainParked() && platform.nextParkedEventDelay ? platform.nextParkedEventDelay() : platform.nextEventDelay?.(); }
   mayServeEvents() { return !(this.parkedServing > 0 && this.mainParked()); }

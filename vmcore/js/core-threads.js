@@ -29,10 +29,12 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=75ac67a1c845';
+import { Blocked } from '../../runtime/scheduler.js?v=ebd42d0a624c';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=75ac67a1c845';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=75ac67a1c845';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ebd42d0a624c';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=ebd42d0a624c';
+import { CLASS } from './linker.js?v=ebd42d0a624c';
+const CLASS_INIT_STATE = CLASS.initState;
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
@@ -49,6 +51,13 @@ export const THREADS_STATE_BYTES = 96 + 4 * 1024, MONITOR_BYTES = 48, MONITORS =
 const FLAG_NO_BLOCK = 1, FLAG_GREEN = 2, WAIT_LISTED = 1, WAIT_REACQUIRE = 2;
 const PARKED = -1, YIELD = -2, DONE = -3;   // advance(): the thread is parked, yielded, or its work is done
 const STEP_WAIT = Object.freeze({ kind: 'step' }), DRIVE_STEP = Object.freeze({ kind: 'wait', wait: Object.freeze({ kind: 'drive' }) });
+/**
+ * What waitFor throws when the main thread's event suspends (WasmEngine.suspendable): the run of a main-Looper message waits for something only the browser's event loop can
+ * bring (a network exchange, an asynchronous host job), and the JavaScript frames between the event pump and the run are the pump's own. The main thread's frames stay in its
+ * record, parked like any other thread's; the JavaScript frames unwind to the pump (no catch on the way takes it: it is not an Error, a JavaException or a LooperYield), and
+ * the pump resumes the run when the wait is over (WasmEngine.resumeSuspended).
+ */
+export const MAIN_SUSPEND = Object.freeze({ name: 'MainSuspend', mainSuspend: true, message: 'the main thread\'s event is suspended until its wait ends' });
 
 export class CoreThreads {
   /** `engine`: the WasmEngine; `records`: { main, guestBase, guestSpan, guestCount, javaStack } (vmcore/js/host-bridge.js LAYOUT). */
@@ -89,6 +98,13 @@ export class CoreThreads {
     rt.monitorEnter = value => { while (!rt.monitorTryEnter(value)) sched.resolveNested(new Blocked({ ready: () => rt.monitorFree(value), reason: 'monitor' })); };
     rt.monitorExit = (value, thread) => { if (x.mon_exit(recordOf(thread), word(value)) !== S.OK) rt.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned'); };
     rt.ownsMonitor = (value, thread) => { const t = recordOf(thread); return x.mon_owner(word(value) + 4, 0) === this.u32[(t + T.tid) >> 2]; };
+    // Diagnostics (src/report-summary.js): the thread whose tid the lock word names, or null when nobody holds it; { tid, thread: null } for a tid no live thread has
+    rt.monitorOwnerThread = value => {
+      const address = value === null || value === undefined ? 0 : engine.refWord(value); if (!address) return null;
+      const tid = x.mon_owner(address + 4, 0); if (!tid) return null;
+      for (const thread of new Set([sched.mainThread(), ...sched.threads])) { const t = thread.core?.t; if (t !== undefined && this.u32[(t + T.tid) >> 2] === tid) return { tid, thread }; }
+      return { tid, thread: null };
+    };
   }
 
   /** A record for a started thread: a recycled one, or the next of the guest region. */
@@ -142,6 +158,7 @@ export class CoreThreads {
     let deadline = Infinity;
     if (phase === WAIT_LISTED && millis) deadline = thread.core.deadline ??= this.sched.clock.now() + millis;
     const reason = on ? 'monitor' : phase === WAIT_LISTED ? 'Object.wait' : phase === WAIT_REACQUIRE ? 'Object.wait (reacquire)' : 'class initialization';
+    if (reason === 'class initialization') this.engine.noteInitWait?.(t, u32[(t + T.blockWord) >> 2] - CLASS_INIT_STATE);   // the watched word is the Class's initState
     let blocker = null;
     if (on) blocker = this.engine.refValue(on - 4);
     else if (phase !== 0) { const monitor = u32[(t + T.waitMonitor) >> 2]; if (monitor) blocker = this.engine.refValue(u32[monitor >> 2] - 4); }
@@ -339,7 +356,14 @@ export class CoreThreads {
       if (choice.thread === owner) { if (this.last !== owner) sched.switching(rt, this.last, owner); this.last = owner; rt.thread = owner; return; }
       if (choice.thread !== null) { this.guest(choice.thread, owner); continue; }
       rt.thread = sched.mainThread();
-      try { sched.idle(choice.earliest, `${owner.name} is blocked (${owner.blocked?.reason ?? 'unknown'})`); } finally { rt.thread = owner; }
+      try { sched.idle(choice.earliest, `${owner.name} is blocked (${owner.blocked?.reason ?? 'unknown'})`); }
+      catch (error) {
+        // Nothing here can wake the owner without the browser's event loop (network-would-block). The main thread's event that may suspend (WasmEngine.suspendable) does, as a
+        // main thread blocked on a device does: its frames stay parked in its record and the event pump returns; the pump resumes it once its wait is over.
+        if (error?.details?.kind === 'network-would-block' && this.engine.maySuspend(owner)) { this.engine.noteSuspend(owner, error); throw MAIN_SUSPEND; }
+        throw error;
+      }
+      finally { rt.thread = owner; }
     }
   }
   /** The quantum `thread` runs with: sized for a background thread in a slice with a deadline (QUANTUM_TARGET_MS), the core's own otherwise. */

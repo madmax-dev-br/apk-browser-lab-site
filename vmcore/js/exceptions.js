@@ -12,6 +12,8 @@ export const WELL_KNOWN = ['Ljava/lang/NullPointerException;', 'Ljava/lang/Array
   'Ljava/lang/AbstractMethodError;', 'Ljava/lang/IncompatibleClassChangeError;', 'Ljava/lang/NoSuchFieldError;', 'Ljava/lang/NoSuchMethodError;',
   'Ljava/lang/IllegalMonitorStateException;', 'Ljava/lang/InterruptedException;', 'Ljava/lang/IllegalArgumentException;'];   // threads.h: monitor-exit, Object.wait/notify
 export const RESOLVE_WELL_KNOWN = 0xffffff00;
+/** exceptions.h: EXC_EVENT_ERRONEOUS (a class became erroneous; ERRONEOUS_* says what it keeps) and EXC_EVENT_WAITED (a thread waited for another thread's initializer). */
+export const EVENT_ERRONEOUS = 4, EVENT_WAITED = 5, ERRONEOUS_STORED = 0, ERRONEOUS_PENDING = 1, ERRONEOUS_STOPPED = 2;
 const EVENT_CREATED = 1, EVENT_CONSTRUCTED = 2, EVENT_WRAPPED = 3, THROWABLE = 'Ljava/lang/Throwable;', STRING = 'Ljava/lang/String;';
 const LONG_OPS = new Set([0x9e, 0x9f, 0xbe, 0xbf]), REMAINDER_OPS = new Set([0x94, 0x9f, 0xb4, 0xbf, 0xd4, 0xdc]);
 
@@ -55,7 +57,7 @@ export class Exceptions {
       case 4: return `negative array length ${b | 0}`;
       case 5: return 'stack size 1MB';
       case 6: return 'Failed to allocate: the heap is full after a collection';
-      case 8: return c === 1 ? `Failed resolution of: ${describe(b).replace(/^\[+/, '')}` : `Could not initialize class ${dotted(describe(b))}`;   // c = 1: a class that exists nowhere (CLASS_MISSING)
+      case 8: return c === 1 ? `Failed resolution of: ${describe(b).replace(/^\[+/, '')}` : pretty(describe(b));   // c = 1: a class that exists nowhere (CLASS_MISSING); else an erroneous class (ART ThrowEarlierClassFailure: its PrettyDescriptor)
       case 11: return `${describe(b)} into ${describe(c)}`;   // APKRuntime.checkArrayValue: the value's class, the array's class
       case 12: return `abstract method "${prettyMethod(this.linker.methodList[b]?.key ?? String(b))}"`;   // ART's ThrowAbstractMethodError: the method id
       case 13: return `Class ${pretty(describe(b))} does not implement interface ${pretty(describe(c))}`;   // ART's ThrowIncompatibleClassChangeErrorClassForInterfaceDispatch: the receiver's class, the interface
@@ -82,6 +84,7 @@ export class Exceptions {
   }
 
   event(event, object, a, b, c, stackAt, count, thread = 0) {
+    if (event === EVENT_ERRONEOUS || event === EVENT_WAITED) return;   // about a class, not an exception object: vmcore/js/host-bridge.js keeps them
     const stack = this.stack(stackAt, count);
     if (event === EVENT_CREATED) { this.records.set(object, { message: this.message(a, b, c, thread), cause: null, stack }); return; }
     if (event === EVENT_WRAPPED) { this.records.set(object, { message: null, cause: a, stack }); return; }

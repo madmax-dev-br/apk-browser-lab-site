@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=75ac67a1c845';
-import { Invoke } from './interpreter.js?v=75ac67a1c845';
-import { APKError } from './apk-error.js?v=75ac67a1c845';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=75ac67a1c845';
+import { gcRoot } from './heap-gc.js?v=ebd42d0a624c';
+import { Invoke } from './interpreter.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=ebd42d0a624c';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=ebd42d0a624c';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -583,14 +583,7 @@ export function createSystemServicesHost(platform) {
     const parts = value.split(new RegExp(r.stringCharacters(expression))); while (parts.length > 1 && parts.at(-1) === '') parts.pop();
     const array = r.newArray(`[${STRING_T}`, parts.length); r.array(array).elements = parts; return array;
   }, { static: true });
-  // ---- android.os.Debug: no debugger can attach to the VM; the native heap numbers describe the VM's own arena (src/unsafe-native.js) and the cost counters are VM time.
-  const DEBUG = 'Landroid/os/Debug;';
-  registry.type(DEBUG, 'Ljava/lang/Object;');
-  def(DEBUG, 'isDebuggerConnected', '()Z', () => 0, { static: true }); def(DEBUG, 'waitingForDebugger', '()Z', () => 0, { static: true });
-  def(DEBUG, 'waitForDebugger', '()V', () => {}, { static: true });   // returns at once: nothing ever attaches, which is what the call observes on a device without a debugger
-  for (const name of ['getNativeHeapSize', 'getNativeHeapAllocatedSize', 'getNativeHeapFreeSize', 'getPss']) def(DEBUG, name, '()J', r => BigInt(Math.floor((r.heap?.size ?? 0) * 64)), { static: true });
-  def(DEBUG, 'threadCpuTimeNanos', '()J', r => BigInt(Math.floor(platform.clock.now() * 1e6)), { static: true });
-  def(DEBUG, 'getBinderSentTransactions', '()I', () => 0, { static: true }); def(DEBUG, 'getBinderReceivedTransactions', '()I', () => 0, { static: true });
+  // android.os.Debug and dalvik.system.VMDebug: src/vm-debug-host.js.
   // java.security.PrivilegedActionException: AccessController.doPrivileged(PrivilegedExceptionAction) wraps checked exceptions of the action in it.
   const PAE = 'Ljava/security/PrivilegedActionException;';
   registry.type(PAE, 'Ljava/lang/Exception;', [], { allocatable: true });

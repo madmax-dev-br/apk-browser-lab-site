@@ -1,9 +1,10 @@
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=75ac67a1c845';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=ebd42d0a624c';
 
 // The classic View touch pipeline: View.dispatchTouchEvent / onTouchEvent, ViewGroup.dispatchTouchEvent / onInterceptTouchEvent / requestDisallowInterceptTouchEvent and
 // View.setOnTouchListener, following android-13.0.0_r1 View.java and ViewGroup.java for a single pointer (the browser delivers one pointer per gesture). A real MotionEvent
 // reaches a classic View from a Compose AndroidView (AndroidViewHolder.dispatchTouchEvent), from an app's own dispatch code, or from a host that injects pointer events.
-// Long press: CheckForLongPress after 500 ms of VM time. Not modelled: multi-touch target splitting, hover/generic motion, the scrolling-container tap delay and TouchDelegate.
+// Long press: CheckForLongPress after 500 ms of VM time. ViewGroup.dispatchGenericPointerEvent hands a pointer generic motion event (the wheel's ACTION_SCROLL) to the child under the pointer. Not modelled: multi-touch target
+// splitting, hover dispatch to children (ViewGroup.dispatchHoverEvent), the scrolling-container tap delay and TouchDelegate.
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', MOTION = 'Landroid/view/MotionEvent;', LISTENER = 'Landroid/view/View$OnTouchListener;';
 const DOWN = 0, UP = 1, MOVE = 2, CANCEL = 3;
 
@@ -160,6 +161,21 @@ export function createViewTouchHost(platform) {
     }
     if (canceled || masked === UP) { touch.target = null; touch.disallow = false; }
     return handled ? 1 : 0;
+  });
+  // ViewGroup.dispatchGenericPointerEvent: a pointer generic motion event (ACTION_SCROLL of a mouse wheel) goes to the children under the pointer, the topmost first, each
+  // seeing it in its own coordinates (dispatchTransformedGenericPointerEvent: offset by the group's scroll and the child's position, through the child's transform), until
+  // one handles it; when none does, the group's own View.dispatchGenericPointerEvent (false: View.dispatchGenericMotionEvent then calls the group's onGenericMotionEvent).
+  def(GROUP, 'dispatchGenericPointerEvent', `(${MOTION})Z`, (r, _m, [self, ev]) => {
+    const x = bitsFloat(event(r, ev, 'getX', 'F')), y = bitsFloat(event(r, ev, 'getY', 'F'));
+    for (const child of orderedChildren(r, self)) {
+      if (!visible(r, child)) continue;                                     // View.canReceivePointerEvents
+      const point = childPoint(r, self, child, x, y); if (!point) continue;  // isTransformedTouchPointInView
+      const dx = point.x - x, dy = point.y - y;
+      event(r, ev, 'offsetLocation', 'V', ['F', 'F'], [floatBits(dx), floatBits(dy)]);
+      try { if (flag(call(r, child, VIEW, 'dispatchGenericMotionEvent', [MOTION], 'Z', [ev]))) return 1; }
+      finally { event(r, ev, 'offsetLocation', 'V', ['F', 'F'], [floatBits(-dx), floatBits(-dy)]); }
+    }
+    return 0;
   });
   return registry;
 }

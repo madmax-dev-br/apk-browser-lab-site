@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=75ac67a1c845';
-import { GC_ROOTS } from './heap-gc.js?v=75ac67a1c845';
-import { LooperYield } from './message-queue-native.js?v=75ac67a1c845';
-import { APKError } from './apk-error.js?v=75ac67a1c845';
+import { createHostRegistry } from './host-contract.js?v=ebd42d0a624c';
+import { GC_ROOTS } from './heap-gc.js?v=ebd42d0a624c';
+import { LooperYield } from './message-queue-native.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=ebd42d0a624c';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -23,6 +23,7 @@ import { APKError } from './apk-error.js?v=75ac67a1c845';
 const OBJECT = 'Ljava/lang/Object;', RUNNABLE = 'Ljava/lang/Runnable;', HOST_TASK = 'Lapkweb/bridge/HostTask;';
 const LOOPER = 'Landroid/os/Looper;', QUEUE = 'Landroid/os/MessageQueue;', HANDLER = 'Landroid/os/Handler;', MESSAGE = 'Landroid/os/Message;';
 const MESSAGES_LIMIT = 1024, FLAG_ASYNCHRONOUS = 2;
+const LOOP_ONCE = `${LOOPER}->loopOnce(${LOOPER}JI)Z`;   // the call of loopOnce below that may suspend (vmcore/js/host-bridge.js suspendable)
 const key = (owner, name, type) => `${owner}->${name}:${type}`;
 const K = {
   messages: key(QUEUE, 'mMessages', MESSAGE), target: key(MESSAGE, 'target', HANDLER), callback: key(MESSAGE, 'callback', RUNNABLE), next: key(MESSAGE, 'next', MESSAGE),
@@ -61,12 +62,14 @@ export function createLooperHost(platform) {
     return isNull(receiver) ? null : registry.entryOfClass(runtime, runtime.typeOf(receiver));
   };
   let dispatching = null;   // the package that owns the message the main thread is dispatching now (null: the app's or the platform's own)
+  let suspendedOwner = null;   // the same, for a message whose run is suspended (loopOnce): main is still dispatching it
   const otherProcess = runtime => {
     if (!platform.packages?.multi) return () => false;
+    const current = dispatching ?? suspendedOwner;
     return candidate => {
       if (candidate.platformTask || candidate.message === undefined || isNull(candidate.message)) return false;
       const owner = messageOwner(runtime, candidate.message);
-      return !!owner && !owner.main && owner !== dispatching;
+      return !!owner && !owner.main && owner !== current;
     };
   };
   // A query that only returns numbers reads queued messages through handles; on the WebAssembly core every handle made while host code runs is pinned until that host call
@@ -213,14 +216,27 @@ export function createLooperHost(platform) {
     // ---- running ----
     /** One iteration of Looper.loop(): MessageQueue.next() (which runs the IdleHandlers and, with nothing due, ends the call with a LooperYield), dispatchMessage, recycleUnchecked. */
     loopOnce(runtime) {
-      const { looper, ident } = main, outer = dispatching;
-      dispatching = platform.packages?.multi ? messageOwner(runtime, host.peek(runtime)) : null;
-      try { const more = call(runtime, LOOPER, 'loopOnce', [LOOPER, 'J', 'I'], 'Z', [looper, ident, 0]); host.armed = true; return more; }
-      catch (error) {
-        if (error?.looperYield !== true) throw error;
+      const { looper, ident } = main, outer = dispatching, owner = platform.packages?.multi ? messageOwner(runtime, host.peek(runtime)) : null;
+      dispatching = owner;
+      const settle = outcome => {
+        if (!('error' in outcome)) { host.armed = true; return outcome.value; }
+        if (outcome.error?.looperYield !== true) throw outcome.error;
         runtime.hostCall = null; host.armed = false;   // the thread is blocked in the poll: next() is only entered again for a message that is due
         return false;
-      } finally { dispatching = outer; }
+      };
+      const once = () => call(runtime, LOOPER, 'loopOnce', [LOOPER, 'J', 'I'], 'Z', [looper, ident, 0]);
+      try {
+        // On the WebAssembly core the message may suspend at the top of the pump (vmcore/js/host-bridge.js suspendable): a main thread that waits there for the network
+        // keeps its frames parked while the pump returns to the browser's event loop; `settle` then runs when the pump resumes it and it ends (with `owner` dispatching again).
+        const engine = runtime.nestedRuns === 0 && !runtime.diagnosticDepth ? runtime.wasm : null;
+        if (engine?.suspendable) {
+          const ran = engine.suspendable(LOOP_ONCE, once, outcome => { const previous = dispatching; dispatching = owner; suspendedOwner = null; try { return settle(outcome); } finally { dispatching = previous; } });
+          if (ran.suspended) { suspendedOwner = owner; return false; }
+          return settle({ value: ran.value });
+        }
+        return settle({ value: once() });
+      } catch (error) { return settle({ error }); }
+      finally { dispatching = outer; }
     },
     /** Runs a queued host event ahead of the queue order (see nextDue): it is taken out of the queue and its Runnable called, as dispatchMessage would. */
     runDirect(runtime, event) {

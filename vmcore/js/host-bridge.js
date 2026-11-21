@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=75ac67a1c845';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=75ac67a1c845';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=75ac67a1c845';
-import { HandleTable } from './handles.js?v=75ac67a1c845';
-import { Exceptions } from './exceptions.js?v=75ac67a1c845';
-import { coreImports } from './boundary-imports.js?v=75ac67a1c845';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=75ac67a1c845';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=75ac67a1c845';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=75ac67a1c845';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=75ac67a1c845';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=75ac67a1c845';
-import { timedExports, timedBridge } from './core-timing.js?v=75ac67a1c845';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=75ac67a1c845';
-import { Blocked } from '../../runtime/scheduler.js?v=75ac67a1c845';
-import { CoreThreads, CORE_STATUS } from './core-threads.js?v=75ac67a1c845';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=75ac67a1c845';
-import { PaintRecords } from './paint-record.js?v=75ac67a1c845';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ebd42d0a624c';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=ebd42d0a624c';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ebd42d0a624c';
+import { HandleTable } from './handles.js?v=ebd42d0a624c';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=ebd42d0a624c';
+import { coreImports } from './boundary-imports.js?v=ebd42d0a624c';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=ebd42d0a624c';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=ebd42d0a624c';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=ebd42d0a624c';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=ebd42d0a624c';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=ebd42d0a624c';
+import { timedExports, timedBridge } from './core-timing.js?v=ebd42d0a624c';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ebd42d0a624c';
+import { Blocked } from '../../runtime/scheduler.js?v=ebd42d0a624c';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=ebd42d0a624c';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ebd42d0a624c';
+import { PaintRecords } from './paint-record.js?v=ebd42d0a624c';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -98,7 +98,7 @@ export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, quantumCut: 28, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
   tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
 const GC = Object.freeze({ base: 4, end: 8, startBits: 12, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
-  trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, grow: 196, SIZE: 448 });
+  allocated: 112, trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, freedBytes: 140, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, grow: 196, SIZE: 448 });
 const GROW = Object.freeze({ limit: 0, holeBytes: 4, holeCount: 8, wanted: 16 });   // gc.h GcGrow
 /** Dynamic memory: the heap grows by at least this much at a time, and the other threads' records are taken from the area this many at a time. */
 const ARENA_STEP = 16 * MiB, GUEST_BLOCK = 8;
@@ -148,9 +148,11 @@ export class WasmEngine {
     if (pages * 65536 <= LAYOUT.HEAP + 16 * MiB) throw new Error(`vmcore: ${pages} pages leave no heap above the ${LAYOUT.HEAP / MiB} MiB of metaspace and thread records`);
     this.linker = new Linker(runtime, { memory: this.memory, metaStart: LAYOUT.META, metaEnd: LAYOUT.META_END, natives, ...LINKER_LIMITS });
     this.exceptions = new Exceptions(this.linker);
+    this.initWaits = new Map(); this.pendingErroneous = new Map();   // per Thread record: the classes it waited for (EVENT_WAITED); the classes that keep its next NoClassDefFoundError
     this.WIDE_HIGH = runtime.argumentWords(['J'], [0n])[1];   // the JavaScript VM's marker of a long/double's second register
     this.pins = []; this.patched = []; this.patchEpoch = 0; this.usedBridge = null; this.hostDepth = 0; this.sites = new Map(); this.methodInfos = new WeakMap(); this.lastError = null; this.stopReason = null; this.fieldSites = new Map(); this.parked = null;
-    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0, grows: 0, grownBytes: 0 };
+    this.suspendToken = null; this.suspendableRun = null; this.suspended = null;   // the main thread's event that may suspend, the one in progress, the one suspended (suspendable)
+    this.stats = { bridged: 0, frames: 0, steps: 0, nested: 0, nativeSites: 0, collections: 0, hostCollections: 0, markMs: 0, sweepMs: 0, companionScans: 0, pinsAtCollection: 0, rootIds: 0, grows: 0, grownBytes: 0, freedObjects: 0, freedBytes: 0 };   // freedObjects/freedBytes: summed over every collection (the core keeps the last one's)
     installHostLinking(this.linker, runtime, { staticValue: (reference, slot) => this.writeValue(slot, reference.type, runtime.readStatic(reference)) });
     this.installRouting();
   }
@@ -533,7 +535,8 @@ export class WasmEngine {
   execute(method, args) {
     const mi = this.bodyInfo(method);
     if (!mi) throw new APKError(`vmcore: ${method.owner}->${method.name}${method.signature} is not a method the core's linker knows`);
-    return this.runNested(mi.id, this.wordsOf(args), method.result ?? method.signature.slice(method.signature.indexOf(')') + 1));
+    const token = this.suspendToken !== null && this.suspendToken.key === method.key ? this.suspendToken : null;   // the call a suspendable host call named (suspendable)
+    return this.runNested(mi.id, this.wordsOf(args), method.result ?? method.signature.slice(method.signature.indexOf(')') + 1), 0, 0, token);
   }
   /** The argument words of the JavaScript VM's argument registers (WIDE_HIGH after each long/double). */
   wordsOf(args) {
@@ -552,7 +555,7 @@ export class WasmEngine {
    * Runs method `id` (VM.methods) with argument words `words` in a nested run (or a first run, when no frame is live), collecting and resuming while it stops with OUT_OF_MEMORY,
    * and gives the JavaScript VM's value of `result`. A Java exception that leaves it is thrown as a JavaException; any other stop as a CoreStop (or the host's own error).
    */
-  runNested(id, words, result, initClass = 0, uncount = 0) {
+  runNested(id, words, result, initClass = 0, uncount = 0, token = null) {
     // the JavaScript VM's runNested (interpreter.js): the main thread runs host events; the process's main Looper exists before the first Java code; the running thread's own
     // wait, if it is parked below this run (main-Looper messages served while it waits), is kept aside, and the run gets a record of its own meanwhile (CoreThreads.borrow)
     const rt = this.runtime, sched = rt.scheduler;
@@ -560,18 +563,124 @@ export class WasmEngine {
     if (rt.nestedRuns >= rt.maxNestedRuns) rt.throwJava('Ljava/lang/StackOverflowError;', 'native re-entry depth exceeded');
     const owner = rt.thread ?? sched.mainThread();
     const parked = owner.blocked !== null || owner.coreWait ? { blocked: owner.blocked, state: owner.state, timedOut: owner.timedOut, coreWait: owner.coreWait } : null;
+    // the run of the method a suspendable host call named, at the top of a main-thread event (suspendable): it may suspend while it waits (MAIN_SUSPEND)
+    const suspendable = token !== null && token.run === null && rt.nestedRuns === 0 && initClass === 0 && parked === null && owner === sched.main && this.suspended === null;
     const giveBack = parked !== null ? this.threads.borrow(owner) : null;
     if (parked !== null) { owner.blocked = null; owner.state = 'runnable'; owner.coreWait = null; }
     if (++rt.nestedRuns === 1) sched.beginEvent(rt);
     owner.nestedDepth++;
     const cut = rt.coreCut; rt.coreCut = false;   // a nested run has an owner: it never yields to the slice deadline (CoreThreads.mustYield), so its quantum is not cut for it either
-    try { return this.runOn(owner, id, words, result, initClass, uncount, parked); }
+    let suspended = false;
+    try { return suspendable ? this.runSuspendable(owner, id, words, result, uncount, token) : this.runOn(owner, id, words, result, initClass, uncount, parked); }
+    catch (error) { if (error === MAIN_SUSPEND && suspendable && this.suspended === token.run) suspended = true; throw error; }
     finally {
       rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
       if (giveBack !== null) giveBack();
       if (parked !== null) { owner.blocked = parked.blocked; owner.state = parked.state; owner.timedOut = parked.timedOut; owner.coreWait = parked.coreWait; }
-      if (rt.nestedRuns === 0 && owner === sched.main) rt.platform?.looperHost?.hostEventRan(rt);
+      if (!suspended && rt.nestedRuns === 0 && owner === sched.main) rt.platform?.looperHost?.hostEventRan(rt);
     }
+  }
+  /**
+   * runOn for the suspendable run of a main-thread event: the same run, with what its end needs kept in an object (the record's state to put back, the result type), since
+   * the JavaScript frames that started it are gone when it ends after a suspension (resumeSuspended).
+   */
+  runSuspendable(owner, id, words, result, uncount, token) {
+    const x = this.x, t = this.t, u32 = this.u32, n = words.length, at = t >> 2;
+    if (n > 440) throw new APKError(`vmcore: ${n} argument words`);
+    const saved = [THREAD.frame, THREAD.pc, THREAD.depth, THREAD.stackTop, THREAD.throwing, THREAD.status, THREAD.detail, THREAD.result, THREAD.result + 4].map(offset => u32[at + (offset >> 2)]);
+    for (let i = 0, args = at + (THREAD.args >> 2); i < n; i++) u32[args + i] = words[i] >>> 0;
+    this.stats.nested++;
+    const steps = owner.core.steps, base = steps.length; steps.push(OWN_STEP);
+    const run = { owner, t, base, result, uncount, token, saved, since: 0, suspensions: 0, waitedMs: 0 }, outer = this.suspendableRun;
+    token.run = run; this.suspendableRun = run;
+    let status;
+    try { status = this.threads.finish(owner, x.run_nested(t, id, t + THREAD.args, 0) >>> 0); }
+    catch (error) { if (error !== MAIN_SUSPEND || this.suspended !== run) this.restoreRecord(run); throw error; }   // suspended: the frames and the base step stay for resumeSuspended
+    finally { this.suspendableRun = outer; }
+    return this.endRun(run, status);
+  }
+  /** The record's state when the suspendable `run` started, put back once it is over (its outcome read first: endRun); its host steps above its base are dropped. */
+  restoreRecord(run) {
+    run.owner.core.steps.length = run.base;
+    const w = this.u32, at = run.t >> 2, saved = run.saved;
+    [THREAD.frame, THREAD.pc, THREAD.depth, THREAD.stackTop, THREAD.throwing, THREAD.status, THREAD.detail, THREAD.result, THREAD.result + 4].forEach((offset, i) => { w[at + (offset >> 2)] = saved[i]; });
+  }
+  /** The outcome of the suspendable `run` that ended with `status`, as runOn gives it (a value, a JavaException, the stop error); the record's state is put back. */
+  endRun(run, status) {
+    const t = run.t, detail = this.r32(t + THREAD.detail);
+    let value, thrown = 0;
+    if (status === Status.OK) value = run.result === 'V' ? undefined : this.valueAt(run.result, t + THREAD.result);
+    else if (status === Status.UNCAUGHT) thrown = this.r32(t + THREAD.result);
+    this.restoreRecord(run);
+    if (status === Status.OK) { if (run.uncount) this.view.setBigUint64(t + THREAD.steps, BigInt(this.steps - run.uncount), true); return value; }
+    if (status === Status.UNCAUGHT) throw new JavaException(this.refValue(thrown), this.messageOf(thrown));
+    throw this.stopError(status, detail);
+  }
+
+  // ---- the main thread's event that waits for the browser's event loop (docs/THREADS.md section 3)
+  // A main-thread event runs on the JavaScript stack of the event pump, which cannot return to the browser's event loop while the event waits: a main thread parked there for
+  // what only that loop brings (a network exchange in flight, an asynchronous host job such as a certificate the lab signs with WebCrypto) ended the app with
+  // network-would-block, where a device's main thread just blocks until the answer comes. The pump's own call into Java at the top of an event (looper-host.js loopOnce: a
+  // Handler message, a coroutine continuation on Dispatchers.Main) says it may suspend (suspendable): when the main thread waits for that in such a run, the run is suspended
+  // instead -- its frames and host steps stay in the main thread's record, parked like any other thread's, and the JavaScript frames down to the pump unwind. The pump then
+  // serves what may run while the main thread is blocked (the lab's host tasks, the other threads), returns to the browser's event loop, and resumes the run once its wait is
+  // over (resumeSuspended); the host call's continuation (`then`) gets the run's outcome. A run nested in host code (a host native that called Java and needs its value before it
+  // returns) cannot suspend: its wait still ends with network-would-block.
+  /**
+   * Calls fn(), host code at the top of a main-thread event whose run of method `key` (the call fn makes, and only its value is fn's) may suspend. Returns
+   * { suspended: false, value } when it ended, or { suspended: true }; then `then(outcome)` ({ value } or { error }) is called when the run ends (from resumeSuspended, which
+   * returns what it returns).
+   */
+  suspendable(key, fn, then) {
+    const token = { key, then, run: null }, outer = this.suspendToken; this.suspendToken = token;
+    try { return { suspended: false, value: fn() }; }
+    catch (error) { if (error === MAIN_SUSPEND && token.run !== null && this.suspended === token.run) return { suspended: true }; throw error; }
+    finally { this.suspendToken = outer; }
+  }
+  /** May `owner`, in CoreThreads.waitFor, suspend its run: the main thread in the suspendable run itself (no other run nested on the JavaScript stack, no nested host wait). */
+  maySuspend(owner) {
+    const run = this.suspendableRun, rt = this.runtime, sched = rt.scheduler;
+    return run !== null && run.owner === owner && owner === sched.main && this.suspended === null && rt.nestedRuns === 1 && owner.nestedDepth === 1 && sched.waitingNested.size === 0 && owner.core.steps[run.base] === OWN_STEP;
+  }
+  /** CoreThreads.waitFor suspends the run (it throws MAIN_SUSPEND next): recorded in the trace, never silent. */
+  noteSuspend(owner, error) {
+    const run = this.suspendableRun, rt = this.runtime, sched = rt.scheduler, blocked = owner.blocked;
+    this.suspended = run; sched.suspendedMain = run; run.since = performance.now(); run.suspensions++; this.stats.suspensions = (this.stats.suspensions ?? 0) + 1;
+    const what = blocked?.blocker ? `, ${String(rt.typeOf(blocked.blocker)).replace(/^L|;$/g, '').replaceAll('/', '.')}` : '';
+    rt.record(`SCHEDULER main thread suspended in its event: it waits (${blocked?.reason ?? 'unknown'}${what}) and only the browser's event loop can end that wait (${rt.network?.pending ?? 0} network exchange(s) or host job(s) in flight); its frames stay parked, the event pump returns and resumes the event when the wait ends, as a blocked main thread on a device`);
+  }
+  /** The main thread's event is suspended (its record parked in its wait). */
+  get mainSuspended() { return this.suspended !== null; }
+  /** The suspended event's wait is over (the scheduler's wake() made the main thread runnable): the pump resumes it now. */
+  suspendedReady() { const run = this.suspended; if (run === null) return false; this.runtime.scheduler.wake(); return run.owner.state === 'runnable'; }
+  /**
+   * Resumes the suspended event (the pump calls it once suspendedReady): the run goes on from its wait on a fresh JavaScript stack until it ends, then the continuation of the host
+   * call that started it gets its outcome, and what the continuation returns (or throws) is this call's. If it waits for the event loop again it is suspended again (undefined).
+   */
+  resumeSuspended() {
+    const run = this.suspended; if (run === null) return undefined;
+    const rt = this.runtime, sched = rt.scheduler, owner = run.owner, threads = this.threads;
+    if (owner.state !== 'runnable') return undefined;
+    const waited = performance.now() - run.since; run.waitedMs += waited;
+    this.suspended = null; sched.suspendedMain = null;
+    rt.thread = owner;
+    if (++rt.nestedRuns === 1) sched.beginEvent(rt);
+    owner.nestedDepth++;
+    const cut = rt.coreCut, outer = this.suspendableRun; rt.coreCut = false; this.suspendableRun = run;
+    if (threads.last !== owner) { sched.switching(rt, threads.last, owner); threads.last = owner; }
+    rt.record(`SCHEDULER main thread resumes its suspended event after ${Math.round(waited)} ms`);
+    let outcome;
+    try {
+      const status = threads.finish(owner, threads.resume(owner));
+      try { outcome = { value: this.endRun(run, status) }; } catch (error) { outcome = { error }; }
+    } catch (error) {
+      if (error === MAIN_SUSPEND && this.suspended === run) return undefined;   // it waits for the event loop again: still suspended, its continuation still pending
+      this.restoreRecord(run); outcome = { error };
+    } finally {
+      this.suspendableRun = outer; rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
+      if (this.suspended !== run && rt.nestedRuns === 0) rt.platform?.looperHost?.hostEventRan(rt);
+    }
+    return run.token.then(outcome);
   }
   runOn(owner, id, words, result, initClass, uncount, parked) {
     // a few thousand nested runs a frame on a large Compose screen: the thread's state is kept in locals (no record, no BigInt) and the base step is shared when nothing is parked
@@ -607,6 +716,12 @@ export class WasmEngine {
 
   /** The error a run that stopped with `status` throws to whoever started it: the host's own error for HOST_FAILED, a CoreStop otherwise. */
   stopError(status, detail) {
+    const error = this.stopErrorOf(status, detail);
+    // class initializers this stop abandoned (EVENT_ERRONEOUS, ERRONEOUS_STOPPED): the stop is why they failed
+    for (const entry of this.runtime.classInitFailures?.values() ?? []) if (entry.labPending) { entry.labPending = false; entry.lab = String(error?.message ?? error); }
+    return error;
+  }
+  stopErrorOf(status, detail) {
     const key = status === Status.UNSUPPORTED ? `opcode 0x${detail.toString(16)}` : status === Status.UNRESOLVED ? `constant ${detail}` : this.linker.methodList[detail]?.key ?? String(detail);
     if (status === Status.HOST_FAILED && this.lastError) { const error = this.lastError; this.lastError = null; return error; }
     if (status === Status.HOST_STOPPED) return new CoreStop(status, detail, `vmcore: a host step the core does not take yet, at ${key}: ${this.stopReason ?? '?'}`);
@@ -892,13 +1007,38 @@ export class WasmEngine {
   // ---- exceptions
   /** env.exception: the core's own exceptions get the JavaScript VM's message and stack on their companion, where Throwable's host methods read them. */
   exceptionEvent(t, event, object, a, b, c, stack, count) {
+    t >>>= 0; event >>>= 0;
+    if (event === EVENT_ERRONEOUS) { this.classErroneous(t, a >>> 0, object >>> 0, b >>> 0); return; }
+    if (event === EVENT_WAITED) { const waits = this.initWaits.get(t) ?? this.initWaits.set(t, new Set()).get(t); waits.add(a >>> 0); return; }
     this.exceptions.imports.exception(t, event, object, a, b, c, stack, count);
     const record = this.exceptions.records.get(object >>> 0); if (!record) return;
     const f = this.space.objectAt(object >>> 0);
     if (f.message === undefined) f.message = record.message;
     f.stack = record.stack.map(entry => this.linker.methodList[entry.method]?.def?.method ?? { owner: this.linker.methodList[entry.method]?.owner.type, name: this.linker.methodList[entry.method]?.name });
     if (record.cause) f.cause = this.refValue(record.cause);
+    if (event === 1 && a >>> 0 === 8 && c >>> 0 !== 1) this.erroneousUse(t, object >>> 0, b >>> 0, f);   // the NoClassDefFoundError of an erroneous class
   }
+  /** EVENT_ERRONEOUS: class `address` became erroneous (APKRuntime.noteClassInitFailure keeps why, and the error it keeps, a host root). */
+  classErroneous(t, address, error, how) {
+    const type = this.linker.describe(address); if (!type) return;
+    if (how === ERRONEOUS_PENDING) { const list = this.pendingErroneous.get(t) ?? this.pendingErroneous.set(t, []).get(t); list.push(type); return; }
+    if (how === ERRONEOUS_STOPPED) { this.runtime.noteClassInitFailure(type, { stopped: true }); return; }
+    if (how === ERRONEOUS_STORED && error) this.runtime.noteClassInitFailure(type, { value: this.refValue(error) });
+  }
+  /**
+   * A use of erroneous class `address` created NoClassDefFoundError `object` (its message: the class's PrettyDescriptor, vmcore/js/exceptions.js). As ART's ThrowEarlierClassFailure, its
+   * cause is the error the class keeps; a thread that waited for another thread's initializer gets "<clinit> failed for class X; see exception in other thread" without one
+   * (WaitForInitializeClass). The classes waiting for this thread's next NoClassDefFoundError (ERRONEOUS_PENDING) keep it.
+   */
+  erroneousUse(t, object, address, f) {
+    const rt = this.runtime, type = this.linker.describe(address), waited = this.initWaits.get(t)?.delete(address) === true, entry = type ? rt.classInitFailures?.get(type) : undefined;
+    if (waited) { f.message = `<clinit> failed for class ${String(type).slice(1, -1).replaceAll('/', '.')}; see exception in other thread`; f.cause = null; }
+    else if (entry?.stored) { f.cause = entry.stored; entry.laterUses++; }
+    const pending = this.pendingErroneous.get(t);
+    if (pending !== undefined) { this.pendingErroneous.delete(t); const value = this.refValue(object); for (const k of pending) rt.noteClassInitFailure(k, { value, via: type }); }
+  }
+  /** A class initializer's thread waits for another thread's initializer (CoreThreads.parkCore, a no-block thread): what EVENT_WAITED records when the core itself waits. */
+  noteInitWait(t, address) { const waits = this.initWaits.get(t) ?? this.initWaits.set(t, new Set()).get(t); waits.add(address >>> 0); }
   messageOf(address) { const f = this.space.objectAt(address); return typeof f.message === 'string' ? f.message : this.exceptions.records.get(address)?.message ?? null; }
   /** What is known of exception record `address`: its class and message. */
   describe(address) { return address ? { type: this.linker.describe(this.r32(address)), message: this.messageOf(address) } : null; }
@@ -984,6 +1124,7 @@ export class WasmEngine {
     const release = () => { const freed = this.r32(h + GC.freed) >>> 2, count = this.r32(h + GC.freedCount); for (let i = 0; i < count; i++) { const address = this.u32[freed + i]; space.release(address); this.exceptions.records.delete(address); } };
     while (x.gc_sweep(h)) { release(); x.gc_freed_clear(h); }
     release(); x.gc_freed_clear(h);
+    this.stats.freedObjects += this.r32(h + GC.freedObjects); this.stats.freedBytes += this.r32(h + GC.freedBytes);   // the sweep's results (gc.c sweep), for VMDebug's runtime stats (src/vm-debug-host.js)
     for (const map of ephemeronMaps) for (const key of [...map.keys()]) if (typeof key === 'number' && !handles.addressById.has(key)) map.delete(key);   // the key died: so does the entry
     if (this.fixedTrigger !== undefined) this.w32(h + GC.trigger, this.fixedTrigger);
     this.paceArena();
@@ -1062,6 +1203,22 @@ export class WasmEngine {
   /** The record (facade) of the object at `address`, as runtime.object() gives it. */
   recordAt(address) { return this.space.objectAt(address); }
   /** The core's heap for reports: its size in bytes, what the last collection left alive, how many collections ran, and how many objects the hosts hold a handle of. */
+  /**
+   * The heap's counters as ART's Heap keeps them, for VMDebug's runtime stats (src/vm-debug-host.js): collections and their time, the bytes freed by every collection, the bytes in
+   * records now (GcHeap.allocated: the live set of the last collection plus what was allocated since, a thread's live buffer counted whole as ART counts a TLAB), and the records on
+   * the heap now (start bits: every allocation sets one, the sweep clears the dead ones; the threads' holes have none).
+   */
+  heapCounters() {
+    const h = this.h, engine = this;
+    return { collections: this.stats.collections, gcMs: this.stats.markMs + this.stats.sweepMs, bytesNow: this.r32(h + GC.allocated), bytesFreed: this.stats.freedBytes, objectsFreed: this.stats.freedObjects,
+      get objectsNow() { return engine.recordsNow(); } };   // a walk of the start bitmap: only when asked for
+  }
+  recordsNow() {
+    const h = this.h, base = this.r32(h + GC.base), end = this.r32(h + GC.end), bitsAt = this.r32(h + GC.startBits) >>> 2, words = (end - base) >>> 8, u32 = this.u32;
+    let records = 0;
+    for (let i = 0; i < words; i++) { let v = u32[bitsAt + i]; if (v === 0) continue; v -= (v >>> 1) & 0x55555555; v = (v & 0x33333333) + ((v >>> 2) & 0x33333333); records += (((v + (v >>> 4)) & 0x0f0f0f0f) * 0x01010101) >>> 24; }
+    return records;
+  }
   memoryInfo() { const h = this.h, LAYOUT = this.layout; return { threadCapacity: LAYOUT.GUEST_COUNT, metaBytes: this.linker.top - LAYOUT.META, metaCapacity: LAYOUT.META_END - LAYOUT.META, classes: this.linker.classList.length, methods: this.linker.methodList.length, threadRecords: this.threads?.nextGuest ?? 0, threadRecordsFree: this.threads?.free.length ?? 0, heapBytes: this.heapBytes, dynamic: this.dynamic, areaBytes: this.dynamic ? this.r32(h + GC.end) - LAYOUT.HEAP : 0, areaLimit: this.dynamic ? this.pages * 65536 - LAYOUT.HEAP : 0, heapRoom: this.room, grows: this.stats.grows, liveBytes: this.stats.collections ? this.r32(h + GC.liveBytes) : null, liveObjects: this.stats.collections ? this.r32(h + GC.liveObjects) : null, collections: this.stats.collections, handles: Number(this.runtime.heap?.size ?? 0) }; }
   /** Drops the pins of top-level host code (between top-level calls of a test or a driver that keeps nothing in JavaScript locals). */
   unpinTopLevel() { if (this.hostDepth === 0) this.pins.length = 0; }

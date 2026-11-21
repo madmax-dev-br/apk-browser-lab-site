@@ -2,11 +2,11 @@
 // entries that run the JNI bridge's own handlers (src/jni-host.js JniBridge.handlersFor: the same JNI semantics as for the lab's WebAssembly libraries), and the
 // library objects the bridge binds native methods to (Java_ export names and RegisterNatives). Arguments follow AAPCS64: integers and pointers in X0-X7, float and
 // double in V0-V7, the rest on the stack; "..." arguments of Call<Type>Method continue in the same registers, a va_list is AAPCS64's structure.
-import { APKError } from '../apk-error.js?v=75ac67a1c845';
-import { JNI_FUNCTIONS } from '../jni-function-table.js?v=75ac67a1c845';
-import { variadic, vaList } from './libc.js?v=75ac67a1c845';
-import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=75ac67a1c845';
-import { utf8 } from './text.js?v=75ac67a1c845';
+import { APKError } from '../apk-error.js?v=ebd42d0a624c';
+import { JNI_FUNCTIONS } from '../jni-function-table.js?v=ebd42d0a624c';
+import { variadic, vaList } from './libc.js?v=ebd42d0a624c';
+import { ARM64_WINDOW, registerArm64Memory } from '../unsafe-native.js?v=ebd42d0a624c';
+import { utf8 } from './text.js?v=ebd42d0a624c';
 
 const JNI_OK = 0, JNI_EVERSION = -3, VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 // JNI parameters that are 32-bit integers (jint, jsize, jboolean, jbyte, jchar, jshort) rather than pointers or references: on AAPCS64 only their low 32 bits are defined

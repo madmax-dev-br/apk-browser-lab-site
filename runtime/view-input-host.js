@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=75ac67a1c845';
-import { gcRoot } from './heap-gc.js?v=75ac67a1c845';
+import { APKError } from './apk-runtime.js?v=ebd42d0a624c';
+import { gcRoot } from './heap-gc.js?v=ebd42d0a624c';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;';
 const SUPER_ERROR = 'Landroid/util/SuperNotCalledException;';

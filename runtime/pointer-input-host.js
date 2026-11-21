@@ -3,15 +3,17 @@
 // family takes the same input (takesPointerInput): its rows are chosen by the list's own touch handling.
 // The page sends coordinates relative to the Compose owner View it touched; one pointer, one gesture at a time (DOWN ... MOVE* ... UP/CANCEL). Each sample enters the
 // owner's window at its root View in window coordinates, as Android's input dispatcher delivers it (so parents intercept and clickable parents get unconsumed touches).
-import { isComposeOwner } from './compose-owner.js?v=75ac67a1c845';
+import { isComposeOwner } from './compose-owner.js?v=ebd42d0a624c';
+import { scrollsItself } from './scrolling-view.js?v=ebd42d0a624c';
 export const ACTION_DOWN = 0, ACTION_UP = 1, ACTION_MOVE = 2, ACTION_CANCEL = 3, ACTION_SCROLL = 8;
 const MOTION = 'Landroid/view/MotionEvent;', P = ['J', 'J', 'I', 'F', 'F', 'I'];
 const VIEW = 'Landroid/view/View;', LIST = 'Landroid/widget/AbsListView;';
 /**
- * Whether a View of this class takes the page's pointer as real MotionEvents: Compose content, and the original AbsListView family (ListView, GridView and the lists of menu popups
- * and AlertDialogs), where a tap on a row, a long press and a scroll are decided by the list's own onTouchEvent, not by an OnClickListener a semantic click could call.
+ * Whether a View of this class takes the page's pointer as real MotionEvents: Compose content, the original AbsListView family (ListView, GridView and the lists of menu popups
+ * and AlertDialogs), where a tap on a row, a long press and a scroll are decided by the list's own onTouchEvent, not by an OnClickListener a semantic click could call, and
+ * every View that scrolls itself (src/scrolling-view.js: a RecyclerView, a NestedScrollView, a ViewPager, ScrollView, HorizontalScrollView and their subclasses).
  */
-export const takesPointerInput = (runtime, type) => isComposeOwner(runtime, type) || runtime.classes.has(LIST) && runtime.isSubtype(type, LIST);
+export const takesPointerInput = (runtime, type) => isComposeOwner(runtime, type) || runtime.classes.has(LIST) && runtime.isSubtype(type, LIST) || scrollsItself(runtime, type);
 /** The root View of the owner's window (View.getRootView: the DecorView of an Activity or Dialog window), or null when the owner is not attached to a window. */
 function rootOf(runtime, ownerViewId) {
   const dispatch = (name, signature, result) => runtime.dispatch({ owner: VIEW, name, parameters: [], result, signature }, [{ ref: ownerViewId }], 'virtual');
@@ -83,10 +85,17 @@ const PROPERTIES = 'Landroid/view/MotionEvent$PointerProperties;', COORDS = 'Lan
 /**
  * A mouse wheel / trackpad scroll as ACTION_SCROLL (a generic motion event from SOURCE_MOUSE), like the Android input dispatcher: Compose's `scrollable` turns the
  * AXIS_VSCROLL/AXIS_HSCROLL values into scroll offsets (64 dp per notch). `dx`, `dy` are the wheel deltas in dp (positive = content moves up/left, as in the DOM).
+ * For a Compose owner the event goes to the owner View; for a View that scrolls itself (or an original list) it enters the window at its root View in window coordinates,
+ * as ViewRootImpl delivers a pointer generic motion event: Activity.dispatchGenericMotionEvent for an Activity window, then ViewGroup.dispatchGenericPointerEvent hands it to
+ * the children under the pointer, innermost first, until one's onGenericMotionEvent handles it (RecyclerView, NestedScrollView, ScrollView, HorizontalScrollView and
+ * AbsListView implement ACTION_SCROLL there with ViewConfiguration's scroll factors).
  */
 function dispatchWheel(runtime, { ownerViewId, x, y, t, dx, dy }) {
-  if (!runtime.heap.has(ownerViewId) || !isComposeOwner(runtime, runtime.object({ ref: ownerViewId }).type)) return { handled: false, dropped: 'not-a-compose-view' };
+  const type = runtime.heap.has(ownerViewId) ? runtime.object({ ref: ownerViewId }).type : null, compose = !!type && isComposeOwner(runtime, type);
+  if (!type || !compose && !takesPointerInput(runtime, type)) return { handled: false, dropped: 'not-a-compose-view' };
   if (![x, y, dx, dy].every(Number.isFinite)) throw new TypeError('Invalid scroll sample');
+  const root = compose ? null : rootOf(runtime, ownerViewId), activity = root ? activityOf(runtime, root) : null, [ox, oy] = root ? windowOffset(runtime, ownerViewId) : [0, 0];
+  x += ox; y += oy;
   const call = (owner, name, signature, parameters, result, values, mode = 'virtual') => runtime.dispatch({ owner, name, signature, parameters, result }, values, mode);
   const properties = runtime.allocate(PROPERTIES); call(PROPERTIES, '<init>', '()V', [], 'V', [properties], 'direct'); call(PROPERTIES, 'clear', '()V', [], 'V', [properties]);
   runtime.storeField(runtime.object(properties).fields, `${PROPERTIES}->toolType:I`, TOOL_TYPE_MOUSE);
@@ -98,7 +107,10 @@ function dispatchWheel(runtime, { ownerViewId, x, y, t, dx, dy }) {
   const parameters = ['J', 'J', 'I', 'I', `[${PROPERTIES}`, `[${COORDS}`, 'I', 'I', 'F', 'F', 'I', 'I', 'I', 'I'];
   const event = call(MOTION, 'obtain', `(JJII[${PROPERTIES}[${COORDS}IIFFIIII)${MOTION}`, parameters, MOTION, runtime.argumentWords(parameters, [time, time, ACTION_SCROLL, 1, propertiesArray, coordsArray, 0, 0, bits(1), bits(1), 0, 0, SOURCE_MOUSE, 0]), 'static');
   let handled;
-  try { handled = call('Landroid/view/View;', 'dispatchGenericMotionEvent', `(${MOTION})Z`, [MOTION], 'Z', [{ ref: ownerViewId }, event]); }
+  try {
+    handled = activity ? call(ACTIVITY, 'dispatchGenericMotionEvent', `(${MOTION})Z`, [MOTION], 'Z', [activity, event])
+      : call('Landroid/view/View;', 'dispatchGenericMotionEvent', `(${MOTION})Z`, [MOTION], 'Z', [root ?? { ref: ownerViewId }, event]);
+  }
   finally { try { call(MOTION, 'recycle', '()V', [], 'V', [event]); } catch { /* recycled by the app */ } }
   return { handled: !!handled };
 }

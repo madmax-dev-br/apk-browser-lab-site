@@ -1,13 +1,13 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=75ac67a1c845';
-import { staticRetentionLines } from './heap-gc.js?v=75ac67a1c845';
-import { overrideSummaryLines } from './method-overrides.js?v=75ac67a1c845';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=75ac67a1c845';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=75ac67a1c845';
-import { hostMapSummaryLines } from './host-map.js?v=75ac67a1c845';
-import { attributeGap } from './worker-task-log.js?v=75ac67a1c845';
-import { loadImageText } from './load-image.js?v=75ac67a1c845';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=ebd42d0a624c';
+import { staticRetentionLines } from './heap-gc.js?v=ebd42d0a624c';
+import { overrideSummaryLines } from './method-overrides.js?v=ebd42d0a624c';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=ebd42d0a624c';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=ebd42d0a624c';
+import { hostMapSummaryLines } from './host-map.js?v=ebd42d0a624c';
+import { attributeGap } from './worker-task-log.js?v=ebd42d0a624c';
+import { loadImageText } from './load-image.js?v=ebd42d0a624c';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -35,6 +35,20 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const frames = [...String(message).matchAll(/(L[^\s:]+?;->[^\s]+?) \[[^\]]+\] at PC (0x[\da-f]+)/gi)].map(([, frame, pc]) => `${dotted(frame.split('->')[0])}.${frame.split('->')[1].replace(/\(.*$/, '')}@${pc}`);
     const text = String(message).replace(/^(?:L[^\s:]+?;->[^\s]+? \[[^\]]+\] at PC 0x[\da-f]+: )+/i, '');
     out.push(`VM ERROR: ${text.slice(0, 240)}`); if (frames.length) out.push(`  at: ${frames.slice(-6).reverse().join(' ← ')}`);
+    // a NoClassDefFoundError of a class whose initializer failed earlier: its message is only the class name (ART), so the line says what it is and why
+    const erroneous = /^(?:<clinit> failed for class )?([\w$.]+?)(?:; see exception in other thread)?$/.exec(text.trim())?.[1], failed = erroneous ? [...(runtime.classInitFailures?.keys() ?? [])].find(type => dotted(type) === erroneous) : undefined;
+    if (failed) out.push(`  that is NoClassDefFoundError: the static initializer of ${erroneous} failed earlier: ${runtime.classInitFailureText(failed)}`);
+  });
+  part(() => {   // classes whose static initializer failed (APKRuntime.noteClassInitFailure): every later use throws NoClassDefFoundError, so the original exception is said here
+    const table = runtime.classInitFailures; if (!table?.size) return;
+    out.push(`Class initializers that FAILED (${table.size}; every later use of the class throws NoClassDefFoundError, as on Android; the original exception, innermost frames first):`);
+    for (const [type, entry] of [...table].slice(0, 8)) out.push(`  ${dotted(type)}${entry.via ? ` (needs ${dotted(entry.via)})` : ''}: ${runtime.classInitFailureText(type)} [thread ${entry.thread}${entry.laterUses ? `, ${entry.laterUses} later use${entry.laterUses === 1 ? '' : 's'}` : ''}]`);
+    if (table.size > 8) out.push(`  +${table.size - 8} more`);
+  });
+  part(() => {   // System.loadLibrary / System.load of a library no ABI of the APK packages (APKRuntime.libraryNotFound): Android's own UnsatisfiedLinkError, never silent
+    const table = runtime.librariesNotFound; if (!table?.size) return;
+    const abis = [...table.values()][0]?.abis ?? [];
+    out.push(`Native libraries NOT FOUND (System.loadLibrary threw UnsatisfiedLinkError "dlopen failed: library ... not found", as on a device): ${[...table].slice(0, 8).map(([name, entry]) => `${name} ×${entry.count} (from ${entry.caller})`).join('; ')}${table.size > 8 ? `; +${table.size - 8} more` : ''}. The APK ${abis.length ? `packages native libraries for ${abis.join(', ')} only` : 'packages no native library'}; an app whose libraries ship in an ABI split APK needs that split opened with the base APK.`);
   });
   part(() => {   // an internal JavaScript error: its own message and the top frames, so one photo has them
     const stack = error?.details?.jsStack; if (!stack) return;
@@ -118,13 +132,15 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const frames = (main.frames ?? []).slice(-8).reverse().map(frame => frame.method ? `${dotted(frame.method.owner)}.${frame.method.name}` : frame.cont ? '(host call)' : '?');
     { const target = main.blocked?.blocker ?? main.blocker;
       if (main.blocked && target && !(main.blocker)) { try {
-        const record = runtime.object(target), owner = runtime.monitors?.get(record.id)?.owner;
+        // the holder: the WebAssembly core's lock word (core-threads.js monitorOwnerThread), or the JavaScript VM's monitor table
+        const core = runtime.monitorOwnerThread ? runtime.monitorOwnerThread(target) : undefined, owner = core !== undefined ? core?.thread ?? null : runtime.monitors?.get(runtime.object(target).id)?.owner;
+        const holder = owner ? `monitor held by ${owner.name}${owner.blocked ? ` (${owner.state}: ${owner.blocked.reason}${Number.isFinite(owner.blocked.deadline) ? `, deadline in ${Math.round(owner.blocked.deadline - (runtime.platform?.clock?.now?.() ?? 0))} ms` : ''})` : ` (${owner.state})`}` : core ? `monitor held by thread id ${core.tid}, which no live thread has` : 'no thread holds the monitor';
         const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}`);
-        out.push(`the main thread waits on the monitor of a ${dotted(runtime.typeOf(target))} (${main.blocked.reason}); ${owner ? `monitor held by ${owner.name}` : 'no thread holds the monitor'}; may call notify: ${releasers.join(', ') || 'no active thread'}`);
+        out.push(`the main thread waits on the monitor of a ${dotted(runtime.typeOf(target))} (${main.blocked.reason}); ${holder}; may call notify: ${releasers.join(', ') || 'no active thread'}`);
         const thread = threadObjectNote(runtime, target); if (thread) out.push(thread);
       } catch { /* the monitor object is not inspectable */ } } }
     if (main.blocked && main.blocker) { try { const releasers = (runtime.scheduler.threads ?? []).filter(t => t !== main && (t.state === 'runnable' || (t.state === 'blocked' && Number.isFinite(t.blocked?.deadline)))).slice(0, 4).map(t => `${t.name} ${t.state}${t.frames?.length ? ' in ' + (t.frames.at(-1).method ? dotted(t.frames.at(-1).method.owner).split('.').pop() + '.' + t.frames.at(-1).method.name : '(host)') : ''}`); out.push(`the main thread waits on a ${dotted(runtime.typeOf(main.blocker))}; may release it: ${releasers.join(', ') || 'no active thread'}`); } catch { /* blocker not inspectable */ } }
-    out.push(`main thread: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'waiting'})` : ''}${main.nestedDepth ? `, inside a nested native call (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : '; no Java frames (idle in the looper' + (runtime.lastHostCall ? `, last host call ${String(runtime.lastHostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').replaceAll('/', '.')}` : '') + ')'}`);
+    out.push(`main thread: ${main.state}${main.blocked ? ` (${main.blocked.reason ?? 'waiting'})` : ''}${runtime.wasm?.mainSuspended ? ', its event suspended in that wait (the event pump resumes it when the wait ends)' : ''}${main.nestedDepth ? `, inside a nested native call (${main.nestedDepth})` : ''}${frames.length ? '; ' + frames.join(' ← ') : runtime.wasm?.mainSuspended ? '' : '; no Java frames (idle in the looper' + (runtime.lastHostCall ? `, last host call ${String(runtime.lastHostCall).replace(/^L|;->/g, m => m === ';->' ? '.' : '').replaceAll('/', '.')}` : '') + ')'}`);
     // the longest episode of the main thread inside one event (kept after it ended): where it was, what it was doing, the hottest methods of the last seconds
     { const busy = runtime.monitor?.mainBusy;
       if (busy) out.push(`main thread busy for ${(busy.busyMs / 1000).toFixed(0)} s in a single event (${busy.event})${busy.capped ? `; event ended by the limit after ${(busy.endedAfterMs / 1000).toFixed(0)} s (the stack was already unwound: the frames below are from the last sample)` : busy.ended ? `; the event ended after ${(busy.endedAfterMs / 1000).toFixed(0)} s` : ' and is still running'}; main thread loop: ${busy.hot.join(', ') || '(no samples)'}; innermost frames: ${busy.frames.join(' <- ') || '(none)'}${busy.hostCall ? `; inside the host call ${busy.hostCall}${busy.resourceCall ? ` (${busy.resourceCall})` : ''}` : ''}${busy.overdue?.count ? `; ${busy.overdue.count} overdue messages, the oldest for ${(busy.overdue.oldestMs / 1000).toFixed(1)} s` : ''}`); }

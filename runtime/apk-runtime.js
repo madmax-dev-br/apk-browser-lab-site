@@ -1,36 +1,38 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=75ac67a1c845';
-import { VMClock } from './vm-clock.js?v=75ac67a1c845';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=75ac67a1c845';
-import { OperationMonitor } from './operation-monitor.js?v=75ac67a1c845';
-import { ExecutionProfile } from './execution-profile.js?v=75ac67a1c845';
-import { SamplingProfiler } from './sampling-profiler.js?v=75ac67a1c845';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=75ac67a1c845';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=75ac67a1c845';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=75ac67a1c845';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=75ac67a1c845';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=75ac67a1c845';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=75ac67a1c845';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=75ac67a1c845';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=75ac67a1c845';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=75ac67a1c845';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=75ac67a1c845';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=75ac67a1c845';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=75ac67a1c845';
-import { APKError } from './apk-error.js?v=75ac67a1c845';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=75ac67a1c845';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=75ac67a1c845';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=75ac67a1c845';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=75ac67a1c845';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=75ac67a1c845';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=75ac67a1c845';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=75ac67a1c845';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=75ac67a1c845';
+import STATIC_SHIMS from './shim-static-methods.js?v=ebd42d0a624c';
+import { VMClock } from './vm-clock.js?v=ebd42d0a624c';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=ebd42d0a624c';
+import { OperationMonitor } from './operation-monitor.js?v=ebd42d0a624c';
+import { ExecutionProfile } from './execution-profile.js?v=ebd42d0a624c';
+import { SamplingProfiler } from './sampling-profiler.js?v=ebd42d0a624c';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ebd42d0a624c';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ebd42d0a624c';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ebd42d0a624c';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ebd42d0a624c';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ebd42d0a624c';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=ebd42d0a624c';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ebd42d0a624c';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ebd42d0a624c';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ebd42d0a624c';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ebd42d0a624c';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=ebd42d0a624c';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=ebd42d0a624c';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ebd42d0a624c';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ebd42d0a624c';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=ebd42d0a624c';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ebd42d0a624c';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ebd42d0a624c';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ebd42d0a624c';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ebd42d0a624c';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=ebd42d0a624c';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=75ac67a1c845';
-import { bootClassLacksMember } from './boot-class-members.js?v=75ac67a1c845';
-export { APKError } from './apk-error.js?v=75ac67a1c845';
-import { BinaryReader } from './binary-reader.js?v=75ac67a1c845';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=75ac67a1c845';
+import { Scheduler, Blocked } from './scheduler.js?v=ebd42d0a624c';
+import { bootClassLacksMember } from './boot-class-members.js?v=ebd42d0a624c';
+export { APKError } from './apk-error.js?v=ebd42d0a624c';
+import { BinaryReader } from './binary-reader.js?v=ebd42d0a624c';
+import { recordCollection } from './runtime-stats.js?v=ebd42d0a624c';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=ebd42d0a624c';
+import { scrollsItself } from './scrolling-view.js?v=ebd42d0a624c';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -520,6 +522,11 @@ EXTERNAL_PARENTS.set('Ljava/lang/UnsupportedOperationException;', 'Ljava/lang/Ru
 // Native libraries tolerant mode never stubs: obfuscated hash-named libraries (typical of protection layers) and known protection,
 // anti-fraud, attestation and payment-security names. They need their original binary (APK-REAL-TASKS task 14) or stay a hard stop.
 export { PROTECTED_NATIVE_LIBRARY };
+// The platform's public NDK libraries (system/core rootdir/etc/public.libraries.android.txt, android-13.0.0_r1): every device has them in /system/lib64, so an app's
+// System.loadLibrary of one finds it there whatever its APK packages. The lab runs none of them as machine code: a request for one stays the explicit lab limitation (nativeRequired).
+export const PUBLIC_NDK_LIBRARIES = new Set(['libandroid.so', 'libaaudio.so', 'libamidi.so', 'libbinder_ndk.so', 'libc.so', 'libcamera2ndk.so', 'libdl.so', 'libEGL.so', 'libGLESv1_CM.so',
+  'libGLESv2.so', 'libGLESv3.so', 'libicu.so', 'libicui18n.so', 'libicuuc.so', 'libjnigraphics.so', 'liblog.so', 'libmediandk.so', 'libm.so', 'libnativehelper.so', 'libnativewindow.so',
+  'libneuralnetworks.so', 'libOpenMAXAL.so', 'libOpenSLES.so', 'libRS.so', 'libstdc++.so', 'libsync.so', 'libvulkan.so', 'libwebviewchromium_plat_support.so', 'libz.so']);
 export const SHIMS = new Set([
   'Ljava/lang/Object;-><init>()V', 'Landroid/app/Activity;-><init>()V',
   'Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V',
@@ -1370,6 +1377,8 @@ export class APKRuntime {
    * Returns undefined when `type` is usable by the current thread now (initialized, or being initialized by this very thread), a Blocked(retry) while another thread
    * initializes it or a class it needs, or an Invoke chain that runs the pending <clinit> methods as ordinary interpreter frames. A class whose initializer failed is erroneous:
    * every later use throws NoClassDefFoundError. The first failure surfaces as the Error itself or an ExceptionInInitializerError wrapping a non-Error throwable.
+   * A class whose superclass (or an interface with default methods it initializes) is erroneous becomes erroneous too, keeping the NoClassDefFoundError it threw as its own
+   * error (ART ClassLinker::InitializeClass, android-13.0.0_r1: SetStatus(kErrorResolved) stores the pending exception).
    */
   initStep(type) {
     const thread = currentThread(this), state = this.initialized.get(type);
@@ -1390,6 +1399,13 @@ export class APKRuntime {
       const c = this.classes.get(t); if (!c || visiting.has(t)) return undefined;
       if (depth > 128) fail('Class initialization depth limit exceeded');
       visiting.add(t);
+      try { return needs(t, c, depth); }
+      catch (error) {   // a class it needs is erroneous: this one becomes erroneous with the NoClassDefFoundError that says so (the same object), and the error goes on
+        if (error instanceof JavaException && error.erroneousClass !== undefined && this.initialized.get(t) === undefined) { this.initialized.set(t, { status: 'failed', value: error.value, error }); this.noteClassInitFailure(t, { value: error.value, via: error.erroneousClass }); }
+        throw error;
+      }
+    };
+    const needs = (t, c, depth) => {
       if (!(c.flags & 0x200)) {
         if (c.superclass) { const wait = visit(c.superclass, depth + 1); if (wait) return wait; }
         const seen = new Set();
@@ -1430,7 +1446,10 @@ export class APKRuntime {
     const key = target.name + target.signature; let type = target.owner;
     for (;;) { const cls = this.classes.get(type); if (!cls) return target.owner; if (cls.methods.has(key)) return type; if (!cls.superclass) return target.owner; type = cls.superclass; }
   }
-  initWait(type) { return new Blocked({ ready: () => this.initialized.get(type)?.status !== 'initializing', retry: true, reason: `class initialization of ${type}` }); }
+  initWait(type) {
+    const thread = currentThread(this); (thread.initWaitedFor ??= new Set()).add(type);   // a failure seen after this wait is "see exception in other thread" (throwErroneous)
+    return new Blocked({ ready: () => this.initialized.get(type)?.status !== 'initializing', retry: true, reason: `class initialization of ${type}` });
+  }
   prepareStatics(cls, type) {
     for (const entry of cls.staticFields) {
       const field = cls.dex.field(entry.index); this.storeField(this.staticFields, field.key, defaultValue(field.type));
@@ -1456,10 +1475,31 @@ export class APKRuntime {
     const failedType = order[index], value = thrown instanceof JavaException ? thrown.value : null;
     for (let i = index; i < order.length; i++) {
       const t = order[i];
-      if (i === index || this.isSubtype(t, failedType)) this.initialized.set(t, { status: 'failed', value, error: thrown });
+      if (i === index || this.isSubtype(t, failedType)) { this.initialized.set(t, { status: 'failed', value, error: thrown }); this.noteClassInitFailure(t, value !== null ? { value, via: i === index ? null : failedType } : { labError: thrown, via: i === index ? null : failedType }); }
       else if (this.initialized.get(t)?.status === 'initializing') this.initialized.delete(t);
     }
     return thrown;
+  }
+  /**
+   * A class became erroneous: why, for the diagnostics summary ("Class initializers that FAILED") and the trace, whatever the app does with the exceptions. `value`: the error the
+   * class keeps (the Error its <clinit> threw, the ExceptionInInitializerError wrapping another throwable, or the NoClassDefFoundError of a class it needed); `labError`: a lab
+   * error (not a Java exception) stopped the initializer; `via`: the class whose failure made this one erroneous. Both engines call it (vmcore/js/host-bridge.js for the core).
+   * The entry keeps the error object alive (a host root), so the cause chain and its stack stay readable.
+   */
+  noteClassInitFailure(type, { value = null, labError = null, via = null, stopped = false } = {}) {
+    const table = this.classInitFailures ??= new Map(); if (table.has(type) || table.size >= 64) return;
+    const lab = labError ? String(labError.message ?? labError) : null;
+    table.set(type, { thread: String(currentThread(this)?.name ?? '?'), atMs: Math.round(this.platform?.clock?.now?.() ?? 0), stored: value, lab, labPending: stopped, via, laterUses: 0 });
+    try { this.record(`CLASS-INIT FAILED ${dottedName(type)}${via ? ` (needs ${dottedName(via)}, which failed)` : ''}: ${this.classInitFailureText(type)}`); } catch { /* the trace is detached */ }
+  }
+  /** The original exception of a failed class initializer, innermost cause first: "java.lang.IllegalStateException: boom at a.B.c <- ..." (the wrappers it went through after it). */
+  classInitFailureText(type) {
+    const entry = this.classInitFailures?.get(type); if (!entry) return null;
+    if (!entry.stored) return entry.lab !== null ? `lab error: ${entry.lab.slice(0, 300)}` : entry.labPending ? 'the run stopped inside the initializer (lab stop; see the VM error)' : 'unknown';
+    const chain = []; let value = entry.stored;
+    try { for (let i = 0; i < 8 && value && value.ref !== undefined; i++) { chain.push(value); const cause = this.object(value).cause; if (!cause || cause.ref === undefined || chain.some(v => v.ref === cause.ref)) break; value = cause; } } catch { /* a part of the chain is not readable */ }
+    const original = this.describeThrowable(chain.at(-1)), wrappers = chain.slice(0, -1).map(v => this.describeThrowable(v).type);
+    return `${original.type}${original.message ? ': ' + original.message : ''}${original.stack.length ? '  at ' + original.stack.slice(0, 6).join(' ← ') : ''}${wrappers.length ? ` (thrown as ${wrappers.join(' ← caused by ')})` : ''}`;
   }
   /** The class path ART prints in "Didn't find class" messages: the app's base APK and native library directory (virtual filesystem). */
   classPathText() {
@@ -1488,11 +1528,19 @@ export class APKRuntime {
     if (APKRuntime.isPlatformSpace(component) || this.classResolvable(component)) { memo.add(component); return; }
     this.throwNoClassDef(component);
   }
+  /**
+   * A use of an erroneous class: ART ClassLinker::ThrowEarlierClassFailure (android-13.0.0_r1) rethrows the error the class keeps wrapped in a NoClassDefFoundError whose message is the
+   * class's PrettyDescriptor ("a.b.C$D") and whose cause is that error (the ExceptionInInitializerError or Error of the first failure). A thread that waited while another thread ran
+   * the initializer gets ClassLinker::WaitForInitializeClass's "<clinit> failed for class a.b.C; see exception in other thread", without a cause.
+   */
   throwErroneous(type, state) {
-    const message = `Could not initialize class ${type.slice(1, -1).replaceAll('/', '.')}`;
+    const pretty = type.slice(1, -1).replaceAll('/', '.'), waited = currentThread(this)?.initWaitedFor?.delete(type) === true;
+    const message = waited ? `<clinit> failed for class ${pretty}; see exception in other thread` : pretty;
     const value = this.makeObject('Ljava/lang/NoClassDefFoundError;'), obj = this.object(value);
-    obj.message = message; obj.cause = state.value ?? null; obj.causeInitialized = true; obj.stack = this.captureStack();
-    throw new JavaException(value, message);
+    obj.message = message; obj.cause = waited ? null : state.value ?? null; obj.causeInitialized = true; obj.stack = this.captureStack();
+    const entry = this.classInitFailures?.get(type); if (entry) entry.laterUses++;
+    const error = new JavaException(value, message); error.erroneousClass = type;
+    throw error;
   }
   materialize(value, type) {
     if (!value || typeof value !== 'object' || !value.encoded) return value;
@@ -1854,8 +1902,7 @@ export class APKRuntime {
     if (this.platform?.performClick?.(this, ref(id)) === true) { this.clicks++; return this.snapshot(); }
     if (!view.listener) {
       // A tap is View.performClick(), which a class may override without any OnClickListener (the Toolbar's overflow button opens its menu there; custom Views do the same).
-      let overridden = false; for (let type = view.type, depth = 0; type && depth < 64 && type !== 'Landroid/view/View;'; type = this.parent(type), depth++) if (this.classes.get(type)?.methods.has('performClick()Z')) { overridden = true; break; }
-      if (!overridden) fail('View has no OnClickListener');
+      // A clickable View with neither (android:clickable="true", often to keep touches from the Views behind it) takes the tap and does nothing: performClick() returns false.
       this.dispatch({ owner: 'Landroid/view/View;', name: 'performClick', signature: '()Z', parameters: [], result: 'Z' }, [ref(id)], 'virtual');
       this.clicks++;
       return this.snapshot();
@@ -1901,7 +1948,7 @@ export class APKRuntime {
       if (!kind) fail(`Unsupported renderer view: ${v.type}`);
       if (['text', 'button', 'input', 'check'].includes(kind)) texts.push(v.text);
       return { id: v.id, type: v.type, kind, text: v.text, orientation: v.orientation === 1 ? 'vertical' : 'horizontal',
-        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...((this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;')) || (isComposeOwner(this, v.type) && !this.isSubtype(v.type, COMPOSE_OWNER_NAME)) ? { touchInput: true } : {}) /* an original list, or a Compose owner renamed by R8 (its semantics tree is unreadable, so the page binds its pointer here): the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
+        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(scrollsItself(this, v.type) ? { touchInput: true, selfScroll: true } : (this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;')) || (isComposeOwner(this, v.type) && !this.isSubtype(v.type, COMPOSE_OWNER_NAME)) ? { touchInput: true } : {}) /* a View that scrolls itself (src/scrolling-view.js: its drag and wheel reach it as MotionEvents, its children are shown moved by its scroll), an original list, or a Compose owner renamed by R8 (its semantics tree is unreadable, so the page binds its pointer here): the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
         padding: v.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }, layoutWidth: v.layoutWidth ?? null,
         clipChildren: v.clipChildren !== false, clipToPadding: v.clipToPadding !== false,
         layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? (['text', 'button', 'input', 'check'].includes(kind) && this.isSubtype(v.type, 'Landroid/widget/TextView;') ? this.platform?.textViewApi?.currentTextColor?.(this, value) ?? null : null),
@@ -2118,7 +2165,7 @@ export class APKRuntime {
     else if (this.gcEnabled) this.gcPressure = true;   // heap-gc.js collectionDue: a native resource asked for it
   }
   /** A collection finished: native growth is measured from here (registerNativeAllocation), and every native table that paces itself by collections hears it (nativeCollectionHooks). */
-  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; for (const hook of this.nativeCollectionHooks ?? []) hook(); }
+  nativeCollected() { this.nativeBytesAtCollection = this.nativeBytes ?? 0; recordCollection(this); for (const hook of this.nativeCollectionHooks ?? []) hook(); }   // recordCollection: VMDebug's GC rate histograms (src/runtime-stats.js)
   collectForNativeHandles(what) { if (this.engine === 'wasm') { if (!this.wasm) return false; this.wasm.collect('native-handles'); return true; } return this.emergencyCollect(what); }
   stressCollect() { if (GC_STRESS && this.gcEnabled) collectGarbage(this, { reason: 'stress', generation: auditGeneration(this) }); }
   safepointCollect() {
@@ -2412,8 +2459,45 @@ export class APKRuntime {
     const libraries = this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown');
     const basenames = [...new Set(libraries.map(path => path.split('/').pop()))];
     const custom = requestedLibrary ? this.platform?.onNativeLibraryUnavailable?.(this, requestedLibrary, null) : undefined;   // a device component may need to make a swallowed failure visible (src/microg-device.js); a string answer is the error's message
-    const message = typeof custom === 'string' ? custom : `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
-    this.throwJava('Ljava/lang/UnsatisfiedLinkError;', message, { kind: 'jni-required', method, requestedLibrary, nativeLibraries: libraries });
+    // where the requested library is: the ABIs of the APK that package it (a library packaged for another ABI only is still a library this VM cannot run), or a platform library
+    const soname = requestedLibrary ? (requestedLibrary.includes('/') ? requestedLibrary.slice(requestedLibrary.lastIndexOf('/') + 1) : `lib${requestedLibrary}.so`) : null, abis = soname ? this.packagedLibraryAbis(soname) : [];
+    const where = !soname ? '' : abis.length ? ` (${soname} is packaged for ${abis.join(', ')}; the device ABI is ${this.arm64 ? 'arm64-v8a (ARM64 interpreter) and wasm32' : 'wasm32'})` : PUBLIC_NDK_LIBRARIES.has(soname) ? ` (${soname} is a platform NDK library, present on every device)` : '';
+    const message = typeof custom === 'string' ? custom : `JNI execution required: ${method}${requestedLibrary ? `; requested library ${requestedLibrary}${where}` : ''}. This VM has no Android ELF/JNI execution backend; packaged ARM/x86 machine code cannot be executed directly. Packaged libraries: ${basenames.slice(0, 12).join(', ') || 'none'}${basenames.length > 12 ? ` (+${basenames.length - 12} more)` : ''}`;
+    this.throwJava('Ljava/lang/UnsatisfiedLinkError;', message, { kind: 'jni-required', method, requestedLibrary, nativeLibraries: libraries, ...(soname ? { packagedFor: abis } : {}) });
+  }
+  /** The ABIs whose native library directory of the APK (lib/<abi>/) has `soname`: where the package manager extracts libraries from on a device. [] when none packages it. */
+  packagedLibraryAbis(soname) {
+    const abis = [];
+    for (const value of this.nativeLibraries) {
+      const path = typeof value === 'string' ? value : value.path ?? '', match = /^lib\/([^/]+)\/([^/]+)$/.exec(path);
+      if (match && match[2] === soname && !abis.includes(match[1])) abis.push(match[1]);
+    }
+    return abis;
+  }
+  /**
+   * System.loadLibrary(name) / System.load(path) of a library that does not exist for this app: no ABI directory of the APK packages it (only the base APK was opened, without the ABI
+   * split that carries its libraries; a name the app tries in turn), or System.load names a file that is not there. On Android PathClassLoader.findLibrary finds nothing,
+   * Runtime.loadLibrary0 hands the bare soname to the dynamic linker (libcore Runtime.java, android-13.0.0_r1), and nativeLoad answers the linker's error: the app gets
+   * java.lang.UnsatisfiedLinkError "dlopen failed: library "lib<name>.so" not found", which it may catch. That is what is thrown here (not a lab limitation): it is recorded in the
+   * trace and counted for the diagnostics summary (librariesNotFound), never silent. Returns when the library is packaged for some ABI, is a platform NDK library
+   * (PUBLIC_NDK_LIBRARIES), or framework code asked for it (a platform library): those stay the lab's explicit limitation (nativeRequired).
+   */
+  libraryNotFound(kind, text) {
+    const soname = kind === 'load' ? text.slice(text.lastIndexOf('/') + 1) : `lib${text}.so`;
+    if (this.packagedLibraryAbis(soname).length || PUBLIC_NDK_LIBRARIES.has(soname)) return;
+    if (kind === 'load') { let present = true; try { const fs = this.platform?.javaIo?.fs?.(); present = !fs || !!fs.stat(text); } catch { present = true; } if (present) return; }   // a file the app wrote or extracted: it exists, the lab cannot run it
+    // the caller: the first frame outside java.lang.System/Runtime; a framework class loads the platform's own libraries (Conscrypt's javacrypto, media_jni ...)
+    const caller = (this.captureStack?.() ?? []).find(frame => frame?.owner !== 'Ljava/lang/System;' && frame?.owner !== 'Ljava/lang/Runtime;') ?? null;
+    const owner = caller?.owner ?? this.currentMethod?.owner;
+    if (!owner || !this.dex.classes.has(owner) || this.dex.bootClasses?.has(owner)) return;
+    // a device component that needs this library to make its failure visible keeps its say (src/microg-device.js), as nativeRequired gives it
+    const custom = this.platform?.onNativeLibraryUnavailable?.(this, text, null);
+    if (typeof custom === 'string') this.throwJava('Ljava/lang/UnsatisfiedLinkError;', custom, { kind: 'jni-required', method: `Ljava/lang/System;->${kind}(Ljava/lang/String;)V`, requestedLibrary: text, nativeLibraries: this.nativeLibraries.map(value => typeof value === 'string' ? value : value.path ?? value.name ?? value.basename ?? 'unknown') });
+    const path = kind === 'load' ? text : soname, at = `${dottedName(owner)}.${caller?.name ?? '?'}`;
+    const table = this.librariesNotFound ??= new Map(), entry = table.get(path) ?? (table.size < 64 ? table.set(path, { count: 0, caller: at, abis: [...new Set(this.nativeLibraries.map(value => /^lib\/([^/]+)\//.exec(typeof value === 'string' ? value : value.path ?? '')?.[1]).filter(Boolean))] }).get(path) : null);
+    if (entry) entry.count++;
+    if (!entry || entry.count === 1) this.record(`JNI dlopen failed: library "${path}" not found (${kind === 'load' ? 'no such file' : `no ABI directory of the APK packages it${entry?.abis.length ? `; it packages libraries for ${entry.abis.join(', ')}` : '; it packages no native library'}`}); System.${kind} from ${at} throws UnsatisfiedLinkError`);
+    this.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: library "${path}" not found`, { kind: 'native-library-not-found', library: path });
   }
   /** The Java frames of the current thread, innermost first: the methods Throwable.getStackTrace reports (constructors of the exception itself are not part of the trace). */
   captureStack() {
@@ -3359,6 +3443,7 @@ export class APKRuntime {
       if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
       if (this.arm64?.load(name, text)) return undefined;   // the APK's own arm64-v8a library, run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (this.stubNativeLibrary(text)) return undefined;
+      this.libraryNotFound(name, text);   // no ABI of the APK packages it: Android's own UnsatisfiedLinkError ("dlopen failed: library ... not found")
       this.nativeRequired(key, text);
     }
     if (method.owner === 'Ljava/lang/System;') {

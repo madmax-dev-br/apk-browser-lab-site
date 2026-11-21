@@ -1,10 +1,11 @@
-import { resolveIntentFields } from './intent-resolver.js?v=75ac67a1c845';
-import { APKError } from './apk-error.js?v=75ac67a1c845';
-import { registerPackageValueFields } from './package-value-fields.js?v=75ac67a1c845';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=75ac67a1c845';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=75ac67a1c845';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=75ac67a1c845';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=75ac67a1c845';
+import { resolveIntentFields } from './intent-resolver.js?v=ebd42d0a624c';
+import { APKError } from './apk-error.js?v=ebd42d0a624c';
+import { registerPackageValueFields } from './package-value-fields.js?v=ebd42d0a624c';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ebd42d0a624c';
+import { nativeHeap } from './vm-debug-host.js?v=ebd42d0a624c';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=ebd42d0a624c';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=ebd42d0a624c';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=ebd42d0a624c';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -913,19 +914,27 @@ export function createAppServicesHost(platform) {
   def(APP_TASK, 'finishAndRemoveTask', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.finishFrames(r, framesOf(task).reverse()); });
   def(APP_TASK, 'moveToFront', '()V', (r, _m, [self]) => { const task = appTask(r, self); if (task) platform.moveTaskToFront(r, task); });
   def(APP_TASK, 'setExcludeFromRecents', '(Z)V', (r, _m, [self, exclude]) => { const task = appTask(r, self); if (task) task.excludeFromRecents = !!exclude; });
-  // getProcessMemoryInfo: Debug.MemoryInfo per pid; this process's figures describe the VM's own heap (the same numbers Debug.getPss reports), other pids are not visible and read zero.
-  const kb = r => Math.floor(((r.heap?.size ?? 0) * 64) / 1024);
+  // Debug.MemoryInfo of this process (ActivityManager.getProcessMemoryInfo, Debug.getMemoryInfo, Debug.getPss), in kB: the Java heap and the native heap (src/vm-debug-host.js nativeHeap)
+  // as the VM keeps them; other pids are not visible and read zero. The WebAssembly core counts its heap in bytes (the bytes in records); the JavaScript VM counts records, and its
+  // Java heap figure is the records at 64 bytes each, the figure this lab has always reported for it.
+  const javaHeapKb = r => Math.floor((r.engine === 'wasm' && r.wasm ? r.wasm.heapCounters().bytesNow : (r.heap?.size ?? 0) * 64) / 1024);
+  const nativeHeapKb = r => Math.floor(nativeHeap(r).allocated / 1024);
+  const MEMORY_FIELDS = ['dalvikPss', 'dalvikPrivateDirty', 'dalvikSharedDirty', 'nativePss', 'nativePrivateDirty', 'nativeSharedDirty', 'otherPss', 'otherPrivateDirty', 'otherSharedDirty'];
+  const fillMemoryInfo = (r, info, own) => {
+    const put = (name, value) => putField(r, info, MEMORY_INFO, name, 'I', value);
+    for (const name of MEMORY_FIELDS) put(name, 0);
+    if (own) { const java = javaHeapKb(r), native = nativeHeapKb(r); put('dalvikPss', java); put('dalvikPrivateDirty', java); put('nativePss', native); put('nativePrivateDirty', native); }
+  };
   def(ACTIVITY_MANAGER, 'getProcessMemoryInfo', `([I)[${MEMORY_INFO}`, (r, _m, [, pids]) => {
     if (pids === null) r.throwJava('Ljava/lang/NullPointerException;', 'pids');
     const wanted = r.array(pids).elements, out = r.newArray(`[${MEMORY_INFO}`, wanted.length);
-    r.array(out).elements = wanted.map(pid => {
-      const info = r.allocate(MEMORY_INFO), own = pid === platform.virtualProcess.pid, put = (name, value) => putField(r, info, MEMORY_INFO, name, 'I', value);
-      for (const name of ['dalvikPss', 'dalvikPrivateDirty', 'dalvikSharedDirty', 'nativePss', 'nativePrivateDirty', 'nativeSharedDirty', 'otherPss', 'otherPrivateDirty', 'otherSharedDirty']) put(name, 0);
-      if (own) { put('dalvikPss', kb(r)); put('dalvikPrivateDirty', kb(r)); put('nativePss', kb(r)); put('nativePrivateDirty', kb(r)); }
-      return info;
-    });
+    r.array(out).elements = wanted.map(pid => { const info = r.allocate(MEMORY_INFO); fillMemoryInfo(r, info, pid === platform.virtualProcess.pid); return info; });
     return out;
   });
+  const DEBUG_T = 'Landroid/os/Debug;';
+  def(DEBUG_T, 'getMemoryInfo', `(${MEMORY_INFO})V`, (r, _m, [info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); fillMemoryInfo(r, info, true); }, { static: true });
+  def(DEBUG_T, 'getMemoryInfo', `(I${MEMORY_INFO})Z`, (r, _m, [pid, info]) => { if (info === null) r.throwJava('Ljava/lang/NullPointerException;', null); const own = pid === platform.virtualProcess.pid; fillMemoryInfo(r, info, own); return own ? 1 : 0; }, { static: true });   // false: the pid's smaps cannot be read
+  def(DEBUG_T, 'getPss', '()J', r => BigInt(javaHeapKb(r) + nativeHeapKb(r)), { static: true });   // the process's total PSS in kB, MemoryInfo.getTotalPss of this process
   const memField = (r, self, name) => r.object(self).fields.get(`${MEMORY_INFO}->${name}:I`) ?? 0;
   def(MEMORY_INFO, 'getTotalPss', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPss') + memField(r, self, 'nativePss') + memField(r, self, 'otherPss'));
   def(MEMORY_INFO, 'getTotalPrivateDirty', '()I', (r, _m, [self]) => memField(r, self, 'dalvikPrivateDirty') + memField(r, self, 'nativePrivateDirty') + memField(r, self, 'otherPrivateDirty'));
