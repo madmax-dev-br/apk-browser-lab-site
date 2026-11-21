@@ -1,13 +1,13 @@
-import { coreMemorySetting } from './core-memory.js?v=a64e78a38c60';
-import { isMemoryStep } from './memory-budget.js?v=a64e78a38c60';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=a64e78a38c60';
-import { sanitizeHostMap } from './host-map.js?v=a64e78a38c60';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=a64e78a38c60';
-import { sanitizeLocation } from './runtime-permissions.js?v=a64e78a38c60';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=a64e78a38c60';
-import { sanitizeMicrogServices } from './microg-services.js?v=a64e78a38c60';
-import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=a64e78a38c60';
-import { tunnelEndpoint } from './tcp-tunnel.js?v=a64e78a38c60';
+import { coreMemorySetting } from './core-memory.js?v=ea49b2bd6e79';
+import { isMemoryStep } from './memory-budget.js?v=ea49b2bd6e79';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=ea49b2bd6e79';
+import { sanitizeHostMap } from './host-map.js?v=ea49b2bd6e79';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=ea49b2bd6e79';
+import { sanitizeLocation } from './runtime-permissions.js?v=ea49b2bd6e79';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=ea49b2bd6e79';
+import { sanitizeMicrogServices } from './microg-services.js?v=ea49b2bd6e79';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=ea49b2bd6e79';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=ea49b2bd6e79';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };

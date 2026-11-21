@@ -38,6 +38,30 @@ function prettyMethod(key) {
   return `${pretty(result)} ${dotted(owner)}.${name}(${types.map(pretty).join(', ')})`;
 }
 
+/**
+ * Android 13's NullPointerException message for the instruction at `pc` of method `mi` (opcode `op`, which the core reports with the exception), as ART's
+ * ThrowNullPointerExceptionFromDexPC words it and the JavaScript VM gives it (src/interpreter.js refineNullPointerMessage): the method invoked, the field read or written, the array
+ * dereferenced. The core raises it exactly at that instruction, on the null register. null when the instruction is not one of these (the bare message stays).
+ */
+function nullPointerMessage(mi, pc, op) {
+  const units = mi?.original, dex = mi?.def?.method?.dex;
+  if (!units || !dex || pc >= units.length || (units[pc] & 255) !== op) return null;
+  const operand = units[pc + 1];
+  if ((op >= 0x6e && op <= 0x72) || (op >= 0x74 && op <= 0x78)) {
+    const target = operand < dex.methods.length ? dex.method(operand) : null; if (!target) return null;
+    const kind = op === 0x72 || op === 0x78 ? 'interface' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
+    return `Attempt to invoke ${kind} method '${pretty(target.result)} ${dotted(target.owner)}.${target.name}(${target.parameters.map(pretty).join(', ')})' on a null object reference`;
+  }
+  if (op >= 0x52 && op <= 0x5f) {
+    const field = operand < dex.fields.length ? dex.field(operand) : null; if (!field) return null;
+    return `Attempt to ${op <= 0x58 ? 'read from' : 'write to'} field '${pretty(field.type)} ${dotted(field.owner)}.${field.name}' on a null object reference`;
+  }
+  if (op >= 0x44 && op <= 0x4a) return 'Attempt to read from null array';
+  if (op >= 0x4b && op <= 0x51) return 'Attempt to write to null array';
+  if (op === 0x21) return 'Attempt to get length of null array';
+  return null;
+}
+
 export class Exceptions {
   constructor(linker) {
     this.linker = linker; this.records = new Map(); this.decodeString = null;
@@ -86,7 +110,11 @@ export class Exceptions {
   event(event, object, a, b, c, stackAt, count, thread = 0) {
     if (event === EVENT_ERRONEOUS || event === EVENT_WAITED) return;   // about a class, not an exception object: vmcore/js/host-bridge.js keeps them
     const stack = this.stack(stackAt, count);
-    if (event === EVENT_CREATED) { this.records.set(object, { message: this.message(a, b, c, thread), cause: null, stack }); return; }
+    if (event === EVENT_CREATED) {
+      let message = this.message(a, b, c, thread);
+      if (a === 0 && message === 'null object reference' && stack.length) { const top = stack[0]; message = nullPointerMessage(this.linker.methodList[top.method], top.pc, b & 255) ?? message; }
+      this.records.set(object, { message, cause: null, stack }); return;
+    }
     if (event === EVENT_WRAPPED) { this.records.set(object, { message: null, cause: a, stack }); return; }
     if (event === EVENT_CONSTRUCTED) {   // the host Throwable constructors of the JavaScript VM: (), (String), (String, Throwable), (Throwable), ArrayIndexOutOfBoundsException(int)
       const mi = this.linker.methodList[a], u32 = this.linker.u32, parameters = mi?.parameters ?? [], word = i => u32[(b >>> 2) + 1 + i];

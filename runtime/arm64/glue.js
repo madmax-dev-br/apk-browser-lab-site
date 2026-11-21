@@ -1,12 +1,12 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=a64e78a38c60';
-import { Arm64Process } from './process.js?v=a64e78a38c60';
-import { createLibc } from './libc.js?v=a64e78a38c60';
-import { attachArm64Jni } from './jni.js?v=a64e78a38c60';
-import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=a64e78a38c60';
-import { BUCKET, inBucket } from '../time-breakdown.js?v=a64e78a38c60';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=ea49b2bd6e79';
+import { Arm64Process } from './process.js?v=ea49b2bd6e79';
+import { createLibc } from './libc.js?v=ea49b2bd6e79';
+import { attachArm64Jni } from './jni.js?v=ea49b2bd6e79';
+import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=ea49b2bd6e79';
+import { BUCKET, inBucket } from '../time-breakdown.js?v=ea49b2bd6e79';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
@@ -32,6 +32,7 @@ export function createArm64Native(runtime) {
         assets: { read: name => entries.has('assets/' + name) ? runtime.apkReader('assets/' + name) : null, list: dir => [...new Set([...entries].filter(e => e.startsWith(`assets/${dir ? dir + '/' : ''}`) && !e.slice(`assets/${dir ? dir + '/' : ''}`.length).includes('/')).map(e => e.slice(e.lastIndexOf('/') + 1)))] } }),
       log: line => runtime.record(line),
       pid: runtime.platform?.virtualProcess?.pid ?? 4321,
+      progress: cpu => runtime.monitor?.nativeProgress?.(() => `ARM64 native code at ${cpu.where(cpu.pc)}`),   // a long native run keeps the page's heartbeat alive, naming where it is
       queueTask: runtime.platform?.queueTask ? (fn, delay) => runtime.platform.queueTask(() => inBucket(runtime.tb, BUCKET.NATIVE, fn), delay, []) : null,   // the native threads' slices: the breakdown's native bucket
     });
     process.threads.javaThreadName = () => runtime.thread?.name ?? 'main';

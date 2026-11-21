@@ -1,10 +1,12 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=a64e78a38c60';
-import { APKError } from './apk-runtime.js?v=a64e78a38c60';
-import { ephemeronMap } from './heap-gc.js?v=a64e78a38c60';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=a64e78a38c60';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=a64e78a38c60';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=ea49b2bd6e79';
+import { APKError } from './apk-runtime.js?v=ea49b2bd6e79';
+import { ephemeronMap } from './heap-gc.js?v=ea49b2bd6e79';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=ea49b2bd6e79';
+import { sniffMime } from './bitmap-codec-host.js?v=ea49b2bd6e79';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=ea49b2bd6e79';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
+const NO_DRAWABLE = Symbol('no drawable');   // loadFileDrawable: a file that is neither XML nor an image (Resources.getDrawable answers null)
 const fail = (message, details = {}) => { throw new APKError(`Resource backend: ${message}`, { kind: 'resource-backend-unsupported', ...details }); };
 const empty = value => value == null || value === 0;
 export const STYLE_METHODS = new Set();
@@ -303,13 +305,17 @@ export class AndroidStyleBackend {
    */
   loadFileDrawable(runtime, id) {
     const codec = this.platform.bitmapCodec, file = id >>> 0 ? codec?.resourceFile(runtime, id) : null;
-    if (!file || !/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.path)) return null;
-    const bytes = Uint8Array.from(file.read ? file.read() : runtime.apkReader(file.path)), defaults = codec.densityDefaults(file.density), scale = defaults.inDensity && defaults.inDensity !== defaults.inTargetDensity ? defaults.inTargetDensity / defaults.inDensity : 1;
+    if (!file || /\.xml$/i.test(file.path)) return null;
+    const bytes = Uint8Array.from(file.read ? file.read() : runtime.apkReader(file.path));
+    // A file that does not end in .xml is decoded as an image whatever its name (ResourcesImpl.decodeImageDrawable: ImageDecoder reads the format from the bytes); one that is no
+    // image gives no drawable: decodeImageDrawable catches the IOException and Resources.getDrawable returns null (a res/raw file named without an extension, a JSON or a font).
+    if (!/\.(png|jpe?g|webp|gif|bmp)$/i.test(file.path) && sniffMime(bytes) === null) { runtime.record(`RESOURCE drawable ${id >>> 0} null [${file.path}: not an XML file and not an image (ImageDecoder cannot decode it)]`); return NO_DRAWABLE; }
+    const defaults = codec.densityDefaults(file.density), scale = defaults.inDensity && defaults.inDensity !== defaults.inTargetDensity ? defaults.inTargetDensity / defaults.inDensity : 1;
     if (hasNinePatchChunk(bytes)) {
       const drawable = this.platform.drawableViewHost.createNinePatchDrawable(runtime, bytes, scale);
       runtime.record(`RESOURCE drawable ${id >>> 0} NinePatchDrawable [${file.path}: compiled npTc chunk, density ${file.density || 160} -> 160]`); return drawable;
     }
-    if (/\.(gif|webp)$/i.test(file.path) && this.platform.animatedImages.declaredFrameCount(bytes) > 1) {   // ResourcesImpl.decodeImageDrawable: ImageDecoder.decodeDrawable, an AnimatedImageDrawable for an animated file (API 28+)
+    if ((/\.(gif|webp)$/i.test(file.path) || /^image\/(gif|webp)$/.test(sniffMime(bytes) ?? '')) && this.platform.animatedImages.declaredFrameCount(bytes) > 1) {   // ResourcesImpl.decodeImageDrawable: ImageDecoder.decodeDrawable, an AnimatedImageDrawable for an animated file (API 28+)
       const drawable = this.platform.animatedImages.create(runtime, bytes, { srcDensity: defaults.inDensity, dstDensity: defaults.inTargetDensity });
       runtime.record(`RESOURCE drawable ${id >>> 0} AnimatedImageDrawable [${file.path}, density ${file.density || 160} -> 160]`); return drawable;
     }
@@ -320,7 +326,7 @@ export class AndroidStyleBackend {
     runtime.record(`RESOURCE drawable ${id >>> 0} BitmapDrawable [${file.path}, density ${file.density || 160} -> 160]`); return drawable;
   }
   loadDrawable(runtime, id, theme, density = 0, suppliedValue = null) {
-    const fileDrawable = this.loadFileDrawable(runtime, id); if (fileDrawable !== null) return fileDrawable;
+    const fileDrawable = this.loadFileDrawable(runtime, id); if (fileDrawable !== null) return fileDrawable === NO_DRAWABLE ? null : fileDrawable;
     if (density && density !== 160) fail(`Drawable density override ${density} requires qualified resource selection; this profile is density 160`, { resourceId: id });
     let value = suppliedValue ? { dataType: this.get(runtime, suppliedValue, VALUE, 'type', 'I'), rawData: this.get(runtime, suppliedValue, VALUE, 'data', 'I') } : this.platform.resources.resolve(id >>> 0); while (value.resolved) value = value.resolved;
     if (value.kind === 'unresolved') fail(value.reason, { resourceId: id });

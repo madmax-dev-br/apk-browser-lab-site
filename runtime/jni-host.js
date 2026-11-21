@@ -1,19 +1,20 @@
-import { APKError } from './apk-error.js?v=a64e78a38c60';
-import { constantField, nonConstantField } from './framework-constants.js?v=a64e78a38c60';
-import { JavaException } from './apk-runtime.js?v=a64e78a38c60';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=a64e78a38c60';
-import { buildElfDescriptor } from './native-descriptor.js?v=a64e78a38c60';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=a64e78a38c60';
-import { NativeLinker, LinkError } from './native-linker.js?v=a64e78a38c60';
-import { hostFunction } from './wasm-host-function.js?v=a64e78a38c60';
-import { parseWasm } from './wasm-dylink.js?v=a64e78a38c60';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=a64e78a38c60';
-import { BUCKET, inBucket } from './time-breakdown.js?v=a64e78a38c60';
-import { registerWasmMemory } from './unsafe-native.js?v=a64e78a38c60';
-import { writeSkPath } from './skia-path-layout.js?v=a64e78a38c60';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=a64e78a38c60';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=a64e78a38c60';
-import { withVariants } from './native-provider-variants.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { constantField, nonConstantField } from './framework-constants.js?v=ea49b2bd6e79';
+import { JavaException } from './apk-runtime.js?v=ea49b2bd6e79';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=ea49b2bd6e79';
+import { buildElfDescriptor } from './native-descriptor.js?v=ea49b2bd6e79';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=ea49b2bd6e79';
+import { NativeLinker, LinkError } from './native-linker.js?v=ea49b2bd6e79';
+import { hostFunction } from './wasm-host-function.js?v=ea49b2bd6e79';
+import { parseWasm } from './wasm-dylink.js?v=ea49b2bd6e79';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=ea49b2bd6e79';
+import { BUCKET, inBucket } from './time-breakdown.js?v=ea49b2bd6e79';
+import { Blocked } from './scheduler.js?v=ea49b2bd6e79';
+import { registerWasmMemory } from './unsafe-native.js?v=ea49b2bd6e79';
+import { writeSkPath } from './skia-path-layout.js?v=ea49b2bd6e79';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=ea49b2bd6e79';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=ea49b2bd6e79';
+import { withVariants } from './native-provider-variants.js?v=ea49b2bd6e79';
 
 // JNI -> WebAssembly bridge.
 //
@@ -335,11 +336,20 @@ export class JniBridge {
   #classType(handle) { const value = this.#value(handle); const type = this.runtime.object(value).classType; if (!type) throw new APKError('JNI jclass argument is not a java.lang.Class', { kind: 'jni-invalid-reference' }); return type; }
 
   /** Enter native code: a local-reference frame and the caller's loader for FindClass. */
-  #enter(method, body) {
-    const frame = []; this.frames.push(frame);
-    const outerLoader = this.callerLoader; this.callerLoader = this.runtime.currentMethod?.dex?.definingLoader ?? null;
-    try { return inBucket(this.runtime.tb, BUCKET.NATIVE, body); }   // native code is the time breakdown's native bucket (src/time-breakdown.js)
-    finally { this.frames.pop(); for (const h of frame) this.locals.delete(h); this.callerLoader = outerLoader; }
+  // A native call that parks its Java thread (a wait of ARM64 native code on a Java thread: src/arm64/threads.js callFromJava) answers a Blocked: its frame (the local references the
+  // native code still holds) and the caller's loader stay until the call ends, and the Blocked's finish continues it inside the same frame.
+  #enter(method, body, frame = null) {
+    const own = Array.isArray(frame) ? frame : Object.assign([], { loader: this.runtime.currentMethod?.dex?.definingLoader ?? null }); this.frames.push(own);
+    const outerLoader = this.callerLoader; this.callerLoader = own.loader; let parked = false;
+    try {
+      const out = inBucket(this.runtime.tb, BUCKET.NATIVE, body);   // native code is the time breakdown's native bucket (src/time-breakdown.js)
+      if (out instanceof Blocked) { parked = true; return new Blocked({ ready: out.ready, deadline: out.deadline, reason: out.reason, roots: out.roots, blocker: out.blocker, finish: timedOut => this.#enter(method, () => out.finish(timedOut), own) }); }
+      return out;
+    } finally {
+      const at = this.frames.lastIndexOf(own); if (at >= 0) this.frames.splice(at, 1);
+      if (!parked) for (const h of own) this.locals.delete(h);
+      this.callerLoader = outerLoader;
+    }
   }
 
   // ---- native method binding and invocation ---------------------------------------------------------------------------------------------
@@ -365,9 +375,13 @@ export class JniBridge {
     return this.#enter(method, () => {
       const wasmArgs = [binding.lib.envPtr ?? this.proc.envPtr, this.#local(isStatic ? r.classObject(method.owner) : args[0])];
       parameters.forEach((type, i) => wasmArgs.push(this.#toWasm(type, args[(isStatic ? 0 : 1) + i])));
-      let result = binding.lib.callNative ? binding.lib.callNative(binding, method, wasmArgs) : binding.fn(...wasmArgs);   // ARM64 code runs in its interpreter (src/arm64/jni.js)
-      if (this.pending !== null) { const exception = this.pending; this.pending = null; throw new JavaException(exception, r.object(exception).message ?? null, r.object(exception).exceptionDetails ?? null); }
-      return this.#fromWasm(method.result, result);
+      const result = binding.lib.callNative ? binding.lib.callNative(binding, method, wasmArgs) : binding.fn(...wasmArgs);   // ARM64 code runs in its interpreter (src/arm64/jni.js)
+      const complete = value => {
+        if (value instanceof Blocked) return new Blocked({ ready: value.ready, deadline: value.deadline, reason: value.reason, roots: value.roots, blocker: value.blocker, finish: timedOut => complete(value.finish(timedOut)) });   // parked (see #enter)
+        if (this.pending !== null) { const exception = this.pending; this.pending = null; throw new JavaException(exception, r.object(exception).message ?? null, r.object(exception).exceptionDetails ?? null); }
+        return this.#fromWasm(method.result, value);
+      };
+      return complete(result);
     });
   }
   #toWasm(type, value) {
@@ -469,6 +483,9 @@ export class JniBridge {
     const stringOf = handle => { const v = self.#value(handle); return v === null ? null : r.stringCharacters(v); };
     const arrayOf = handle => { const v = self.#value(handle); if (v === null) throw new APKError('JNI array argument is null', { kind: 'jni-null' }); return r.array(v); };
     const outOfBounds = (message) => { self.#throwNew('Ljava/lang/ArrayIndexOutOfBoundsException;', message); };
+    // ART's JNI checks these arguments in every build (jni_internal.cc CHECK_NON_NULL_ARGUMENT, CheckJNI or not): a null one is JavaVMExt::JniAbort, the process aborts with
+    // this message. The lab stops the run the same way, naming the function and the argument, instead of continuing with a pending exception ART never raises.
+    const jniAbort = (fn, argument, cause = null) => { throw new APKError(`JNI DETECTED ERROR IN APPLICATION: ${argument} == null in call to ${fn} (ART aborts the process here, with or without CheckJNI)${cause ? `; the null came from a failed lookup the native code did not check: ${cause}` : ''}`, { kind: 'jni-abort', function: fn, argument, ...(cause ? { cause } : {}) }); };
     const h = {};
 
     // -- version / classes
@@ -518,7 +535,7 @@ export class JniBridge {
     h.GetMethodID = memberId(false); h.GetStaticMethodID = memberId(true);
     const fieldId = (isStatic) => (_env, cls, namePtr, sigPtr) => {
       const info = self.#findField(self.#classType(cls), cString(namePtr), cString(sigPtr), isStatic);
-      if (!info) { r.record?.(`JNI Get${isStatic ? 'Static' : ''}FieldID ${self.#classType(cls)} ${cString(namePtr)} ${cString(sigPtr)}: no such field (NoSuchFieldError)`); self.#throwNew('Ljava/lang/NoSuchFieldError;', cString(namePtr)); return 0; }
+      if (!info) { self.lastFieldIdFailure = `Get${isStatic ? 'Static' : ''}FieldID ${self.#classType(cls)} ${cString(namePtr)} ${cString(sigPtr)}: no such field`; r.record?.(`JNI ${self.lastFieldIdFailure} (NoSuchFieldError)`); self.#throwNew('Ljava/lang/NoSuchFieldError;', cString(namePtr)); return 0; }
       return self.#fieldId(info);
     };
     h.GetFieldID = fieldId(false); h.GetStaticFieldID = fieldId(true);
@@ -554,8 +571,11 @@ export class JniBridge {
     const traceFilter = globalThis.process?.env?.APKWEB_JNI_TRACE ? new RegExp(globalThis.process.env.APKWEB_JNI_TRACE) : null, traceMax = Number(globalThis.process?.env?.APKWEB_JNI_TRACE_MAX ?? 4000);
     let traced = 0;
     const brief = (type, value) => briefValue(r, type, value);
+    const callTypeName = code => ({ L: 'Object', Z: 'Boolean', B: 'Byte', C: 'Char', S: 'Short', I: 'Int', J: 'Long', F: 'Float', D: 'Double', V: 'Void' })[code] ?? '';
     const callWith = (mode, kind, resultType) => (_env, objOrCls, ...rest) => {
       const nonvirtual = mode === 'nonvirtual', mid = rest[nonvirtual ? 1 : 0], argPtr = rest[nonvirtual ? 2 : 1];
+      const fn = `Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${callTypeName(resultType)}Method${kind === 'A' ? 'A' : ''}`;
+      if (mode !== 'static' && !objOrCls) jniAbort(fn, 'obj'); if (!mid) jniAbort(fn, 'mid');
       const info = self.methodIds[mid]; if (!info) throw new APKError(`Invalid jmethodID ${typeof mid === 'number' ? '0x' + mid.toString(16) : String(mid)} in Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${resultType ?? ''}Method${kind === 'A' ? 'A' : ''} (the bridge has handed out ${self.methodIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(mid) });
       const raw = kind === 'A' ? jvalues(info.parameters, argPtr) : varargs(info.parameters, argPtr);
       const values = info.parameters.map((type, i) => toVM(type, raw[i]));
@@ -586,18 +606,19 @@ export class JniBridge {
     h.NewObject = newObject('V'); h.NewObjectV = newObject('V'); h.NewObjectA = newObject('A');
 
     // -- reflection <-> IDs (FromReflectedMethod / FromReflectedField / ToReflectedMethod / ToReflectedField): the reflected object carries the member the lab resolved for it
-    h.FromReflectedMethod = (_env, obj) => { const member = r.object(self.#value(obj)).member; if (!member?.method) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Method or Constructor'); return 0; } return self.#methodId({ ...member.method, static: !!(member.flags & 8) }); };
-    h.FromReflectedField = (_env, obj) => { const member = r.object(self.#value(obj)).member; if (!member?.field) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Field'); return 0; } return self.#fieldId({ ...member.field, static: !!(member.flags & 8) }); };
+    h.FromReflectedMethod = (_env, obj) => { if (!obj) jniAbort('FromReflectedMethod', 'jlr_method'); const member = r.object(self.#value(obj)).member; if (!member?.method) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Method or Constructor'); return 0; } return self.#methodId({ ...member.method, static: !!(member.flags & 8) }); };
+    h.FromReflectedField = (_env, obj) => { if (!obj) jniAbort('FromReflectedField', 'jlr_field'); const member = r.object(self.#value(obj)).member; if (!member?.field) { self.lastFieldIdFailure = 'FromReflectedField of an object that is not a java.lang.reflect.Field'; self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Field'); return 0; } return self.#fieldId({ ...member.field, static: !!(member.flags & 8) }); };
     h.ToReflectedMethod = (_env, _cls, id, isStatic) => { const info = self.methodIds[id]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject(info.name === '<init>' ? 'constructor' : 'method', { method: info, flags: 1 | (isStatic ? 8 : 0) })); };
     h.ToReflectedField = (_env, _cls, id, isStatic) => { const f = self.fieldIds[id]; if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject('field', { field: f, flags: 1 | (isStatic ? 8 : 0) })); };
 
     // -- fields
-    const fieldRef = id => { const f = self.fieldIds[id]; if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
+    // A null jfieldID is what a failed GetFieldID/FromReflectedField answered: ART aborts on it in every build; the abort names that failed lookup, the cause to look at.
+    const fieldRef = (id, fn) => { if (!id) jniAbort(fn, 'fid', self.lastFieldIdFailure); const f = self.fieldIds[id]; if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
     for (const [name, code] of callTypes.slice(0, 9)) {
-      h[`Get${name}Field`] = (_env, obj, id) => { const f = fieldRef(id); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
-      h[`Set${name}Field`] = (_env, obj, id, value) => { const f = fieldRef(id); r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
-      h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id); if ('constant' in f) return toJNI(code, f.constant); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
-      h[`SetStatic${name}Field`] = (_env, _cls, id, value) => { const f = fieldRef(id); r.writeStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key }, toVM(code, value)); };
+      h[`Get${name}Field`] = (_env, obj, id) => { if (!obj) jniAbort(`Get${name}Field`, 'obj'); const f = fieldRef(id, `Get${name}Field`); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
+      h[`Set${name}Field`] = (_env, obj, id, value) => { if (!obj) jniAbort(`Set${name}Field`, 'obj'); const f = fieldRef(id, `Set${name}Field`); r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
+      h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id, `GetStatic${name}Field`); if ('constant' in f) return toJNI(code, f.constant); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
+      h[`SetStatic${name}Field`] = (_env, _cls, id, value) => { const f = fieldRef(id, `SetStatic${name}Field`); r.writeStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key }, toVM(code, value)); };
     }
 
     // -- strings

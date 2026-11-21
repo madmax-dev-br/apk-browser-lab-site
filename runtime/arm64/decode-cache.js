@@ -7,7 +7,7 @@
 // The cache lives on the process's memory (every thread of the process shares it). A write into a 4 KiB page holding a cached instruction drops that page's entries, so
 // code a library writes, decrypts or patches at run time is decoded again before it runs.
 
-import { decodeBitMasks, ror, ones } from './cpu.js?v=a64e78a38c60';
+import { decodeBitMasks, ror, ones } from './cpu.js?v=ea49b2bd6e79';
 
 const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 const bit = (word, n) => (word >>> n) & 1, field = (word, lo, width) => (word >>> lo) & ((1 << width) - 1);

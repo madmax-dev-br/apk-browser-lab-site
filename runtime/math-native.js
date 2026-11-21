@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
 
 // libcore.math.NativeBN: the BoringSSL BIGNUM calls Android's java.math.BigInteger falls back to for large multiplications, divisions and modPow.
 // A BIGNUM is an opaque long handle; the value is an exact arbitrary-precision integer held by the host (JavaScript BigInt), so every result is the

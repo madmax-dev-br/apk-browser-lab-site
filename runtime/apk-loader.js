@@ -1,22 +1,22 @@
-import { createArm64Native } from './arm64/glue.js?v=a64e78a38c60';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=a64e78a38c60';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=a64e78a38c60';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=a64e78a38c60';
-import { inspectELF } from './native-inspector.js?v=a64e78a38c60';
-import { elfBuildId } from './elf-build-id.js?v=a64e78a38c60';
-import { crc32 } from './zip-entry.js?v=a64e78a38c60';
-import { resolveDevice } from './device-profile.js?v=a64e78a38c60';
-import { resourceProfileFor } from './device-configuration.js?v=a64e78a38c60';
-import { JniBridge } from './jni-host.js?v=a64e78a38c60';
-import { providerForApk } from './native-provider-variants.js?v=a64e78a38c60';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=a64e78a38c60';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=a64e78a38c60';
-import { AndroidResources } from './android-resources.js?v=a64e78a38c60';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=a64e78a38c60';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=a64e78a38c60';
-import { FrameworkProvider } from './framework-provider.js?v=a64e78a38c60';
-import { APKArchive } from './apk-archive.js?v=a64e78a38c60';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=a64e78a38c60';
+import { createArm64Native } from './arm64/glue.js?v=ea49b2bd6e79';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=ea49b2bd6e79';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=ea49b2bd6e79';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=ea49b2bd6e79';
+import { inspectELF } from './native-inspector.js?v=ea49b2bd6e79';
+import { elfBuildId } from './elf-build-id.js?v=ea49b2bd6e79';
+import { crc32 } from './zip-entry.js?v=ea49b2bd6e79';
+import { resolveDevice } from './device-profile.js?v=ea49b2bd6e79';
+import { resourceProfileFor } from './device-configuration.js?v=ea49b2bd6e79';
+import { JniBridge } from './jni-host.js?v=ea49b2bd6e79';
+import { providerForApk } from './native-provider-variants.js?v=ea49b2bd6e79';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=ea49b2bd6e79';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=ea49b2bd6e79';
+import { AndroidResources } from './android-resources.js?v=ea49b2bd6e79';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=ea49b2bd6e79';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=ea49b2bd6e79';
+import { FrameworkProvider } from './framework-provider.js?v=ea49b2bd6e79';
+import { APKArchive } from './apk-archive.js?v=ea49b2bd6e79';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=ea49b2bd6e79';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -818,6 +818,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
     }
   }
   for (const [index, companion] of companions.entries()) {
+    // the "With microG" option preinstalls microG's packages as system packages: an app with one of their package names (a Play Store APK is com.android.vending) cannot be
+    // installed next to them, as Android refuses a second package of a name; the load says which option and what to do, before anything runs
+    if (companion.packageName === manifest.packageName && companion.deviceOption === 'microg') throw new APKError(`INSTALL_FAILED_DUPLICATE_PACKAGE: this APK is ${manifest.packageName}, and the "With microG" device option already installs microG's own ${companion.packageName} as a system package. Android does not install two packages with one name: turn "With microG" off in Device to run this APK.`, { kind: 'microg-package-clash', packageName: manifest.packageName });
     if (companion.packageName === manifest.packageName) fail(`Companion package ${companion.packageName} has the same package name as the app (INSTALL_FAILED_DUPLICATE_PACKAGE)`);
     if (companions.findIndex(other => other.packageName === companion.packageName) !== index) fail(`Companion package ${companion.packageName} is given twice (INSTALL_FAILED_DUPLICATE_PACKAGE)`);
   }

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=a64e78a38c60';
-import { createHostRegistry } from './host-contract.js?v=a64e78a38c60';
-import { Blocked, VMThread } from './scheduler.js?v=a64e78a38c60';
-import { Invoke } from './interpreter.js?v=a64e78a38c60';
-import { GC_ROOTS } from './heap-gc.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { createHostRegistry } from './host-contract.js?v=ea49b2bd6e79';
+import { Blocked, VMThread } from './scheduler.js?v=ea49b2bd6e79';
+import { Invoke } from './interpreter.js?v=ea49b2bd6e79';
+import { GC_ROOTS } from './heap-gc.js?v=ea49b2bd6e79';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -15,7 +15,7 @@ import { GC_ROOTS } from './heap-gc.js?v=a64e78a38c60';
 // Contract references: java.util.concurrent.ThreadPoolExecutor / FutureTask / Executors / BlockingQueue, java.lang.Thread (android-13.0.0_r1 libcore).
 
 const THREAD = 'Ljava/lang/Thread;', RUNNABLE = 'Ljava/lang/Runnable;', CALLABLE = 'Ljava/util/concurrent/Callable;', OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;', THROWABLE = 'Ljava/lang/Throwable;';
-const TPE = 'Ljava/util/concurrent/ThreadPoolExecutor;', STPE = 'Ljava/util/concurrent/ScheduledThreadPoolExecutor;', FUTURE_TASK = 'Ljava/util/concurrent/FutureTask;', SCHEDULED_TASK = 'Ljava/util/concurrent/ScheduledThreadPoolExecutor$ScheduledFutureTask;';
+const TPE = 'Ljava/util/concurrent/ThreadPoolExecutor;', AES = 'Ljava/util/concurrent/AbstractExecutorService;', STPE = 'Ljava/util/concurrent/ScheduledThreadPoolExecutor;', FUTURE_TASK = 'Ljava/util/concurrent/FutureTask;', SCHEDULED_TASK = 'Ljava/util/concurrent/ScheduledThreadPoolExecutor$ScheduledFutureTask;';
 const FACTORY = 'Ljava/util/concurrent/ThreadFactory;', UNIT = 'Ljava/util/concurrent/TimeUnit;', QUEUE = 'Ljava/util/concurrent/BlockingQueue;', HANDLER = 'Ljava/util/concurrent/RejectedExecutionHandler;';
 const UEH = 'Ljava/lang/Thread$UncaughtExceptionHandler;', EXECUTORS = 'Ljava/util/concurrent/Executors;', DEFAULT_FACTORY = 'Ljava/util/concurrent/Executors$DefaultThreadFactory;', WORKER = 'Ljava/util/concurrent/ThreadPoolExecutor$Worker;';
 const COLLECTION = 'Ljava/util/Collection;', LIST = 'Ljava/util/List;';
@@ -187,7 +187,8 @@ export function createConcurrencyHost(platform) {
   // Thread.interrupt() (libcore Thread.java): when a java.nio channel operation is in progress its Interruptible blocker is told, which closes the channel
   // (ClosedByInterruptException) -- AbstractInterruptibleChannel.begin()/end() register it through the hidden Thread.blockedOn.
   def(THREAD, 'interrupt', '()V', (r, _m, [self]) => {
-    const st = state(r, self), blocker = st.blocker ?? null; st.interrupted = true;
+    const st = state(r, self), blocker = st.blocker ?? null; if (st.finished) return;   // interrupt0 of a thread that has exited finds no native Thread (ART): nothing to set
+    st.interrupted = true;
     if (blocker !== null && blocker !== 0) r.dispatch({ owner: 'Lsun/nio/ch/Interruptible;', name: 'interrupt', parameters: [THREAD], result: 'V', signature: `(${THREAD})V` }, [blocker, self], 'virtual');
   });
   def(THREAD, 'blockedOn', '(Lsun/nio/ch/Interruptible;)V', (r, _m, [self, blocker]) => { state(r, self).blocker = blocker; });
@@ -514,7 +515,9 @@ export function createConcurrencyHost(platform) {
     void abort;
   }
   const describe = (r, ref) => { try { return r.stringCharacters(vcall(r, ref, OBJECT, 'toString', [], STRING)); } catch { return jtype(r, ref); } };
-  type(TPE, OBJECT, ['Ljava/util/concurrent/ExecutorService;', 'Ljava/util/concurrent/Executor;', 'Ljava/util/concurrent/AbstractExecutorService;'], { allocatable: true });
+  // ThreadPoolExecutor extends AbstractExecutorService (libcore), a class with DEX code in the framework: what the host does not implement (invokeAny, newTaskFor) is its code, and a
+  // call site naming AbstractExecutorService (instance-of, check-cast, invoke-virtual of submit) finds a ThreadPoolExecutor below it, as on Android.
+  type(TPE, AES, ['Ljava/util/concurrent/ExecutorService;', 'Ljava/util/concurrent/Executor;'], { allocatable: true });
   type(STPE, TPE, ['Ljava/util/concurrent/ScheduledExecutorService;'], { allocatable: true });
   const pool = (r, ref) => r.object(ref).pool ?? throwNew(r, 'Ljava/lang/IllegalStateException;', 'executor used before construction');
   // The pool's view of an app-defined BlockingQueue: length -> size(), push -> offer() (false when it is full), shift -> poll(), splice(0) -> poll() until empty, remove -> remove(Object)

@@ -1,11 +1,11 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { BLOCKED } from './cpu.js?v=a64e78a38c60';
-import { formatC, variadic } from './libc.js?v=a64e78a38c60';
-import { lookup } from '../libcore-io-native.js?v=a64e78a38c60';
-import { utf8 } from './text.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { BLOCKED } from './cpu.js?v=ea49b2bd6e79';
+import { formatC, variadic } from './libc.js?v=ea49b2bd6e79';
+import { lookup } from '../libcore-io-native.js?v=ea49b2bd6e79';
+import { utf8 } from './text.js?v=ea49b2bd6e79';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -65,9 +65,9 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.ilogb = (p, c) => { const v = Math.abs(c.getD(0)); return v === 0 ? 0x80000000n : BigInt(Math.floor(Math.log2(v))); }; lib.ilogbf = (p, c) => { const v = Math.abs(c.getS(0)); return v === 0 ? 0x80000000n : BigInt(Math.floor(Math.log2(v))); };
   lib.logb = (p, c) => ({ double: Math.floor(Math.log2(Math.abs(c.getD(0)))) });
   // ---- process, scheduling, files
-  lib.sched_getcpu = () => 0; lib.pthread_gettid_np = (p, c) => n(c, 0); lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
+  lib.sched_getcpu = () => 0; lib.pthread_gettid_np = (p, c) => p.threads.byPthread(n(c, 0))?.tid ?? -1; lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
   lib.__libc_current_sigrtmin = () => 34; lib.__libc_current_sigrtmax = () => 64;
-  for (const name of ['sigemptyset64', 'sigfillset64', 'sigaddset64', 'sigdelset64', 'sigismember64', 'sigaction64', 'sigprocmask64', 'sigwait']) lib[name] = () => 0;
+  lib.sigwait = () => 0;   // the sigset_t functions, sigaction64 and sigprocmask64: src/arm64/signals.js
   lib.posix_fadvise = lib.posix_fallocate = lib.mlock = lib.munlock = lib.mincore = () => 0;
   lib.mremap = (p, c) => { const old = n(c, 0), oldSize = n(c, 1), size = n(c, 2), at = p.mapRegion(size, 0x1000); p.memory.copyIn(at, p.memory.bytes(old, Math.min(oldSize, size)).slice()); return at; };
   lib.memfd_create = (p, c) => { const path = `/memfd/${str(p, x(c, 0))}-${Date.now()}`; c.x[0] = BigInt(p.allocString(path)); c.x[1] = 0o102n; return lib.open(p, c); };

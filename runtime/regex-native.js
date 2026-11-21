@@ -1,4 +1,5 @@
-import {APKError} from './apk-error.js?v=a64e78a38c60';
+import {APKError} from './apk-error.js?v=ea49b2bd6e79';
+import {MAX_REGEX_HANDLES} from './icu-break-provider.js?v=ea49b2bd6e79';
 
 const PATTERN='Lcom/android/icu/util/regex/PatternNative;',MATCHER='Lcom/android/icu/util/regex/MatcherNative;',REGISTRY='Llibcore/util/NativeAllocationRegistry;';
 const FINALIZERS=new Map([[0x5245475001n,'pattern'],[0x5245474d01n,'matcher']]);
@@ -16,6 +17,11 @@ const checked=(r,handle,kind)=>{
  return {state,token:Number(handle)};
 };
 const remember=(r,token,kind)=>{const state=stateFor(r),handle=BigInt(token);state.handles.set(handle,kind);return handle;};
+// Patterns and Matchers that became garbage keep their ICU objects until a collection frees their holders (NativeAllocationRegistry, below). A loop that makes a Matcher per item
+// (one per ZIP entry, per line) inside a single event can run past the session's handle limit before the heap itself asks for a collection: as ART's registry paces collections by
+// native allocations, the many live handles ask for one (both engines), and at the limit a collection runs right away before the new handle is refused.
+const REGEX_PACE=1024;
+const room=r=>{const state=stateFor(r);if(state.handles.size>=MAX_REGEX_HANDLES-2)r.collectForNativeHandles?.('java.util.regex Pattern/Matcher');};
 const close=(r,handle)=>{const {state,token}=checked(r,handle);state.session.close(token);state.handles.delete(handle);};
 function syntaxError(r,error,pattern){
  const owner='Ljava/util/regex/PatternSyntaxException;',reference=r.allocate(owner),description=error.icuErrorName||error.message;
@@ -36,9 +42,9 @@ export function createRegexNativeBindings(){
  const bindings=new Map(),add=(owner,signature,callback)=>bindings.set(owner+'->'+signature,callback);
  add(PATTERN,'getNativeFinalizer()J',()=>0x5245475001n);add(MATCHER,'getNativeFinalizer()J',()=>0x5245474d01n);
  add(PATTERN,'compileImpl(Ljava/lang/String;I)J',(r,[text,flags])=>{
-  const pattern=r.stringCharacters(text);return boundary(r,()=>remember(r,stateFor(r).session.compile(pattern,flags),'pattern'),{pattern});
+  const pattern=r.stringCharacters(text);room(r);return boundary(r,()=>remember(r,stateFor(r).session.compile(pattern,flags),'pattern'),{pattern});
  });
- add(PATTERN,'openMatcherImpl(J)J',(r,[handle])=>{const {state,token}=checked(r,handle,'pattern');return boundary(r,()=>remember(r,state.session.openMatcher(token),'matcher'));});
+ add(PATTERN,'openMatcherImpl(J)J',(r,[handle])=>{room(r);const {state,token}=checked(r,handle,'pattern');return boundary(r,()=>remember(r,state.session.openMatcher(token),'matcher'));});
  add(PATTERN,'getMatchedGroupIndexImpl(JLjava/lang/String;)I',(r,[handle,name])=>{const {state,token}=checked(r,handle,'pattern');return boundary(r,()=>state.session.matchedGroupIndex(token,r.stringCharacters(name)));});
  add(MATCHER,'setInputImpl(JLjava/lang/String;II)V',(r,[handle,text,start,end])=>{const {state,token}=checked(r,handle,'matcher');return boundary(r,()=>state.session.setInput(token,r.stringCharacters(text),start,end));});
  const matching=(r,handle,output,operation,start)=>{
@@ -64,7 +70,7 @@ export function regexRegistryBridge(r,method,args){
   const referent=r.object(args[1]),handle=args[2];checked(r,handle,kind);const reference=r.makeObject(REGEX_CLEANER);r.object(reference).regexCleanup=handle;
   // ART runs the NativeAllocationRegistry cleaner when the referent (the Pattern/Matcher native holder) becomes unreachable; this VM has no finalizers, so the collector calls this when it frees the referent.
   referent.onFree=()=>{const state=states.get(r);if(state?.handles.has(handle)){try{close(r,handle);}catch{/* already released */}}};
-  if(stateFor(r).handles.size>=128)r.gcPressure=true;   // many live native regex objects: ask for a collection at the next safepoint instead of waiting for heap pressure
+  {const state=stateFor(r);state.registered=(state.registered??0)+1;if(state.handles.size>=128&&(r.engine!=='wasm'||state.registered-(state.requestedAt??0)>=REGEX_PACE)){state.requestedAt=state.registered;r.requestNativeCollection?.('regex');}}   // many live native regex objects: ask for a collection at the next safepoint (the JavaScript VM's gcPressure, the core's requested collection) instead of waiting for heap pressure
   return{value:reference};
  }
  if(method.name==='run'&&method.signature==='()V'&&args[0]&&r.object(args[0]).type===REGEX_CLEANER){

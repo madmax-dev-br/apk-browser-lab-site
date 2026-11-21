@@ -1,38 +1,39 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=a64e78a38c60';
-import { VMClock } from './vm-clock.js?v=a64e78a38c60';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=a64e78a38c60';
-import { OperationMonitor } from './operation-monitor.js?v=a64e78a38c60';
-import { ExecutionProfile } from './execution-profile.js?v=a64e78a38c60';
-import { SamplingProfiler } from './sampling-profiler.js?v=a64e78a38c60';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=a64e78a38c60';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=a64e78a38c60';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=a64e78a38c60';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=a64e78a38c60';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=a64e78a38c60';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=a64e78a38c60';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=a64e78a38c60';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=a64e78a38c60';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=a64e78a38c60';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=a64e78a38c60';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=a64e78a38c60';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=a64e78a38c60';
-import { APKError } from './apk-error.js?v=a64e78a38c60';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=a64e78a38c60';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=a64e78a38c60';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=a64e78a38c60';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=a64e78a38c60';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=a64e78a38c60';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=a64e78a38c60';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=a64e78a38c60';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=a64e78a38c60';
+import STATIC_SHIMS from './shim-static-methods.js?v=ea49b2bd6e79';
+import { VMClock } from './vm-clock.js?v=ea49b2bd6e79';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=ea49b2bd6e79';
+import { OperationMonitor } from './operation-monitor.js?v=ea49b2bd6e79';
+import { ExecutionProfile } from './execution-profile.js?v=ea49b2bd6e79';
+import { SamplingProfiler } from './sampling-profiler.js?v=ea49b2bd6e79';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=ea49b2bd6e79';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=ea49b2bd6e79';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=ea49b2bd6e79';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=ea49b2bd6e79';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=ea49b2bd6e79';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=ea49b2bd6e79';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=ea49b2bd6e79';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=ea49b2bd6e79';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=ea49b2bd6e79';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=ea49b2bd6e79';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=ea49b2bd6e79';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=ea49b2bd6e79';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=ea49b2bd6e79';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=ea49b2bd6e79';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=ea49b2bd6e79';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=ea49b2bd6e79';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=ea49b2bd6e79';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=ea49b2bd6e79';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=ea49b2bd6e79';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=ea49b2bd6e79';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=a64e78a38c60';
-import { bootClassLacksMember } from './boot-class-members.js?v=a64e78a38c60';
-export { APKError } from './apk-error.js?v=a64e78a38c60';
-import { BinaryReader } from './binary-reader.js?v=a64e78a38c60';
-import { recordCollection } from './runtime-stats.js?v=a64e78a38c60';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=a64e78a38c60';
-import { scrollsItself } from './scrolling-view.js?v=a64e78a38c60';
+import { Scheduler, Blocked } from './scheduler.js?v=ea49b2bd6e79';
+import { ProcessStartPending } from './package-registry.js?v=ea49b2bd6e79';
+import { bootClassLacksMember } from './boot-class-members.js?v=ea49b2bd6e79';
+export { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { BinaryReader } from './binary-reader.js?v=ea49b2bd6e79';
+import { recordCollection } from './runtime-stats.js?v=ea49b2bd6e79';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=ea49b2bd6e79';
+import { scrollsItself } from './scrolling-view.js?v=ea49b2bd6e79';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -708,6 +709,7 @@ addBridge('java/lang/Runtime', ['getRuntime()Ljava/lang/Runtime;', 'loadLibrary(
 addBridge('java/lang/Enum', ['<init>(Ljava/lang/String;I)V', 'name()Ljava/lang/String;', 'ordinal()I', 'toString()Ljava/lang/String;']);
 addBridge('java/lang/Enum', ['valueOf(Ljava/lang/Class;Ljava/lang/String;)Ljava/lang/Enum;', 'compareTo(Ljava/lang/Enum;)I', 'compareTo(Ljava/lang/Object;)I', 'getDeclaringClass()Ljava/lang/Class;']);
 addBridge('java/lang/Integer', ['valueOf(I)Ljava/lang/Integer;', 'intValue()I', 'parseInt(Ljava/lang/String;)I', 'parseInt(Ljava/lang/String;I)I']);
+addBridge('java/lang/Integer', ['valueOf(Ljava/lang/String;)Ljava/lang/Integer;', 'valueOf(Ljava/lang/String;I)Ljava/lang/Integer;']);   // served by the boxed-type bridge (bridgeB0); listed so reflection finds them
 addBridge('java/lang/Boolean', ['parseBoolean(Ljava/lang/String;)Z','valueOf(Ljava/lang/String;)Ljava/lang/Boolean;', 'valueOf(Z)Ljava/lang/Boolean;', 'booleanValue()Z']);
 addBridge('java/lang/Math', ['min(II)I', 'max(II)I', 'abs(I)I']);
 addBridge('android/text/TextUtils', ['isEmpty(Ljava/lang/CharSequence;)Z', 'equals(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Z']);
@@ -897,7 +899,7 @@ for (const [name, type] of [['AtomicReferenceFieldUpdater', 'Ljava/lang/Object;'
     `getAndSet(Ljava/lang/Object;${type})${type}`, `compareAndSet(Ljava/lang/Object;${type}${type})Z`, `weakCompareAndSet(Ljava/lang/Object;${type}${type})Z`]);
   if(type==='I'||type==='J')addBridge(owner,[`getAndIncrement(Ljava/lang/Object;)${type}`,`getAndDecrement(Ljava/lang/Object;)${type}`,`incrementAndGet(Ljava/lang/Object;)${type}`,`decrementAndGet(Ljava/lang/Object;)${type}`,`getAndAdd(Ljava/lang/Object;${type})${type}`,`addAndGet(Ljava/lang/Object;${type})${type}`]);
 }
-EXTERNAL_PARENTS.set('Ljava/util/concurrent/ThreadPoolExecutor;', 'Ljava/lang/Object;');
+EXTERNAL_PARENTS.set('Ljava/util/concurrent/ThreadPoolExecutor;', 'Ljava/util/concurrent/AbstractExecutorService;');   // libcore: ThreadPoolExecutor extends AbstractExecutorService (concurrency-host.js)
 EXTERNAL_INTERFACES.set('Ljava/util/concurrent/ThreadPoolExecutor;', ['Ljava/util/concurrent/Executor;', 'Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/Executors', ['newFixedThreadPool(I)Ljava/util/concurrent/ExecutorService;', 'newFixedThreadPool(ILjava/util/concurrent/ThreadFactory;)Ljava/util/concurrent/ExecutorService;']);
 addBridge('java/util/concurrent/ThreadPoolExecutor', ['execute(Ljava/lang/Runnable;)V', 'shutdown()V', 'isShutdown()Z']);
@@ -1373,6 +1375,8 @@ export class APKRuntime {
     const tb = this.tb, previous = tb.enter(BUCKET.INIT);
     try { for (let step; (step = this.initStep(type)) !== undefined;) this.finishHostStep(step); } finally { tb.leave(previous); }
   }
+  /** True while another thread than the current one runs the <clinit> of `type` (the WebAssembly core answers from its own class state: vmcore/js/host-bridge.js). */
+  initPendingElsewhere(type) { const state = this.initialized.get(type); return state?.status === 'initializing' && state.thread !== currentThread(this); }
   /**
    * Returns undefined when `type` is usable by the current thread now (initialized, or being initialized by this very thread), a Blocked(retry) while another thread
    * initializes it or a class it needs, or an Invoke chain that runs the pending <clinit> methods as ordinary interpreter frames. A class whose initializer failed is erroneous:
@@ -2018,6 +2022,7 @@ export class APKRuntime {
       // thread parked in a native) cannot make every boxed Long and String result of the other threads immortal. Entries of natives further out stay below `mark`.
       const mark = this.hostAllocs.length; let keep = false;
       try { const outcome = this.dispatchCore(method, args, mode, callerOwner, true); keep = outcome instanceof Blocked || outcome instanceof Invoke; return outcome; }
+      catch (error) { if (error instanceof ProcessStartPending) return error.blocked; throw error; }   // another package's process starts on the main thread: this call site waits, then calls again (src/package-registry.js)
       finally { if (!keep && this.hostAllocs.length > mark) this.releaseHostAllocs(mark); }
     }
     const outcome = this.dispatchCore(method, args, mode, callerOwner, wantFrame);
@@ -2878,10 +2883,10 @@ export class APKRuntime {
     const wanted = (parameters ?? []).join(''), match = BRIDGE_INDEX.get(owner + '\0' + name)?.find(entry => entry.params === wanted);
     if (!match) {
       // Platform-host bridged members (android.view.View getters/setters such as getElevation()F used by ObjectAnimator reflection).
-      for (let at = owner, depth = 0; at && depth < 64; at = this.parent(at), depth++) for (const result of ['V', 'Z', 'I', 'F', 'J', 'D', 'S', 'B', 'C']) { const key = `${at}->${name}(${wanted})${result}`; if (this.platform?.supports?.(key)) return { method: { owner: at, name, parameters: parameters ?? [], result, signature: `(${wanted})${result}`, key }, flags: 1 | 0x10000 }; }
+      for (let at = owner, depth = 0; at && depth < 64; at = this.parent(at), depth++) for (const result of ['V', 'Z', 'I', 'F', 'J', 'D', 'S', 'B', 'C', ...(this.platform?.hostedResults?.(at, name, wanted) ?? [])]) { const key = `${at}->${name}(${wanted})${result}`; if (this.platform?.supports?.(key)) return { method: { owner: at, name, parameters: parameters ?? [], result, signature: `(${wanted})${result}`, key }, flags: 1 | 0x10000 }; }
       return null;
     }
-    return { method: { owner, name, parameters: parameters ?? [], result: match.result, signature: `(${match.params})${match.result}`, key: match.key }, flags: 1 | 0x10000 };
+    return { method: { owner, name, parameters: parameters ?? [], result: match.result, signature: `(${match.params})${match.result}`, key: match.key }, flags: 1 | 0x10000 | (STATIC_SHIMS.has(match.key) ? 8 : 0) };   // Modifier.isStatic as the jar declares it
   }
   reflectionAccess(member, accessible, receiver = null) {
     if (accessible) return;
@@ -2909,7 +2914,12 @@ export class APKRuntime {
     for (let i = 0; i < parameters.length; i++) { const type = method.parameters[i], value = this.unboxReflection(parameters[i], type); words.push(value); if (type === 'J' || type === 'D') words.push(WIDE_HIGH); }
     // Class initialization precedes reflective construction and is not a target-method exception.
     if (constructor) { receiver = this.allocate(method.owner); words.unshift(receiver); }
-    else if (staticCall) this.initialize(method.owner);
+    else if (staticCall) {
+      // Another thread runs the class's <clinit>: this call site parks its thread until it ends and calls Method.invoke again (a site call: Blocked.retry), so the wait can
+      // last over network exchanges; reached from host code, the nested wait ends by running the invoke itself (finish).
+      if (this.initPendingElsewhere(method.owner)) return new Blocked({ ready: () => !this.initPendingElsewhere(method.owner), retry: true, reason: `class initialization of ${method.owner}`, finish: () => this.reflectionInvoke(member, accessible, receiver, argumentsArray, wrap) });
+      this.initialize(method.owner);
+    }
     // The target runs as a continuation of the calling green thread (an Invoke), not through a nested dispatch on the JavaScript stack: a reflective call that blocks (a lock, a
     // Future.get, a park) then parks only this thread, and the scheduler can resume every other one, including the thread that holds what this one waits for.
     const wrapError = error => {

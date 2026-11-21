@@ -4,10 +4,17 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { Arm64Cpu, BLOCKED } from './cpu.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=ea49b2bd6e79';
+import { ART_BLOCKED } from './signals.js?v=ea49b2bd6e79';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
+// bionic's pthread_internal_t (android-13.0.0_r1 bionic/libc/bionic/pthread_internal.h, arm64): pthread_t is the address of this record, and TLS_SLOT_THREAD_ID (tp + 8) holds it.
+// The fields the lab fills: tid, the cached pid, pthread_attr_t (flags, stack_base, stack_size, guard_size, sched_policy, sched_priority), start_routine and its argument, and
+// alternate_signal_stack (the mapping bionic gives every thread for its signal handlers: SIGNAL_STACK_SIZE with a guard page at its bottom, installed with sigaltstack).
+// The record has a page to itself, as in bionic (it sits in the thread's own mapping), so code that reads past the fields it knows stays in readable memory.
+export const PTHREAD_INTERNAL = Object.freeze({ tid: 0x10, cachedPid: 0x14, attrFlags: 0x18, stackBase: 0x20, stackSize: 0x28, guardSize: 0x30, schedPolicy: 0x38, schedPriority: 0x3c, joinState: 0x50, startRoutine: 0x60, startArg: 0x68, alternateSignalStack: 0x80, stackTop: 0x90 });
+export const SIGNAL_STACK_SIZE = 0x4000 + 0x1000, GUARD_SIZE = 0x1000;   // SIGNAL_STACK_SIZE_WITHOUT_GUARD (16 KiB) + PTHREAD_GUARD_SIZE
 
 export class NativeThreads {
   constructor(process, { queueTask = null, now = () => performance.now(), log = () => {} } = {}) {
@@ -17,6 +24,24 @@ export class NativeThreads {
     this.exitEntry = process.hostEntry('pthread:exit', (p, cpu) => { this.finish(this.current, cpu.x[0]); cpu.exited = true; });
   }
   get running() { return this.current; }
+  /** The thread's pthread_t: the address of its pthread_internal_t (made on first use for the main and the Java threads), with its alternate signal stack. */
+  selfOf(record = this.current) {
+    if (record.self) return record.self;
+    const p = this.process, mem = p.memory, self = p.mapRegion(0x1000, 0x1000), alt = p.mapRegion(SIGNAL_STACK_SIZE, 0x1000), F = PTHREAD_INTERNAL;
+    const stack = record.stack ?? { base: p.mainStack?.base ?? 0, size: p.mainStack?.size ?? 0 };
+    mem.writeU32(self + F.tid, record.tid); mem.writeU32(self + F.cachedPid, p.pid);
+    mem.writeU32(self + F.attrFlags, 0); mem.writePtr(self + F.stackBase, stack.base); mem.write64(self + F.stackSize, BigInt(stack.size)); mem.write64(self + F.guardSize, BigInt(GUARD_SIZE));
+    if (record.start !== undefined) { mem.writePtr(self + F.startRoutine, record.start); mem.writePtr(self + F.startArg, record.arg ?? 0); }
+    mem.writePtr(self + F.alternateSignalStack, alt); mem.writePtr(self + F.stackTop, stack.base + stack.size);
+    record.self = self; record.altStack = { sp: alt + GUARD_SIZE, size: SIGNAL_STACK_SIZE - GUARD_SIZE, flags: 0 };
+    if (record.tp) mem.writePtr(record.tp + 8, self);   // TLS_SLOT_THREAD_ID
+    (this.bySelf ??= new Map()).set(self, record);
+    return self;
+  }
+  /** The thread a pthread_t names (the address pthread_create / pthread_self gave), or undefined. */
+  byPthread(value) { const key = Number(value); return this.bySelf?.get(key) ?? this.threads.get(key); }
+  /** The native thread with kernel thread id `tid` (a created thread, the main thread or a Java thread that called native code). */
+  byTid(tid) { return this.threads.get(tid) ?? this.javaByTid?.get(tid); }
   /**
    * The native identity of a Java thread that calls into native code (a JNI native method, JNI_OnLoad): on a device each Java thread is its own native thread, with its
    * own tid, TLS block (pthread keys, errno, the thread-local storage of every library) and stack. Here the call runs on the calling CPU's stack, synchronously, but as
@@ -26,28 +51,56 @@ export class NativeThreads {
     const p = this.process, isMain = !javaThread || javaThread === this.javaMain?.();
     let record = isMain ? this.threads.get(p.pid) : (this.javaRecords ??= new WeakMap()).get(javaThread);
     if (!record) {
-      const region = p.mapRegion(0x10000, 0x1000), tp = region + 0x100; p.initThreadTls(tp);
-      record = { tid: this.nextTid++, cpu: p.cpu, state: 'running', tp, errno: tp - 0xf0, keys: new Map(), java: true, name: javaThread.name ?? null };
+      // its own interpreter state and stack (as a created thread): a native call of this Java thread can park it in a wait (callFromJava) while other Java threads call native code
+      const stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000), tp = region + stackSize + 0x100; p.initThreadTls(tp);
+      const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
+      cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.nested = 0;
+      record = { tid: this.nextTid++, cpu, ownCpu: true, state: 'running', tp, errno: tp - 0xf0, keys: new Map(), java: true, name: javaThread.name ?? null, stack: { base: region, size: stackSize } };
+      record.sigmask = ART_BLOCKED; (this.javaByTid ??= new Map()).set(record.tid, record);
       this.javaRecords.set(javaThread, record); this.log(`ARM64 native thread ${record.tid} is Java thread "${record.name ?? '?'}"`);
     }
-    if (record === this.current) return fn();
-    const previous = this.current, previousTp = p.cpu.tpidr;
-    this.current = record; p.cpu.tpidr = BigInt(record.tp);
-    try { return fn(); } finally { this.current = previous; p.cpu.tpidr = previousTp; }
+    if (record === this.current) { p.signals?.deliver(p, record); return fn(); }
+    const previous = this.current, previousTp = p.cpu.tpidr, previousCpu = p.activeCpu;
+    this.current = record; if (record.ownCpu) p.activeCpu = record.cpu; else { p.activeCpu = p.cpu; p.cpu.tpidr = BigInt(record.tp); }
+    try { p.signals?.deliver(p, record); return fn(); } finally { this.current = previous; p.activeCpu = previousCpu; if (!record.ownCpu) p.cpu.tpidr = previousTp; }
+  }
+  /**
+   * A native method called by a Java thread other than the main thread. At the top of that thread's native calls it runs on the thread's own interpreter state, and a wait that
+   * cannot be satisfied yet parks the Java thread instead of holding the whole VM: `park({ ready, delayMs, what, resume })` makes the VM's Blocked (src/arm64/jni.js), and
+   * resume() continues the native code where it waited (another park, or the raw result). A call nested in a JNI callback, and the main thread's calls, run synchronously.
+   */
+  callFromJava(javaThread, address, args, options, park) {
+    return this.asJavaThread(javaThread, () => {
+      const record = this.current, cpu = record.cpu;
+      if (!park || !record.ownCpu || (cpu.nested ?? 0) > 0 || record.inCall) return this.process.call(address, args, options);
+      const saved = cpu.beginCall(address, args, options);
+      return this.continueFromJava(javaThread, record, saved, options, park);
+    });
+  }
+  continueFromJava(javaThread, record, saved, options, park) {
+    const cpu = record.cpu; let outcome;
+    record.inCall = true; record.parkable = true; record.state = 'running';
+    try { outcome = cpu.run(RETURN_SENTINEL); } catch (error) { record.inCall = false; throw error; } finally { record.parkable = false; }
+    if (outcome === 'done') { record.inCall = false; record.state = 'running'; return cpu.endCall(saved, options.returns); }
+    if (outcome !== 'blocked') { record.inCall = false; throw new APKError(`ARM64 interpreter: a native call of Java thread "${record.name ?? '?'}" ended as '${outcome}' (pc 0x${cpu.pc.toString(16)})`, { kind: 'arm64-threads' }); }
+    const until = Math.min(record.deadline ?? Infinity, record.wakeAt?.() ?? Infinity);
+    return park({ ready: () => record.ready?.() === true || this.now() >= until, delayMs: until - this.now(), what: record.what ?? 'a native wait',
+      resume: () => this.asJavaThread(javaThread, () => this.continueFromJava(javaThread, record, saved, options, park)) });
   }
   create(start, arg) {
     const p = this.process, stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000), tp = region + stackSize + 0x100;
     p.initThreadTls(tp);
     const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
-    cpu.describe = p.cpu.describe; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.x[0] = BigInt(arg); cpu.x[30] = BigInt(this.exitEntry); cpu.pc = Number(start); cpu.nested = 0;
-    const thread = { tid: this.nextTid++, cpu, state: 'runnable', tp, errno: tp - 0xf0, keys: new Map(), waiters: [], result: 0n };
+    cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.x[0] = BigInt(arg); cpu.x[30] = BigInt(this.exitEntry); cpu.pc = Number(start); cpu.nested = 0;
+    const thread = { tid: this.nextTid++, cpu, state: 'runnable', tp, errno: tp - 0xf0, keys: new Map(), waiters: [], result: 0n, stack: { base: region, size: stackSize }, start: Number(start), arg: Number(arg), sigmask: this.current.sigmask ?? ART_BLOCKED };   // a new thread inherits its creator's signal mask
     this.threads.set(thread.tid, thread); this.log(`ARM64 native thread ${thread.tid} started at 0x${Number(start).toString(16)}`);
+    const self = this.selfOf(thread);
     this.schedulePump();
-    return thread.tid;
+    return self;
   }
   finish(thread, value) { thread.state = 'done'; thread.result = value; this.log(`ARM64 native thread ${thread.tid} ended`); }
   /** Can the thread that is running now be suspended at this call (true), or must its wait be driven synchronously (false)? */
-  canSuspend(cpu) { const t = this.current; return !t.main && !t.java && t.cpu === cpu && (cpu.nested ?? 0) === 0; }
+  canSuspend(cpu) { const t = this.current; return !t.main && (!t.java || t.parkable === true) && t.cpu === cpu && (cpu.nested ?? 0) === 0; }
   /** The waiting primitive for host functions: returns BLOCKED (the call is retried when the thread runs again) or, for a synchronous caller, runs the other threads until `ready()`. */
   // `wakeAt()`: the earliest time the condition may turn true by time alone (a timer), when it does not wait for another thread
   wait(cpu, ready, { what, deadline = Infinity, wakeAt = null } = {}) {
@@ -82,6 +135,7 @@ export class NativeThreads {
   slice(thread) {
     const previous = this.current, p = this.process; this.current = thread; p.activeCpu = thread.cpu; thread.state = 'running';
     try {
+      p.signals?.deliver(p, thread);   // a signal sent to this thread while it was not running: its handler runs first (src/arm64/signals.js)
       const outcome = thread.cpu.run(-1, SLICE);
       if (outcome === 'exited' || thread.state === 'done') { thread.state = 'done'; return true; }
       if (outcome === 'blocked') return true;   // state set to 'waiting' by wait()
@@ -124,8 +178,9 @@ export class NativeThreads {
     return timedOut ? 110 : 0;   // ETIMEDOUT
   }
   condSignal(cond) { const mem = this.process.memory; mem.writeU32(cond, (mem.readU32(cond) + 1) >>> 0); return 0; }
-  join(cpu, tid, out) {
-    const thread = this.threads.get(tid); if (!thread || thread.main) return 3;   // ESRCH
+  join(cpu, pthread, out) {
+    const thread = this.byPthread(pthread); if (!thread || thread.main) return 3;   // ESRCH
+    const tid = thread.tid;
     const got = this.wait(cpu, () => thread.state === 'done', { what: `pthread_join of thread ${tid}` });
     if (got === BLOCKED) return BLOCKED;
     if (out) this.process.memory.write64(out, thread.result);

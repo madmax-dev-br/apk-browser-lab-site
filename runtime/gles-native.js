@@ -1,6 +1,6 @@
-import { Blocked } from './scheduler.js?v=a64e78a38c60';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=a64e78a38c60';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=a64e78a38c60';
+import { Blocked } from './scheduler.js?v=ea49b2bd6e79';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=ea49b2bd6e79';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=ea49b2bd6e79';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md). These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
@@ -110,9 +110,20 @@ const EXTENSIONS = { EXT_color_buffer_float: 'GL_EXT_color_buffer_float', EXT_co
 // ---- java.nio buffers and Java arrays (NIOAccess of the original JNI) -------------------------------------------------------------------------------------------------------
 const ELEMENT = { B: 1, Z: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const BUFFER_ELEMENT = [['Ljava/nio/ByteBuffer;', 'B'], ['Ljava/nio/CharBuffer;', 'C'], ['Ljava/nio/ShortBuffer;', 'S'], ['Ljava/nio/IntBuffer;', 'I'], ['Ljava/nio/FloatBuffer;', 'F'], ['Ljava/nio/LongBuffer;', 'J'], ['Ljava/nio/DoubleBuffer;', 'D']];
+/**
+ * A pointer an ARM64 native caller passed to a GL entry point (src/arm64/gles.js): `bytes` at `address` of the ARM64 process memory (src/arm64/memory.js), standing where the
+ * Java bindings take a java.nio Buffer. `bytes` is the size the C call implies (Infinity where the GL call itself bounds what it reads or writes); `type` 'B' marks GLboolean
+ * output. Reads are copies (WebGL refuses views of a resizable buffer, and the memory may grow during the call); an access outside the memory is the process's segmentation fault.
+ */
+export class NativeRegion {
+  constructor(memory, address, bytes = Infinity, type = undefined) { this.memory = memory; this.address = Number(address); this.bytes = bytes; this.type = type; }
+  read(count) { if (!Number.isFinite(count)) throw new Error(`internal: a native GL pointer at 0x${this.address.toString(16)} was read without a size`); return this.memory.bytes(this.address, count).slice(); }
+  write(bytes) { this.memory.copyIn(this.address, bytes); }
+}
 /** Where the remaining elements of a java.nio.Buffer are: { native: address } or { array, index (in array elements), type }, and how many bytes remain. */
 export function nioRegion(r, buffer) {
   if (buffer === null || buffer === undefined) return null;
+  if (buffer instanceof NativeRegion) return buffer;
   const fields = r.object(buffer).fields, get = key => fields.get(key);
   const position = get(`${BUFFER}->position:I`) ?? 0, limit = get(`${BUFFER}->limit:I`) ?? 0, shift = get(`${BUFFER}->_elementSizeShift:I`) ?? 0;
   const bytes = Math.max(0, limit - position) << shift, address = BigInt.asIntN(64, BigInt(get(`${BUFFER}->address:J`) ?? 0n));
@@ -150,11 +161,13 @@ function writeArrayBytes(r, array, type, index, bytes) {
 /** The remaining bytes of a Buffer, or of a Java array from `offset` (in elements), at most `limit` bytes. */
 function readRegion(r, region, limit = Infinity) {
   const count = Math.min(region.bytes, limit);
+  if (region instanceof NativeRegion) return region.read(count);
   return region.address !== undefined ? readNativeBytes(r, region.address, count) : arrayBytes(r, region.array, region.type, region.index, count);
 }
 function writeRegion(r, region, bytes) {
   if (bytes.length > region.bytes) r.throwJava(IAE, 'remaining() < needed');
-  if (region.address !== undefined) writeNativeBytes(r, region.address, bytes); else writeArrayBytes(r, region.array, region.type, region.index, bytes);
+  if (region instanceof NativeRegion) region.write(bytes);
+  else if (region.address !== undefined) writeNativeBytes(r, region.address, bytes); else writeArrayBytes(r, region.array, region.type, region.index, bytes);
 }
 const arrayRegion = (r, array, offset, type) => {
   if (array === null) r.throwJava(IAE, `${type === 'F' ? 'params' : 'array'} == null`);
@@ -191,7 +204,8 @@ function stateOf(r) {
   }
   return s;
 }
-const threadOf = r => r.thread ?? r.scheduler?.mainThread?.() ?? r;
+// EGL binds a context and an error to a thread: the VM's Java thread, or the ARM64 native thread (a pthread of src/arm64/threads.js) whose call is running (r.eglThread, set by src/arm64/gles.js)
+const threadOf = r => r.eglThread ?? r.thread ?? r.scheduler?.mainThread?.() ?? r;
 const setEglError = (r, error) => { stateOf(r).errors.set(threadOf(r), error); };
 const eglFail = (r, error, value = 0) => { setEglError(r, error); return value; };
 const eglOk = (r, value = 1) => { setEglError(r, EGL.SUCCESS); return value; };
@@ -222,15 +236,19 @@ function newContext(r, config, version, share) {
 
 // ---- surfaces: a framebuffer object per surface and WebGL context ------------------------------------------------------------------------------------------------------------
 /** The SurfaceView behind a Surface (src/camera-surface-host.js) and its size now. */
-function windowOf(r, surface) {
+export function windowOf(r, surface) {
   const sink = surface === null ? null : r.object(surface).surface?.sink;
   if (!sink || sink.kind !== 'holder' || !sink.valid?.()) return null;
   return sink.view;
 }
+/** The buffer size of a SurfaceView's window: what the producer set (ANativeWindow_setBuffersGeometry), else SurfaceHolder.setFixedSize, else the View's size. */
+export function windowSize(r, viewRef) {
+  const view = r.object(viewRef), state = view.surfaceView, b = view.bounds;
+  return state?.bufferGeometry ?? state?.fixed ?? (b ? { width: Math.max(1, b.right - b.left), height: Math.max(1, b.bottom - b.top) } : { width: 1, height: 1 });
+}
 function surfaceSize(r, surface) {
   if (surface.kind !== 'window') return { width: surface.width, height: surface.height };
-  const view = r.object(surface.view), state = view.surfaceView, b = view.bounds, fixed = state?.fixed;
-  return fixed ?? (b ? { width: Math.max(1, b.right - b.left), height: Math.max(1, b.bottom - b.top) } : { width: 1, height: 1 });
+  return windowSize(r, surface.view);
 }
 function surfaceTarget(r, context, surface) {
   const gl = context.gl; let entry = surface.targets.get(gl);
@@ -347,7 +365,7 @@ function glesBindings(add) {
   const both = (S, name, signatures, body) => { for (const signature of signatures) S(name, signature, body); };
   // pointer-like arguments: an array with an offset, or a java.nio Buffer (the next argument when it is an array)
   const vec = (r, args, i, type) => typeof args[i + 1] === 'number' && args.length > i + 1 && isArrayRef(r, args[i]) ? arrayRegion(r, args[i], args[i + 1], type) : args[i] === null ? r.throwJava(IAE, `${type === 'F' ? 'params' : 'data'} == null`) : nioRegion(r, args[i]);
-  const isArrayRef = (r, value) => value !== null && typeof value === 'object' && r.typeOf(value).startsWith('[');
+  const isArrayRef = (r, value) => value !== null && typeof value === 'object' && !(value instanceof NativeRegion) && r.typeOf(value).startsWith('[');
   const readInts = (r, args, i, count) => Array.from(ints(readRegion(r, vec(r, args, i, 'I'), count * 4)));
   const writeVec = (r, args, i, type, values, kind = 'int') => { const region = vec(r, args, i, type); writeRegion(r, region, kind === 'float' ? bytesOfFloats(values) : kind === 'long' ? bytesOfLongs(values) : bytesOfInts(values)); };
   const unsupported = (S, name, signatures, why) => { for (const signature of signatures) S(name, signature, r => r.throwJava(UOE, `${name}: ${why}`)); };
@@ -917,3 +935,10 @@ export function createGlesNativeBindings() {
 }
 /** The snapshot payload of a SurfaceView an EGL window surface draws into (apk-runtime), or undefined. */
 export function glSurfaceNodeState(runtime, object) { return platforms.get(runtime)?.nodeState(runtime, object); }
+/**
+ * For the ARM64 process's libEGL.so / libGLESv2.so / libGLESv3.so (src/arm64/gles.js): the same EGL state machine (one display, the configs, contexts, surfaces and the
+ * per-thread current context and error) and the same GL contexts as the Java classes, so a native renderer and android.opengl share one model.
+ */
+export function createEglCore() { return eglCore(); }
+export const EGL_CONSTANTS = EGL, GL_CONSTANTS = GL;
+export const glAccess = { glFor, lookup, raise, nameOf, stateOf, currentOf, setEglError };

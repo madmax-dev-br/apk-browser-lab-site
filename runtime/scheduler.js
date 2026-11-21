@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
 
 // Green-thread scheduler for the VM.
 //
@@ -75,6 +75,7 @@ export class Scheduler {
   start(thread, driver) { thread.driver = driver; thread.started = true; thread.state = 'runnable'; this.add(thread); this.rt.multiThreaded = true; }
   terminate(thread) {
     thread.state = 'terminated'; thread.finished = true; thread.blocked = null;
+    thread.interrupted = false;   // ART keeps the flag in the native Thread, which exits with it: Thread.isInterrupted of a dead thread is false and Thread.interrupt of one does nothing
     this.threads = this.threads.filter(candidate => candidate !== thread);
     if (this.cursor >= this.threads.length) this.cursor = 0;
     if (this.rt.monitors) for (const [id, monitor] of this.rt.monitors) if (monitor.owner === thread) this.rt.monitors.delete(id);
@@ -299,6 +300,15 @@ export class Scheduler {
    * whose waker is stuck beneath this stack raises the deadlock error instead of hanging.
    */
   resolveNested(blocked) {
+    // The thread may already be parked in a wait of its own (host code running as the main thread while main waits: a host task of the event pump, a callback while main
+    // is suspended): this wait is the host code's, on top of it. The parked one is kept aside and put back when this one is over, as a nested run keeps it (WasmEngine.runNested);
+    // replacing it and then clearing it lost it: the thread resumed as if its own wait had ended (on the core a host-step wait then had no Blocked to finish).
+    const parkedThread = this.rt.thread, parked = parkedThread.blocked !== null || parkedThread.coreWait ? { blocked: parkedThread.blocked, state: parkedThread.state, timedOut: parkedThread.timedOut, coreWait: parkedThread.coreWait } : null;
+    if (parked !== null) parkedThread.coreWait = null;
+    try { return this.#resolveNested(blocked); }
+    finally { if (parked !== null) { parkedThread.blocked = parked.blocked; parkedThread.state = parked.state; parkedThread.timedOut = parked.timedOut; parkedThread.coreWait = parked.coreWait; } }
+  }
+  #resolveNested(blocked) {
     for (;;) {
       const thread = this.rt.thread;
       thread.blocked = blocked; thread.state = 'blocked'; thread.nestedBlock = true; this.waitingNested.add(thread);

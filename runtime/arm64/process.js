@@ -3,21 +3,22 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=a64e78a38c60';
-import { Arm64Memory } from './memory.js?v=a64e78a38c60';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=a64e78a38c60';
-import { NativeThreads } from './threads.js?v=a64e78a38c60';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=ea49b2bd6e79';
+import { Arm64Memory } from './memory.js?v=ea49b2bd6e79';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=ea49b2bd6e79';
+import { NativeThreads } from './threads.js?v=ea49b2bd6e79';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=ea49b2bd6e79';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);   // the process's lowest address (its first page stays unmapped, as NULL's)
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
 export class Arm64Process {
-  constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null } = {}) {
+  constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null, progress = undefined } = {}) {
     this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
+    this.cpu.progress = progress;   // (cpu) every 2^20 instructions of any thread (src/arm64/glue.js: the operation monitor's heartbeat)
     this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
     this.memory.cpu = this.cpu; this.memory.activeCpu = () => this.activeCpu; this.memory.recentCalls = () => { const out = []; for (let i = 1; i <= 8; i++) { const index = this.recentHost[(this.recentAt - i) & 7]; if (index !== null && index !== undefined) out.push(index === 'svc' ? 'svc' : this.hostNames[index]); } return out.reverse(); };   // a fault names the instruction of the thread that is running
     this.readLibrary = readLibrary;   // soname -> Uint8Array of the app's library, or null
@@ -29,7 +30,7 @@ export class Arm64Process {
     this.atexit = []; this.tlsModules = []; this.tlsSize = 0;
     // the main thread: stack and TLS
     const stackSize = 1024 * 1024, stack = this.mapRegion(stackSize + 0x10000, 0x10000);
-    this.cpu.sp = stack + stackSize; this.tlsBase = stack + stackSize;   // TLS area above the stack top
+    this.cpu.sp = stack + stackSize; this.tlsBase = stack + stackSize; this.mainStack = { base: stack, size: stackSize };   // TLS area above the stack top
     this.tp = this.tlsBase + 0x100;   // thread pointer: bionic's TLS slots start here; static TLS blocks follow at tp+16 (variant 1)
     this.memory.write64(this.tp + 40, 0x2b992ddfa23249d6n);   // TLS_SLOT_STACK_GUARD (__stack_chk_guard)
     this.cpu.tpidr = BigInt(this.tp);

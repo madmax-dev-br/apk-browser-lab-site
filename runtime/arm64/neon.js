@@ -1,12 +1,35 @@
 // Advanced SIMD (NEON) for the ARM64 interpreter (src/arm64/cpu.js): the integer and floating-point vector groups compilers emit for copies, string scans,
 // hashing, image and math code. Lanes are read and written as BigInt (integers) or numbers (floats) over the 16-byte registers; each instruction is computed
 // lane by lane as the Arm ARM pseudocode defines it. An encoding outside these groups stops the run naming it (Arm64Unsupported), never an approximation.
-const ones = n => (1n << BigInt(n)) - 1n;
+const ONES = Array.from({ length: 129 }, (_, n) => (1n << BigInt(n)) - 1n);   // the lane masks, made once: every vector instruction asks for one
+const ones = n => ONES[n] ?? (1n << BigInt(n)) - 1n;
 const sx = (v, bits) => BigInt.asIntN(bits, v), ux = (v, bits) => BigInt.asUintN(bits, v);
 const bit = (word, n) => (word >>> n) & 1, field = (word, lo, width) => (word >>> lo) & ((1 << width) - 1);
 
-export function lanes(cpu, reg, esize, count) { const out = new Array(count), o = reg * 16, eb = esize / 8; for (let i = 0; i < count; i++) { let v = 0n; for (let b = eb - 1; b >= 0; b--) v = (v << 8n) | BigInt(cpu.vbuf[o + i * eb + b]); out[i] = v; } return out; }
-export function setLanes(cpu, reg, esize, values, totalBytes = 16) { const o = reg * 16, eb = esize / 8; cpu.vbuf.fill(0, o, o + 16); values.forEach((value, i) => { let v = ux(value, esize); for (let b = 0; b < eb; b++) { cpu.vbuf[o + i * eb + b] = Number(v & 0xffn); v >>= 8n; } }); void totalBytes; }
+// Lanes of 8, 16, 32 and 64 bits are read and written whole through the register file's DataView (little-endian, as the register bytes are laid out) instead of byte by
+// byte through BigInt shifts; a 128-bit lane (PMULL's) keeps the byte loop. Same values, same bytes: only the cost of moving them changes.
+const logicalWords = new Int32Array(4);   // the result of a vector logical operation before it is written (the destination may be a source)
+const lanesBytewise =(cpu, o, eb, count, out) => { for (let i = 0; i < count; i++) { let v = 0n; for (let b = eb - 1; b >= 0; b--) v = (v << 8n) | BigInt(cpu.vbuf[o + i * eb + b]); out[i] = v; } return out; };
+export function lanes(cpu, reg, esize, count) {
+  const out = new Array(count), o = reg * 16, view = cpu.vview, buf = cpu.vbuf;
+  switch (esize) {
+    case 8: for (let i = 0; i < count; i++) out[i] = BigInt(buf[o + i]); return out;
+    case 16: for (let i = 0; i < count; i++) out[i] = BigInt(view.getUint16(o + 2 * i, true)); return out;
+    case 32: for (let i = 0; i < count; i++) out[i] = BigInt(view.getUint32(o + 4 * i, true)); return out;
+    case 64: for (let i = 0; i < count; i++) out[i] = view.getBigUint64(o + 8 * i, true); return out;
+    default: return lanesBytewise(cpu, o, esize / 8, count, out);
+  }
+}
+export function setLanes(cpu, reg, esize, values, totalBytes = 16) {
+  const o = reg * 16, eb = esize / 8, view = cpu.vview, buf = cpu.vbuf, count = values.length; buf.fill(0, o, o + 16); void totalBytes;
+  switch (esize) {
+    case 8: for (let i = 0; i < count; i++) if (values[i] !== undefined) buf[o + i] = Number(BigInt.asUintN(8, values[i])); return;
+    case 16: for (let i = 0; i < count; i++) if (values[i] !== undefined) view.setUint16(o + 2 * i, Number(BigInt.asUintN(16, values[i])), true); return;
+    case 32: for (let i = 0; i < count; i++) if (values[i] !== undefined) view.setUint32(o + 4 * i, Number(BigInt.asUintN(32, values[i])), true); return;
+    case 64: for (let i = 0; i < count; i++) if (values[i] !== undefined) view.setBigUint64(o + 8 * i, BigInt.asUintN(64, values[i]), true); return;
+    default: for (let i = 0; i < count; i++) { if (values[i] === undefined) continue; let v = ux(values[i], esize); for (let b = 0; b < eb; b++) { buf[o + i * eb + b] = Number(v & 0xffn); v >>= 8n; } }
+  }
+}
 const flanes = (cpu, reg, esize, count) => { const out = []; for (let i = 0; i < count; i++) out.push(esize === 64 ? cpu.vview.getFloat64(reg * 16 + 8 * i, true) : cpu.vview.getFloat32(reg * 16 + 4 * i, true)); return out; };
 const setFlanes = (cpu, reg, esize, values) => { const o = reg * 16; cpu.vbuf.fill(0, o, o + 16); values.forEach((v, i) => esize === 64 ? cpu.vview.setFloat64(o + 8 * i, v, true) : cpu.vview.setFloat32(o + 4 * i, v, true)); };
 const satS = (v, bits) => { const max = (1n << BigInt(bits - 1)) - 1n, min = -(1n << BigInt(bits - 1)); return v > max ? max : v < min ? min : v; };
@@ -59,10 +82,14 @@ function threeSame(cpu, word, scalar) {
     setFlanes(cpu, rd, esize, a.map((x, i) => fr(op(x, b[i])))); return true;
   }
   const esize = 8 << size, count = scalar ? 1 : (q ? 128 : 64) / esize, a = lanes(cpu, rn, esize, count), b = lanes(cpu, rm, esize, count), mask = ones(esize), total = q ? 16 : 8;
-  if (opcode === 0b00011) {   // logical: AND BIC ORR ORN EOR BSL BIT BIF
-    const A = lanes(cpu, rn, 64, 2), B = lanes(cpu, rm, 64, 2), D = lanes(cpu, rd, 64, 2), m = ones(64);
-    const r = A.map((x, i) => { const y = B[i], d = D[i]; switch (`${u}${size}`) { case '00': return x & y; case '01': return x & ~y & m; case '02': return x | y; case '03': return x | (~y & m); case '10': return x ^ y; case '11': return (x & d) | (y & ~d & m); case '12': return (d & ~y & m) | (x & y); default: return (d & y) | (x & ~y & m); } });
-    setLanes(cpu, rd, 64, q ? r : [r[0]], total); return true;
+  if (opcode === 0b00011) {   // logical: AND BIC ORR ORN EOR BSL BIT BIF, bitwise over the register's 32-bit words (no lanes: the operation is the same on every bit)
+    const w = cpu.vwords ??= new Uint32Array(cpu.vbuf.buffer, cpu.vbuf.byteOffset, cpu.vbuf.length >> 2), n = q ? 4 : 2, a0 = rn * 4, b0 = rm * 4, d0 = rd * 4, op = u * 4 + size;
+    const r = logicalWords; for (let i = 0; i < n; i++) {
+      const x = w[a0 + i], y = w[b0 + i], d = w[d0 + i];
+      r[i] = op === 0 ? x & y : op === 1 ? x & ~y : op === 2 ? x | y : op === 3 ? x | ~y : op === 4 ? x ^ y : op === 5 ? (x & d) | (y & ~d) : op === 6 ? (d & ~y) | (x & y) : (d & y) | (x & ~y);
+    }
+    for (let i = 0; i < n; i++) w[d0 + i] = r[i]; if (!q) { w[d0 + 2] = 0; w[d0 + 3] = 0; }   // a 64-bit operation zeroes the upper half
+    return true;
   }
   const S = v => sx(v, esize), U = v => v, d = lanes(cpu, rd, esize, count);
   let out;
@@ -297,14 +324,16 @@ function structures(cpu, word, at) {
     }
     bytes = address - base;
   } else {
-    const selem = ((opcode & 1) << 1 | bit(word, 21)) + 1, scale = opcode >> 2, s = bit(word, 12);
+    // single structure: opcode<2:0> is bits 15:13 (the 4-bit `opcode` above is bits 15:12, whose low bit is S); scale = opcode<2:1>, selem = opcode<0>:R + 1
+    const opc = opcode >> 1, selem = ((opc & 1) << 1 | bit(word, 21)) + 1, scale = opc >> 1, s = bit(word, 12);
     if (scale === 3) {   // LD1R..LD4R: load and replicate
       if (!l) return false;
       const esize = 8 << size, eb = esize / 8;
       for (let r = 0; r < selem; r++) { const reg = (rt + r) % 32, value = mem.read(base + r * eb, eb); setLanes(cpu, reg, esize, Array(regBytes / eb).fill(value)); }
       bytes = selem * eb;
     } else {
-      const eb = 1 << scale, index = scale === 0 ? (q << 3) | (s << 2) | size : scale === 1 ? (q << 2) | (s << 1) | (size >> 1) : scale === 2 ? (size & 1 ? q : (q << 1) | s) : q;
+      // scale 2 is a 32-bit lane (size 00, index Q:S) or a 64-bit one (size 01, index Q)
+      const eb = scale === 2 && (size & 1) ? 8 : 1 << scale, index = scale === 0 ? (q << 3) | (s << 2) | size : scale === 1 ? (q << 2) | (s << 1) | (size >> 1) : scale === 2 ? (size & 1 ? q : (q << 1) | s) : q;
       for (let r = 0; r < selem; r++) { const o = ((rt + r) % 32) * 16 + index * eb; if (l) cpu.vbuf.set(mem.bytes(base + r * eb, eb), o); else mem.copyIn(base + r * eb, cpu.vbuf.slice(o, o + eb)); }
       bytes = selem * eb;
     }

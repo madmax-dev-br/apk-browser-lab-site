@@ -2,11 +2,12 @@
 // entries that run the JNI bridge's own handlers (src/jni-host.js JniBridge.handlersFor: the same JNI semantics as for the lab's WebAssembly libraries), and the
 // library objects the bridge binds native methods to (Java_ export names and RegisterNatives). Arguments follow AAPCS64: integers and pointers in X0-X7, float and
 // double in V0-V7, the rest on the stack; "..." arguments of Call<Type>Method continue in the same registers, a va_list is AAPCS64's structure.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { JNI_FUNCTIONS } from '../jni-function-table.js?v=a64e78a38c60';
-import { variadic, vaList } from './libc.js?v=a64e78a38c60';
-import { registerArm64Memory } from '../unsafe-native.js?v=a64e78a38c60';
-import { utf8 } from './text.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { Blocked } from '../scheduler.js?v=ea49b2bd6e79';
+import { JNI_FUNCTIONS } from '../jni-function-table.js?v=ea49b2bd6e79';
+import { variadic, vaList } from './libc.js?v=ea49b2bd6e79';
+import { registerArm64Memory } from '../unsafe-native.js?v=ea49b2bd6e79';
+import { utf8 } from './text.js?v=ea49b2bd6e79';
 
 const JNI_OK = 0, JNI_EVERSION = -3, VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 // JNI parameters that are 32-bit integers (jint, jsize, jboolean, jbyte, jchar, jshort) rather than pointers or references: on AAPCS64 only their low 32 bits are defined
@@ -44,13 +45,19 @@ export function attachArm64Jni(process, bridge) {
         if (type === 'F') fp.push({ kind: 'float', value }); else if (type === 'D') fp.push({ kind: 'double', value }); else gp.push(typeof value === 'bigint' ? value : BigInt(Math.trunc(value)));
       });
       if (fp.length > 8) throw new APKError('ARM64 JNI: more than 8 floating-point arguments (stack-passed FP arguments are not implemented)', { kind: 'arm64-unsupported' });
-      const result = method.result;
-      const raw = process.threads.asJavaThread(bridge.runtime.thread, () => process.call(address, gp, { floats: fp, returns: result === 'D' ? 'd' : result === 'F' ? 's' : 'x' }));   // as the calling Java thread's native thread
-      if (result === 'J') return BigInt.asIntN(64, raw);
-      if (result === 'D' || result === 'F') return raw;
-      if (result === 'V') return undefined;
-      if (result.startsWith('L') || result.startsWith('[')) return Number(raw);
-      return Number(BigInt.asIntN(32, raw));
+      const result = method.result, rt = bridge.runtime;
+      const convert = raw => {
+        if (raw instanceof Blocked) return raw;
+        if (result === 'J') return BigInt.asIntN(64, raw);
+        if (result === 'D' || result === 'F') return raw;
+        if (result === 'V') return undefined;
+        if (result.startsWith('L') || result.startsWith('[')) return Number(raw);
+        return Number(BigInt.asIntN(32, raw));
+      };
+      // a Java thread whose native code waits (a condition, a mutex, a sleep, a join) parks like a Java wait: the VM's Blocked, its deadline on the VM clock, resumed by the scheduler
+      const park = ({ ready, delayMs, what, resume }) => new Blocked({ ready, deadline: Number.isFinite(delayMs) ? (rt.platform?.clock?.now?.() ?? performance.now()) + Math.max(0, delayMs) : Infinity, reason: `ARM64 native wait: ${what}`, finish: () => convert(resume()) });
+      const parkable = rt.thread && rt.thread !== rt.scheduler?.main ? park : null;   // the main thread's native calls stay synchronous (its events and the page's requests wait for them)
+      return convert(process.threads.callFromJava(rt.thread, address, gp, { floats: fp, returns: result === 'D' ? 'd' : result === 'F' ? 's' : 'x' }, parkable));   // as the calling Java thread's native thread
     },
   };
   const handlers = bridge.handlersFor(lib);

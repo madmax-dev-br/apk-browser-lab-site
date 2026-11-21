@@ -4,7 +4,7 @@
 // the thread stacks by src/arm64/process.js. An access outside it (the first page of the window included, so NULL plus a small offset) is a segmentation fault: it
 // stops the run with an error naming the address and the instruction, as SIGSEGV would end the process.
 // `u8` and `dv` are views of the buffer itself, indexed by address - base: code outside this file uses the methods, which take addresses.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
 
 export class Arm64Memory {
   // The address space is one resizable ArrayBuffer grown in place: the operating system backs its pages only when they are touched, so a large reservation (a runtime that

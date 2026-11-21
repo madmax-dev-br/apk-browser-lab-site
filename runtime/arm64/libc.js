@@ -3,10 +3,11 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { BLOCKED } from './cpu.js?v=a64e78a38c60';
-import { extendLibc } from './libc-extra.js?v=a64e78a38c60';
-import { utf8 } from './text.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { BLOCKED } from './cpu.js?v=ea49b2bd6e79';
+import { extendLibc } from './libc-extra.js?v=ea49b2bd6e79';
+import { addGles } from './gles.js?v=ea49b2bd6e79';
+import { utf8 } from './text.js?v=ea49b2bd6e79';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -186,14 +187,14 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.clock = () => BigInt(Math.floor(performance.now() * 1000));
   // ---- threads (src/arm64/threads.js): pthread_create runs the start routine as a native thread; locks, conditions, joins and futexes wait for real
   const T = p => p.threads, BLOCK = r => r; let nextKey = 1;
-  lib.pthread_create = (p, c) => { const tid = T(p).create(n(c, 2), n(c, 3)); p.memory.write64(n(c, 0), BigInt(tid)); return 0; };
+  lib.pthread_create = (p, c) => { const self = T(p).create(n(c, 2), n(c, 3)); p.memory.writePtr(n(c, 0), self); return 0; };   // pthread_t: the address of the new thread's pthread_internal_t
   lib.pthread_join = (p, c) => BLOCK(T(p).join(c, n(c, 0), n(c, 1)));
   lib.pthread_detach = () => 0;
   // pthread_cleanup_push / pop (bionic's __pthread_cleanup_t { prev; routine; arg; } on the caller's stack, a per-thread chain): pop runs the routine when asked, pthread_exit runs every pushed routine
   lib.__pthread_cleanup_push = (p, c) => { const t = T(p).current, record = n(c, 0); p.memory.writePtr(record, t.cleanup ?? 0); p.memory.writePtr(record + 8, n(c, 1)); p.memory.writePtr(record + 16, n(c, 2)); t.cleanup = record; };
   lib.__pthread_cleanup_pop = (p, c) => { const t = T(p).current, record = n(c, 0), execute = s32(c, 1); t.cleanup = p.memory.readPtr(record) || 0; if (execute) p.call(p.memory.readPtr(record + 8), [p.memory.readPtr(record + 16)]); };
   lib.pthread_exit = (p, c) => { const t = T(p).current, value = x(c, 0); if (t.main) throw new APKError('ARM64 native code called pthread_exit on the thread that runs Java', { kind: 'arm64-threads' }); while (t.cleanup) { const record = t.cleanup; t.cleanup = p.memory.readPtr(record) || 0; p.call(p.memory.readPtr(record + 8), [p.memory.readPtr(record + 16)]); } T(p).finish(t, value); c.exited = true; };
-  lib.pthread_self = p => T(p).current.tid;
+  lib.pthread_self = p => T(p).selfOf();
   lib.gettid = p => T(p).current.tid;
   lib.pthread_equal = (p, c) => x(c, 0) === x(c, 1) ? 1 : 0;
   lib.pthread_mutex_init = (p, c) => { const m = n(c, 0), type = n(c, 1) ? p.memory.readU32(n(c, 1)) & 3 : 0; p.memory.writeU32(m, type << 14); p.memory.writeU32(m + 4, 0); p.memory.writeU32(m + 8, 0); return 0; };
@@ -215,19 +216,21 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.pthread_rwlock_rdlock = lib.pthread_rwlock_wrlock = (p, c) => BLOCK(T(p).mutexLock(c, n(c, 0)));
   lib.pthread_rwlock_tryrdlock = lib.pthread_rwlock_trywrlock = (p, c) => T(p).mutexTrylock(n(c, 0));
   lib.pthread_rwlock_unlock = (p, c) => T(p).mutexUnlock(n(c, 0));
-  for (const name of ['pthread_rwlock_init', 'pthread_rwlock_destroy', 'pthread_attr_init', 'pthread_attr_destroy', 'pthread_attr_setstacksize', 'pthread_attr_setdetachstate', 'pthread_attr_getstacksize', 'pthread_attr_setschedparam', 'pthread_attr_setschedpolicy', 'pthread_setname_np', 'pthread_getname_np', 'pthread_condattr_init', 'pthread_condattr_setclock', 'pthread_condattr_destroy', 'pthread_setschedparam', 'pthread_sigmask', 'sigaction', 'sigemptyset', 'sigaddset', 'sigfillset', 'sigprocmask', 'setpriority']) lib[name] = () => 0;
-  lib.pthread_kill = () => 0;
-  const sleepFor = (p, c, ms) => { if (!T(p).canSuspend(c)) return 0; const t = T(p).current; if (t.sleepUntil === undefined) t.sleepUntil = T(p).now() + ms; const deadline = t.sleepUntil, r = T(p).wait(c, () => T(p).now() >= deadline, { what: 'sleep', deadline }); if (r === BLOCKED) return BLOCKED; t.sleepUntil = undefined; return 0; };
+  for (const name of ['pthread_rwlock_init', 'pthread_rwlock_destroy', 'pthread_attr_init', 'pthread_attr_destroy', 'pthread_attr_setstacksize', 'pthread_attr_setdetachstate', 'pthread_attr_getstacksize', 'pthread_attr_setschedparam', 'pthread_attr_setschedpolicy', 'pthread_setname_np', 'pthread_getname_np', 'pthread_condattr_init', 'pthread_condattr_setclock', 'pthread_condattr_destroy', 'pthread_setschedparam', 'setpriority']) lib[name] = () => 0;
+  // a thread that cannot be suspended (native code called from Java) sleeps by running the other native threads until the time has passed, as they run meanwhile on a device
+  const sleepFor = (p, c, ms) => { if (!T(p).canSuspend(c)) { const deadline = T(p).now() + ms; T(p).wait(c, () => T(p).now() >= deadline, { what: 'sleep', deadline }); return 0; } const t = T(p).current; if (t.sleepUntil === undefined) t.sleepUntil = T(p).now() + ms; const deadline = t.sleepUntil, r = T(p).wait(c, () => T(p).now() >= deadline, { what: 'sleep', deadline }); if (r === BLOCKED) return BLOCKED; t.sleepUntil = undefined; return 0; };
   lib.nanosleep = (p, c) => { const ptr = n(c, 0), r = sleepFor(p, c, Number(p.memory.read64(ptr)) * 1000 + Number(p.memory.read64(ptr + 8)) / 1e6); return r; };
   lib.usleep = (p, c) => sleepFor(p, c, n(c, 0) / 1000);
   lib.sleep = (p, c) => sleepFor(p, c, n(c, 0) * 1000);
-  lib.sched_yield = (p, c) => { if (!T(p).canSuspend(c)) return 0; const t = T(p).current; if (t.yielded) { t.yielded = false; return 0; } t.yielded = true; t.state = 'waiting'; t.ready = () => true; t.deadline = Infinity; return BLOCKED; };
+  lib.sched_yield = (p, c) => { if (!T(p).canSuspend(c)) { T(p).runOthers(T(p).current); return 0; } const t = T(p).current; if (t.yielded) { t.yielded = false; return 0; } t.yielded = true; t.state = 'waiting'; t.ready = () => true; t.deadline = Infinity; return BLOCKED; };
   lib.pthread_once = (p, c) => { const control = n(c, 0); if (p.memory.readU32(control) === 0) { p.memory.writeU32(control, 1); p.call(n(c, 1), []); p.memory.writeU32(control, 2); } return 0; };
   lib.pthread_key_create = (p, c) => { const key = nextKey++; p.memory.writeU32(n(c, 0), key); return 0; };
   lib.pthread_key_delete = () => 0;
   lib.pthread_getspecific = (p, c) => T(p).current.keys.get(n(c, 0)) ?? 0;
   lib.pthread_setspecific = (p, c) => { T(p).current.keys.set(n(c, 0), n(c, 1)); return 0; };
-  lib.pthread_getattr_np = () => 0; lib.pthread_attr_getstack = (p, c) => { p.memory.writePtr(n(c, 1), Number(c.sp) - 0x70000); p.memory.write64(n(c, 2), 0x80000n); return 0; };
+  // pthread_getattr_np: the thread's own pthread_attr_t (bionic: flags, stack_base, stack_size, guard_size, sched_policy, sched_priority, 16 reserved bytes); pthread_attr_getstack reads one back
+  lib.pthread_getattr_np = (p, c) => { const t = T(p).byPthread(n(c, 0)); if (!t) return 3; const self = T(p).selfOf(t); p.memory.copyIn(n(c, 1), p.memory.bytes(self + 0x18, 56).slice()); return 0; };   // ESRCH
+  lib.pthread_attr_getstack = (p, c) => { const attr = n(c, 0), size = p.memory.read64(attr + 16); if (size === 0n) { p.memory.writePtr(n(c, 1), Number(c.sp) - 0x70000); p.memory.write64(n(c, 2), 0x80000n); return 0; } p.memory.writePtr(n(c, 1), p.memory.readPtr(attr + 8)); p.memory.write64(n(c, 2), size); return 0; };
   // ---- dlfcn
   lib.dlopen = (p, c) => { const name = n(c, 0) ? str(p, x(c, 0)) : null; if (!name) return 0x7e0000000001; try { const soname = name.slice(name.lastIndexOf('/') + 1); const handle = p.load(soname); return p.order.indexOf(handle) + 0x7e0000000100; } catch (error) { p.dlerror = error.message; return 0; } };
   lib.dlsym = (p, c) => { const handle = n(c, 0), name = str(p, x(c, 1)), lib0 = handle >= 0x7e0000000100 ? p.order[handle - 0x7e0000000100] : null; const address = lib0 ? lib0.exports.get(name) : p.resolve(name, null); if (address === undefined || address === null) { p.dlerror = `undefined symbol: ${name}`; return 0; } return address; };
@@ -341,5 +344,5 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   };
   lib.__errno_location = lib.__errno;
   void ENOMEM; void EAGAIN; void ERANGE;
-  return extendLibc(lib, { runtime, fs, clock, assets });
+  return addGles(extendLibc(lib, { runtime, fs, clock, assets }), { runtime });   // libEGL, libGLESv2 / v3 and ANativeWindow: src/arm64/gles.js
 }

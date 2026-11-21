@@ -5,9 +5,9 @@
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { executeNeon } from './neon.js?v=a64e78a38c60';
-import { DecodeCache } from './decode-cache.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { executeNeon } from './neon.js?v=ea49b2bd6e79';
+import { DecodeCache } from './decode-cache.js?v=ea49b2bd6e79';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -25,8 +25,10 @@ const field = (word, lo, width) => (word >>> lo) & ((1 << width) - 1);
 const signExtendInt = (value, bits) => (value << (32 - bits)) >> (32 - bits);
 const hex = n => '0x' + (n >>> 0).toString(16).padStart(8, '0');
 
-function ones(n) { return (1n << BigInt(n)) - 1n; }
-function ror(value, shift, width) { const w = BigInt(width), s = BigInt(shift % width); if (s === 0n) return value; return ((value >> s) | (value << (w - s))) & ones(width); }
+// BigInt constants by number: building a BigInt per instruction (a mask, a shift amount) was a large share of the interpreter's time
+const ONES = Array.from({ length: 129 }, (_, n) => (1n << BigInt(n)) - 1n), SMALL = Array.from({ length: 129 }, (_, n) => BigInt(n));
+function ones(n) { return ONES[n] ?? (1n << BigInt(n)) - 1n; }
+function ror(value, shift, width) { const s = shift % width; if (s === 0) return value; return ((value >> SMALL[s]) | (value << SMALL[width - s])) & ONES[width]; }
 function replicate(value, esize, width) { let out = 0n; for (let i = 0; i < width; i += esize) out |= value << BigInt(i); return out & ones(width); }
 /** DecodeBitMasks (Arm ARM): the wmask and tmask of a logical immediate / bitfield instruction. */
 function decodeBitMasks(n, imms, immr, immediate, width) {
@@ -73,22 +75,33 @@ export class Arm64Cpu {
     return (code & 1) && code !== 15 ? !result : result;
   }
   addWithCarry(a, b, carry, width, setFlags) {
-    const mask = ones(width), ua = a & mask, ub = b & mask, unsigned = ua + ub + BigInt(carry), result = unsigned & mask;
-    if (setFlags) { const signed = sx(ua, width) + sx(ub, width) + BigInt(carry); this.n = (result >> BigInt(width - 1)) === 1n; this.z = result === 0n; this.c = unsigned !== result; this.v = sx(result, width) !== signed; }
+    const mask = ONES[width], ua = a & mask, ub = b & mask, unsigned = ua + ub + (carry ? 1n : 0n), result = unsigned & mask;
+    if (setFlags) {   // V: both operands of one sign and the result of the other (the same as comparing the signed sum, without converting to signed)
+      const top = SMALL[width - 1]; this.n = (result >> top) === 1n; this.z = result === 0n; this.c = unsigned !== result; this.v = (((ua ^ result) & (ub ^ result)) >> top) !== 0n;
+    }
     return result;
   }
 
   // ---- running
   /** Calls the function at `address` with integer arguments in X0..X7 (and doubles in D0..D7 when `floats` gives them) and returns X0 (and D0/S0 on request). */
-  call(address, args = [], { floats = [], returns = 'x' } = {}) {
+  call(address, args = [], options = {}) {
+    const saved = this.beginCall(address, args, options);
+    this.nested = (this.nested ?? 0) + 1;   // inside a call made from JavaScript a wait cannot suspend the thread: the waiting host function runs the other threads itself
+    let outcome; try { outcome = this.run(RETURN_SENTINEL); } finally { this.nested--; }
+    if (outcome !== 'done') throw new APKError(`ARM64 interpreter: a native call ended as '${outcome}' (pc 0x${this.pc.toString(16)})`, { kind: 'arm64-threads' });
+    return this.endCall(saved, options.returns);
+  }
+  /** The first half of call(): the arguments in place, pc at the function and X30 at the sentinel; run(RETURN_SENTINEL) executes it (a thread that can park continues it later), endCall ends it. */
+  beginCall(address, args = [], { floats = [] } = {}) {
     const saved = { lr: this.x[30], pc: this.pc, sp: this.sp };   // sp too: stack-passed arguments lower it, and the interrupted caller's frame must be where it left it
     for (let i = 0; i < 8; i++) if (i < args.length) this.x[i] = BigInt.asUintN(64, BigInt(args[i]));
     floats.forEach((value, i) => { if (value.kind === 'float') this.setS(i, value.value); else this.setD(i, value.value ?? value); });
     if (args.length > 8) { const extra = args.slice(8); let sp = Number(this.sp) - 8 * extra.length; sp -= sp % 16; this.sp = sp; extra.forEach((value, i) => this.mem.write64(sp + 8 * i, BigInt.asUintN(64, BigInt(value)))); }
     this.x[30] = BigInt(RETURN_SENTINEL); this.pc = Number(address);
-    this.nested = (this.nested ?? 0) + 1;   // inside a call made from JavaScript a wait cannot suspend the thread: the waiting host function runs the other threads itself
-    let outcome; try { outcome = this.run(RETURN_SENTINEL); } finally { this.nested--; }
-    if (outcome !== 'done') throw new APKError(`ARM64 interpreter: a native call ended as '${outcome}' (pc 0x${this.pc.toString(16)})`, { kind: 'arm64-threads' });
+    return saved;
+  }
+  /** The result of a call that reached the sentinel (X0, or D0/S0 with `returns` 'd'/'s'), and the caller's lr, pc and sp back. */
+  endCall(saved, returns = 'x') {
     const result = returns === 'd' ? this.getD(0) : returns === 's' ? this.getS(0) : this.x[0];
     this.x[30] = saved.lr; this.pc = saved.pc; this.sp = saved.sp;
     return result;
@@ -99,7 +112,10 @@ export class Arm64Cpu {
     while (this.pc !== stopAt) {
       if (this.pc >= HOST_BASE) { const returnTo = Number(this.x[30]); if (this.host(this, (this.pc - HOST_BASE) / 16) === BLOCKED) return 'blocked'; if (this.exited) return 'exited'; if (this.jumpTo !== undefined) { this.pc = this.jumpTo; this.jumpTo = undefined; } else this.pc = returnTo; continue; }   // jumpTo: longjmp's target
       if (--left < 0) return 'yield';
-      if (++this.steps > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps}) exceeded at pc 0x${this.pc.toString(16)}`, { kind: 'arm64-budget' });
+      if ((++this.steps & 0xfffff) === 0) {   // every 2^20 instructions: the budget, and the progress report (the Worker's heartbeat names the native code while it runs)
+        if (this.steps > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps}) exceeded at pc 0x${this.pc.toString(16)}`, { kind: 'arm64-budget' });
+        if (this.progress !== undefined) this.progress(this);
+      }
       const at = this.pc, step = cache.get(this, at);   // decoded once per address (src/arm64/decode-cache.js)
       this.pc += 4;
       step(this);
@@ -238,13 +254,13 @@ export class Arm64Cpu {
 
   // ---- data processing, register
   shifted(value, type, amount, width) {
-    const mask = ones(width), v = value & mask, s = BigInt(amount);
+    const mask = ONES[width], v = value & mask, s = SMALL[amount];
     switch (type) { case 0: return (v << s) & mask; case 1: return v >> s; case 2: return ux(sx(v, width) >> s, width); default: return ror(v, amount, width); }
   }
   extended(value, option, shift, width) {
     const len = [8, 16, 32, 64][option & 3], signed = option & 4;
     let v = ux(value, len); if (signed) v = ux(sx(v, len), 64);
-    return (v << BigInt(shift)) & ones(width);
+    return (v << SMALL[shift]) & ONES[width];
   }
   dataRegister(word, at) {
     const sf = bit(word, 31), width = sf ? 64 : 32, rd = word & 31, rn = field(word, 5, 5), rm = field(word, 16, 5), op1 = bit(word, 28), op2 = field(word, 21, 4);
@@ -450,7 +466,7 @@ export class Arm64Cpu {
     if (bits10 === 0b11) { this.fset(t, rd, this.fget(t, this.cond(field(word, 12, 4)) ? rn : rm)); return; }   // FCSEL
     if (field(word, 10, 3) === 0b100) {   // FMOV (immediate)
       const imm8 = field(word, 13, 8), sign = imm8 >> 7, exp = ((imm8 >> 4) & 7), frac = imm8 & 15;
-      const e = (exp & 4) ? exp - 7 : exp + 1, value = (1 + frac / 16) * Math.pow(2, e - 1) * (sign ? -1 : 1);   // VFPExpandImm
+      const e = (exp & 4) ? exp - 7 : exp + 1, value = (1 + frac / 16) * Math.pow(2, e) * (sign ? -1 : 1);   // VFPExpandImm: imm8 0x70 is 1.0, 0x00 is 2.0, 0x60 is 0.5
       this.fset(t, rd, value); return;
     }
     if (field(word, 10, 4) === 0b1000) {   // FCMP / FCMPE

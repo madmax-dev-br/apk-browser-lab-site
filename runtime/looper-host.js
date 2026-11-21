@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=a64e78a38c60';
-import { GC_ROOTS } from './heap-gc.js?v=a64e78a38c60';
-import { LooperYield } from './message-queue-native.js?v=a64e78a38c60';
-import { APKError } from './apk-error.js?v=a64e78a38c60';
+import { createHostRegistry } from './host-contract.js?v=ea49b2bd6e79';
+import { GC_ROOTS } from './heap-gc.js?v=ea49b2bd6e79';
+import { LooperYield } from './message-queue-native.js?v=ea49b2bd6e79';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
 
 // The main thread's Looper, MessageQueue, Handler and Message are the original android-13.0.0_r1 classes in framework.dex. This file is what surrounds them on the host side.
 //
@@ -75,6 +75,17 @@ export function createLooperHost(platform) {
   // A query that only returns numbers reads queued messages through handles; on the WebAssembly core every handle made while host code runs is pinned until that host call
   // returns, and these queries run again and again inside one long call while main is parked. Nothing they read outlives them, so their pins are dropped when they return.
   const transient = (runtime, query) => { const pins = runtime?.wasm?.pins, mark = pins?.length; try { return query(); } finally { if (pins && pins.length > mark) pins.length = mark; } };
+  /** Takes `message` out of the main queue's list (mMessages / Message.next), as MessageQueue.next() does with the message it returns; false when it is not queued. */
+  const unlink = (runtime, message) => {
+    const queue = runtime.object(main.queue).fields, head = queue.get(K.messages);
+    if (head === message) { runtime.storeField(queue, K.messages, get(runtime, message, K.next) ?? null); runtime.storeField(runtime.object(message).fields, K.next, null); return true; }
+    for (let previous = head, guard = 0; !isNull(previous) && guard < 200000; guard++) {
+      const next = get(runtime, previous, K.next);
+      if (next === message) { runtime.storeField(runtime.object(previous).fields, K.next, get(runtime, message, K.next) ?? null); runtime.storeField(runtime.object(message).fields, K.next, null); return true; }
+      previous = next;
+    }
+    return false;
+  };
   const host = {
     ...registry, interfaces: registry.interfacesOf,
     armed: true,
@@ -156,7 +167,39 @@ export function createLooperHost(platform) {
       if (event !== undefined) { event.handler = target; event.message = message; event.messageWhen = when; return event; }   // event.when stays the exact time the host asked for; the queue orders by the whole millisecond (Message.when)
       return { when, front: when === 0, handler: isNull(target) ? null : target, message, barrier: isNull(target) };
     },
+    /**
+     * MessageQueue.next() for one given message: unlinked from the main queue (mMessages / next) and marked in use, under the queue's monitor. false when another thread holds that
+     * monitor (it is inside enqueueMessage or removeMessages: the list is not to be touched now) or the message is no longer queued.
+     */
+    takeMessage(runtime, message) {
+      const queue = main?.queue; if (!queue || !runtime.monitorTryEnter(queue)) return false;
+      try {
+        const id = ref => runtime.object(ref).id, wanted = id(message);
+        let previous = null;
+        for (let at = get(runtime, queue, K.messages), guard = 0; !isNull(at) && guard < 200000; previous = at, at = get(runtime, at, K.next), guard++) {
+          if (id(at) !== wanted) continue;
+          const next = get(runtime, at, K.next);
+          runtime.object(previous === null ? queue : previous).fields.set(previous === null ? K.messages : K.next, isNull(next) ? null : next);
+          runtime.object(at).fields.set(K.next, null);
+          call(runtime, MESSAGE, 'markInUse', [], 'V', [], at);
+          return true;
+        }
+        return false;
+      } finally { runtime.monitorExit(queue); }
+    },
     callbackOf(runtime, message) { const callback = get(runtime, message, K.callback); return isNull(callback) ? null : callback; },
+    /** Takes `message` out of the main queue's list (what MessageQueue.next() does with the message it hands out); false when it is no longer queued. */
+    unlink(runtime, message) {
+      if (main === null) return false;
+      const same = (a, b) => a === b || (!isNull(a) && !isNull(b) && typeof a === 'object' && typeof b === 'object' && a.ref === b.ref);
+      let previous = null, current = get(runtime, main.queue, K.messages);
+      while (!isNull(current) && !same(current, message)) { previous = current; current = get(runtime, current, K.next); }
+      if (isNull(current)) return false;
+      const next = get(runtime, current, K.next), rest = isNull(next) ? null : next;
+      runtime.storeField(runtime.object(previous === null ? main.queue : previous).fields, previous === null ? K.messages : K.next, rest);
+      runtime.storeField(runtime.object(current).fields, K.next, null);
+      return true;
+    },
     whatOf(runtime, message) { return get(runtime, message, key(MESSAGE, 'what', 'I')) ?? 0; },
     /** Every queued message, in queue order. */
     snapshot(runtime) {
@@ -242,8 +285,14 @@ export function createLooperHost(platform) {
     runDirect(runtime, event) {
       if (event.task === undefined && event.message !== undefined) {   // an ordinary Handler message of another process's main thread (otherProcess): its Runnable runs, as dispatchMessage would
         const callback = host.callbackOf(runtime, event.message), outer = dispatching;
+        if (callback === null && !host.takeMessage(runtime, event.message)) return;   // a message without a Runnable: taken out of the queue as next() takes it (not now if another thread is inside the queue)
         dispatching = messageOwner(runtime, event.message);
         try {
+          if (callback === null) {   // Looper.loopOnce: target.dispatchMessage(msg) (handleMessage, or the Handler's Callback), then recycleUnchecked
+            call(runtime, HANDLER, 'dispatchMessage', [MESSAGE], 'V', [event.message], event.handler);
+            call(runtime, MESSAGE, 'recycleUnchecked', [], 'V', [], event.message);
+            return;
+          }
           call(runtime, HANDLER, 'removeCallbacks', [RUNNABLE], 'V', [callback], event.handler);
           call(runtime, RUNNABLE, 'run', [], 'V', [], callback);
         } finally { dispatching = outer; }

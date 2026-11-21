@@ -1,10 +1,11 @@
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=a64e78a38c60';
+import { sharedAssetBytes } from './shared-asset-bytes.js?v=ea49b2bd6e79';
 
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
 // MAX_REGEX_INPUT: the text a Matcher runs over (an app may match a whole JSON or HTML response, which Android does not bound): copied as UTF-16 into the module's 64 MiB, so at
 // most 16 MiB of it; the break iterators keep the 64 Ki units of their wrapper (icu-break-wrapper.cpp).
 const MAX_REGEX_INPUT = 8 * 1024 * 1024;
-const MAX_HANDLES = 16384, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
+export const MAX_REGEX_HANDLES = 16384;   // live patterns + matchers of one session (src/regex-native.js collects before it is reached)
+const MAX_HANDLES = MAX_REGEX_HANDLES, MAX_TEXT = 65536, MAX_WASM = 4 * 1024 * 1024, MAX_DATA = 8 * 1024 * 1024;
 const fail = message => { throw new Error(`ICU boundary backend: ${message}`); };
 const bytes = value => value instanceof Uint8Array ? value : new Uint8Array(value);
 async function digest(value) {

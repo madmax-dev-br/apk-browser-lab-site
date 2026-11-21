@@ -29,11 +29,11 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=a64e78a38c60';
+import { Blocked } from '../../runtime/scheduler.js?v=ea49b2bd6e79';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a64e78a38c60';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=a64e78a38c60';
-import { CLASS } from './linker.js?v=a64e78a38c60';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ea49b2bd6e79';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=ea49b2bd6e79';
+import { CLASS } from './linker.js?v=ea49b2bd6e79';
 const CLASS_INIT_STATE = CLASS.initState;
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
@@ -126,11 +126,9 @@ export class CoreThreads {
   /** Gives VMThread `thread` record `t` in mode `flags`: a tid, and its interrupt flag over the record's word. */
   bind(thread, t, flags = FLAG_NO_BLOCK) {
     const { x } = this, u32 = () => this.u32, pending = thread.interrupted === true;
-    if (thread.core === undefined) {
-      thread.core = { t, deadline: undefined, steps: [] };
-      Object.defineProperty(thread, 'interrupted', { configurable: true, enumerable: true,
-        get: () => u32()[(thread.core.t + T.interrupted) >> 2] !== 0, set: value => x.thr_set_interrupted(thread.core.t, value ? 1 : 0) });
-    } else thread.core.t = t;
+    if (thread.core === undefined) thread.core = { t, deadline: undefined, steps: [] }; else thread.core.t = t;
+    if (Object.getOwnPropertyDescriptor(thread, 'interrupted')?.get === undefined) Object.defineProperty(thread, 'interrupted', { configurable: true, enumerable: true,
+      get: () => u32()[(thread.core.t + T.interrupted) >> 2] !== 0, set: value => x.thr_set_interrupted(thread.core.t, value ? 1 : 0) });
     if (!x.thr_attach(t, flags)) throw new APKError('vmcore: no thread id left in the core');
     if (pending) x.thr_set_interrupted(t, 1);
   }
@@ -142,6 +140,8 @@ export class CoreThreads {
     const t = core.t, view = this.engine.view;
     this.retired.steps += Number(view.getBigUint64(t + T.steps, true)); this.retired.calls += Number(view.getBigUint64(t + T.calls, true));
     this.engine.resetRecord(t); this.free.push(t);
+    // the record goes to the next thread: the flag stops being read from (and written to) it; a dead thread is never interrupted (Scheduler.terminate)
+    Object.defineProperty(thread, 'interrupted', { configurable: true, enumerable: true, writable: true, value: false });
   }
   /** Instructions and calls of every record (the ended threads' included). */
   totals() {
@@ -405,9 +405,12 @@ export class CoreThreads {
     const core = thread.core; if (core === undefined || !thread.coreWait) return null;
     const own = core.t, aux = this.allocate(), tid = this.u32[(own + T.tid) >> 2], auxTid = this.u32[(aux + T.tid) >> 2];
     this.u32[(aux + T.tid) >> 2] = tid; this.u32[(aux + T.flags) >> 2] = this.u32[(own + T.flags) >> 2]; this.u32[(aux + T.state) >> 2] = 0;
+    this.u32[(aux + T.interrupted) >> 2] = this.u32[(own + T.interrupted) >> 2];   // one thread, one interrupt status: the run sees the thread's flag, not the recycled record's
     core.t = aux; this.stats.auxRuns++;
     return () => {
-      const view = this.engine.view;
+      const view = this.engine.view, flag = this.u32[(aux + T.interrupted) >> 2];
+      // what the run did to the flag is the thread's: an interrupt set during it reaches the parked wait (thr_interrupt takes it out of Object.wait), one it consumed is gone
+      if (flag !== this.u32[(own + T.interrupted) >> 2]) this.x.thr_set_interrupted(own, flag ? 1 : 0);
       view.setBigUint64(own + T.steps, view.getBigUint64(own + T.steps, true) + view.getBigUint64(aux + T.steps, true), true);
       view.setBigUint64(own + T.calls, view.getBigUint64(own + T.calls, true) + view.getBigUint64(aux + T.calls, true), true);
       core.t = own; this.engine.resetRecord(aux); this.u32[(aux + T.tid) >> 2] = auxTid; this.free.push(aux);

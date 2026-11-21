@@ -1,7 +1,16 @@
-import { APKError } from './apk-error.js?v=a64e78a38c60';
-import { gcRoot } from './heap-gc.js?v=a64e78a38c60';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=a64e78a38c60';
-import { AndroidResources } from './android-resources.js?v=a64e78a38c60';
+import { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { gcRoot } from './heap-gc.js?v=ea49b2bd6e79';
+import { Blocked } from './scheduler.js?v=ea49b2bd6e79';
+
+/**
+ * Thrown by a host method that needs another package's process while that process starts on the main thread (ensureProcess off the main thread): the Java call site that
+ * called the host method parks its thread on `blocked` and calls the method again when the process is up (Blocked.retry), as a caller of ActivityManager waits for it.
+ */
+export class ProcessStartPending extends Error {
+  constructor(blocked) { super(blocked.reason); this.name = 'ProcessStartPending'; this.blocked = blocked; }
+}
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=ea49b2bd6e79';
+import { AndroidResources } from './android-resources.js?v=ea49b2bd6e79';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -163,7 +172,27 @@ export function createPackageRegistry(platform) {
     if (entry.main) return;
     if (entry.state === 'started' || entry.state === 'starting') return;   // 'starting': a provider or the Application reaching its own package during start
     if (entry.state === 'failed') throw new APKError(`Process ${entry.name} failed to start: ${entry.failure?.message ?? entry.failure}`, { kind: 'package-process-failed' });
+    if (platform.offMainThread?.(runtime) && runtime.scheduler?.resolveNested && platform.looperHost?.started?.()) return startOnMainThread(runtime, entry);
     entry.state = 'starting'; runtime.record(`PACKAGE start process ${entry.name} (uid ${entry.uid}, pid ${entry.pid})`);
+    bindApplication(runtime, entry);
+    platform.onPackageProcessStarted?.(runtime, entry);   // a device option that applies its package's settings once the process is up (src/microg-device.js: the user's microG services)
+  }
+  /**
+   * handleBindApplication runs on the started process's main thread (its Looper is the main Looper, the lab's one main Looper shared by the packages), whichever thread of
+   * another package asked for one of its components (a provider acquired from a worker thread): the asking thread waits while a main-thread task starts the process, as
+   * ActivityManager makes a caller wait for the provider's process to publish it. A Handler made by the Application or a provider's onCreate binds to the main Looper and a
+   * main-thread check there (Looper.getMainLooper().isCurrentThread()) holds, as on a device.
+   */
+  function startOnMainThread(runtime, entry) {
+    if (!entry.mainStartQueued) {
+      entry.mainStartQueued = true;
+      // a failure is the package's state: the waiter reports it on its own thread when its call runs again
+      platform.queueTask(() => { entry.mainStartQueued = false; try { ensureProcess(runtime, entry); } catch (failure) { if (entry.state !== 'failed') throw failure; } }, 0, []);
+    }
+    // the host method that needed the process unwinds (nothing it did before is kept) and runs again once the process is up (src/apk-runtime.js dispatch: ProcessStartPending)
+    throw new ProcessStartPending(new Blocked({ ready: () => entry.state === 'started' || entry.state === 'failed', retry: true, reason: `the start of process ${entry.name} on its main thread` }));
+  }
+  function bindApplication(runtime, entry) {
     try {
       loaderOf(runtime, entry);
       const name = entry.manifest.applicationName, type = name ? typeIn(runtime, entry, name) : APPLICATION;
@@ -176,7 +205,6 @@ export function createPackageRegistry(platform) {
       runtime.dispatch({ owner: type, name: 'onCreate', signature: '()V', parameters: [], result: 'V' }, [app], 'virtual');
       entry.state = 'started';
     } catch (failure) { entry.state = 'failed'; entry.failure = failure; throw failure; }
-    platform.onPackageProcessStarted?.(runtime, entry);   // a device option that applies its package's settings once the process is up (src/microg-device.js: the user's microG services)
   }
 
   // ---- ApplicationInfo of a companion (PackageParser / PackageInfoUtils over its manifest) -------------------------------------------------------------------------

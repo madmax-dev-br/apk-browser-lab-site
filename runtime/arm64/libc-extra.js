@@ -1,12 +1,13 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=a64e78a38c60';
-import { formatC, variadic, vaList } from './libc.js?v=a64e78a38c60';
-import { addSockets } from './sockets.js?v=a64e78a38c60';
-import { addMoreLibc } from './libc-more.js?v=a64e78a38c60';
-import { addSyscalls } from './syscalls.js?v=a64e78a38c60';
-import { utf8 } from './text.js?v=a64e78a38c60';
+import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
+import { formatC, variadic, vaList } from './libc.js?v=ea49b2bd6e79';
+import { addSockets } from './sockets.js?v=ea49b2bd6e79';
+import { addMoreLibc } from './libc-more.js?v=ea49b2bd6e79';
+import { addSyscalls } from './syscalls.js?v=ea49b2bd6e79';
+import { addSignals } from './signals.js?v=ea49b2bd6e79';
+import { utf8 } from './text.js?v=ea49b2bd6e79';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
 const decoder = utf8, encoder = new TextEncoder();
@@ -152,7 +153,47 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   lib.fdopendir = (p, c) => setErrno(p, EINVAL) && 0;
   lib.readdir = (p, c) => { const d = dirs.get(n(c, 0)); if (!d || d.index >= d.names.length) return 0; const name = d.names[d.index++]; p.memory.fill(d.entry, 0, 280); p.memory.write64(d.entry, BigInt(d.index)); p.memory.setUint16(d.entry + 16, 280); putString(p, d.entry + 19, 256, String(name).split('/').pop()); return d.entry; };
   lib.closedir = (p, c) => { const d = dirs.get(n(c, 0)); if (d) { p.free(d.entry); dirs.delete(n(c, 0)); p.free(n(c, 0)); } return 0; };
+  // scandir (bionic scandir.cpp): every entry of the directory that `filter` accepts (all of them when it is null), each copied into its own malloc'd dirent, the array of pointers
+  // malloc'd too and sorted with `compar` (qsort) when given; the caller frees each entry and the array. alphasort / versionsort compare the names (strcoll / strverscmp in bionic:
+  // bionic's only locale is C.UTF-8, where strcoll is strcmp).
+  lib.scandir = lib.scandir64 = (p, c) => {
+    const path = str(p, x(c, 0)), out = n(c, 1), filter = n(c, 2), compar = n(c, 3);
+    if (vfs().stat(path)?.type !== 'dir') return setErrno(p, vfs().stat(path) ? ENOTDIR : ENOENT) && -1;
+    const names = ['.', '..', ...vfs().list(path)], entries = [], scratch = p.malloc(280);
+    try {
+      names.forEach((name, i) => {
+        p.memory.fill(scratch, 0, 280); p.memory.write64(scratch, BigInt(i + 1)); p.memory.write64(scratch + 8, BigInt(i + 1)); p.memory.setUint16(scratch + 16, 280); putString(p, scratch + 19, 256, String(name).split('/').pop());
+        if (filter && Number(BigInt.asIntN(32, p.call(filter, [scratch]))) === 0) return;
+        const copy = p.malloc(280); p.memory.copyIn(copy, p.memory.bytes(scratch, 280).slice()); entries.push(copy);
+      });
+    } finally { p.free(scratch); }
+    const list = p.malloc(Math.max(8, 8 * entries.length)); entries.forEach((entry, i) => p.memory.writePtr(list + 8 * i, entry));
+    if (compar && entries.length > 1) { c.x[0] = BigInt(list); c.x[1] = BigInt(entries.length); c.x[2] = 8n; c.x[3] = BigInt(compar); lib.qsort(p, c); }
+    p.memory.writePtr(out, list); return entries.length;
+  };
+  const direntName = (p, ptr) => decoder.decode(p.memory.cString(p.memory.readPtr(ptr) + 19));
+  lib.alphasort = lib.alphasort64 = (p, c) => { const a = direntName(p, n(c, 0)), b = direntName(p, n(c, 1)); return a < b ? -1 : a > b ? 1 : 0; };
   lib.statfs = lib.statvfs = lib.fstatfs = lib.fstatvfs = (p, c) => { p.memory.fill(n(c, 1), 0, 120); p.memory.write64(n(c, 1) + 8, 4096n); p.memory.write64(n(c, 1) + 16, 1n << 20n); p.memory.write64(n(c, 1) + 24, 1n << 19n); p.memory.write64(n(c, 1) + 32, 1n << 19n); return 0; };
+  // pathconf / fpathconf as bionic's libc/bionic/pathconf.cpp answers them from statfs of the file's filesystem (the virtual filesystem: one ext4-like volume, 4 KiB blocks,
+  // 255-byte names): LINK_MAX of a filesystem bionic does not list, MAX_CANON/MAX_INPUT 255, PATH_MAX and PIPE_BUF 4096, the _POSIX_* options; the names bionic leaves
+  // without a limit are -1 with errno untouched, an unknown name is EINVAL.
+  const pathconfValue = (p, name) => {
+    switch (name) {   // bionic's <bits/sysconf.h> numbering (not glibc's)
+      case 0: return 64n;                        // _PC_FILESIZEBITS
+      case 1: return 127n;                       // _PC_LINK_MAX (LINK_MAX)
+      case 2: case 3: return 255n;               // _PC_MAX_CANON, _PC_MAX_INPUT
+      case 4: return 255n;                       // _PC_NAME_MAX (statfs f_namelen)
+      case 5: case 6: return 4096n;              // _PC_PATH_MAX, _PC_PIPE_BUF
+      case 7: return 1n;                         // _PC_2_SYMLINKS
+      case 8: case 12: case 11: return 4096n;    // _PC_ALLOC_SIZE_MIN and _PC_REC_XFER_ALIGN (f_frsize), _PC_REC_MIN_XFER_SIZE (f_bsize)
+      case 14: case 15: return 1n;               // _PC_CHOWN_RESTRICTED, _PC_NO_TRUNC
+      case 16: return 0n;                        // _PC_VDISABLE ('\0')
+      case 9: case 10: case 13: case 17: case 18: case 19: return 0xffffffffffffffffn;   // _PC_REC_INCR/MAX_XFER_SIZE, _PC_SYMLINK_MAX, _PC_ASYNC_IO, _PC_PRIO_IO, _PC_SYNC_IO: no limit
+      default: return setErrno(p, EINVAL);
+    }
+  };
+  lib.pathconf = (p, c) => { const path = str(p, x(c, 0)); if (!vfs().stat(path)) return setErrno(p, ENOENT); return pathconfValue(p, n(c, 1)); };   // statfs of a missing path: ENOENT
+  lib.fpathconf = (p, c) => pathconfValue(p, n(c, 1));
   lib.basename = (p, c) => { const path = str(p, x(c, 0)), base = path.replace(/\/+$/, '').split('/').pop() || '/'; return p.allocString(base); };
   lib.dirname = (p, c) => { const path = str(p, x(c, 0)), at = path.replace(/\/+$/, '').lastIndexOf('/'); return p.allocString(at <= 0 ? (at === 0 ? '/' : '.') : path.slice(0, at)); };
   // ---- identity, limits, signals (one process, no signals delivered)
@@ -164,9 +205,13 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   lib.getpriority = () => 0; lib.sched_setaffinity = lib.sched_getaffinity = () => 0;
   lib.sched_get_priority_max = () => 99; lib.sched_get_priority_min = () => 1; lib.pthread_getschedparam = lib.pthread_attr_getschedparam = (p, c) => { if (n(c, 2)) p.memory.writeU32(n(c, 2), 0); return 0; };
   lib.pthread_attr_getguardsize = (p, c) => { p.memory.write64(n(c, 1), 4096n); return 0; };
-  lib.signal = lib.bsd_signal = () => 0; lib.sigaltstack = () => 0; lib.sigdelset = lib.sigismember = () => 0;
-  const signalled = sig => { throw new APKError(`ARM64 native code raised signal ${sig} in its own process: the run ends here, as on a device without a handler`, { kind: 'arm64-abort', signal: sig }); };
-  lib.raise = (p, c) => signalled(s32(c, 0)); lib.kill = (p, c) => s32(c, 1) === 0 ? 0 : signalled(s32(c, 1)); lib.tgkill = (p, c) => signalled(s32(c, 2));
+  lib.sigaltstack = (p, c) => {   // the calling thread's alternate signal stack (stack_t: ss_sp, ss_flags, ss_size); bionic installs one per thread (src/arm64/threads.js selfOf). No signal is delivered here, so it is state only
+    const threads = p.threads, t = threads.current; threads.selfOf(t); const ss = n(c, 0), old = n(c, 1), alt = t.altStack;
+    if (old) { p.memory.writePtr(old, alt.flags & 2 ? 0 : alt.sp); p.memory.writeU32(old + 8, alt.flags & 2); p.memory.writeU32(old + 12, 0); p.memory.write64(old + 16, BigInt(alt.flags & 2 ? 0 : alt.size)); }
+    if (ss) { const flags = p.memory.readU32(ss + 8); t.altStack = flags & 2 ? { sp: 0, size: 0, flags: 2 } : { sp: p.memory.readPtr(ss), size: Number(p.memory.read64(ss + 16)), flags: 0 }; }   // SS_DISABLE
+    return 0;
+  }; 
+  // signal, raise, kill, tgkill and the masks: src/arm64/signals.js
   lib.syslog = (p, c) => { runtime?.record?.(`LOG I syslog: ${formatC(p.memory, str(p, x(c, 1)), variadic(c, 2))}`); };
   lib.openlog = lib.closelog = () => {};
   lib.perror = (p, c) => { runtime?.record?.(`LOG E perror: ${n(c, 0) ? str(p, x(c, 0)) + ': ' : ''}errno ${p.memory.readU32(p.errnoAddress)}`); };
@@ -227,5 +272,5 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
     p.free(lock.ptr); locks.delete(b); return 0;
   };
   void clock;
-  return addSyscalls(addMoreLibc(addSockets(lib, { runtime }), { runtime }));
+  return addSyscalls(addSignals(addMoreLibc(addSockets(lib, { runtime }), { runtime }), { runtime }));
 }

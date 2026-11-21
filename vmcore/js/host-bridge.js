@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=a64e78a38c60';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=a64e78a38c60';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=a64e78a38c60';
-import { HandleTable } from './handles.js?v=a64e78a38c60';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=a64e78a38c60';
-import { coreImports } from './boundary-imports.js?v=a64e78a38c60';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=a64e78a38c60';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=a64e78a38c60';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=a64e78a38c60';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=a64e78a38c60';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=a64e78a38c60';
-import { timedExports, timedBridge } from './core-timing.js?v=a64e78a38c60';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=a64e78a38c60';
-import { Blocked } from '../../runtime/scheduler.js?v=a64e78a38c60';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=a64e78a38c60';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=a64e78a38c60';
-import { PaintRecords } from './paint-record.js?v=a64e78a38c60';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=ea49b2bd6e79';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=ea49b2bd6e79';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=ea49b2bd6e79';
+import { HandleTable } from './handles.js?v=ea49b2bd6e79';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=ea49b2bd6e79';
+import { coreImports } from './boundary-imports.js?v=ea49b2bd6e79';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=ea49b2bd6e79';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=ea49b2bd6e79';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=ea49b2bd6e79';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=ea49b2bd6e79';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=ea49b2bd6e79';
+import { timedExports, timedBridge } from './core-timing.js?v=ea49b2bd6e79';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=ea49b2bd6e79';
+import { Blocked } from '../../runtime/scheduler.js?v=ea49b2bd6e79';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=ea49b2bd6e79';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=ea49b2bd6e79';
+import { PaintRecords } from './paint-record.js?v=ea49b2bd6e79';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -111,7 +111,7 @@ export const STATUS_NAMES = Object.freeze({ ...STATUS, 64: 'host step not suppor
 const METHOD_KIND_UNBOUND = 0x7fff0003, METHOD_KIND_UNLINKED = 0x7fff0001;
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
 const OWN_STEP = Object.freeze({ kind: 'own', parked: null });   // CoreThreads' base step of a nested run with nothing parked (runOn)
-const VM_GC = 24, STRING = 'Ljava/lang/String;', CLASS_TYPE = 'Ljava/lang/Class;', CLASS_OBJECT_CLASS = 8, INITIALIZED = 2;
+const VM_GC = 24, STRING = 'Ljava/lang/String;', CLASS_TYPE = 'Ljava/lang/Class;', CLASS_OBJECT_CLASS = 8, INITIALIZED = 2, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZED / CLASS_INITIALIZING
 const MODE = op => op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
 const isNull = value => value === null || value === undefined || value === 0;
 const kindOf = type => type === 'J' || type === 'D' ? 'W' : type[0] === 'L' || type[0] === '[' ? 'L' : type;
@@ -462,6 +462,7 @@ export class WasmEngine {
     // the time breakdown's buckets: Java run from host code is a core run (timedExports), class initialization its own
     // (an initialized class returns before the clock is read, as APKRuntime.initialize does)
     rt.initialize = type => { if (engine.initialized(type)) return; const previous = tb.enter(BUCKET.INIT); try { return engine.initialize(type); } finally { tb.leave(previous); } };
+    rt.initPendingElsewhere = type => engine.initPendingElsewhere(type);
     rt.execute = (method, code, args) => engine.execute(method, args);   // the core's run owns the clock (timedExports)
     rt.readStatic = reference => engine.readStatic(reference, proto.readStatic);
     rt.writeStatic = (reference, value) => engine.writeStatic(reference, value, proto.writeStatic);
@@ -522,10 +523,21 @@ export class WasmEngine {
 
   /** Nothing to initialize: a class without DEX code, or one already initialized. */
   initialized(type) { return !this.runtime.classes.has(type) || this.r32(this.linker.classOf(type).address + CLASS.initState) === INITIALIZED; }
+  /** True while another thread than the current one runs the <clinit> of `type` (the core's CLASS_INITIALIZING with an initThread of its own). */
+  initPendingElsewhere(type) {
+    const info = this.runtime.classes.has(type) ? this.linker.classes.get(type) : undefined, own = this.runtime.thread?.core?.t;
+    if (!info?.address || own === undefined) return false;
+    return this.r32(info.address + CLASS.initState) === CLASS_INITIALIZING && this.r32(info.address + CLASS.initThread) !== own;
+  }
   /** APKRuntime.initialize in the core: a class with DEX code is initialized by a nested run whose entry is a static `return-void` of its own (the <clinit> chain runs above it). */
   initialize(type) {
     if (!this.runtime.classes.has(type)) return;
     const info = this.linker.classOf(type);
+    if (this.r32(info.address + CLASS.initState) === INITIALIZED) return;
+    // Another thread runs its <clinit> (Method.invoke of a static method, a host read of a static): this thread waits for it on the JavaScript stack of the host call, as a
+    // thread at an invoke-static waits in the core (INIT_BLOCKED); the nested run below would stop with the thread blocked instead. A failed initializer is the nested run's
+    // NoClassDefFoundError, as before.
+    if (this.initPendingElsewhere(type) && this.runtime.scheduler?.resolveNested) this.runtime.scheduler.resolveNested(new Blocked({ ready: () => !this.initPendingElsewhere(type), reason: `class initialization of ${type}` }));
     if (this.r32(info.address + CLASS.initState) === INITIALIZED) return;
     this.initMethod ??= this.linker.rawMethod(Uint16Array.of(0x000e), { registers: 0 });
     this.runNested(this.initMethod, [], 'V', info.address, 1);
