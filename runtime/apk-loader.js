@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=efe50e99a19d';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=efe50e99a19d';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=efe50e99a19d';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=efe50e99a19d';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=efe50e99a19d';
-import { inspectELF } from './native-inspector.js?v=efe50e99a19d';
-import { elfBuildId } from './elf-build-id.js?v=efe50e99a19d';
-import { crc32 } from './zip-entry.js?v=efe50e99a19d';
-import { resolveDevice } from './device-profile.js?v=efe50e99a19d';
-import { resourceProfileFor } from './device-configuration.js?v=efe50e99a19d';
-import { JniBridge } from './jni-host.js?v=efe50e99a19d';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=efe50e99a19d';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=efe50e99a19d';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=efe50e99a19d';
-import { AndroidResources } from './android-resources.js?v=efe50e99a19d';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=efe50e99a19d';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=efe50e99a19d';
-import { FrameworkProvider } from './framework-provider.js?v=efe50e99a19d';
-import { APKArchive } from './apk-archive.js?v=efe50e99a19d';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=efe50e99a19d';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=efe50e99a19d';
+import { usesProcesses } from './system-programs.js?v=bf542493e850';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=bf542493e850';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=bf542493e850';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=bf542493e850';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=bf542493e850';
+import { inspectELF } from './native-inspector.js?v=bf542493e850';
+import { elfBuildId } from './elf-build-id.js?v=bf542493e850';
+import { crc32 } from './zip-entry.js?v=bf542493e850';
+import { resolveDevice } from './device-profile.js?v=bf542493e850';
+import { resourceProfileFor } from './device-configuration.js?v=bf542493e850';
+import { JniBridge } from './jni-host.js?v=bf542493e850';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=bf542493e850';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=bf542493e850';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=bf542493e850';
+import { AndroidResources } from './android-resources.js?v=bf542493e850';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=bf542493e850';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=bf542493e850';
+import { FrameworkProvider } from './framework-provider.js?v=bf542493e850';
+import { APKArchive } from './apk-archive.js?v=bf542493e850';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=bf542493e850';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=bf542493e850';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -957,6 +957,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     methods: program.methodCount, strings: program.stringCount, inspectionComplete: true,
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
+    splits: (archive.splits ?? []).map(split => ({ name: split.name, entries: split.entries.length })),   // the split APKs installed with the base (installSplits), as PackageInfo.splitNames lists them
     kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),
     unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 },
     microg: options.microg ? { version: options.microg.version, packages: companions.filter(c => c.deviceOption === 'microg').map(c => c.packageName) } : null,

@@ -67,27 +67,49 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       if (item.icon?.bytes) { const url = URL.createObjectURL(new Blob([item.icon.bytes], { type: item.icon.mime || 'image/png' })), img = doc.createElement('img'); shelfURLs.push(url); img.alt = ''; img.src = url; img.draggable = false; box.append(img); }
       else { box.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="${ANDROID_HEAD}"/></svg>`; box.classList.add('generic'); }
       fileLine(button, item); button.setAttribute('aria-label', `Open ${name}`);
-      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nHold or right-click: uninstall`;
-      if (item.problem) { button.dataset.problem = item.problem.code ?? 'problem'; button.title = `${name}\n${item.problem.message ?? 'The stored APK cannot be opened.'}\nTap to see why and choose the APK again.\nHold or right-click: uninstall`; const mark = el('span', 'launcher-problem', button); mark.textContent = '!'; mark.setAttribute('aria-hidden', 'true'); button.setAttribute('aria-label', `${name}: the stored APK cannot be opened, choose it again`); }   // the stored copy could not be used (src/apk-shelf.js file()): still on the launcher, marked
+      button.title = `${name}\n${item.packageName ?? item.name}${item.hasHandle ? '\nOpens the file from where it is on disk (the newest version)' : '\nOpens the copy saved in this browser'}\nHold or right-click: menu`;
+      if (item.problem) { button.dataset.problem = item.problem.code ?? 'problem'; button.title = `${name}\n${item.problem.message ?? 'The stored APK cannot be opened.'}\nTap to see why and choose the APK again.\nHold or right-click: menu`; const mark = el('span', 'launcher-problem', button); mark.textContent = '!'; mark.setAttribute('aria-hidden', 'true'); button.setAttribute('aria-label', `${name}: the stored APK cannot be opened, choose it again`); }   // the stored copy could not be used (src/apk-shelf.js file()): still on the launcher, marked
       button.addEventListener('click', () => { if (!working) shelfActions.open?.(item.id); });   // the page decides (busy() also means "no app loaded", the very case a saved app is opened in)
-      button.addEventListener('contextmenu', event => { event.preventDefault(); shelfActions.remove?.(item); });
-      longPress(button, () => item);
+      menuKeys(button, () => item); longPress(button, () => item);
       shelfButtons.push(button);
     }
     if (!placed) wall.after(app);   // an app that is not saved (a demo, a hosted example) leads the row
     wall.hidden = !(mode === 'idle' && shelfButtons.length === 0);
   };
-  // Long press on an icon of the home screen (as on a launcher): a small menu over it with Uninstall (the copy kept in this browser is deleted; shelfActions.remove confirms).
-  // The press that opened the menu is not a click: it does not open the app.
-  let menu = null, pressTimer = 0, pressed = null;
-  const closeMenu = () => { menu?.remove(); menu = null; };
+  // Long press on an icon of the home screen (as on a launcher), a right-click, or the context-menu key / Shift+F10 on a focused icon: a small menu over it with Package (the
+  // window with the open package's details and the Activity its icon opens: shelfActions.package, for the app of this run) and Uninstall (the copy kept in this browser is
+  // deleted; shelfActions.remove confirms). Arrow keys move in the menu, Esc closes it and gives the focus back to the icon. The press that opened it is not a click.
+  let menu = null, menuOwner = null, pressTimer = 0, pressed = null;
+  const closeMenu = ({ refocus = false } = {}) => { const owner = menuOwner; menu?.remove(); menu = null; menuOwner = null; if (refocus && owner && owner.isConnected !== false) owner.focus?.(); };
+  const menuEntries = item => [
+    ...(shelfActions.hasPackage?.(item) ? [['Package', () => shelfActions.package?.(item), '']] : []),
+    ...(item.id !== null && item.id !== undefined ? [['Uninstall', () => shelfActions.remove?.(item), ' danger']] : []),
+  ];
   const openMenu = (button, item) => {
-    closeMenu(); menu = el('div', 'launcher-menu', launcher); menu.setAttribute('role', 'menu');
-    const name = el('div', 'launcher-menu-title', menu); name.textContent = item.label || String(item.name).replace(/\.apk$/i, '');
-    const remove = el('button', 'launcher-menu-item', menu); remove.type = 'button'; remove.setAttribute('role', 'menuitem'); remove.textContent = 'Uninstall';
-    remove.addEventListener('click', event => { event.stopPropagation(); closeMenu(); shelfActions.remove?.(item); });
+    const entries = menuEntries(item); closeMenu(); if (!entries.length) return false;
+    menu = el('div', 'launcher-menu', launcher); menu.setAttribute('role', 'menu'); menuOwner = button;
+    const name = el('div', 'launcher-menu-title', menu); name.textContent = item.label || String(item.name ?? '').replace(/\.apk$/i, ''); menu.setAttribute('aria-label', name.textContent);
+    const items = entries.map(([text, action, kind]) => {
+      const entry = el('button', `launcher-menu-item${kind}`, menu); entry.type = 'button'; entry.setAttribute('role', 'menuitem'); entry.textContent = text; entry.tabIndex = -1;
+      entry.addEventListener('click', event => { event.stopPropagation(); closeMenu({ refocus: true }); action(); });   // the icon has the focus again: a window opened by the action gives it back when it closes
+      return entry;
+    });
+    menu.addEventListener('keydown', event => {
+      const at = items.indexOf(doc.activeElement), go = index => { event.preventDefault(); event.stopPropagation(); items[(index + items.length) % items.length].focus?.(); };
+      if (event.key === 'ArrowDown') go(at + 1); else if (event.key === 'ArrowUp') go(at - 1); else if (event.key === 'Home') go(0); else if (event.key === 'End') go(items.length - 1);
+      else if (event.key === 'Escape' || event.key === 'Tab') { event.preventDefault(); event.stopPropagation(); closeMenu({ refocus: true }); }
+    });
     const box = button.getBoundingClientRect(), base = launcher.getBoundingClientRect(), scale = pageScale();
-    menu.style.left = `${Math.max(4, (box.left - base.left) / scale)}px`; menu.style.top = `${(box.bottom - base.top) / scale + 4}px`; remove.focus?.();
+    menu.style.left = `${Math.max(4, (box.left - base.left) / scale)}px`; menu.style.top = `${(box.bottom - base.top) / scale + 4}px`; items[0].focus?.();
+    return true;
+  };
+  /** Right-click, the context-menu key and Shift+F10 on an icon open its menu (as a long press does). */
+  const menuKeys = (button, itemOf) => {
+    button.addEventListener('contextmenu', event => { const item = itemOf(); if (!item) return; event.preventDefault(); openMenu(button, item); });
+    button.addEventListener('keydown', event => {
+      if (!(event.key === 'ContextMenu' || (event.key === 'F10' && event.shiftKey))) return;
+      const item = itemOf(); if (!item) return; event.preventDefault(); event.stopPropagation?.(); openMenu(button, item);
+    });
   };
   const longPress = (button, itemOf) => {
     button.addEventListener('pointerdown', event => {
@@ -100,7 +122,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     button.addEventListener('click', event => { if (pressed?.button === button && pressed.fired) { pressed = null; event.stopImmediatePropagation(); event.preventDefault(); } }, true);
   };
   doc.addEventListener?.('pointerdown', event => { if (menu && !menu.contains(event.target)) closeMenu(); }, true);
-  doc.addEventListener?.('keydown', event => { if (event.key === 'Escape') closeMenu(); });
+  doc.addEventListener?.('keydown', event => { if (event.key === 'Escape' && menu) closeMenu({ refocus: true }); });
   const away = () => mode === 'home' || mode === 'closed' || mode === 'idle' || mode === 'installing' || mode === 'installed';   // the launcher is on screen, no app window
 
   const setTransform = (scale, lift, animate) => { for (const node of targets()) { node.style.transition = animate ? 'transform .26s cubic-bezier(.2,.8,.2,1), border-radius .26s, opacity .2s' : 'none'; node.style.transformOrigin = '50% 50%'; node.style.transform = scale === 1 && lift === 0 ? '' : `translateY(${-lift}px) scale(${scale})`; node.style.borderRadius = scale === 1 ? '' : '28px'; node.style.opacity = ''; } };
@@ -229,7 +251,9 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     const rect = screen.getBoundingClientRect(), x = (event.clientX - rect.left) / rect.width, y = (event.clientY - rect.top) / rect.height, half = CARD_SCALE / 2, centre = 0.5 - CARD_LIFT;
     if (event.detail === 0 || (Math.abs(x - 0.5) <= half && Math.abs(y - centre) <= half)) resume(); else show('home');   // keyboard activation or a tap on the card resumes; a tap beside it goes home
   });
-  longPress(app, () => (mode === 'closed' || mode === 'installed') ? shelfItems.find(item => item.id === shelfCurrent) ?? null : null);   // the app of this run, when it is not running (closed, or installed and not started) and is saved
+  // the app of this run while its icon is on the launcher (not while it installs): its saved entry, or (a demo, a hosted example) an entry of its own with no Uninstall
+  const currentItem = () => { if (!away() || mode === 'installing' || mode === 'idle') return null; const saved = shelfItems.find(item => item.id === shelfCurrent); return saved ? { ...saved, current: true } : { id: null, current: true, label: label.textContent || pendingLabel, name: pendingLabel }; };
+  menuKeys(app, currentItem); longPress(app, currentItem);
   app.addEventListener('click', () => resume());
   const button = (selector, action) => screen.querySelector(selector)?.addEventListener('click', event => { event.stopPropagation(); if (!working && !busy()) action(); });
   button('.sysbar-back', () => { if (mode === 'overview') { resume(); return; } if (away()) return; if (canGoBack()) back(); else leave('home'); });   // Back on the root Activity of the launcher task leaves it in the background (Android 12+)

@@ -1,14 +1,14 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=efe50e99a19d';
-import { staticRetentionLines } from './heap-gc.js?v=efe50e99a19d';
-import { overrideSummaryLines } from './method-overrides.js?v=efe50e99a19d';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=efe50e99a19d';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=efe50e99a19d';
-import { hostMapSummaryLines } from './host-map.js?v=efe50e99a19d';
-import { attributeGap } from './worker-task-log.js?v=efe50e99a19d';
-import { loadImageText } from './load-image.js?v=efe50e99a19d';
-import { identityText } from './device-identity.js?v=efe50e99a19d';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=bf542493e850';
+import { staticRetentionLines } from './heap-gc.js?v=bf542493e850';
+import { overrideSummaryLines } from './method-overrides.js?v=bf542493e850';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=bf542493e850';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=bf542493e850';
+import { hostMapSummaryLines } from './host-map.js?v=bf542493e850';
+import { attributeGap } from './worker-task-log.js?v=bf542493e850';
+import { loadImageText } from './load-image.js?v=bf542493e850';
+import { identityText } from './device-identity.js?v=bf542493e850';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -70,7 +70,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   });
   part(() => {   // renderer (src/gpu-raster.js): only when the experimental GPU replay was selected in this session; a fallback to CPU is never silent
     const gpu = runtime.gpuRaster; if (!gpu) return; const s = gpu.status();
-    out.push(s.active === 'gpu' ? `Rendering: GPU (experimental, ${s.api ?? 'WebGL'}${s.gpuRenderer ? `, ${s.gpuRenderer}` : ''}): ${s.frames} frames, ${s.gpuMs} ms, max ${s.maxMs} ms` : s.requested === 'gpu' || s.reason ? `Rendering: CPU — GPU unavailable: ${s.reason ?? 'unknown'}` : 'Rendering: CPU (default)');
+    out.push(s.active === 'gpu' ? `Rendering: GPU (experimental, ${s.api ?? 'WebGL'}${s.gpuRenderer ? `, ${s.gpuRenderer}` : ''}): ${s.frames} frames, ${s.gpuMs} ms, max ${s.maxMs} ms${s.recoveries ? `; ${s.recoveries} lost WebGL context(s) replaced, the last: ${s.lastLoss}` : ''}` : s.requested === 'gpu' || s.reason ? `Rendering: CPU — GPU unavailable: ${s.reason ?? 'unknown'}` : 'Rendering: CPU (default)');
   });
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
   part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)

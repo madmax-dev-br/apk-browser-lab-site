@@ -1,67 +1,68 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=efe50e99a19d';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=efe50e99a19d';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=efe50e99a19d';
-import { drawFrameGraph } from './frame-graph.js?v=efe50e99a19d';
-import { clientIdentityStatus } from './client-identity.js?v=efe50e99a19d';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=efe50e99a19d';
-import { initCollapsibleSections } from './panel-sections.js?v=efe50e99a19d';
-import { warmupLabel } from './warmup.js?v=efe50e99a19d';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=efe50e99a19d';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=efe50e99a19d';
-import { initHelpTips } from './help-tips.js?v=efe50e99a19d';
-import { initControlPanelUI } from './control-panel-ui.js?v=efe50e99a19d';
-import { createToolDock } from './tool-dock.js?v=efe50e99a19d';
-import { createPermissionsPanel } from './permissions-panel.js?v=efe50e99a19d';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=efe50e99a19d';
-import { createAppDataPanel } from './app-data-panel.js?v=efe50e99a19d';
-import { createCameraLab } from './camera-lab.js?v=efe50e99a19d';
-import { createOverridesPanel } from './overrides-panel.js?v=efe50e99a19d';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=efe50e99a19d';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=efe50e99a19d';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=efe50e99a19d';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=efe50e99a19d';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=efe50e99a19d';
-import { MICROG_SERVICES } from './microg-services.js?v=efe50e99a19d';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=efe50e99a19d';
-import { createOrientationLock } from './orientation-lock.js?v=efe50e99a19d';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=efe50e99a19d';
-import { createHostMapPanel } from './host-map-panel.js?v=efe50e99a19d';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=efe50e99a19d';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=efe50e99a19d';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=efe50e99a19d';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=efe50e99a19d';
-import { createDeviceView, createViewState } from './device-view.js?v=efe50e99a19d';
-import { createTaskSwitcher } from './task-switcher.js?v=efe50e99a19d';
-import { createDeviceZoom } from './device-zoom.js?v=efe50e99a19d';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=efe50e99a19d';
-import { formatApiGapReport } from './api-gap-scan.js?v=efe50e99a19d';
-import { createLogcatPanel } from './logcat-panel.js?v=efe50e99a19d';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=efe50e99a19d';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=efe50e99a19d';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=efe50e99a19d';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=efe50e99a19d';
-import { createAppPalette } from './app-palette.js?v=efe50e99a19d';
-import { createScreenRecorder } from './screen-recorder.js?v=efe50e99a19d';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=efe50e99a19d';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=efe50e99a19d';
-import { createAdb } from './adb-commands.js?v=efe50e99a19d';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=efe50e99a19d';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=efe50e99a19d';
-import { createAdbTerminal } from './adb-terminal.js?v=efe50e99a19d';
-import { memorySummary } from './worker-memory.js?v=efe50e99a19d';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=efe50e99a19d';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=efe50e99a19d';
-import { createModalHost } from './lab-modal.js?v=efe50e99a19d';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=efe50e99a19d';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=efe50e99a19d';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=efe50e99a19d';
-import { createDragLayer } from './lab-drag.js?v=efe50e99a19d';
-import { createLabScroll } from './lab-scroll.js?v=efe50e99a19d';
-import { createGlSurfaces } from './gl-surfaces.js?v=efe50e99a19d';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=efe50e99a19d';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=efe50e99a19d';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=efe50e99a19d';
-import { resolveIntentFields } from './intent-resolver.js?v=efe50e99a19d';
+import { APKWorkerClient } from './apk-worker-client.js?v=bf542493e850';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=bf542493e850';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=bf542493e850';
+import { drawFrameGraph } from './frame-graph.js?v=bf542493e850';
+import { clientIdentityStatus } from './client-identity.js?v=bf542493e850';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=bf542493e850';
+import { initCollapsibleSections } from './panel-sections.js?v=bf542493e850';
+import { warmupLabel } from './warmup.js?v=bf542493e850';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=bf542493e850';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=bf542493e850';
+import { initHelpTips } from './help-tips.js?v=bf542493e850';
+import { initControlPanelUI } from './control-panel-ui.js?v=bf542493e850';
+import { createToolDock } from './tool-dock.js?v=bf542493e850';
+import { createPermissionsPanel } from './permissions-panel.js?v=bf542493e850';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=bf542493e850';
+import { createAppDataPanel } from './app-data-panel.js?v=bf542493e850';
+import { createCameraLab } from './camera-lab.js?v=bf542493e850';
+import { createOverridesPanel } from './overrides-panel.js?v=bf542493e850';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=bf542493e850';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=bf542493e850';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=bf542493e850';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=bf542493e850';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=bf542493e850';
+import { MICROG_SERVICES } from './microg-services.js?v=bf542493e850';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=bf542493e850';
+import { createOrientationLock } from './orientation-lock.js?v=bf542493e850';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=bf542493e850';
+import { createHostMapPanel } from './host-map-panel.js?v=bf542493e850';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=bf542493e850';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=bf542493e850';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=bf542493e850';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=bf542493e850';
+import { createDeviceView, createViewState } from './device-view.js?v=bf542493e850';
+import { createTaskSwitcher } from './task-switcher.js?v=bf542493e850';
+import { createDeviceZoom } from './device-zoom.js?v=bf542493e850';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=bf542493e850';
+import { formatApiGapReport } from './api-gap-scan.js?v=bf542493e850';
+import { createLogcatPanel } from './logcat-panel.js?v=bf542493e850';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=bf542493e850';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=bf542493e850';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=bf542493e850';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=bf542493e850';
+import { createAppPalette } from './app-palette.js?v=bf542493e850';
+import { createScreenRecorder } from './screen-recorder.js?v=bf542493e850';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=bf542493e850';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=bf542493e850';
+import { createAdb } from './adb-commands.js?v=bf542493e850';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=bf542493e850';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=bf542493e850';
+import { createAdbTerminal } from './adb-terminal.js?v=bf542493e850';
+import { memorySummary } from './worker-memory.js?v=bf542493e850';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=bf542493e850';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=bf542493e850';
+import { createModalHost } from './lab-modal.js?v=bf542493e850';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=bf542493e850';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=bf542493e850';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=bf542493e850';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=bf542493e850';
+import { createDragLayer } from './lab-drag.js?v=bf542493e850';
+import { createLabScroll } from './lab-scroll.js?v=bf542493e850';
+import { createGlSurfaces } from './gl-surfaces.js?v=bf542493e850';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=bf542493e850';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=bf542493e850';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=bf542493e850';
+import { resolveIntentFields } from './intent-resolver.js?v=bf542493e850';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -132,7 +133,7 @@ async function removeSavedApp(item) {
   if (!yes) return;
   if (state.shelfId === item.id && state.inventory) {   // the app on screen: it closes, as an uninstall closes it on a device
     cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.needsRestart = false;
-    $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview';
+    $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; appInfo.render();
   }
   await apkShelf.remove(item.id); if (state.shelfId === item.id) state.shelfId = null; await refreshShelf(); setStatus(`${name} uninstalled`); appendTrace(`${name} uninstalled from the home screen (its stored copy deleted)`);
 }
@@ -154,8 +155,6 @@ function setStatus(message, kind = '') {
   $('status-dot').className = kind;
   notifyParent('apk-lab-state', { mode: state.mode, status: message, running: kind === 'ok' });
 }
-// "Recriar" / "Reabrir" the Activity: shown while an APK runs (an Activity is on screen), disabled while the VM is busy.
-function syncReloadButton() { for (const id of ['reopen-activity']) { const button = $(id); if (!button) continue; button.hidden = state.mode !== 'apk' || !state.currentSource; button.disabled = state.busy || !!state.runStarting; } }   // Reopen restarts the app from zero (reopenApp): also after it failed or ended
 // "Tela pronta" (src/screen-ready.js): the Activity and its fragments loaded and the screen is still; the title says what it still waits for.
 function showScreenReady(ready) {
   const chip = $('screen-ready'); if (!chip) return;
@@ -170,9 +169,7 @@ function showWarmup(warmup) {
   chip.hidden = false; chip.dataset.ready = String(!label.warming); chip.textContent = label.text; chip.title = label.title;
 }
 function setBusy(busy) {
-  state.busy = busy; syncReloadButton();
-  $('activity-select').disabled = busy;
-  $('back-button').disabled = busy || !state.runtime || !state.canGoBack;
+  state.busy = busy;
   $('inspect-native-button').disabled = busy || !state.runtime;
   if ($('clear-app-data')) $('clear-app-data').disabled = busy || !state.runtime;
   if ($('clear-microg-data')) $('clear-microg-data').disabled = !canClearMicrogData({ busy, running: !!state.runtime, loadedMicrog: state.loadedMicrog });
@@ -274,8 +271,6 @@ function reportAPKError(error, title, { crash = state.launchAttempted } = {}) {
   if (error.navigation) state.canGoBack = !!error.navigation.canGoBack;
   if (!apkVM.worker) { state.runtime = null; state.apkRunning = false; }
   if (crash && state.mode === 'apk' && state.currentSource) closeCrashedApp();
-  $('back-button').hidden = state.mode !== 'apk' || !state.canGoBack;
-  $('back-button').disabled = state.busy || !state.runtime || !state.canGoBack; syncReloadButton();
   if (state.mode === 'apk') showError(error, title);
   else appendTrace(`APK ERROR: ${error.message || error}`);
   if (crash && state.mode === 'apk' && state.currentSource) setStatus('The app stopped because of an error · tap its icon on the home screen to open it again', 'error');
@@ -294,7 +289,6 @@ function dismissApp(by = 'by the user (swiped out of the recents)') {
   state.needsRestart = true; state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   apkVM.cancel(); hideError(); markLastRunEnded();   // ended by the user: the next visit must not report it as a run that stopped without warning
   closeCrashedApp(`The app was ended ${by}: its process was killed; tap its icon on the home screen to open it again in a new VM.`);
-  $('back-button').hidden = true; syncReloadButton();
   setStatus('App ended · tap its icon on the home screen to open it again'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENDED';
 }
 /** "Close" (or Esc) on the error window: the device is on screen again, its launcher with the app's icon focused (Enter reopens it). */
@@ -370,9 +364,92 @@ function showLoadTimes() {
   const seconds = ms => (ms / 1000).toFixed(2);
   let text = `Loaded in ${seconds(times.loadMs)} s (${[`file read ${times.readMs} ms`, ...loadPhaseParts(times)].join(' · ')})`;
   if (times.launchMs !== undefined) text += ` · Activity opened in ${seconds(times.launchMs)} s`;
-  $('load-times').hidden = false;
-  $('load-times').textContent = text;
+  state.loadTimes.text = text; appInfo.render();
 }
+// ---- the open package: its line at the top of the controls, its line in the status bar (with the details on hover or focus), the Activity its icon opens ----
+/** The Activity the launcher icon opens, per package: chosen in the Package window (src/package-modal.js), kept for this page's life; undefined: the manifest's own. */
+const launchChoices = new Map();
+function launchActivity(inventory = state.inventory) {
+  const chosen = inventory?.packageName ? launchChoices.get(inventory.packageName) : undefined;
+  return chosen && (inventory.activities ?? []).some(activity => (typeof activity === 'string' ? activity : activity?.name) === chosen) ? chosen : undefined;
+}
+/** The app's name as the launcher shows it (its label once the VM answered), else the package id, else the file name. */
+function appLabel() {
+  const known = state.launcherInfo, label = known?.inventory === state.inventory ? known?.info?.label : null;
+  return label || state.inventory?.packageName || String(state.currentSource?.name ?? 'App').replace(/\.(apk|aab|apks|xapk|apkm)$/i, '');
+}
+/** "Launch" in the Package window: the choice is recorded for the package and the app opens again from zero with it, as the old select and "Reopen" did (reopenApp). */
+function launchWith(name) {
+  const inventory = state.inventory; if (!inventory?.packageName || !name) return;
+  if (name === defaultActivity(inventory)) launchChoices.delete(inventory.packageName); else launchChoices.set(inventory.packageName, name);
+  appendTrace(`Launch activity: ${name}${launchChoices.has(inventory.packageName) ? ' (chosen in the Package window)' : ' (the manifest\'s)'}`); appInfo.render();
+  if (state.launchAttempted || state.needsRestart) reopenApp(); else runAPK();
+}
+function showPackageWindow() {
+  const inventory = state.inventory; if (!inventory) return null;
+  return openPackageModal({ modalHost, inventory, label: appLabel(), icon: taskSwitcher?.icon?.() ?? null, file: { name: state.currentSource?.name ?? null, bytes: state.currentFileBytes ?? null },
+    current: launchActivity() ?? null, busy: () => state.busy || !!state.runStarting || !state.currentSource, onLaunch: launchWith });
+}
+/** The package's one line at the top of the controls (icon, name, version); the details open under it. Without a package the "Open APK" drop zone is shown instead. */
+function showPackageLine() {
+  const panel = $('apk-panel'), strip = $('inspection-panel'); if (!panel || !strip) return;
+  const loaded = !!state.currentSource; panel.dataset.state = loaded ? 'loaded' : 'empty'; strip.hidden = !loaded; if (!loaded) return;
+  $('package-label').textContent = appLabel();
+  const version = state.inventory?.manifestAttrs?.versionName; $('package-version').textContent = version ? String(version) : '';
+  const box = $('package-icon'), url = taskSwitcher?.icon?.() ?? null, img = box.querySelector('img');
+  if (url) { if (img?.getAttribute('src') !== url) { const image = document.createElement('img'); image.alt = ''; image.src = url; box.replaceChildren(image); } box.classList.add('has-icon'); }
+  else { box.replaceChildren(); box.textContent = 'APK'; box.classList.remove('has-icon'); }
+}
+/** The status bar's line about the open app ("Counter · loaded in 0.43 s") and its details on hover, focus or a tap (load times by phase, package, version, Activity, engine, ABI). */
+const appInfo = (() => {
+  const button = $('app-info'), panel = $('app-info-detail'), seconds = ms => `${(ms / 1000).toFixed(2)} s`;
+  if (!button || !panel) return { render() {}, hide() {} };
+  const row = (label, value, { sub = false, note = null } = {}) => { const line = document.createElement('div'); line.className = sub ? 'md-row md-sub' : 'md-row'; const a = document.createElement('span'), b = document.createElement('strong'); a.textContent = label; b.textContent = value; line.append(a, b); if (note) { const small = document.createElement('small'); small.textContent = note; line.append(small); } return line; };
+  function fill() {
+    const inventory = state.inventory, times = state.loadTimes, rows = [];
+    rows.push(row(appLabel(), inventory?.manifestAttrs?.versionName ? `version ${inventory.manifestAttrs.versionName}` : ''));
+    if (times?.done) {
+      rows.push(row('Loaded in', seconds(times.loadMs)), row('file read', `${times.readMs} ms`, { sub: true }));
+      for (const part of loadPhaseParts(times)) { const at = part.lastIndexOf(' ', part.length - 4); rows.push(row(part.slice(0, at), part.slice(at + 1), { sub: true })); }
+      if (times.launchMs !== undefined) rows.push(row('Activity opened in', seconds(times.launchMs)));
+    }
+    if (inventory?.packageName) rows.push(row('Package', inventory.packageName));
+    if (inventory?.manifestAttrs?.versionCode !== undefined) rows.push(row('Version code', String(inventory.manifestAttrs.versionCode)));
+    if (inventory?.usesSdk) rows.push(row('SDK', `min ${inventory.usesSdk.minSdkVersion ?? '—'} · target ${inventory.usesSdk.targetSdkVersion ?? inventory.usesSdk.minSdkVersion ?? '—'}`));
+    const activity = launchActivity() ?? defaultActivity(inventory);
+    if (activity) rows.push(row('Launch activity', activity.split('.').pop(), { note: launchActivity() ? `${activity} · chosen in the Package window` : activity }));
+    if (state.loadedEngine) rows.push(row('Engine', state.loadedEngine === 'js' ? 'JavaScript VM' : 'WebAssembly core'));
+    rows.push(row('Device ABI', state.runArm64 ? 'arm64-v8a, wasm32' : 'wasm32'));
+    const abis = Object.keys(inventory?.nativeByABI ?? {}); if (abis.length) rows.push(row('APK ABIs', abis.sort().join(', ')));
+    if (state.currentSource?.name) rows.push(row('File', state.currentFileBytes ? `${formatSize(state.currentFileBytes)}` : '—', { note: state.currentSource.name }));
+    const hint = document.createElement('p'); hint.textContent = 'Hold the app\'s icon on the home screen for the Package window (activities, permissions, splits).';
+    panel.replaceChildren(...rows, hint);
+  }
+  function place() {
+    if (panel.hidden) return;
+    const box = button.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight, margin = 8;
+    const left = Math.max(margin, Math.min(innerWidth - width - margin, box.left)), above = box.top - height - 6;
+    panel.style.left = `${Math.round(left)}px`; panel.style.top = `${Math.round(above >= margin ? above : box.bottom + 6)}px`;
+  }
+  let leaving = null, pinned = false;
+  const show = on => { panel.hidden = !on; button.setAttribute('aria-expanded', on ? 'true' : 'false'); if (on) { fill(); place(); } else pinned = false; };
+  const enter = () => { clearTimeout(leaving); show(true); }, leave = () => { if (pinned) return; clearTimeout(leaving); leaving = setTimeout(() => show(false), 150); };
+  button.addEventListener('mouseenter', enter); button.addEventListener('mouseleave', leave); panel.addEventListener('mouseenter', enter); panel.addEventListener('mouseleave', leave);
+  button.addEventListener('focus', enter); button.addEventListener('blur', () => { pinned = false; leave(); });
+  button.addEventListener('click', () => { pinned = !pinned || panel.hidden; show(pinned); });   // a tap (touch) keeps it open until the next tap or Esc
+  button.addEventListener('keydown', event => { if (event.key === 'Escape') { event.preventDefault(); pinned = false; show(false); } });
+  window.addEventListener?.('resize', place); window.addEventListener?.('scroll', place, true);
+  return {
+    render() {
+      const times = state.loadTimes; showPackageLine();
+      if (!state.inventory || !times?.done) { button.hidden = true; show(false); return; }
+      const text = `${appLabel()} · loaded in ${seconds(times.loadMs)}${times.launchMs !== undefined ? ` · opened in ${seconds(times.launchMs)}` : ''}`;
+      button.hidden = false; button.querySelector('.app-info-text').textContent = text; button.setAttribute('aria-label', `${text}. Details on hover or focus.`); button.title = '';
+      if (!panel.hidden) { fill(); place(); }
+    },
+    hide() { button.hidden = true; show(false); },
+  };
+})();
 function onWorkerProgress(progress = {}) {
   notePhase(progress.phase);
   const phases = { 'framework-resources': 'Loading original Android styles data', framework: 'Loading compiled AOSP code', manifest: 'Reading the manifest', dex: 'Inspecting DEX', native: 'Taking inventory of native libraries', complete: 'Inspection complete', launch: 'Trying to start the Activity', intent: 'Opening the link', click: 'Running DEX callback', back: 'Returning to the previous Activity', resources: 'Reading resources and XML layouts' };
@@ -385,7 +462,7 @@ function onWorkerProgress(progress = {}) {
 }
 function cancelOperation() {
   ++state.operation; state.abortController?.abort(); apkVM.cancel(); setTimeout(() => apkVM.prewarm?.(), 0); state.apiGaps = null; pluginHost.vmChanged();   // the next APK starts in a Worker that is already warming
-  state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true; syncReloadButton(); state.lastAPKError = null;
+  state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; state.lastAPKError = null;
   clearInterval(state.operationTimer); $('operation-panel').hidden = true;
   state.homeMode = 'idle'; showDeviceHome('idle');
   setBusy(false);
@@ -650,13 +727,7 @@ function showInventory(inventory) {
   archiveSummary.append(dexSummary);
   const nativeCount = inventory.nativeLibraries?.length || 0;
   const nativeSummary = document.createElement('p'); nativeSummary.textContent = `${nativeCount} packaged libraries; JNI support will be checked on use.`; archiveSummary.append(nativeSummary); archiveSummary.hidden = false;
-  const select = $('activity-select'); select.replaceChildren();
-  (inventory.activities || []).forEach((activity) => {
-    const name = typeof activity === 'string' ? activity : activity.name;
-    const option = document.createElement('option'); option.value = name; option.textContent = `${name}${activity.launcher ? ' · launcher' : ''}`;
-    option.selected = name === inventory.launcherActivity; select.append(option);
-  });
-  if (!select.options.length) { const option = document.createElement('option'); option.value = ''; option.textContent = 'Automatic selection'; select.append(option); }
+  showPackageLine();
   const details = $('inventory-details'); details.replaceChildren();
   if (inventory.classNames?.length || Array.isArray(inventory.classes)) { const names = inventory.classNames || inventory.classes; details.append(listSection(`DEX CLASSES · ${Math.min(120, names.length)} NAMES SHOWN OF ${inventory.classes ?? names.length} · ${Math.max(0, names.length - 120)} MORE NAMES IN THE INVENTORY`, names.slice(0, 120))); }
   if (inventory.dexSummaries?.length) details.append(listSection('INVENTORY PER DEX', inventory.dexSummaries.map((dex) => `${dex.filename}: ${dex.classes ?? '—'} classes · ${dex.methods ?? '—'} methods · ${formatSize(dex.bytes || 0)}`)));
@@ -719,10 +790,10 @@ async function importSource(source, autoRun = false) {
   // A new run (another APK, or the app opened again from its launcher icon) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Keep app data" option; the panel settings are kept.
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; showClientCertState(); state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
-  taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false; $('back-button').hidden = true;
+  taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false;
   $('empty-preview').querySelector('h2').textContent = 'Your app starts here.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
   const token = beginOperation('Reading the APK file…');
-  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; if ($('inspection-badge')) $('inspection-badge').textContent = 'Analyzing';
+  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('inventory-empty').firstElementChild.textContent = 'Reading the package…'; if ($('inspection-badge')) $('inspection-badge').textContent = 'Analyzing';
   $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · local file` : 'Test APK hosted locally';
   $('preview-name').textContent = source.name;
   state.shelfId = source.shelfId ?? null; await refreshShelf();
@@ -730,8 +801,7 @@ async function importSource(source, autoRun = false) {
   state.trace = []; appendTrace(`Opening ${source.name} in an isolated Web Worker. No upload.`);
   setStatus('Reading the APK file…');
   try {
-    let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0 };
-    $('load-times').hidden = true;
+    let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0 }; state.currentFileBytes = source.file?.size ?? null; appInfo.render();
     if (source.file) buffer = await source.file.arrayBuffer();
     else {
       state.abortController = new AbortController();
@@ -742,6 +812,7 @@ async function importSource(source, autoRun = false) {
     }
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('The APK exceeds the 1 GiB limit.');
+    state.currentFileBytes = buffer.byteLength;
     $('file-size').textContent = `${formatSize(buffer.byteLength)} · processed in the browser`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     frameMeter.reset();   // the frame counts of "Show frame rate" start with the app
@@ -767,7 +838,7 @@ async function importSource(source, autoRun = false) {
     }
   } catch (error) {
     if (token !== state.operation) return;
-    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle';
+    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle'; $('inventory-empty').firstElementChild.textContent = 'The package could not be read: the error window says why.'; appInfo.render();
     // An installed app that failed to open keeps its icon on the launcher (it is not the app of a run any more: drawn as a saved app, to tap again), and the error offers to
     // choose its APK again, which replaces the stored copy. Before, the entry stayed "the app of this run", whose icon the idle launcher hides: the app vanished from the home screen.
     if (source.shelfId) { state.reimportShelfId = source.shelfId; state.shelfId = null; await refreshShelf(); }
@@ -1107,7 +1178,7 @@ const adbDevice = {
     if (!entries.length && !isCurrent) return false;
     if (!keepData) { await this.ensureLoaded(packageName); await waitIdle(); showAppData(await apkVM.clearAppData()); }   // the data goes with the package, as on a device
     await waitIdle();
-    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; setStatus(`${packageName} uninstalled`); }
+    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; appInfo.render(); setStatus(`${packageName} uninstalled`); }
     for (const entry of entries) await apkShelf.remove(entry.id);
     await refreshShelf(); appendTrace(`adb: ${packageName} uninstalled${keepData ? ' (data kept)' : ' (data deleted)'}`); return true;
   },
@@ -1297,13 +1368,13 @@ const hostMapPanel = createHostMapPanel({ $, get: () => deviceState.settings.net
 const deviceView = createDeviceView({ $, state, deviceState, frameMeter, hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, notifyParent, clickView: id => clickView(id), hooks: {
   cameraSurface(element, info) { cameraLab.bindSurface(element, info); },
   glSurface(element, info) { glSurfaces.bind(element, info); },
-  navigationChanged(canGoBack) { $('back-button').disabled = state.busy || !canGoBack; $('back-button').hidden = state.mode !== 'apk' || !canGoBack; syncReloadButton(); },
+  navigationChanged() {},   // Back is the device's own: its navigation bar or gesture (src/task-switcher.js), Esc on the screen or Alt+← (below), adb and the MCP tools
   closed() {
     taskSwitcher?.closed(); orientationLock.reset();   // the device shows its launcher: the app's icon starts it again
     if (state.mode === 'apk') { setStatus('App ended · no active Activity'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENDED'; }
   },
   rendered(snapshot, composeReady) {
-    syncReloadButton(); showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup); taskSwitcher?.sync(snapshot, state.inventory);
+    showScreenReady(snapshot.screenReady); showWarmup(snapshot.warmup); taskSwitcher?.sync(snapshot, state.inventory);
     overridesPanel.hits(snapshot.methodOverrides); methodHooksPanel.update(snapshot.methodHooks); microgEntriesPanel.update(snapshot.deviceOptions?.microg?.entryPoints ?? null); microgServicesPanel.update(snapshot.deviceOptions?.microg?.services ?? null, state.loadedMicrog); ignoredPanel.hits(snapshot.ignoredActivities); mocksPanel.hits(snapshot.endpointMocks); hostMapPanel.hits(snapshot.hostMap);
     hideBoot({ force: true }); $('empty-preview').hidden = true; updateMemoryMeter(snapshot.vmHealth); showCoreUsage(snapshot.vmHealth); state.lastSnapshot = snapshot; redrawLayoutBounds(); syncFrameGraph(); if (snapshot.vmHealth) { const before = JSON.stringify(state.lastVmHealth?.clientIdentity ?? null); state.lastVmHealth = snapshot.vmHealth; if (JSON.stringify(snapshot.vmHealth.clientIdentity ?? null) !== before) showClientCertState(); } if (snapshot.vmHealth?.renderer) showRendererStatus(snapshot.vmHealth.renderer, true); composeInspector.rendered(snapshot); pluginHost.snapshot(snapshot);
     if (snapshot.droppedEvent) appendTrace(`Event dropped: View ${snapshot.droppedEvent.id} (${snapshot.droppedEvent.type}) no longer exists in the VM.`);
@@ -1315,9 +1386,9 @@ const deviceView = createDeviceView({ $, state, deviceState, frameMeter, hideErr
   },
 } });
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
-const appPalette = createAppPalette({ toggle: $('look-app-colors'), origin: () => $('android-screen') });   // src/app-palette.js: the page in the open app's colours, as soon as the launcher knows its icon (task switcher onIcon: the stored icon of a saved app, then the VM's)
+const appPalette = createAppPalette({ origin: () => $('android-screen') });   // src/app-palette.js: the page in the open app's colours, as soon as the launcher knows its icon (task switcher onIcon: the stored icon of a saved app, then the VM's)
 window.apkLabPalette = appPalette;   // test and console access: .state
-taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item) }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); }, onIcon: url => { if (url) appPalette.fromURL(url); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
+taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item), hasPackage: item => !!state.inventory && (item.current || item.id === state.shelfId), package: () => showPackageWindow() }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); appInfo.render(); }, onIcon: url => { if (url) appPalette.fromURL(url); showPackageLine(); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
   begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Device navigation'); else appendTrace(message); },
   announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'App ended · tap its icon to open it again' : 'App in the background (onPause, onStop) · tap to go back'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENDED' : '<span></span> PAUSED'; } });
 // The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
@@ -1337,18 +1408,6 @@ const DEVICE_REGIONS = Object.keys(ISO_COUNTRIES).map(code => [code, `${displayN
 const DEVICE_ZONES = [['', 'Follow the browser'], ['America/Sao_Paulo', 'São Paulo (UTC−3)'], ['UTC', 'UTC'], ['America/New_York', 'New York'], ['Europe/London', 'London'], ['Europe/Paris', 'Paris'], ['Asia/Kolkata', 'India (UTC+5:30)'], ['Asia/Tokyo', 'Tokyo'], ['Australia/Sydney', 'Sydney']];
 const DEVICE_SCREENS = [['phone', 'Phone · 411 × 914 dp'], ['compact', 'Compact · 360 × 800 dp'], ['large', 'Large · 412 × 892 dp'], ['small', 'Small · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp'], ['custom', 'Custom…']];
 const fillSelect = (select, entries) => { select.replaceChildren(...entries.map(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; return option; })); };
-// "Internet" in the preview bar: the device's connectivity in one click (Controls › Network › Connectivity, applied live). Off is "No connection"; on is the mode it had before.
-let lastOnlineConnectivity = 'online';
-function syncNetworkToggle(settings) {
-  const button = $('network-toggle'); if (!button) return; const offline = settings.connectivity === 'offline';
-  if (!offline) lastOnlineConnectivity = settings.connectivity;
-  button.setAttribute('aria-pressed', offline ? 'true' : 'false'); button.classList.toggle('offline', offline); button.textContent = offline ? 'No internet' : 'Internet';
-}
-$('network-toggle')?.addEventListener('click', () => {
-  const offline = deviceState.settings.connectivity === 'offline';
-  applyDeviceSettings(sanitizeSettings({ ...deviceState.settings, connectivity: offline ? lastOnlineConnectivity : 'offline' }));
-  setStatus(offline ? 'Device internet on' : 'Device internet off: the app sees the device with no connection');
-});
 /** The line under Dispositivo › Proxy: whether what is typed is in use, off, or refused (and so off). */
 let proxyTyping = false;   // the Proxy field's own input is being applied: writeDevicePanel leaves the field as typed
 /** The On/Off pill of the mTLS field and the line under it: what is configured and what the running app did with it (vmHealth.clientIdentity). */
@@ -1386,7 +1445,6 @@ async function syncRunProxy() {
 relayDetector.check().catch(() => {});
 $('cp-sec-network')?.addEventListener('toggle', () => { if ($('cp-sec-network').open) refreshRelay(); });
 function writeDevicePanel(settings) {
-  syncNetworkToggle(settings);
   $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2)}×`;
   { const [language, region] = String(settings.locale).split('-'); $('dev-locale').value = language; if ($('dev-region')) $('dev-region').value = region; } $('dev-dark').checked = settings.darkTheme; $('dev-animator').value = String(settings.animatorScale); $('dev-hour24').checked = settings.hour24; $('dev-tz').value = settings.timeZone;
   $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-frame-graph').checked = !!settings.frameGraph; if (!proxyTyping) $('dev-proxy').value = settings.network.proxyUrl; if ($('dev-client-cert')) $('dev-client-cert').value = (settings.network.clientCertHosts ?? []).join(', '); if ($('dev-relay-channel')) $('dev-relay-channel').checked = settings.network.relayChannel === true; showProxyState();   /* not from its own typing: a URL half typed (or refused) is not kept, and rewriting the field erased it; the line under it says what is in use */ if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB); writeCoreMemory(settings.coreMemory);
@@ -1425,7 +1483,7 @@ function showRendererStatus(status, fromSnapshot = false) {
   if (status?.reason && status.reason !== rendererShown.split('|')[2] && status.requested === 'gpu') appendTrace(`GPU unavailable: ${status.reason} — using CPU`);
   rendererShown = key;
   const requested = deviceState.settings?.renderer ?? 'gpu';
-  if (!status) { note.textContent = apkVM.worker ? 'In use: CPU' : `In use: CPU${requested === 'gpu' ? ' · GPU on the next launch' : ''}`; note.dataset.state = ''; return; }
+  if (!status) { note.textContent = requested === 'gpu' ? 'GPU selected: it starts when an app draws its first frame' : 'In use: CPU'; note.dataset.state = ''; note.title = note.textContent; return; }   // no app drawing yet: say what was chosen, not "CPU"
   if (status.active === 'gpu') { note.textContent = `In use: GPU (${status.api ?? 'WebGL'}${status.gpuRenderer ? ` · ${status.gpuRenderer}` : ''})`; note.dataset.state = 'gpu'; }
   else if (status.requested === 'gpu' || (requested === 'gpu' && status.reason)) { note.textContent = `GPU unavailable: ${status.reason ?? 'unknown reason'} — using CPU`; note.dataset.state = 'fallback'; }
   else { note.textContent = 'In use: CPU'; note.dataset.state = ''; }
@@ -1528,13 +1586,11 @@ async function runAPK() {
 }
 async function runAPKOnce(retried = false) {
   await flushPendingInputs();
-  const activity = $('activity-select').value || undefined;
   if (state.launchAttempted || state.needsRestart) {   // a second run, or a run after a failure: the APK is reopened in a fresh Worker (a VM left busy or broken by the failure is replaced)
     const source = state.currentSource;
     if (!source) return;
     await importSource(source);
     if (!state.runtime || state.busy) return;
-    if (activity && [...$('activity-select').options].some(option => option.value === activity)) $('activity-select').value = activity;
   }
   await taskSwitcher?.infoSettled?.();   // the launcher's label and icon request of the load just finished (the VM client takes one request at a time)
   await syncRunProxy();   // a relay started (or stopped) since the load: the proxy the app starts with
@@ -1542,7 +1598,7 @@ async function runAPKOnce(retried = false) {
   if (!state.bootVisible) showBoot('Starting the app…');   // a run after a failure reopens the APK first, and the end of that load hides the overlay: the launch gets it back
   const token = beginOperation('Trying to start the Activity…');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
-  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-data')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
+  try { const snapshot = await state.runtime.launch(launchActivity(), { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-data')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
   catch (error) {
     // The Worker was still inside an earlier operation (a run that failed while it kept working): start over once in a fresh Worker instead of reporting "already busy".
     if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando|processing/i.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }
@@ -1628,7 +1684,6 @@ async function loadScenarioCatalog() {
 // The lab has a single mode (APK); switchMode('apk') resets the preview chrome to the APK's current state.
 function switchMode() {
   state.mode = 'apk';
-  $('back-button').hidden = !state.canGoBack; syncReloadButton();
   if (!state.apkRunning) showDeviceHome(); else { $('android-device').hidden = false; $('android-device').inert = false; $('empty-preview').hidden = true; }
   hideError();
   $('execution-engine').textContent = '411 × 840 dp · DENSITY 1';
@@ -1666,7 +1721,15 @@ showDeviceHome(state.homeMode ?? 'idle');   // by default the stage shows the An
 refreshShelf();   // the apps saved by earlier visits, on that launcher
 $('error-close').addEventListener('click', dismissError);
 document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$('error-panel').hidden && !event.target?.closest?.('input,textarea,select,[contenteditable]')) { event.preventDefault(); dismissError(); } });
-$('back-button').addEventListener('click', backAPK);
+// Back from the keyboard (the toolbar has no Back button: the device's navigation bar and gesture are the way back): Esc while the focus is on the device screen, or Alt+←
+// anywhere outside a text field, does what the navigation bar's Back does (src/task-switcher.js navigate). A key the app or a window of the page already took is left alone.
+document.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.repeat || modalHost.count || !$('error-panel').hidden) return;
+  const onScreen = !!event.target?.closest?.('#android-screen'), typing = !!event.target?.closest?.('input,textarea,select,[contenteditable]');
+  const wanted = (event.key === 'Escape' && onScreen && !typing) || (event.key === 'ArrowLeft' && event.altKey && !event.ctrlKey && !event.metaKey && !typing);
+  if (!wanted || !state.runtime) return;
+  event.preventDefault(); taskSwitcher?.navigate?.('back');
+});
 $('recreate-activity')?.addEventListener('click', () => reloadActivity('recreate'));   // the toolbar no longer has this button; lab.reloadActivity still recreates
 /** "Reopen" in the toolbar: the app starts from zero, as after killing its process. The running VM's Worker is terminated (nothing it held stays in memory), the APK is opened
  *  again in a fresh Worker and the launcher Activity starts; app data on the virtual device is kept or cleared as Controls › Files and data › App data says. lab.reloadActivity / the MCP
@@ -1676,7 +1739,6 @@ function reopenApp() {
   state.needsRestart = true; appendTrace?.('Reopen: VM terminated, the app opens again from zero in a fresh Worker');
   return runAPK();
 }
-$('reopen-activity').addEventListener('click', () => reopenApp());
 $('cancel-operation').addEventListener('click', cancelOperation);
 $('native-abi').addEventListener('change', populateNativeLibraries);
 $('inspect-native-button').addEventListener('click', inspectSelectedNative);

@@ -78,7 +78,7 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .controls{border:0;border-bottom:1px solid var(--line);border-radius:0;background:transparent;padding:20px}
 .controls-column>.controls:last-child{border-bottom:0}
 .rail-title{margin:0;font-size:16px;line-height:24px;font-weight:600;color:var(--ink)}
-#apk-panel>.rail-title{margin-bottom:12px}
+#apk-panel .apk-open>.rail-title{margin-bottom:12px}
 .drop-zone{height:auto;align-items:flex-start;justify-content:flex-start;gap:2px;padding:16px;border:1px dashed var(--line-strong);border-radius:var(--r-control);background-color:var(--surface-2);transition:border-color .15s,background-color .15s}
 .drop-zone:hover,.drop-zone.dragging{border-color:var(--accent);background-color:var(--accent-soft)}
 .drop-zone.dragging{border-style:solid}
@@ -109,6 +109,28 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .status-bar .operation-panel button{flex:none;margin:0;font-size:12px;line-height:16px;padding:3px 10px}
 .spinner{border-color:var(--line);border-top-color:var(--accent)}
 .inspection-panel{margin:20px -20px 0;padding:0 20px;border-top:1px solid var(--line)}
+/* the open package at the top of the controls (app.js showPackageLine): one line (icon, name, version) that opens on its details; the "Open APK" drop zone shows only without a package, or under the open details */
+#apk-panel[data-state=loaded]{padding-top:10px;padding-bottom:10px}
+.package-strip.inspection-panel{margin:0;padding:0;border-top:0}
+.package-strip[hidden]{display:none}
+.package-strip>summary.package-line{display:flex;align-items:center;gap:10px;min-height:36px;padding:0;margin:0;list-style:none;cursor:pointer}
+.package-strip>summary.package-line::-webkit-details-marker{display:none}
+.package-strip[open]>summary.package-line{padding-bottom:0}
+.package-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:7px;overflow:hidden;background-color:var(--surface-2);border:1px solid var(--line);color:var(--muted);font:600 9px/1 var(--mono)}
+.package-icon.has-icon{border-color:transparent;background:none}
+.package-icon img{width:100%;height:100%;object-fit:cover}
+.package-title{display:flex;align-items:baseline;gap:8px;flex:1 1 auto;min-width:0}
+.package-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;font-weight:600;color:var(--ink)}
+.package-version{flex:none;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.package-body{padding:4px 0 6px}
+.package-body .file-info{margin-top:8px}
+.package-hint{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
+#apk-panel[data-state=loaded] .package-strip:not([open])~.apk-open{display:none}
+#apk-panel[data-state=loaded] .apk-open{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+#apk-panel[data-state=loaded] .apk-open>.rail-title{font-size:14px;line-height:20px;margin-bottom:8px}
+#apk-panel[data-state=loaded] .drop-zone{padding:10px 12px}
+#apk-panel[data-state=loaded] .drop-zone small{display:none}
+#apk-panel[data-state=loaded] .demo-row{display:none}
 .inspection-panel>summary{display:flex;align-items:center;gap:8px;margin:0;padding:14px 0;border-radius:6px}
 .inspection-panel:not([open])>summary{margin-bottom:0}
 .inspection-panel[open]>summary{padding-bottom:10px}
@@ -127,8 +149,6 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .stats>div{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
 .stats strong{font-size:14px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
 .stats span{margin:0;font-size:14px;color:var(--soft)}
-.activity-label{margin-top:14px}
-.load-times{margin:12px 0 0;font:400 12px/1.5 var(--mono);color:var(--soft)}
 .archive-summary{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
 .archive-summary strong{font-size:14px;font-weight:500;color:var(--ink)}
 .archive-summary p{margin:4px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
@@ -263,7 +283,7 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .preview-bar{height:auto;min-height:48px;padding:8px 20px;gap:8px;justify-content:flex-start;flex-wrap:wrap;background:var(--surface);border-bottom:1px solid var(--line)}
 .preview-title{flex:1 1 120px;gap:0;margin-right:auto;font-size:16px;line-height:24px;font-weight:500;color:var(--ink)}
 .preview-title>span:last-child{max-width:100%}
-.back-button,.reload-activity,.reload-activity+.back-button{margin:0;font-size:14px;line-height:20px;padding:5px 12px}
+.back-button{margin:0;font-size:14px;line-height:20px;padding:5px 12px}
 .fullscreen-button[aria-pressed=true]{border-color:var(--accent);color:var(--accent-ink)}
 .pb-toolbar{gap:6px;margin:0;padding-left:8px;border-left:1px solid var(--line)}
 .pb-toolbar .pb-toolbar-button{font-size:12px;line-height:16px;padding:5px 10px;border-style:dashed;border-radius:var(--r-control)}
@@ -323,6 +343,14 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .memory-detail .md-sub{padding-left:12px;color:var(--soft)}
 .memory-detail p{margin:6px 0 0;color:var(--muted);font-size:11px;line-height:15px}
 .memory-detail .md-live{color:var(--accent)}
+/* the open app's line in the status bar (app.js appInfo): name and load time; its details are the same popover as the memory line's, on hover, focus or a tap */
+.status-bar .app-info{display:inline-flex;align-items:center;flex:0 1 auto;min-width:0;margin:0 auto 0 0;padding:2px 6px;border:0;border-radius:var(--r-control);background:none;color:var(--muted);font:400 12px/20px var(--sans);font-variant-numeric:tabular-nums;cursor:default}
+.status-bar .app-info[hidden]{display:none}
+.status-bar .app-info .app-info-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-decoration:underline dotted var(--line-strong);text-underline-offset:3px}
+.status-bar .app-info:hover:not(:disabled),.status-bar .app-info[aria-expanded=true]{border:0;color:var(--ink);background-color:var(--surface-2)}
+.status-bar:has(.operation-panel:not([hidden]))>.app-info{display:none}
+.app-info-detail .md-row>strong{max-width:220px;overflow-wrap:anywhere}
+.app-info-detail .md-row>small{overflow-wrap:anywhere}
 .crash-notice{padding:10px 20px;gap:12px;border-bottom:1px solid var(--amber);background-color:var(--amber-soft);color:var(--ink);font-size:14px}
 
 /* ---- 6. Exemplos: the catalog as a list ---------------------------------------------------------------------------------------------------------------------- */
@@ -966,3 +994,39 @@ code.lr-text{padding:0;background:none;color:var(--ink);font:400 12px/18px var(-
 @media (max-width:560px){.pl-top{grid-template-columns:minmax(0,1fr)}.em-card .em-fieldset{grid-template-columns:minmax(0,1fr)}.ce-keys{display:none}}
 .lr-sub{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 12px/16px var(--sans);color:var(--muted)}
 .lr-main>.lr-sub{flex-shrink:4}
+
+/* The Package window (src/package-modal.js): who the package is, then the Activity its launcher icon opens, chosen from a searchable list */
+.pkg-modal .lab-modal-body{font:400 13px/1.5 var(--sans)}
+.pkg{display:flex;flex-direction:column;gap:16px}
+.pkg-head{display:flex;align-items:center;gap:14px}
+.pkg-icon{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:12px;overflow:hidden;background-color:var(--surface-2);border:1px solid var(--line);color:var(--muted);font:600 11px/1 var(--mono)}
+.pkg-icon:has(img){border-color:transparent;background:none}
+.pkg-icon img{width:100%;height:100%;object-fit:cover}
+.pkg-who{display:flex;flex-direction:column;min-width:0}
+.pkg-name{font-size:18px;line-height:24px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
+.pkg-id{font:400 12px/18px var(--mono);color:var(--soft);overflow-wrap:anywhere}
+.pkg-facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px 24px;margin:0}
+.pkg-fact{display:grid;grid-template-columns:84px 1fr;gap:12px;min-width:0}
+.pkg-fact dt{color:var(--muted);font-size:12px;line-height:20px}
+.pkg-fact dd{margin:0;color:var(--ink);font-size:13px;line-height:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pkg-perms>summary{cursor:pointer;color:var(--soft);font-size:12px}
+.pkg-perm-list{margin:6px 0 0;padding:0;list-style:none;columns:2 220px;column-gap:16px;font:400 12px/20px var(--mono);color:var(--soft)}
+.pkg-launch{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+.pkg-launch-title{margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--ink)}
+.pkg-launch-note{margin:-4px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
+.pkg-search{width:100%;box-sizing:border-box}
+.pkg-activities{margin:0;padding:4px;list-style:none;max-height:min(280px,40vh);overflow:auto;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--bg)}
+.pkg-activity{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:calc(var(--r-control) - 2px);cursor:pointer}
+.pkg-activity:hover{background-color:var(--surface-2)}
+.pkg-activity.active{background-color:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.pkg-activity-text{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
+.pkg-activity-short{font-size:13px;line-height:18px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-activity-pkg{font:400 11px/16px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-tags{display:flex;gap:4px;flex:none}
+.pkg-tag{padding:1px 7px;border-radius:var(--r-pill);font:500 11px/16px var(--sans);white-space:nowrap;border:1px solid var(--line);color:var(--soft)}
+.pkg-tag.current{border-color:var(--accent);color:var(--accent-ink);background-color:var(--surface)}
+.pkg-empty{margin:0;font-size:12px;color:var(--muted)}
+.pkg-actions{display:flex;align-items:center;gap:12px}
+.pkg-status{flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pkg-go{flex:none}
+@media (max-width:560px){.pkg-tags{flex-direction:column;align-items:flex-end}}

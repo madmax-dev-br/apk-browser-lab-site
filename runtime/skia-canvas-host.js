@@ -1,20 +1,20 @@
-import {APKError} from './apk-runtime.js?v=efe50e99a19d';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=efe50e99a19d';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=efe50e99a19d';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=efe50e99a19d';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=efe50e99a19d';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=efe50e99a19d';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=efe50e99a19d';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=efe50e99a19d';
-import {createBitmapHost} from './bitmap-host.js?v=efe50e99a19d';
-import { gcRoot } from './heap-gc.js?v=efe50e99a19d';
-import {sha256Hex} from './sha256-sync.js?v=efe50e99a19d';
-import {colorLongToArgb} from './color-long.js?v=efe50e99a19d';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=efe50e99a19d';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=efe50e99a19d';
-import {renderNodeByHandle} from './rendernode-native.js?v=efe50e99a19d';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=efe50e99a19d';
-import {BUCKET} from './time-breakdown.js?v=efe50e99a19d';
+import {APKError} from './apk-runtime.js?v=bf542493e850';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=bf542493e850';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=bf542493e850';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=bf542493e850';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=bf542493e850';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=bf542493e850';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=bf542493e850';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=bf542493e850';
+import {createBitmapHost} from './bitmap-host.js?v=bf542493e850';
+import { gcRoot } from './heap-gc.js?v=bf542493e850';
+import {sha256Hex} from './sha256-sync.js?v=bf542493e850';
+import {colorLongToArgb} from './color-long.js?v=bf542493e850';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=bf542493e850';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=bf542493e850';
+import {renderNodeByHandle} from './rendernode-native.js?v=bf542493e850';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=bf542493e850';
+import {BUCKET} from './time-breakdown.js?v=bf542493e850';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -401,7 +401,7 @@ function rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height
  * a `bitmap-raster` (an ImageBitmap the Worker transfers to the page). 'gpu-png' (View Drawable layers): the same GPU replay read back and encoded as the PNG raster the
  * CPU path makes (the page shows it the same way). The cache works as on the CPU (the transport is part of the key, so a CPU raster and a GPU raster of
  * the same recording are separate entries; a reduced request is served the cached full GPU raster), except that an entry whose ImageBitmap already left the Worker is served
- * only while the page still holds it. A GPU failure switches the session to CPU and the same raster is replayed on the CPU at once; a replay that fails on the CPU as well is
+ * only while the page still holds it. A GPU failure switches the session to CPU (a lost context first gets a new one: GpuRasterController.failed) and the same raster is replayed on the CPU at once; a replay that fails on the CPU as well is
  * the recording's own error and propagates as on the CPU path.
  */
 // A GPU raster whose key missed the cache KEY_MISS_STREAK times in a row for its extent (a screen that scrolls or animates: its recording, nested RenderNode display lists included,
@@ -429,7 +429,7 @@ function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,o
  let result;const g0=performance.now();
  try{result=rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,height,options);}
  catch(error){
-  if(error instanceof GpuRasterError){gpu.fallback(error.reason,runtime);return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);}
+  if(error instanceof GpuRasterError){gpu.failed(error,runtime);return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);}
   const cpu=rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);   // throws when the recording itself fails: the GPU is not the cause
   gpu.fallback(`GPU replay error: ${String(error?.message??error).slice(0,160)}`,runtime);return cpu;
  }

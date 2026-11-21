@@ -1,8 +1,8 @@
-import { APKError } from './apk-runtime.js?v=efe50e99a19d';
-import { breakParagraphs } from './text-layout-native.js?v=efe50e99a19d';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=efe50e99a19d';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=efe50e99a19d';
-import { getVectorGraphics } from './vector-native.js?v=efe50e99a19d';
+import { APKError } from './apk-runtime.js?v=bf542493e850';
+import { breakParagraphs } from './text-layout-native.js?v=bf542493e850';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=bf542493e850';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=bf542493e850';
+import { getVectorGraphics } from './vector-native.js?v=bf542493e850';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));

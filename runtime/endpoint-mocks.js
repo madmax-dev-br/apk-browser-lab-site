@@ -12,9 +12,9 @@
 // URL pattern: "http(s)://host[:port]/path[?query]" or a host-less "/path[?query]" (any scheme, host and port). A host label may be "*" (one label: "*.exemplo.com"); a path segment
 // "*" is exactly one segment, "*" inside a segment is any text without "/", and "**" is any number of segments. Without a port the pattern takes any port.
 // Query "exact": the request has exactly the pattern's parameters (any order; a value "*" takes any value); "ignore": the query is not looked at.
-import { inflateRaw } from './inflate.js?v=efe50e99a19d';
-import { REASONS } from './virtual-http-socket.js?v=efe50e99a19d';
-import { utf8Length } from './json-tools.js?v=efe50e99a19d';
+import { inflateRaw } from './inflate.js?v=bf542493e850';
+import { REASONS } from './virtual-http-socket.js?v=bf542493e850';
+import { utf8Length } from './json-tools.js?v=bf542493e850';
 
 export const MOCK_METHODS = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 export const MAX_MOCKS = 50, MAX_BODY_BYTES = 32 * 1024 * 1024, MAX_DELAY_MS = 600000, MAX_HEADERS = 64;

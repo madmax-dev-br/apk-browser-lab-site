@@ -1,5 +1,5 @@
-import {APKError} from './apk-error.js?v=efe50e99a19d';
-import {getPaintStateByHandle} from './paint-host.js?v=efe50e99a19d';
+import {APKError} from './apk-error.js?v=bf542493e850';
+import {getPaintStateByHandle} from './paint-host.js?v=bf542493e850';
 
 // The natives of android.graphics.text.MeasuredText, MeasuredText.Builder and LineBreaker (frameworks/base libs/hwui/jni/text/MeasuredText.cpp and LineBreaker.cpp,
 // android-13.0.0_r1) over AOSP Minikin itself, compiled to wasm32 with HarfBuzz and ICU (src/minikin-provider.js, src/minikin-text.js): MeasuredTextBuilder, StyleRun /

@@ -1,7 +1,7 @@
 // The page in the colours of the app that is open: the brand colour is read from the app's launcher icon (the icon the VM answers through PackageManager), and the page's
 // tokens (lab-tokens.css: accent, paper, lines) are derived from it for the light and the dark page theme, with the accent kept at a readable contrast (WCAG 4.5:1 against
 // the surface it sits on). The change is a circular reveal from the device (View Transitions) where the browser has it and motion is not reduced; otherwise it is immediate.
-// A grey or monochrome icon leaves the page as it is. Off (the "Page in the app's colors" option, kept in localStorage), the page keeps its own palette. Nothing of the app's
+// A grey or monochrome icon leaves the page as it is. It is always on: the old "Page in the app's colors" switch was removed on 2026-11-21. Nothing of the app's
 // screen changes: only the page around the device.
 
 /** The vivid colour that covers most of an RGBA image (alpha >= 200, saturation >= 0.3, lightness 0.15..0.85), as [r, g, b]; null when the image has almost none (a grey icon). */
@@ -66,8 +66,9 @@ export const paletteCSS = palette => `:root:root{${Object.entries(palette.light)
  */
 export function createAppPalette({ doc = globalThis.document, toggle = null, origin = () => null } = {}) {
   const S = { enabled: true, palette: null, color: null, pending: 0 };
-  try { S.enabled = globalThis.localStorage?.getItem(STORAGE_KEY) !== 'off'; } catch { /* storage blocked: on */ }
-  if (toggle) toggle.checked = S.enabled;
+  // Always on (owner, 2026-11-21): the page takes the open app's colours and is neutral with no app; there is no option to turn it off. A stored 'off' from the old switch is dropped.
+  try { globalThis.localStorage?.removeItem(STORAGE_KEY); } catch { /* storage blocked */ }
+  if (toggle) toggle.checked = true;
   const style = doc.createElement('style'); style.id = 'app-palette'; doc.head.append(style);
   const reduced = () => { try { return globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
   const write = css => { style.textContent = css; doc.documentElement.dataset.appPalette = css ? 'on' : 'off'; };

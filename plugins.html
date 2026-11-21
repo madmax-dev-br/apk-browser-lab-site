@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=efe50e99a19d">
-  <link rel="stylesheet" href="./lab-tokens.css?v=efe50e99a19d">
+  <link rel="stylesheet" href="./site-pages.css?v=bf542493e850">
+  <link rel="stylesheet" href="./lab-tokens.css?v=bf542493e850">
 </head>
 <body>
   <header class="topbar">
@@ -767,7 +767,7 @@
         </div>
 
         <h3 id="h-botoes">Plugin buttons</h3>
-        <p>A plugin can have buttons of its own without building HTML: it gives the text, the icon and what to do, and the lab draws real buttons (with keyboard focus, Enter and Space). With <code>placement: 'plugin'</code> (the default) they appear on the plugin's card, in the <b>Plugins</b> panel, and on its row in <b>Controls › Extensions › Plugins</b>; with <code>placement: 'toolbar'</code>, in the device bar, next to Recreate, Reopen, Back and Full screen, with a dashed border and the plugin's name in the tooltip. While the click code runs, the button shows that it is busy and ignores new clicks. Everything is text, never HTML. The buttons disappear when the plugin stops, is turned off or is removed.</p>
+        <p>A plugin can have buttons of its own without building HTML: it gives the text, the icon and what to do, and the lab draws real buttons (with keyboard focus, Enter and Space). With <code>placement: 'plugin'</code> (the default) they appear on the plugin's card, in the <b>Plugins</b> panel, and on its row in <b>Controls › Extensions › Plugins</b>; with <code>placement: 'toolbar'</code>, in the device bar, next to Full screen, with a dashed border and the plugin's name in the tooltip. While the click code runs, the button shows that it is busy and ignores new clicks. Everything is text, never HTML. The buttons disappear when the plugin stops, is turned off or is removed.</p>
 
         <div class="api" id="api-button">
           <h4 class="api-sig"><code>const b = await lab.button({ label, icon, title, id, variant, disabled, placement }, onClick)</code><code>lab.button('Text', onClick)</code></h4>
@@ -1852,6 +1852,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=efe50e99a19d"></script>
+  <script type="module" src="./site-pages.js?v=bf542493e850"></script>
 </body>
 </html>

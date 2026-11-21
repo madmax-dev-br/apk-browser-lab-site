@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=efe50e99a19d") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=efe50e99a19d">
-  <link rel="stylesheet" href="./lab-theme.css?v=efe50e99a19d">
-  <meta name="apk-browser-build" content="efe50e99a19d">
+  <style>@import url("./styles.css?v=bf542493e850") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=bf542493e850">
+  <link rel="stylesheet" href="./lab-theme.css?v=bf542493e850">
+  <meta name="apk-browser-build" content="bf542493e850">
 </head>
 <body>
   <header class="topbar">
@@ -21,26 +21,29 @@
   <main>
     <div class="workspace">
       <aside class="controls-column">
-        <section id="apk-panel" class="controls">
+        <section id="apk-panel" class="controls apk-panel" data-state="empty">
+          <details id="inspection-panel" class="inspection-panel package-strip" hidden>
+          <summary class="package-line" title="The open package: details, classes and native libraries"><span id="package-icon" class="package-icon" aria-hidden="true">APK</span><span class="package-title"><strong id="package-label">App</strong><span id="package-version" class="package-version"></span></span><span class="visually-hidden">Package details</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="package-body">
+          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
+          <div id="inventory-empty" class="inventory-empty"><p>Reading the package…</p></div>
+          <div id="inventory" class="inventory" hidden>
+            <div class="inventory-heading"><span class="tiny-label">Package name</span><strong id="package-name"></strong></div>
+            <div class="stats"><div><strong id="class-count">0</strong><span>DEX classes</span></div><div><strong id="activity-count">0</strong><span>Activities</span></div><div><strong id="dependency-count">0</strong><span>Dependencies</span></div></div>
+            <p class="package-hint">Hold the app's icon on the home screen (or right-click it) and choose Package to see its activities and change the one it opens.</p>
+            <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes and dependencies <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
+          </div>
+          <details id="native-inspection" class="native-inspection" hidden><summary>Analyze native libraries <span>ELF</span></summary><p>Metadata inspection of one library at a time, up to 32 MiB. It does not run native code or implement JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Library</label><select id="native-library"></select><button id="inspect-native-button">Analyze library</button><pre id="native-result" hidden></pre></details>
+          </div>
+          </details>
+          <div class="apk-open">
           <h2 class="rail-title">Open APK</h2>
           <label id="drop-zone" class="drop-zone" for="apk-file">
             <strong>Drop an APK here</strong><span>or <u>choose a file</u></span><small>Accepts .apk and .aab files (an App Bundle runs as its base module), and APK sets (.apks / .xapk / .apkm: a base APK with its splits). The file never leaves this browser.</small>
           </label>
           <input id="apk-file" type="file" accept=".apk,.aab,.apks,.xapk,.apkm,application/vnd.android.package-archive" class="visually-hidden">
           <div class="demo-row"><span>No APK at hand?</span><button id="demo-button">Run demo</button></div>
-          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
-          <div id="load-times" class="load-times" role="status" hidden></div>
-          <details id="inspection-panel" class="inspection-panel">
-          <summary class="inspection-label"><h2 class="rail-title">Package</h2><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-          <div id="inventory-empty" class="inventory-empty"><p>Open an APK to see its package, classes and dependencies.</p></div>
-          <div id="inventory" class="inventory" hidden>
-            <div class="inventory-heading"><span class="tiny-label">Package name</span><strong id="package-name"></strong></div>
-            <div class="stats"><div><strong id="class-count">0</strong><span>DEX classes</span></div><div><strong id="activity-count">0</strong><span>Activities</span></div><div><strong id="dependency-count">0</strong><span>Dependencies</span></div></div>
-            <label class="activity-label" for="activity-select">Launch activity <small>(when opened from the home screen icon)</small></label><select id="activity-select"></select>
-            <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes and dependencies <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
           </div>
-          <details id="native-inspection" class="native-inspection" hidden><summary>Analyze native libraries <span>ELF</span></summary><p>Metadata inspection of one library at a time, up to 32 MiB. It does not run native code or implement JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Library</label><select id="native-library"></select><button id="inspect-native-button">Analyze library</button><pre id="native-result" hidden></pre></details>
-          </details>
           <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>This APK cannot be run yet</strong><p>The report lists file limits that prevent the attempt. See the details below; a partial inspection does not prove compatibility.</p><ul id="unsupported-list"></ul></div>
         </section>
         <section class="controls controls-card" aria-label="Controls">
@@ -244,7 +247,7 @@
               </section>
               <section class="cp-sub" id="cp-sub-rendering" aria-labelledby="cp-sub-rendering-title"><h4 class="cp-subtitle" id="cp-sub-rendering-title">Rendering</h4>
                 <label class="cp-field" for="vm-renderer"><span>Rendering<small>Where screen content (Compose, Canvas) is drawn. GPU uses WebGL in the Worker and falls back to CPU by itself if it fails; applies immediately</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (default)</option><option value="cpu">CPU</option></select></label>
-                <p id="vm-renderer-status" class="cp-note" role="status">In use: CPU</p>
+                <p id="vm-renderer-status" class="cp-note" role="status">GPU selected: it starts when an app draws its first frame</p>
                 <details class="cp-advanced"><summary>Advanced</summary>
                   <label class="cp-field" for="vm-raster-scale"><span>Resolution while moving<small>While the screen moves (animation, scrolling, transition), the frame is drawn at this scale and redrawn sharp when it stops; applies immediately</small></span><select id="vm-raster-scale"><option value="1">100% (default, always sharp)</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
                   <label class="cp-field" for="vm-raster-still"><span>Resolution when still<small>The scale of the final frame, when the screen stops moving. Below 100% the screen is slightly less sharp and each frame costs less; applies immediately</small></span><select id="vm-raster-still"><option value="1">100% (default)</option><option value="0.9">90%</option><option value="0.8">80%</option></select></label>
@@ -311,7 +314,6 @@
             </div></details>
             <p id="cp-filter-empty" class="cp-filter-empty" hidden>No control matches. Try another word, or clear the search.</p>
             <div class="cp-footer" id="cp-footer">
-              <div class="cp-item" data-keywords="appearance theme page colors colours"><label for="look-app-colors" title="The page around the device takes the colours of the open app (read from its launcher icon), with a reveal from the device. The app itself is not changed">Page in the app's colors</label><input id="look-app-colors" type="checkbox" role="switch" checked></div>
               <p id="device-status" class="cp-note" role="status" aria-live="polite">Changes reach the app as on Android: Configuration, re-selected resources and a recreated Activity or onConfigurationChanged.</p>
               <button id="device-reset" class="cp-button" type="button">Restore defaults</button>
             </div>
@@ -319,7 +321,7 @@
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Files and data)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Network; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
         <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Method changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code> and Controls › Debugging › Method returns). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
@@ -343,7 +345,7 @@
           </div>
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Could not run</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Technical details of the run</summary><pre id="error-detail" hidden></pre></details><button id="error-reimport" type="button" title="Opens the file picker: the APK chosen replaces the copy stored for this app (its icon and app data stay)" hidden>Choose the APK again…</button> <button id="error-close" type="button" title="Closes this window; the app stays on the device home screen to open again (Esc)">Close</button> <button id="error-copy" type="button">Copy diagnostics</button> <button id="error-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Show summary</button></div>
         </div>
-        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" tabindex="0" aria-describedby="memory-detail" hidden><i></i><span class="memory-text" role="status"></span></span><div id="memory-detail" class="memory-detail" role="tooltip" hidden></div><span id="execution-engine">411 × 914 dp · density 1</span></div>
+        <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><button id="app-info" class="app-info" type="button" aria-describedby="app-info-detail" aria-expanded="false" hidden><span class="app-info-text"></span></button><div id="app-info-detail" class="memory-detail app-info-detail" role="tooltip" hidden></div><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" tabindex="0" aria-describedby="memory-detail" hidden><i></i><span class="memory-text" role="status"></span></span><div id="memory-detail" class="memory-detail" role="tooltip" hidden></div><span id="execution-engine">411 × 914 dp · density 1</span></div>
         <details id="trace" class="trace"><summary><span>Execution log</span><span id="trace-count">0 events</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Summary</button><button id="screen-state-copy" type="button" title="Copies a summary of what the VM shows (Activities, view tree, Compose, frames, queue, threads, memory) even without an error">State</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">The log will appear after the run.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 lines</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filter by tag or text" aria-label="Filter logcat by tag or text"><select class="logcat-level" aria-label="Minimum level"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Scroll</label><button class="logcat-clear" type="button">Clear</button><select class="logcat-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><button class="logcat-save" type="button">Save</button></div>
@@ -381,7 +383,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=efe50e99a19d"></script>
+  <script type="module" src="./app.js?v=bf542493e850"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

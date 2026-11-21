@@ -1,7 +1,8 @@
-import { Blocked } from './scheduler.js?v=efe50e99a19d';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=efe50e99a19d';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=efe50e99a19d';
-import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=efe50e99a19d';
+import { Blocked } from './scheduler.js?v=bf542493e850';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=bf542493e850';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=bf542493e850';
+import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=bf542493e850';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=bf542493e850';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md), or over the lab's CPU implementation of OpenGL ES 3.0 (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md) when the Worker has no
@@ -11,6 +12,9 @@ import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=efe50e99a19
 //   EGL      one display; a fixed table of RGBA8888 / RGB888 / RGB565 configs, ES2 and ES3 renderable, window and pbuffer, chosen with the EGL 1.4 matching and sorting rules;
 //            contexts of client version 2 or 3 (1.x is refused: the lab has no fixed-function pipeline); per-thread current context and error, as EGL binds them to a thread
 //            (the VM's green threads). A context is one WebGL2 context; contexts created with a share context share its WebGL2 context and its object names.
+//            The WebGL2 context is released (WEBGL_lose_context) as soon as no EGL context uses it (eglDestroyContext once it is not current, eglTerminate, the
+//            runtime's end): the browser keeps at most 4 WebGL contexts per Worker and drops the oldest, which is the GPU raster's (src/webgl-contexts.js). An EGL
+//            context created while the lab holds all 4 runs on the CPU implementation instead, said in the trace, so no context of the lab is pushed out.
 //   Surfaces a window surface is the Surface of a SurfaceView (src/camera-surface-host.js), a pbuffer is offscreen. Each is a framebuffer object of the lab with a colour and a
 //            depth/stencil renderbuffer of its config; the app's framebuffer 0 is that object (bindings, queries, glDrawBuffers / glReadBuffer / glInvalidateFramebuffer of
 //            GL_BACK, GL_COLOR, GL_DEPTH, GL_STENCIL are translated). eglSwapBuffers copies it to the context's canvas, hands the picture to the page
@@ -204,9 +208,12 @@ function backendOf(r) {
   if (r.platform?.glesPath === 'cpu') reason = 'the device setting "OpenGL ES on the CPU" is on';
   else if (typeof OffscreenCanvas !== 'function') reason = 'this Worker has no OffscreenCanvas';
   else {
-    let probe = null; try { probe = new OffscreenCanvas(1, 1).getContext('webgl2'); } catch { probe = null; }
-    if (probe) {
-      try { probe.getExtension('WEBGL_lose_context')?.loseContext(); } catch { /* the probe goes away with its canvas */ }
+    // The probe is a WebGL2 context too: counted and released at once (loseContext frees its slot), and not made at all while the lab holds every slot the browser
+    // allows (a fifth context would push out the oldest, the GPU raster's): then the contexts the lab already holds show this Worker has WebGL.
+    let probe = null, tracked = null;
+    if (freeWebGLContexts() > 0) { try { probe = new OffscreenCanvas(1, 1).getContext('webgl2'); } catch { probe = null; } if (probe) tracked = trackWebGLContext('gles', 'the OpenGL ES probe', probe); }
+    if (probe || freeWebGLContexts() === 0) {
+      releaseWebGLContext(tracked);
       s.backend = { path: 'webgl2', createContext(attributes) { const canvas = new OffscreenCanvas(1, 1), gl = canvas.getContext('webgl2', attributes); return gl ? { gl, canvas, path: 'webgl2' } : null; } };
       r.record?.('OpenGL ES: WebGL2 of the browser (the GPU path)'); return s.backend;
     }
@@ -258,17 +265,44 @@ function newContext(r, config, version, share) {
   const s = stateOf(r);
   let group = share?.group;
   if (!group) {
+    const backend = backendOf(r);
+    if (backend?.path === 'webgl2' && !r.platform?.glBackend && freeWebGLContexts() === 0) {   // one more WebGL context would make the browser drop the oldest one of the lab's
+      const reason = `the browser keeps at most ${WORKER_WEBGL_CONTEXTS} WebGL contexts per Worker and the lab holds ${WORKER_WEBGL_CONTEXTS}`;
+      const created = cpuBackend(r, reason).createContext(); r.record?.(`OpenGL ES: an EGL context on the lab's CPU rasterizer (${reason})`);
+      group = newGroup(r, created); s.groups.push(group);
+    }
+  }
+  if (!group) {
     const backend = backendOf(r); let created = backend?.createContext({ alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
     if (!created && backend?.path === 'webgl2') {   // the browser refused another WebGL2 context (too many, lost): this one runs on the CPU, said in the trace
       created = cpuBackend(r, 'the browser refused a WebGL2 context').createContext(); r.record?.("OpenGL ES: an EGL context on the lab's CPU rasterizer (the browser refused a WebGL2 context)");
     }
     if (!created) return null;
     group = newGroup(r, created); s.groups.push(group);
+    if (group.path === 'webgl2' && !r.platform?.glBackend) group.tracked = trackWebGLContext('gles', `an EGL context of the app (OpenGL ES ${version}.0)`, group.gl);
   }
   const handle = 0x2000n + s.next++;
   const context = { handle, config, version, group, gl: group.gl, thread: null, draw: null, read: null, appDraw: 0, appRead: 0, program: 0, vertexArrays: new Map(), nextVertexArray: 1, error: GL.NO_ERROR,
     viewportSet: false, clientAttribs: new Map(), destroyed: false };
   s.contexts.set(handle, context); return context;
+}
+
+/** An EGL context goes away (destroyed and not current): its WebGL2 context is released once no other EGL context shares it. */
+function dropContext(r, context) {
+  const s = stateOf(r); s.contexts.delete(context.handle);
+  for (const other of s.contexts.values()) if (other.group === context.group) return;
+  releaseGroup(r, context.group);
+}
+function releaseGroup(r, group) {
+  const s = stateOf(r), at = s.groups.indexOf(group); if (at >= 0) s.groups.splice(at, 1);
+  for (const surface of s.surfaces.values()) surface.targets.delete(group.gl);   // its framebuffers go with the context
+  if (group.tracked) { releaseWebGLContext(group.tracked); group.tracked = null; }
+}
+/** The runtime ends (a new load in the Worker): every WebGL2 context of its EGL contexts is released. */
+export function disposeGles(r) {
+  const s = states.get(r); if (!s) return;
+  for (const group of [...s.groups]) releaseGroup(r, group);
+  s.contexts.clear(); s.surfaces.clear(); s.initialized = false;
 }
 
 // ---- surfaces: a framebuffer object per surface and WebGL context ------------------------------------------------------------------------------------------------------------
@@ -750,7 +784,17 @@ function eglCore() {
       backendOf(r);   // WebGL2 or the CPU implementation, decided (and recorded) now
       s.initialized = true; s.initCount++; eglOk(r); return [1, 4];
     },
-    terminate(r, display) { if (BigInt(display ?? 0n) !== DISPLAY) return eglFail(r, EGL.BAD_DISPLAY, 0); stateOf(r).initialized = false; return eglOk(r); },
+    // Android counts initializations (egl_display_t::terminate: "display termination is ref-counted"; EGLImpl.getInitCount reads the count): only the last eglTerminate
+    // terminates. Then, EGL 1.4 3.2, every context and surface of the display is marked for deletion; those current to a thread go when they are released (eglMakeCurrent).
+    terminate(r, display) {
+      if (BigInt(display ?? 0n) !== DISPLAY) return eglFail(r, EGL.BAD_DISPLAY, 0); const s = stateOf(r);
+      if (s.initCount === 0) return eglOk(r);
+      if (--s.initCount > 0) return eglOk(r);
+      s.initialized = false;
+      for (const context of [...s.contexts.values()]) { context.destroyed = true; if (!context.thread) dropContext(r, context); }
+      for (const surface of [...s.surfaces.values()]) { surface.destroyed = true; if (!surface.bound) { releaseSurface(r, surface); s.surfaces.delete(surface.handle); } }
+      return eglOk(r);
+    },
     queryString(r, display, name) {
       if (!ready(r, display)) return null;
       const value = { [EGL.VENDOR]: 'APK Web Lab', [EGL.VERSION]: backendOf(r)?.path === 'cpu' ? '1.4 CPU' : '1.4 WebGL2', [EGL.EXTENSIONS]: 'EGL_KHR_create_context EGL_ANDROID_recordable', [EGL.CLIENT_APIS]: 'OpenGL_ES' }[name];
@@ -775,7 +819,7 @@ function eglCore() {
     },
     destroyContext(r, display, handle) {
       if (!ready(r, display)) return 0; const s = stateOf(r), context = s.contexts.get(BigInt(handle ?? 0n)); if (!context) return eglFail(r, EGL.BAD_CONTEXT, 0);
-      context.destroyed = true; if (!context.thread) s.contexts.delete(context.handle); return eglOk(r);   // destroyed when it is no longer current anywhere (EGL 1.4 3.7.1.2)
+      context.destroyed = true; if (!context.thread) dropContext(r, context); return eglOk(r);   // destroyed when it is no longer current anywhere (EGL 1.4 3.7.1.2)
     },
     createWindowSurface(r, display, configHandle, surfaceObject) {
       if (!ready(r, display)) return 0n; const c = config(configHandle); if (!c) return eglFail(r, EGL.BAD_CONFIG, 0n);
@@ -814,7 +858,7 @@ function eglCore() {
       const release = () => {
         if (!previous) return; const { context } = previous; context.thread = null;
         for (const surface of new Set([context.draw, context.read])) if (surface) { surface.bound--; if (surface.destroyed && !surface.bound) { releaseSurface(r, surface); s.surfaces.delete(surface.handle); } }
-        context.draw = context.read = null; if (context.destroyed) s.contexts.delete(context.handle); s.current.delete(thread);
+        context.draw = context.read = null; if (context.destroyed) dropContext(r, context); s.current.delete(thread);
       };
       if (!contextHandle) { if (drawHandle || readHandle) return eglFail(r, EGL.BAD_MATCH, 0); if (BigInt(display ?? 0n) !== DISPLAY && display) return eglFail(r, EGL.BAD_DISPLAY, 0); release(); return eglOk(r); }
       if (!ready(r, display)) return 0;

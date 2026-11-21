@@ -5,10 +5,10 @@
 // message per frame (no pixels) and answers with an ack; a new frame is only sent after the previous one was acknowledged. Pixels cross to the Worker only for ImageReader targets:
 // one RGBA buffer per frame at the reader's size (read back from a small 2D canvas, transferred, not copied), and one buffer once for a still capture. A stream that only an encoder
 // consumes (a recording) crosses as a VideoFrame of that canvas: no readback, and the Worker's encoder takes it as it is.
-import { createCameraSource } from './camera-source.js?v=efe50e99a19d';
-import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=efe50e99a19d';
-import { probeWebCodecs } from './media-codec-backend.js?v=efe50e99a19d';
-import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=efe50e99a19d';
+import { createCameraSource } from './camera-source.js?v=bf542493e850';
+import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=bf542493e850';
+import { probeWebCodecs } from './media-codec-backend.js?v=bf542493e850';
+import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=bf542493e850';
 
 const FRAME_MS = 1000 / 30, MONITOR_MS = 200, ACK_TIMEOUT_MS = 1500;
 const CAPTURE_SIZE = { width: 960, height: 1280 };   // the upright picture the system camera screen takes (3:4)
@@ -186,7 +186,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     ui.accept.onclick = () => finishCapture(true);
     ui.cancel.onclick = () => finishCapture(false);
     ui.root.onkeydown = event => { if (event.key === 'Escape') { event.preventDefault(); finishCapture(false); } };
-    $('back-button')?.addEventListener('click', interceptBack, true);
+    $('sysbar-nav')?.querySelector?.('.sysbar-back')?.addEventListener('click', interceptBack, true);   // the device's Back (its navigation bar) cancels the capture, as on a phone
     ui.root.hidden = false; setStage('live'); drawCapture();
   }
   // ---- the camera screen's recorder: the frames of its own canvas through the page's encoder into an MP4 held in memory ------------------------------------------------------
@@ -246,7 +246,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
     const ui = captureElements(), content = $('android-content'), layer = $('android-window-layer');
     if (capture.recording) { try { capture.recording.handle.close(); } catch { /* already closed */ } capture.recording = null; }
     ui.root.hidden = true; ui.shutter.onclick = ui.accept.onclick = ui.cancel.onclick = ui.root.onkeydown = null; ui.shutter.style.backgroundColor = ''; ui.shutter.style.borderRadius = ''; ui.shutter.disabled = false; ui.cancel.disabled = false;
-    $('back-button')?.removeEventListener('click', interceptBack, true);
+    $('sysbar-nav')?.querySelector?.('.sysbar-back')?.removeEventListener('click', interceptBack, true);
     content.inert = capture.inertBefore.content; layer.inert = capture.inertBefore.layer;
     try { capture.focusBack?.focus?.(); } catch { /* the element is gone */ }
   }
