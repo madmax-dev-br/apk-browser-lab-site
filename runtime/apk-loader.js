@@ -1,23 +1,23 @@
-import { createArm64Native } from './arm64/glue.js?v=7233e918dcc9';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7233e918dcc9';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=7233e918dcc9';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=7233e918dcc9';
-import { inspectELF } from './native-inspector.js?v=7233e918dcc9';
-import { elfBuildId } from './elf-build-id.js?v=7233e918dcc9';
-import { crc32 } from './zip-entry.js?v=7233e918dcc9';
-import { resolveDevice } from './device-profile.js?v=7233e918dcc9';
-import { resourceProfileFor } from './device-configuration.js?v=7233e918dcc9';
-import { JniBridge } from './jni-host.js?v=7233e918dcc9';
-import { providerForApk } from './native-provider-variants.js?v=7233e918dcc9';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=7233e918dcc9';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7233e918dcc9';
-import { AndroidResources } from './android-resources.js?v=7233e918dcc9';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=7233e918dcc9';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=7233e918dcc9';
-import { FrameworkProvider } from './framework-provider.js?v=7233e918dcc9';
-import { APKArchive } from './apk-archive.js?v=7233e918dcc9';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=7233e918dcc9';
-import { identityTraceLine } from './device-identity.js?v=7233e918dcc9';
+import { createArm64Native } from './arm64/glue.js?v=af8ff7411a95';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=af8ff7411a95';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=af8ff7411a95';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=af8ff7411a95';
+import { inspectELF } from './native-inspector.js?v=af8ff7411a95';
+import { elfBuildId } from './elf-build-id.js?v=af8ff7411a95';
+import { crc32 } from './zip-entry.js?v=af8ff7411a95';
+import { resolveDevice } from './device-profile.js?v=af8ff7411a95';
+import { resourceProfileFor } from './device-configuration.js?v=af8ff7411a95';
+import { JniBridge } from './jni-host.js?v=af8ff7411a95';
+import { providerForApk } from './native-provider-variants.js?v=af8ff7411a95';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=af8ff7411a95';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=af8ff7411a95';
+import { AndroidResources } from './android-resources.js?v=af8ff7411a95';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=af8ff7411a95';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=af8ff7411a95';
+import { FrameworkProvider } from './framework-provider.js?v=af8ff7411a95';
+import { APKArchive } from './apk-archive.js?v=af8ff7411a95';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=af8ff7411a95';
+import { identityTraceLine } from './device-identity.js?v=af8ff7411a95';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -684,7 +684,20 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesApacheHttp=declaredApacheHttp||apacheTarget<28;
   // the original media session data classes (framework-aosp/profiles/media): referenced by the APK
   const MEDIA_TYPES=new Set(['Landroid/media/session/PlaybackState;','Landroid/media/session/PlaybackState$Builder;','Landroid/media/session/PlaybackState$CustomAction;','Landroid/media/MediaMetadata;','Landroid/media/MediaMetadata$Builder;','Landroid/media/MediaDescription;','Landroid/media/MediaDescription$Builder;','Landroid/media/Rating;']);
-  const usesMedia=files.some(file=>file.dex.types.some(type=>MEDIA_TYPES.has(type)));
+  // and the route provider side of MediaRouter2 (MediaRoute2ProviderService, its binder interfaces, route and session data, the MediaRouter2 callback bases): referenced by the APK, or
+  // possibly by a companion package (its code is not scanned at load: the "With microG" option's media route provider extends MediaRoute2ProviderService)
+  const MEDIA_ROUTE=/^Landroid\/media\/(MediaRoute2ProviderService|MediaRoute2Info|RoutingSessionInfo|MediaRoute2ProviderInfo|IMediaRoute2ProviderService(Callback)?|MediaRouter2\$(RouteCallback|TransferCallback|ControllerCallback|OnGetControllerHintsListener))[;$]/;
+  const appUsesMedia=files.some(file=>file.dex.types.some(type=>MEDIA_TYPES.has(type)||MEDIA_ROUTE.test(type)));
+  const usesMedia=appUsesMedia||(options.companionPackages?.length??0)>0||!!options.microg;
+  // the libcore java.util.concurrent classes of framework-aosp/profiles/concurrent (TransferQueue, LinkedTransferQueue, BrokenBarrierException, Flow), and CyclicBarrier, which throws
+  // BrokenBarrierException: referenced by the APK
+  const CONCURRENT=/^Ljava\/util\/concurrent\/(TransferQueue|LinkedTransferQueue|BrokenBarrierException|CyclicBarrier|Flow)[;$]/;
+  const usesConcurrent=files.some(file=>file.dex.types.some(type=>CONCURRENT.test(type)));
+  // the libcore java.lang.invoke originals (framework-aosp/profiles/invoke: MethodHandles, MethodHandle, MethodType, Transformers, VarHandle ...): referenced by the APK
+  const usesInvoke=files.some(file=>file.dex.types.some(type=>type.startsWith('Ljava/lang/invoke/')));
+  // the android.net data classes of framework-aosp/profiles/net (UrlQuerySanitizer and its nested classes, MailTo, Credentials): referenced by the APK
+  const NET=/^Landroid\/net\/(UrlQuerySanitizer|MailTo|Credentials)[;$]/;
+  const usesNet=files.some(file=>file.dex.types.some(type=>NET.test(type)));
   // the org.apache.http classes of framework.jar (framework-aosp/profiles/apache-boot): referenced by the APK, or under the legacy apache-http profile
   const BOOT_HTTP=/^Lorg\/apache\/http\/(conn\/(ssl|scheme)\/|params\/(CoreConnectionPNames|HttpConnectionParams|HttpParams);|conn\/ConnectTimeoutException;)/;
   const appUsesBootHttp=files.some(file=>file.dex.types.some(type=>BOOT_HTTP.test(type)));
@@ -707,7 +720,10 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'speech',explicit:options.enableSpeechProfile,automatic:usesSpeech,reason:'APK-references-android.speech.tts'},
     {name:'apache-http',explicit:options.enableApacheHttpProfile,automatic:usesApacheHttp,reason:declaredApacheHttp?'manifest-uses-library-org.apache.http.legacy':'targetSdkVersion-below-28'},
     {name:'apache-boot',explicit:options.enableApacheBootProfile,automatic:appUsesBootHttp||(options.enableApacheHttpProfile===true||(options.enableApacheHttpProfile!==false&&usesApacheHttp)),reason:appUsesBootHttp?'APK-references-boot-org.apache.http':'apache-http-profile-loaded'},
-    {name:'media',explicit:options.enableMediaProfile,automatic:usesMedia,reason:'APK-references-android.media.session.PlaybackState-or-MediaMetadata'},
+    {name:'media',explicit:options.enableMediaProfile,automatic:usesMedia,reason:appUsesMedia?'APK-references-android.media.session.PlaybackState-MediaMetadata-or-MediaRoute2ProviderService':'companion-package-installed'},
+    {name:'concurrent',explicit:options.enableConcurrentProfile,automatic:usesConcurrent,reason:'APK-references-java.util.concurrent.LinkedTransferQueue-TransferQueue-Flow-or-CyclicBarrier'},
+    {name:'invoke',explicit:options.enableInvokeProfile,automatic:usesInvoke,reason:'APK-references-java.lang.invoke'},
+    {name:'net',explicit:options.enableNetProfile,automatic:usesNet,reason:'APK-references-android.net.UrlQuerySanitizer-MailTo-or-Credentials'},
     {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':'companion-package-installed'},
     {name:'color',explicit:options.enableColorProfile,automatic:usesColorMath,reason:(options.companionPackages?.length??0)>0||!!options.microg?'companion-package-installed':'APK-color-state-list-gives-android:lStar'},

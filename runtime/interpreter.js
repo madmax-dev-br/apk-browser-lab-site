@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { BUCKET } from './time-breakdown.js?v=7233e918dcc9';
-import { Blocked, QUANTUM } from './scheduler.js?v=7233e918dcc9';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { BUCKET } from './time-breakdown.js?v=af8ff7411a95';
+import { Blocked, QUANTUM } from './scheduler.js?v=af8ff7411a95';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=af8ff7411a95';
 
 // Frame-based DEX interpreter.
 //
@@ -847,6 +847,35 @@ function runLoop(rt, owner, base, single = null) {
             if (site !== undefined && site.ready && rt.staticFields.has(site.key)) rt.staticFields.set(site.key, value);
             else { const reference = dex.field(u[pc + 1]), field = rt.resolveField(reference); if (rt.initialized.get(field.owner)?.status !== 'initialized') { const gate = rt.initStep(field.owner); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.writeStatic(reference, value); prog.refs[pc] = { ready: rt.initialized.get(field.owner)?.status === 'initialized' && rt.staticFields.has(field.key), key: field.key }; }
             pc += 2; break;
+          }
+          case 0xfa: case 0xfb: {
+            // invoke-polymorphic(/range) (format 45cc / 4rcc): MethodHandle.invoke / invokeExact (and the VarHandle access modes) with the call site's proto (unit 3) as the
+            // signature: the receiver is the handle, the arguments are those of the proto. The host serves it (src/method-handles.js, APKRuntime.dispatch mode 'polymorphic').
+            let site = prog.refs[pc];
+            if (site === undefined) {
+              if (!(u[pc + 1] < dex.methods.length)) fail('Invalid method index');
+              const declared = dex.method(u[pc + 1]), proto = dex.proto(u[pc + 3]), argc = op === 0xfb ? a : hi;
+              if (op === 0xfa && hi > 5) fail('Invalid invoke register count');
+              if (argc !== wordCount(proto.parameters) + 1) fail('Invalid invoke-polymorphic argument shape');
+              site = prog.refs[pc] = { target: { owner: declared.owner, name: declared.name, parameters: proto.parameters, result: proto.result, signature: proto.signature, key: `${declared.owner}->${declared.name}${proto.signature}`, declared }, argc, first: op === 0xfb ? u[pc + 2] : -1 };
+            }
+            const argc = site.argc, args = new Array(argc);
+            if (site.first >= 0) { const first = site.first; for (let j = 0; j < argc; j++) args[j] = regs[first + j]; }
+            else { const packed = u[pc + 2]; switch (argc) { case 5: args[4] = regs[lo]; case 4: args[3] = regs[(packed >> 12) & 15]; case 3: args[2] = regs[(packed >> 8) & 15]; case 2: args[1] = regs[(packed >> 4) & 15]; case 1: args[0] = regs[packed & 15]; } }
+            rt.callStats.dispatched++;
+            const outcome = rt.dispatch(site.target, args, 'polymorphic', f.method.owner, true);
+            if (outcome instanceof PendingCall) {
+              if (frames.length + rt.depth >= rt.maxCallDepth) rt.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
+              if (outcome.args.length !== outcome.code.incoming) fail(`Argument/register mismatch: ${outcome.method.key}`);
+              f.pc = pc + 4; f.callPc = start; if (frames.length + rt.depth + 1 > rt.peakCallDepth) rt.peakCallDepth = frames.length + rt.depth + 1;
+              f = makeFrame(rt, outcome.method, outcome.code, outcome.args); frames.push(f);
+              regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = 0;
+              break;
+            }
+            if (outcome instanceof Blocked) { f.pc = outcome.retry ? start : pc + 4; f.callPc = start; thread.blocked = outcome; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; break inner; }
+            if (outcome instanceof Invoke) { f.pc = pc + 4; f.callPc = start; input = { kind: 'start', invoke: outcome }; break inner; }
+            if (f === single) return outcome;
+            f.result = outcome; pc += 4; break;
           }
           case 0x6e: case 0x6f: case 0x70: case 0x71: case 0x72:
           case 0x74: case 0x75: case 0x76: case 0x77: case 0x78: {

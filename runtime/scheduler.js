@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
 
 // Green-thread scheduler for the VM.
 //
@@ -245,6 +245,18 @@ export class Scheduler {
     const parked = this.mainParked(); if (parked) this.parkedServing = (this.parkedServing ?? 0) + 1;
     try { return platform.drainEvents?.(this.rt)?.processed ?? 0; } finally { if (parked) this.parkedServing--; }
   }
+  /**
+   * A wait of `thread` that only one thread can end (Blocked.holder: the thread running the <clinit> it needs, the owner of the monitor it enters) while that thread is suspended
+   * under a run on the JavaScript stack (nestedDepth > 0): only the run of `thread`, which is on top, can be continued now, and it waits for the other one. A device runs both
+   * threads in parallel; here neither can go on, so the wait ends with an explicit error naming both instead of serving events and threads on top of it without end.
+   */
+  checkNestedDeadlock(thread) {
+    const blocked = thread.blocked, holder = blocked?.holder?.() ?? null;
+    if (holder === null || holder === thread || !(holder.nestedDepth > 0)) return;
+    const what = blocked.what?.() ?? null, name = text => String(text).replace(/^L/, '').replace(/;->/, '.');
+    const siteOf = t => { const site = t.nestedSites?.at(-1); return site ? name(site) : 'a host call that ran Java'; };
+    throw new APKError(`Deadlock in nested host calls: ${thread.name} waits (${blocked.reason}${what ? ` of ${String(what).replace(/^L|;$/g, '').replaceAll('/', '.')}` : ''}) inside ${siteOf(thread)} for ${holder.name}, whose run is suspended beneath it on the JavaScript stack inside ${siteOf(holder)}: ${holder.name} goes on only once the run of ${thread.name} returns, and that run returns only once ${holder.name} goes on (threads: ${this.describe()})`, { kind: 'cooperative-deadlock', waiter: thread.name, holder: holder.name, reason: blocked.reason });
+  }
   /** What to do when nothing is runnable: run due platform events, skip the clock to the earliest deadline, or report the deadlock. `owner` is the blocked loop owner. */
   idle(earliest, why) {
     const platform = this.rt.platform;
@@ -320,6 +332,7 @@ export class Scheduler {
           if (pins && pins.length > mark) pins.length = mark;   // a finished turn's handles (CoreThreads.waitFor: the pins of a host call that waits do not grow with every turn)
           const earliest = this.wake();
           if (thread.state === 'runnable') { timedOut = thread.timedOut; break; }
+          this.checkNestedDeadlock(thread);
           const { thread: next } = this.pick(thread, null);
           if (next) { this.rt.runThreads(); this.serviceEvents(); idleRounds = 0; continue; }
           this.idle(earliest, `${thread.name} is waiting (${blocked.reason}) and cannot be woken: the threads that could do it are suspended below this host call`);

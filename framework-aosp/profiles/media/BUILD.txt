@@ -1,13 +1,34 @@
-Original Android 13 media profile (android.media.session.PlaybackState, android.media.MediaMetadata, MediaDescription, Rating)
+Original Android 13 media profile (android.media.session.PlaybackState, android.media.MediaMetadata, MediaDescription, Rating; the route provider side of MediaRouter2)
 
     scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
     scripts/build-aosp-media-profile.sh        (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
-    node --test --import ./tests/setup-javacrypto.mjs tests/hidden-members.test.mjs
+    node --test --import ./tests/setup-javacrypto.mjs tests/hidden-members.test.mjs tests/media-route-provider.test.mjs
 
-Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/media-sources.txt, compiled unchanged (no source transform):
+Contents: the pinned android-13.0.0_r1 originals listed in framework-aosp/media-sources.txt:
 android.media.session.PlaybackState (with its Builder and CustomAction), android.media.MediaMetadata (with its Builder), android.media.MediaDescription
 (with its Builder) and android.media.Rating. MediaSession, MediaController and MediaSessionManager are the lab's host classes
 (src/peripheral-services-host.js), which keep the objects an app publishes and hand the same objects to its controllers.
 
+The route provider side of MediaRouter2: android.media.MediaRoute2ProviderService (with its binder MediaRoute2ProviderServiceStub),
+MediaRoute2Info (with its Builder), RoutingSessionInfo (with its Builder), MediaRoute2ProviderInfo (with its Builder), MediaRouter2Utils, and the
+Java the Android SDK aidl compiler writes for IMediaRoute2ProviderService and IMediaRoute2ProviderServiceCallback (framework-aosp/media-aidl-sources.txt,
+generated into generated/ by scripts/generate-service-aidl.py --sources media-aidl-sources.txt --out profiles/media/generated --no-refusals).
+RouteDiscoveryPreference is in the default DEX. MediaRouter2.java is compiled whole and unchanged, and only its callback base classes are kept
+(MediaRouter2.RouteCallback, TransferCallback, ControllerCallback, OnGetControllerHintsListener: abstract classes with empty bodies and an interface,
+which an app or a library subclasses).
+
+Recorded source transform (framework-provenance.json, sourceTransforms): the nine binder callbacks of MediaRoute2ProviderServiceStub post their call to
+the service's Handler as a lambda (mHandler.post(() -> this.m(a, b))) instead of a pooled Message (mHandler.sendMessage(PooledLambda.obtainMessage(
+MediaRoute2ProviderService::m, this, a, b))): com.android.internal.util.function.pooled is not in the lab's framework, and both run the same method
+on the same Looper. Nothing else changes.
+
+Behaviour: the virtual device has no media router service (IMediaRouterService, the system's MediaRouter2 service). A provider service of the app is
+constructed, bound by the app itself, and its original bookkeeping works (notifyRoutes, notifySessionCreated / Updated / Released, getSessionInfo); no
+system service binds it, so its callback stays unset and the binder methods refuse callers that are not the system uid, as the original does.
+MediaRouter2 itself (getInstance, RoutingController) and MediaRouter2Manager are not provided: a call fails as an unsupported API naming it. No route
+or session is invented: the lab reports none of its own.
+
 Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader
-(src/apk-loader.js) adds this DEX when the APK's DEX references one of these classes, or when the loader option enableMediaProfile is true.
+(src/apk-loader.js) adds this DEX when the APK's DEX references one of these classes, when a companion package is installed (the "With microG"
+option's media route provider extends MediaRoute2ProviderService; a companion's code is not scanned at load), or when the loader option
+enableMediaProfile is true.

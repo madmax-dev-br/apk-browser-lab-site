@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=af8ff7411a95';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -9,7 +9,7 @@ const WINDOW = 'Landroid/view/Window;', VIEW = 'Landroid/view/View;', CONTROLLER
 const keys = new Set(), add = (owner, signatures) => signatures.forEach(signature => keys.add(`${owner}->${signature}`));
 add(WINDOW, ['setStatusBarColor(I)V', 'getStatusBarColor()I', 'setNavigationBarColor(I)V', 'getNavigationBarColor()I', 'setNavigationBarDividerColor(I)V', 'getNavigationBarDividerColor()I', 'setDecorFitsSystemWindows(Z)V',
   'addFlags(I)V', 'clearFlags(I)V', 'setFlags(II)V', 'setNavigationBarContrastEnforced(Z)V', 'isNavigationBarContrastEnforced()Z', 'setStatusBarContrastEnforced(Z)V', 'isStatusBarContrastEnforced()Z', 'getInsetsController()Landroid/view/WindowInsetsController;',
-  'addOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;Landroid/os/Handler;)V', 'removeOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;)V']);
+  'addOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;Landroid/os/Handler;)V', 'removeOnFrameMetricsAvailableListener(Landroid/view/Window$OnFrameMetricsAvailableListener;)V', 'setHideOverlayWindows(Z)V']);
 add(VIEW, ['setSystemUiVisibility(I)V', 'getSystemUiVisibility()I', 'getWindowSystemUiVisibility()I', 'getWindowInsetsController()Landroid/view/WindowInsetsController;']);
 add(CONTROLLER, ['setSystemBarsAppearance(II)V', 'getSystemBarsAppearance()I', 'hide(I)V', 'show(I)V', 'addOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'removeOnControllableInsetsChangedListener(Landroid/view/WindowInsetsController$OnControllableInsetsChangedListener;)V', 'setSystemBarsBehavior(I)V', 'getSystemBarsBehavior()I']);
 const FLAG = { FULLSCREEN: 0x400, LAYOUT_NO_LIMITS: 0x200, TRANSLUCENT_STATUS: 0x04000000, TRANSLUCENT_NAVIGATION: 0x08000000, DRAWS_SYSTEM_BAR_BACKGROUNDS: 0x80000000 | 0 };
@@ -217,6 +217,12 @@ export function createSystemBarsHost(platform) {
       if (name === 'setStatusBarContrastEnforced') { bars.statusContrast = !!args[1]; return; }
       if (name === 'isStatusBarContrastEnforced') return bars.statusContrast ? 1 : 0;
       if (name === 'getInsetsController') return controllerFor(r, frame);
+      // Window.setHideOverlayWindows (API 31): HIDE_NON_SYSTEM_OVERLAY_WINDOWS or HIDE_OVERLAY_WINDOWS (a normal permission the manifest grants), else SecurityException; it sets the window's
+      // private flag SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS. The virtual device draws no other app's overlay, so there is nothing else to hide.
+      if (name === 'setHideOverlayWindows') {
+        if (!platform.holdsPermission?.(r, 'android.permission.HIDE_NON_SYSTEM_OVERLAY_WINDOWS') && !platform.holdsPermission?.(r, 'android.permission.HIDE_OVERLAY_WINDOWS')) r.throwJava('Ljava/lang/SecurityException;', 'Permission denial: setHideOverlayWindows: HIDE_OVERLAY_WINDOWS');
+        bars.privateFlags = args[1] ? (bars.privateFlags ?? 0) | 0x80000 : (bars.privateFlags ?? 0) & ~0x80000; return;
+      }
       fail('Unsupported system-bar operation ' + name);
     },
   };

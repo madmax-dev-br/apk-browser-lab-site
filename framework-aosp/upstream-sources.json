@@ -38668,5 +38668,455 @@
     "sha256": "09cb5abf3a2859068904307681ae2c02721d9ca5ee3c4d5ebdf49ab218a459d3",
     "bytes": 29618,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/TransferQueue.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/TransferQueue.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/TransferQueue.java?format=TEXT",
+    "sha256": "f3ab2d318ace0a8c2df5e808622936ab46c6ab00d277f78867bbb52d2de10323",
+    "bytes": 7461,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/LinkedTransferQueue.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/LinkedTransferQueue.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/LinkedTransferQueue.java?format=TEXT",
+    "sha256": "cfff6079dfbb253e5c7b72952b94a3693a8c8bac21d1ab9a42adede07fe68be7",
+    "bytes": 69770,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/BrokenBarrierException.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/BrokenBarrierException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/BrokenBarrierException.java?format=TEXT",
+    "sha256": "a1a4fa19fd56aa3b60ace76ea69a58f0db8d624e786e8adea0d707ac6ba7ec4d",
+    "bytes": 2335,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/util/concurrent/Flow.java",
+    "localPath": "framework-aosp/upstream/java/util/concurrent/Flow.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Flow.java?format=TEXT",
+    "sha256": "6cfb7d4a2f766ddb3a76126d34cd019c25c2a71c464bc9f26f1c20dfc8b75632",
+    "bytes": 13277,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRoute2ProviderService.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderService.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderService.java?format=TEXT",
+    "sha256": "ef2e75f9d1c77946092abd7fc00da38f6f8c82ba3f268a65097ea5955f41bc0c",
+    "bytes": 26751,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRoute2Info.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaRoute2Info.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2Info.java?format=TEXT",
+    "sha256": "042ccfc70794d04f7b7e9187ecb07d109e38e51ce7eed9ae371ff60fc46222fe",
+    "bytes": 32929,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/RoutingSessionInfo.java",
+    "localPath": "framework-aosp/upstream/android/media/RoutingSessionInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RoutingSessionInfo.java?format=TEXT",
+    "sha256": "b75cd32768670b4f36a5c8f7d1637fd3623016ad9429240b99a78132c118ecfc",
+    "bytes": 22450,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRoute2ProviderInfo.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderInfo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderInfo.java?format=TEXT",
+    "sha256": "45235891ca3623130c6709a27119e3f5f51a651c5f880bb73e95047a68d67dbf",
+    "bytes": 7716,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRouter2Utils.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaRouter2Utils.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRouter2Utils.java?format=TEXT",
+    "sha256": "47b99f431a99e0a49d0319f947efa174172ed5a511405db37cbe98b824c50135",
+    "bytes": 2826,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRouter2.java",
+    "localPath": "framework-aosp/upstream/android/media/MediaRouter2.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRouter2.java?format=TEXT",
+    "sha256": "6a5a753943c7b9e012be47e5d7fe713f5f537e3336c7a9add3922f2217623217",
+    "bytes": 82496,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/IMediaRoute2ProviderService.aidl",
+    "localPath": "framework-aosp/upstream/android/media/IMediaRoute2ProviderService.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/IMediaRoute2ProviderService.aidl?format=TEXT",
+    "sha256": "244da126fbb654dbfb32b81f2aefa11599a182012a022b27fe0a2760c2a5b781",
+    "bytes": 1736,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/IMediaRoute2ProviderServiceCallback.aidl",
+    "localPath": "framework-aosp/upstream/android/media/IMediaRoute2ProviderServiceCallback.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/IMediaRoute2ProviderServiceCallback.aidl?format=TEXT",
+    "sha256": "f45b39a6cafebf74dff716711c495ff84297340ff678895eaa115f7c2362bcd0",
+    "bytes": 1260,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRoute2Info.aidl",
+    "localPath": "framework-aosp/upstream/android/media/MediaRoute2Info.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2Info.aidl?format=TEXT",
+    "sha256": "c9d03f34824e5475ef0c2e05f7e57d546af1fdd23b70e8b85f1df9a22dbe6f0f",
+    "bytes": 669,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/RouteDiscoveryPreference.aidl",
+    "localPath": "framework-aosp/upstream/android/media/RouteDiscoveryPreference.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RouteDiscoveryPreference.aidl?format=TEXT",
+    "sha256": "d8cbbdf2e57aee6313476df208fd875e238817949c8fde9972769d0bab5c4d7f",
+    "bytes": 678,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/RoutingSessionInfo.aidl",
+    "localPath": "framework-aosp/upstream/android/media/RoutingSessionInfo.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RoutingSessionInfo.aidl?format=TEXT",
+    "sha256": "05bf2219e1624b8cfe8d8c514b922122fef8ba775562384789f716e69222dba2",
+    "bytes": 672,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "media/java/android/media/MediaRoute2ProviderInfo.aidl",
+    "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderInfo.aidl",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderInfo.aidl?format=TEXT",
+    "sha256": "ca7c9cd9a9eb444b90699335850d3472bf7b4286a8a1a83147a0ebc1fc412e4a",
+    "bytes": 677,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/LambdaConversionException.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/LambdaConversionException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/LambdaConversionException.java?format=TEXT",
+    "sha256": "6d1b97059db017583387cdc0ebd0c5d28d6feeacb15cf1bf3e37a45ef2a5f943",
+    "bytes": 2776,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/CallSite.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/CallSite.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/CallSite.java?format=TEXT",
+    "sha256": "6f635b6116492a7979aa742dc73e4873c4293b990d61c82c332753d4ee417653",
+    "bytes": 17546,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/ConstantCallSite.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/ConstantCallSite.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/ConstantCallSite.java?format=TEXT",
+    "sha256": "52ca8ad093219b975edd5ded1101c287e0f9f2bc1160be50f575f49196cdc38a",
+    "bytes": 5626,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandle.java?format=TEXT",
+    "sha256": "c9f212681ddf969f625388ed51267040641c2bedce15c1c6a8ba3c97534d7609",
+    "bytes": 91679,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandles.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandles.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandles.java?format=TEXT",
+    "sha256": "521421c2cb3a57161761561b23daa006540f7ef592f67c7b49f66951beb50d7a",
+    "bytes": 310308,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandleImpl.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandleImpl.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandleImpl.java?format=TEXT",
+    "sha256": "f5c0d59d275a78eac19955320e6a9e67141d9e0f0e3582d8e9963ff878811a1e",
+    "bytes": 7464,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandleInfo.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandleInfo.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandleInfo.java?format=TEXT",
+    "sha256": "bcb015cec61b7b0f00e73957fcbb1764c0976ed63af9215eb8da5afe8cf7a6dc",
+    "bytes": 16379,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandleNatives.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandleNatives.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandleNatives.java?format=TEXT",
+    "sha256": "9dadc542dccf429f37abb109960ba67ca9cb914294fbb078c07760e37b71e9b6",
+    "bytes": 24640,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodHandleStatics.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodHandleStatics.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodHandleStatics.java?format=TEXT",
+    "sha256": "9e0fffe7da725b7d67c57fcb24516d2f9fb9faa9b54d776e3d8bf253be9892da",
+    "bytes": 7607,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodType.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodType.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodType.java?format=TEXT",
+    "sha256": "2ed71ee20dedde48eeb97e66e1f275b6cb81bff18014b5c874d18aa70f52232a",
+    "bytes": 61881,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MethodTypeForm.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MethodTypeForm.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MethodTypeForm.java?format=TEXT",
+    "sha256": "39c16b911d00d0698b9387120d0daaec607ed42e5a022c8643a44490c64627bf",
+    "bytes": 18147,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/MutableCallSite.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/MutableCallSite.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/MutableCallSite.java?format=TEXT",
+    "sha256": "3056f82f474eee858fc1b85cc695e9531c2c7b013a340db99a2681df7e5efd94",
+    "bytes": 13927,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/Stable.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/Stable.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/Stable.java?format=TEXT",
+    "sha256": "df817f602105909a08bf544480275521e76f0afc8d2e5182f36bbc5965e3b050",
+    "bytes": 3461,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/Transformers.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/Transformers.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/Transformers.java?format=TEXT",
+    "sha256": "e8561fbe96da0651e6d3154533623d6d4b1bb9568c291671a4ca64cffa5eb6f7",
+    "bytes": 129429,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/VarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/VarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/VarHandle.java?format=TEXT",
+    "sha256": "3eb9e3f2b614e0a870d29383d1f5ff258e2fd6849a83e4429400fc575e02de1d",
+    "bytes": 107819,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/VolatileCallSite.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/VolatileCallSite.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/VolatileCallSite.java?format=TEXT",
+    "sha256": "6f4db3564e17b8fd2f9cf6eb09817ea44fd18ecae5f31fcb537729e7b3576ab3",
+    "bytes": 4346,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/invoke/WrongMethodTypeException.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/WrongMethodTypeException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/invoke/WrongMethodTypeException.java?format=TEXT",
+    "sha256": "dc680b7381be6d03a5894d415108a85d091d1834348a1491788a53b006e8da1e",
+    "bytes": 3050,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/sun/invoke/util/BytecodeDescriptor.java",
+    "localPath": "framework-aosp/upstream/sun/invoke/util/BytecodeDescriptor.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/sun/invoke/util/BytecodeDescriptor.java?format=TEXT",
+    "sha256": "dbafdd1719edcccabfe3ba22f51d6ee94b3d65b604fe2b9c323367728a31b93b",
+    "bytes": 4984,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/sun/invoke/util/Wrapper.java",
+    "localPath": "framework-aosp/upstream/sun/invoke/util/Wrapper.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/sun/invoke/util/Wrapper.java?format=TEXT",
+    "sha256": "30ac64c0658b323a39d57d404c43d06428dc1212fd120a7743900dbbcee766f0",
+    "bytes": 28772,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/sun/invoke/util/VerifyAccess.java",
+    "localPath": "framework-aosp/upstream/sun/invoke/util/VerifyAccess.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/sun/invoke/util/VerifyAccess.java?format=TEXT",
+    "sha256": "b6fdd3a4b77f35d107ceb925cf1916290522a9fd57281176629c0ff645633381",
+    "bytes": 17354,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "dalvik/src/main/java/dalvik/system/EmulatedStackFrame.java",
+    "localPath": "framework-aosp/upstream/dalvik/system/EmulatedStackFrame.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/dalvik/src/main/java/dalvik/system/EmulatedStackFrame.java?format=TEXT",
+    "sha256": "e61d9a66f47b6d1c9fbdd0ecf8b51027087469f05e3e52ef4e08bb11c6b50be6",
+    "bytes": 21259,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "libart/src/main/java/java/lang/invoke/ArrayElementVarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/ArrayElementVarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/libart/src/main/java/java/lang/invoke/ArrayElementVarHandle.java?format=TEXT",
+    "sha256": "dc31d9e3bb65cdf2cdfcb79d7684ab42f4740882a0c7cec51d4fbb8eb8bbd735",
+    "bytes": 1133,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "libart/src/main/java/java/lang/invoke/ByteArrayViewVarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/ByteArrayViewVarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/libart/src/main/java/java/lang/invoke/ByteArrayViewVarHandle.java?format=TEXT",
+    "sha256": "49556520af02f60f22a5a697fc348c446b82145c2103861795c48e99ba22b6d0",
+    "bytes": 1302,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "libart/src/main/java/java/lang/invoke/ByteBufferViewVarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/ByteBufferViewVarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/libart/src/main/java/java/lang/invoke/ByteBufferViewVarHandle.java?format=TEXT",
+    "sha256": "c184051a5e1e276ddae1e30a5b5c00e0ad74bd179a87fe1582b0b34982c28869",
+    "bytes": 1338,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "libart/src/main/java/java/lang/invoke/FieldVarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/FieldVarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/libart/src/main/java/java/lang/invoke/FieldVarHandle.java?format=TEXT",
+    "sha256": "7315faab913edab75f102dede3a4ae55d16c5f926db9d1082cb65763fbd612f3",
+    "bytes": 1414,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "libart/src/main/java/java/lang/invoke/StaticFieldVarHandle.java",
+    "localPath": "framework-aosp/upstream/java/lang/invoke/StaticFieldVarHandle.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/libart/src/main/java/java/lang/invoke/StaticFieldVarHandle.java?format=TEXT",
+    "sha256": "e6950bb8aa303817eb31629c217347c812f745ad929882d63fce86b858516831",
+    "bytes": 1217,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/net/UrlQuerySanitizer.java",
+    "localPath": "framework-aosp/upstream/android/net/UrlQuerySanitizer.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/UrlQuerySanitizer.java?format=TEXT",
+    "sha256": "ddf8a4246def2ff30ee605c887d44067c4b9ae6107f96f071ef6360f0d01e0d1",
+    "bytes": 31395,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/net/MailTo.java",
+    "localPath": "framework-aosp/upstream/android/net/MailTo.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/MailTo.java?format=TEXT",
+    "sha256": "dafb4eedd458cd66fb75dc074fda988da510de2b4e2af530b565d5e7da7454c6",
+    "bytes": 5455,
+    "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/frameworks/base",
+    "tag": "android-13.0.0_r1",
+    "path": "core/java/android/net/Credentials.java",
+    "localPath": "framework-aosp/upstream/android/net/Credentials.java",
+    "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/Credentials.java?format=TEXT",
+    "sha256": "24a925faae707fe84a7090712b77239001a980512f022cee096c6f18d15a9ccc",
+    "bytes": 1339,
+    "license": "Apache-2.0"
   }
 ]

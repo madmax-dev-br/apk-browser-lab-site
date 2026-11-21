@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { createHostRegistry } from './host-contract.js?v=7233e918dcc9';
-import { ANDROID_IDS } from './android-ids-data.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
+import { ANDROID_IDS } from './android-ids-data.js?v=af8ff7411a95';
 
 // The rest of android.os.Process over the browser VM's single virtual process (frameworks/base/core/java/android/os/Process.java and its JNI half
 // core/jni/android_util_Process.cpp, android-13.0.0_r1). The uid arithmetic is the Java code verbatim; the natives follow the C++ control flow against the VM's
-// one process: its pid/uid (platform.virtualProcess), a parent pid of 1 (the Os.getppid() binding), no other app processes, no scheduler and no cgroups.
+// one process: its pid/uid (platform.virtualProcess), its parent zygote's pid (platform.virtualProcess.ppid, src/virtual-pids.js), no other app processes, no scheduler and no cgroups.
 // The pieces that need a kernel the VM does not have (/proc readers, pidfds, process groups, freezer, Zygote start) stay unbound and fail by their exact name.
 const PROCESS = 'Landroid/os/Process;', STRING = 'Ljava/lang/String;';
 const FIRST_APPLICATION_UID = 10000, FIRST_SDK_SANDBOX_UID = 20000, LAST_SDK_SANDBOX_UID = 29999, FIRST_APP_ZYGOTE_ISOLATED_UID = 90000, LAST_APP_ZYGOTE_ISOLATED_UID = 98999,
@@ -30,7 +30,7 @@ export function createProcessHost(platform) {
   };
   const statics = (name, signature, fn) => def(PROCESS, name, signature, fn, { static: true });
 
-  statics('myPpid', '()I', () => 1);
+  statics('myPpid', '()I', () => proc().ppid);   // zygote (src/virtual-pids.js)
   statics('isCoreUid', '(I)Z', (_r, _m, [uid]) => (uid >= 0 && appId(uid) < FIRST_APPLICATION_UID ? 1 : 0));   // UserHandle.isCore
   const isIsolated = uid => { uid = appId(uid); return (uid >= FIRST_ISOLATED_UID && uid <= LAST_ISOLATED_UID) || (uid >= FIRST_APP_ZYGOTE_ISOLATED_UID && uid <= LAST_APP_ZYGOTE_ISOLATED_UID) ? 1 : 0; };
   const isSdkSandboxUid = uid => { uid = appId(uid); return uid >= FIRST_SDK_SANDBOX_UID && uid <= LAST_SDK_SANDBOX_UID ? 1 : 0; };
@@ -68,7 +68,7 @@ export function createProcessHost(platform) {
 
   // /proc/<pid>/status readers: the VM has one process, so these answer for it and report -1 (the value they start from) for every other pid.
   statics('getUidForPid', '(I)I', (_r, _m, [pid]) => (pid === proc().pid ? proc().uid : -1));
-  statics('getParentPid', '(I)I', (_r, _m, [pid]) => (pid === proc().pid ? 1 : -1));
+  statics('getParentPid', '(I)I', (_r, _m, [pid]) => (pid === proc().pid ? proc().ppid : -1));   // zygote (src/virtual-pids.js)
   statics('getThreadGroupLeader', '(I)I', (_r, _m, [tid]) => (tid === proc().pid ? proc().pid : -1));
 
   // Signals: sendSignal(pid, sig) is kill(pid, sig) for pid > 0 and ignores failures. The only process there is the app's own; a default-action terminating signal ends it

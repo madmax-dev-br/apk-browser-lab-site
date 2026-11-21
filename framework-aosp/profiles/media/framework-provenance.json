@@ -4,10 +4,20 @@
   "enabledByDefault": false,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "sha256": "7a8117985aa21aafba4834c43cf4a376718dc5bdc871cb641cd4c837ead3b405",
-  "bytes": 29328,
-  "methods": 234,
+  "sha256": "5eaa903642e8aa074ce8731ebe73c64e8d929189178c342ad55a24e05092d048",
+  "bytes": 74452,
+  "methods": 622,
   "classes": [
+    "Landroid/media/IMediaRoute2ProviderService;",
+    "Landroid/media/IMediaRoute2ProviderService$Default;",
+    "Landroid/media/IMediaRoute2ProviderService$Stub$Proxy;",
+    "Landroid/media/IMediaRoute2ProviderService$Stub;",
+    "Landroid/media/IMediaRoute2ProviderService$_Parcel;",
+    "Landroid/media/IMediaRoute2ProviderServiceCallback;",
+    "Landroid/media/IMediaRoute2ProviderServiceCallback$Default;",
+    "Landroid/media/IMediaRoute2ProviderServiceCallback$Stub$Proxy;",
+    "Landroid/media/IMediaRoute2ProviderServiceCallback$Stub;",
+    "Landroid/media/IMediaRoute2ProviderServiceCallback$_Parcel;",
     "Landroid/media/MediaDescription$1;",
     "Landroid/media/MediaDescription$Builder;",
     "Landroid/media/MediaDescription;",
@@ -18,10 +28,43 @@
     "Landroid/media/MediaMetadata$RatingKey;",
     "Landroid/media/MediaMetadata$TextKey;",
     "Landroid/media/MediaMetadata;",
+    "Landroid/media/MediaRoute2Info$$ExternalSyntheticBackport0;",
+    "Landroid/media/MediaRoute2Info$1;",
+    "Landroid/media/MediaRoute2Info$Builder;",
+    "Landroid/media/MediaRoute2Info$ConnectionState;",
+    "Landroid/media/MediaRoute2Info$PlaybackVolume;",
+    "Landroid/media/MediaRoute2Info$Type;",
+    "Landroid/media/MediaRoute2Info;",
+    "Landroid/media/MediaRoute2ProviderInfo$1;",
+    "Landroid/media/MediaRoute2ProviderInfo$Builder;",
+    "Landroid/media/MediaRoute2ProviderInfo;",
+    "Landroid/media/MediaRoute2ProviderService$$ExternalSyntheticLambda0;",
+    "Landroid/media/MediaRoute2ProviderService$$ExternalSyntheticLambda1;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda0;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda1;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda2;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda3;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda4;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda5;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda6;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda7;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub$$ExternalSyntheticLambda8;",
+    "Landroid/media/MediaRoute2ProviderService$MediaRoute2ProviderServiceStub;",
+    "Landroid/media/MediaRoute2ProviderService$Reason;",
+    "Landroid/media/MediaRoute2ProviderService;",
+    "Landroid/media/MediaRouter2$ControllerCallback;",
+    "Landroid/media/MediaRouter2$OnGetControllerHintsListener;",
+    "Landroid/media/MediaRouter2$RouteCallback;",
+    "Landroid/media/MediaRouter2$TransferCallback;",
+    "Landroid/media/MediaRouter2Utils;",
     "Landroid/media/Rating$1;",
     "Landroid/media/Rating$StarStyle;",
     "Landroid/media/Rating$Style;",
     "Landroid/media/Rating;",
+    "Landroid/media/RoutingSessionInfo$1;",
+    "Landroid/media/RoutingSessionInfo$Builder$$ExternalSyntheticLambda0;",
+    "Landroid/media/RoutingSessionInfo$Builder;",
+    "Landroid/media/RoutingSessionInfo;",
     "Landroid/media/session/PlaybackState$1;",
     "Landroid/media/session/PlaybackState$Actions;",
     "Landroid/media/session/PlaybackState$Builder;",
@@ -31,10 +74,50 @@
     "Landroid/media/session/PlaybackState$State;",
     "Landroid/media/session/PlaybackState;"
   ],
-  "classCount": 22,
+  "classCount": 65,
   "algorithmPatches": [],
-  "sourceTransforms": [],
+  "sourceTransforms": [
+    {
+      "path": "android/media/MediaRoute2ProviderService.java",
+      "kind": "pooled-lambda-message-to-posted-lambda",
+      "note": "9 binder callbacks of MediaRoute2ProviderServiceStub post the same method call to the same Handler as a lambda instead of a pooled Message (PooledLambda is not in the lab framework)",
+      "inputSha256": "ef2e75f9d1c77946092abd7fc00da38f6f8c82ba3f268a65097ea5955f41bc0c",
+      "outputSha256": "2583ace4b208326372264e0c8e45da87a3349f3336d67af470b0fd0baa2f1395"
+    }
+  ],
+  "partialSources": [
+    {
+      "path": "android/media/MediaRouter2.java",
+      "kept": [
+        "Landroid/media/MediaRouter2$RouteCallback;",
+        "Landroid/media/MediaRouter2$TransferCallback;",
+        "Landroid/media/MediaRouter2$ControllerCallback;",
+        "Landroid/media/MediaRouter2$OnGetControllerHintsListener;"
+      ],
+      "note": "compiled whole and unchanged; only the callback base classes are D8 inputs. MediaRouter2 (getInstance, RoutingController) is not provided: the virtual device has no media router service, and a call to it fails as an unsupported API naming it"
+    }
+  ],
   "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/content/Intent.aidl",
+      "localPath": "framework-aosp/upstream/android/content/Intent.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/content/Intent.aidl?format=TEXT",
+      "sha256": "d5efd73f7a2ab8f35ada1dd8b5e125d0660f1699bdaf71833f552568ca9e5a90",
+      "bytes": 722,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/os/Bundle.aidl",
+      "localPath": "framework-aosp/upstream/android/os/Bundle.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/os/Bundle.aidl?format=TEXT",
+      "sha256": "c4a7a65e8e2ab4579854d41159ec8a6449872ddbeb0e4f48b89c735f82e38015",
+      "bytes": 712,
+      "license": "Apache-2.0"
+    },
     {
       "project": "platform/frameworks/base",
       "tag": "android-13.0.0_r1",
@@ -74,12 +157,149 @@
       "sha256": "2fffd9e704f8b64f6f6f254540ba88d07e9ef4192b21b4dea8c59a965463c6aa",
       "bytes": 10573,
       "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRoute2ProviderService.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderService.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderService.java?format=TEXT",
+      "sha256": "ef2e75f9d1c77946092abd7fc00da38f6f8c82ba3f268a65097ea5955f41bc0c",
+      "bytes": 26751,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRoute2Info.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaRoute2Info.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2Info.java?format=TEXT",
+      "sha256": "042ccfc70794d04f7b7e9187ecb07d109e38e51ce7eed9ae371ff60fc46222fe",
+      "bytes": 32929,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/RoutingSessionInfo.java",
+      "localPath": "framework-aosp/upstream/android/media/RoutingSessionInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RoutingSessionInfo.java?format=TEXT",
+      "sha256": "b75cd32768670b4f36a5c8f7d1637fd3623016ad9429240b99a78132c118ecfc",
+      "bytes": 22450,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRoute2ProviderInfo.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderInfo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderInfo.java?format=TEXT",
+      "sha256": "45235891ca3623130c6709a27119e3f5f51a651c5f880bb73e95047a68d67dbf",
+      "bytes": 7716,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRouter2Utils.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaRouter2Utils.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRouter2Utils.java?format=TEXT",
+      "sha256": "47b99f431a99e0a49d0319f947efa174172ed5a511405db37cbe98b824c50135",
+      "bytes": 2826,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRouter2.java",
+      "localPath": "framework-aosp/upstream/android/media/MediaRouter2.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRouter2.java?format=TEXT",
+      "sha256": "6a5a753943c7b9e012be47e5d7fe713f5f537e3336c7a9add3922f2217623217",
+      "bytes": 82496,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/IMediaRoute2ProviderService.aidl",
+      "localPath": "framework-aosp/upstream/android/media/IMediaRoute2ProviderService.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/IMediaRoute2ProviderService.aidl?format=TEXT",
+      "sha256": "244da126fbb654dbfb32b81f2aefa11599a182012a022b27fe0a2760c2a5b781",
+      "bytes": 1736,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/IMediaRoute2ProviderServiceCallback.aidl",
+      "localPath": "framework-aosp/upstream/android/media/IMediaRoute2ProviderServiceCallback.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/IMediaRoute2ProviderServiceCallback.aidl?format=TEXT",
+      "sha256": "f45b39a6cafebf74dff716711c495ff84297340ff678895eaa115f7c2362bcd0",
+      "bytes": 1260,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRoute2Info.aidl",
+      "localPath": "framework-aosp/upstream/android/media/MediaRoute2Info.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2Info.aidl?format=TEXT",
+      "sha256": "c9d03f34824e5475ef0c2e05f7e57d546af1fdd23b70e8b85f1df9a22dbe6f0f",
+      "bytes": 669,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/RouteDiscoveryPreference.aidl",
+      "localPath": "framework-aosp/upstream/android/media/RouteDiscoveryPreference.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RouteDiscoveryPreference.aidl?format=TEXT",
+      "sha256": "d8cbbdf2e57aee6313476df208fd875e238817949c8fde9972769d0bab5c4d7f",
+      "bytes": 678,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/RoutingSessionInfo.aidl",
+      "localPath": "framework-aosp/upstream/android/media/RoutingSessionInfo.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/RoutingSessionInfo.aidl?format=TEXT",
+      "sha256": "05bf2219e1624b8cfe8d8c514b922122fef8ba775562384789f716e69222dba2",
+      "bytes": 672,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "media/java/android/media/MediaRoute2ProviderInfo.aidl",
+      "localPath": "framework-aosp/upstream/android/media/MediaRoute2ProviderInfo.aidl",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/media/java/android/media/MediaRoute2ProviderInfo.aidl?format=TEXT",
+      "sha256": "ca7c9cd9a9eb444b90699335850d3472bf7b4286a8a1a83147a0ebc1fc412e4a",
+      "bytes": 677,
+      "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
+  "generatedSources": {
+    "tool": "Android SDK build-tools 36.1.0 aidl --lang=java",
+    "interfaces": [
+      "android/media/IMediaRoute2ProviderService.aidl",
+      "android/media/IMediaRoute2ProviderServiceCallback.aidl"
+    ],
+    "files": [
+      {
+        "localPath": "framework-aosp/profiles/media/generated/android/media/IMediaRoute2ProviderService.java",
+        "sha256": "574de8ae53c2d7bc4f96aae27f91b5467ecc76bb1f8cdffbb4a31aa8670aac9a"
+      },
+      {
+        "localPath": "framework-aosp/profiles/media/generated/android/media/IMediaRoute2ProviderServiceCallback.java",
+        "sha256": "5ced5675cddac7978cac7c0528dba71157a6b1b1e070aba789285014888c4138"
+      }
+    ]
+  },
+  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
   "compileOnlyDeclarationsPackaged": false,
-  "integrationStatus": "Original media data classes (PlaybackState, MediaMetadata, MediaDescription, Rating) that the lab's MediaSession and MediaController host classes pass through unchanged",
-  "activationPolicy": "an installed package DEX references android.media.session.PlaybackState, android.media.MediaMetadata, android.media.MediaDescription or android.media.Rating (or explicit loader option)",
+  "integrationStatus": "Original media data classes (PlaybackState, MediaMetadata, MediaDescription, Rating) that the lab's MediaSession and MediaController host classes pass through unchanged, and the original route provider side of MediaRouter2 (MediaRoute2ProviderService and its binder, route and session data classes, the MediaRouter2 callback bases); no media router service: no system routes, no provider is bound by the device",
+  "activationPolicy": "an installed package DEX references android.media.session.PlaybackState, android.media.MediaMetadata, android.media.MediaDescription, android.media.Rating, android.media.MediaRoute2ProviderService, MediaRoute2Info, RoutingSessionInfo, MediaRoute2ProviderInfo or a MediaRouter2 callback base (or explicit loader option)",
   "correspondingSource": "source-bundle.zip",
   "licenses": [
     "../../LICENSE",

@@ -524,8 +524,8 @@
   "schemaVersion": 1,
   "artifact": "framework.dex",
   "tag": "android-13.0.0_r1",
-  "bytes": 8846444,
-  "sha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
+  "bytes": 8846712,
+  "sha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
   "classCount": 6797,
   "classes": [
     "Landroid/os/Parcelable$Creator;",
@@ -41614,7 +41614,7 @@
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/os/BundleHidden.java",
-        "sha256": "9ebf33d15978a4c11d916379f804c455363c6bd4b9f4efa010375b8d9e23a8bf"
+        "sha256": "b11c94dc3f1a07a7d3da9c8c9e8f94d9b170d216fda48f196a522d0d459a3d74"
       },
       {
         "path": "framework-aosp/lab-java/dev/apkweb/os/FileUtilsHidden.java",

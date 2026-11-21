@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=7233e918dcc9';
-import { fieldOffset } from './unsafe-native.js?v=7233e918dcc9';
+import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
+import { fieldOffset } from './unsafe-native.js?v=af8ff7411a95';
 
 // Platform contract for the hidden/internal framework APIs that android.database and android.database.sqlite (Android 13 sources, compiled into the
 // framework DEX) call: dalvik.system.CloseGuard, dalvik.system.BlockGuard, android.os.FileUtils.setPermissions, android.os.StrictMode SQLite leak
@@ -61,7 +61,8 @@ export function createDatabaseSupportHost(platform) {
 
   // ---- sun.reflect.Reflection.getCallerClass() and Field.getOffset() for the original Unsafe/Bits/Buffer classes.
   // getCallerClass: the class of the method that called the caller-sensitive method (stack = [..., caller, caller-sensitive method]).
-  def('Lsun/reflect/Reflection;', 'getCallerClass', '()Ljava/lang/Class;', r => { const caller = r.methodStack.at(-2); return caller ? r.classObject(caller.owner) : null; }, { static: true });
+  // On the WebAssembly core the frames are the core's (APKRuntime.captureStack, innermost first: [caller-sensitive method, caller, ...]); the JavaScript VM keeps methodStack.
+  def('Lsun/reflect/Reflection;', 'getCallerClass', '()Ljava/lang/Class;', r => { const caller = r.engine === 'wasm' && r.captureStack ? r.captureStack()[1] : r.methodStack.at(-2); return caller ? r.classObject(caller.owner) : null; }, { static: true });
   def('Ljava/lang/reflect/Field;', 'getOffset', '()I', (r, _m, [self]) => fieldOffset(r, r.object(self).member.field.key));
 
   // ---- android.app.ActivityThread: the process's single thread object exists before Application creation; getApplication() is mInitialApplication

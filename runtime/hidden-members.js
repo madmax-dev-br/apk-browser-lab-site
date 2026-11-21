@@ -1,6 +1,6 @@
-import TABLES from './hidden-member-tables.js?v=7233e918dcc9';
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { constantField } from './framework-constants.js?v=7233e918dcc9';
+import TABLES from './hidden-member-tables.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { constantField } from './framework-constants.js?v=af8ff7411a95';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with
@@ -81,9 +81,9 @@ export const ACCESSORS = new Map([
   [key(THREAD, 'mInstrumentation', 'Landroid/app/Instrumentation;'), { get: rt => rt.instrumentation ??= (rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;')), set: (rt, _o, v) => { rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;'); rt.instrumentation = isNull(v) ? null : v; } }],
   [key('Landroid/app/Activity;', 'mDecor', 'Landroid/view/View;'), { get: (rt, o) => { const window = call(rt, o, 'Landroid/app/Activity;', 'getWindow', 'Landroid/view/Window;'); return isNull(window) ? null : call(rt, window, 'Landroid/view/Window;', 'peekDecorView', 'Landroid/view/View;'); } }],
   [key('Landroid/view/View;', 'mContext', 'Landroid/content/Context;'), { get: (rt, o) => call(rt, o, 'Landroid/view/View;', 'getContext', 'Landroid/content/Context;') }],
-  // Executable.artMethod: on ART the ArtMethod* of the method, which is also its jmethodID (FromReflectedMethod answers the same value): here the JNI bridge's jmethodID of the member.
-  // Read-only: on ART writing it would make the Executable dispatch to another method, which the lab does not model (an explicit IllegalAccessException, never a silent store).
-  [key('Ljava/lang/reflect/Executable;', 'artMethod', 'J'), { get: (rt, o) => { const member = rt.object(o).member; if (!member?.method) throw new APKError('Executable.artMethod read on an object without a reflected method', { kind: 'internal' }); if (!rt.jni) throw new APKError('Executable.artMethod is the method\'s jmethodID, and this VM has no JNI bridge', { kind: 'jni-required' }); const id = rt.jni.methodIdOf(member); const seen = rt.artMethodValues ??= new Map(); if (!seen.has(id) && seen.size < 4096) seen.set(id, `${String(member.method.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${member.method.name}`); return BigInt(id); } }],
+  // Executable.artMethod: on ART the ArtMethod* of the method, which is also its jmethodID in a non-debuggable app (FromReflectedMethod answers the same value): the ArtMethod
+  // the lab lays out in the app's ARM64 native process (src/arm64/art-runtime.js), or the JNI bridge's jmethodID of the member when there is no such process.
+  [key('Ljava/lang/reflect/Executable;', 'artMethod', 'J'), { get: (rt, o) => { const member = rt.object(o).member; if (!member?.method) throw new APKError('Executable.artMethod read on an object without a reflected method', { kind: 'internal' }); if (!rt.jni) throw new APKError('Executable.artMethod is the method\'s jmethodID, and this VM has no JNI bridge', { kind: 'jni-required' }); return BigInt(rt.jni.artMethodOf(member)); } }],
   // Field.accessFlags: the access flags of this Field object (getModifiers is their low 16 bits; Field.set refuses a final field from them). A write changes this Field object only, as on ART.
   [key('Ljava/lang/reflect/Field;', 'accessFlags', 'I'), { get: (rt, o) => rt.object(o).member?.flags ?? 0, set: (rt, o, v) => { const obj = rt.object(o); obj.member = { ...obj.member, flags: Number(v) | 0 }; } }],
   // AccessibleObject.override: the flag setAccessible(true) sets and the access checks of invoke / get / set skip on.

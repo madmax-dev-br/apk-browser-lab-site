@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=7233e918dcc9';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=7233e918dcc9';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=7233e918dcc9';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=af8ff7411a95';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=af8ff7411a95';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=af8ff7411a95';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };
@@ -64,7 +64,7 @@ function hostReference(nameSig) {
 }
 
 // Constant kinds (what a rewritten operand names)
-const K_STRING = 1, K_TYPE = 2, K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, K_ARRAY = 11, K_CLASS = 12;
+const K_STRING = 1, K_TYPE = 2, K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, K_ARRAY = 11, K_CLASS = 12, K_POLY = 13;
 const INVOKE_KIND = { 0x6e: K_VIRTUAL, 0x6f: K_SUPER, 0x70: K_DIRECT, 0x71: K_STATIC, 0x72: K_INTERFACE, 0x74: K_VIRTUAL, 0x75: K_SUPER, 0x76: K_DIRECT, 0x77: K_STATIC, 0x78: K_INTERFACE };
 
 /** Code units of each instruction (DEX formats); payload pseudo-instructions (opcode 0 with an ident) are sized by `payloadUnits`. */
@@ -84,6 +84,7 @@ for (const op of [0x23, 0x24, 0x25]) OPERAND_KIND[op] = K_ARRAY;
 for (let op = 0x52; op <= 0x5f; op++) OPERAND_KIND[op] = K_IFIELD;
 for (let op = 0x60; op <= 0x6d; op++) OPERAND_KIND[op] = K_SFIELD;
 for (const [op, kind] of Object.entries(INVOKE_KIND)) OPERAND_KIND[op] = kind;
+OPERAND_KIND[0xfa] = K_POLY; OPERAND_KIND[0xfb] = K_POLY;   // invoke-polymorphic: the method and the call site's proto (unit 3), one constant
 const payloadUnits = (units, pc) => {
   const ident = units[pc];
   if (ident === 0x0100) return units[pc + 1] * 2 + 4;
@@ -456,9 +457,9 @@ export class Linker {
     if (LITTLE_ENDIAN && (at & 1) === 0) units = new Uint16Array(bytes.buffer, at, n).slice();
     else { units = new Uint16Array(n); for (let i = 0; i < n; i++) units[i] = bytes[code.offset + 2 * i] | (bytes[code.offset + 2 * i + 1] << 8); }
     mi.original = units.slice(); const pool = [], entries = new Map();
-    const constant = (kind, index) => {
-      const key = index * 16 + kind; let at = entries.get(key);   // kind < 16: one key per (kind, index), a small integer for every 16-bit index
-      if (at === undefined) { at = pool.length; if (at > 0xffff) throw new Error(`${mi.key}: more than 65536 constants`); pool.push({ kind, index }); entries.set(key, at); }
+    const constant = (kind, index, proto = -1) => {
+      const key = (proto + 1) * 0x100000 + index * 16 + kind; let at = entries.get(key);   // kind < 16: one key per (kind, index[, proto]), an integer for every 16-bit index
+      if (at === undefined) { at = pool.length; if (at > 0xffff) throw new Error(`${mi.key}: more than 65536 constants`); pool.push(proto < 0 ? { kind, index } : { kind, index, proto }); entries.set(key, at); }
       return at;
     };
     for (let pc = 0; pc < n;) {
@@ -471,6 +472,7 @@ export class Linker {
         else if ((op === 0x70 || op === 0x76) && dex.methodOwner(units[pc + 1]) === STRING && this.stringConstructor(dex.method(units[pc + 1]))) {
           units[pc] = (unit & 0xff00) | (INVOKE_STRING_INIT + (op === 0x76 ? 1 : 0)); units[pc + 1] = constant(K_DIRECT, units[pc + 1]);
         }
+        else if (kind === K_POLY) units[pc + 1] = constant(K_POLY, units[pc + 1], units[pc + 3]);
         else units[pc + 1] = constant(kind, units[pc + 1]);
       }
       pc += UNITS[op];
@@ -562,6 +564,7 @@ export class Linker {
           a = info.vtable[slot].address; b = slot; break;
         }
         case K_INTERFACE: a = this.resolveInterfaceMethod(dex.method(entry.index)).address; break;
+        case K_POLY: a = this.polymorphicMethod(dex.method(entry.index), dex.proto(entry.proto)).address; break;
         default: throw new Error(`constant kind ${entry.kind}`);
       }
       this.w32(at + 4, b); Atomics.store(this.u32, at >>> 2, a);
@@ -598,6 +601,20 @@ export class Linker {
   /** Static and direct calls: up the class chain from the referenced class (a constructor only in that class); a class without DEX code answers with a host method. */
   resolveStatic(reference) { return this.resolveUp(reference, true); }
   resolveDirect(reference) { return this.resolveUp(reference, false); }
+  /**
+   * invoke-polymorphic (MethodHandle.invoke / invokeExact, the VarHandle access modes): one host record per (method, call-site proto), owned by the declaring class but not one of
+   * its methods (the declared ([Object)Object stays the method reflection sees). The host trampoline serves it (src/method-handles.js) with the proto's argument words.
+   */
+  polymorphicMethod(reference, proto) {
+    this.requireClass(reference.owner);
+    const owner = this.classOf(reference.owner), key = `${reference.owner}->${reference.name}${proto.signature}#polymorphic`, cache = this.polymorphic ??= new Map();
+    let mi = cache.get(key);
+    if (mi === undefined) {
+      mi = this.newMethod(owner, reference.name, proto.signature, { kind: METHOD_UNBOUND, parameters: proto.parameters, flags: M_NATIVE, accessFlags: ACC_NATIVE | 1, registers: 0, ins: wordCount(proto.parameters) + 1 });
+      cache.set(key, mi);
+    }
+    return mi;
+  }
   resolveUp(reference, isStatic) {
     const nameSig = reference.name + reference.signature; this.requireClass(reference.owner);
     const start = this.classOf(reference.owner), mode = isStatic ? 'static' : 'direct';

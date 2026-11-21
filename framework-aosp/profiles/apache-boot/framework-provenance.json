@@ -170,7 +170,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "d8518842ac21237796fd909b4e092f46dbe15929cd5999b663772c5117079a0b",
+  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original boot-class-path org.apache.http classes (SSL hostname verifiers, SSLSocketFactory, conn.scheme, connection params) of framework.jar",
   "activationPolicy": "an installed package DEX references one of these classes, or the apache-http profile is loaded (or explicit loader option)",

@@ -39,7 +39,7 @@ export class VirtualFileSystem {
       '/storage', '/storage/emulated', '/storage/emulated/0', '/storage/emulated/0/Android', '/storage/emulated/0/Android/data', `/storage/emulated/0/Android/data/${packageName}`,
       '/system', '/system/bin', '/system/lib64', '/system/etc', '/system/fonts', '/proc']) this.put(dir, this.directory());
     for (const name of PUBLIC_DIRECTORIES) { const dir = this.directory(); dir.mode = 0o775; this.put(`/storage/emulated/0/${name}`, dir); }   // see PUBLIC_DIRECTORIES: the app owns what it creates here
-    // /proc and its entries are deliberately empty: nothing in the browser VM backs them.
+    // /proc, /dev and /sys: the entries src/procfs.js installs (the app's own process, selinuxfs); nothing else backs them.
   }
   /** Mounts immutable bytes (zero-copy) at path, e.g. the installed APK at <codePath>/base.apk. */
   /** Stores a node under its canonical path; the node remembers it (inotify events name the node, and a rename updates it). */
@@ -64,8 +64,24 @@ export class VirtualFileSystem {
     return resolved;
   }
   parentOf(path) { const index = path.lastIndexOf('/'); return index <= 0 ? '/' : path.slice(0, index); }
-  stat(path) { const node = this.nodes.get(this.canonical(path)); return node ? { type: node.type, size: node.type === 'file' ? node.size : 0, mtime: node.mtime, mode: node.mode } : null; }
-  node(path) { return this.nodes.get(this.canonical(path)) ?? null; }
+  // A kernel-generated file (procfs, src/procfs.js) has `generate`: its bytes are made when it is opened or read, and stat reports size 0, as the kernel does for /proc files.
+  // `denyOpen` is an error name for a file that exists (stat works) but that the app's SELinux domain may not open (selinuxfs: getattr only).
+  stat(path) { const node = this.node(path); return node ? { type: node.type, size: node.type === 'file' && !node.generate ? node.size : 0, mtime: node.mtime, mode: node.mode } : null; }
+  refresh(node) { if (node?.generate) { const bytes = node.generate(); node.buf = bytes; node.size = bytes.length; node.mtime = this.now(); } return node; }
+  denied(path) { return this.node(path)?.denyOpen ?? null; }
+  node(path) { const p = this.canonical(path); return this.nodes.get(p) ?? this.procNode(p); }
+  /**
+   * A node of the app's /proc (src/procfs.js, the model the ARM64 libc reads too): a generated file, a directory, or for a link (fd/<n>) the node of the file it names
+   * (an unlinked one included: its descriptor keeps it). /proc/self/mem and anything the model does not have are null here (ENOENT for Java).
+   */
+  procNode(p) {
+    if (!this.procfs || !p.startsWith('/proc/')) return null;
+    const entry = this.procfs.lookup(p); if (!entry) return null;
+    if (entry.dir) return { type: 'dir', mode: 0o555, mtime: this.now(), procNames: entry.dir, path: p };
+    if (entry.file) return { type: 'file', buf: new Uint8Array(0), size: 0, mtime: this.now(), mode: 0o444, generate: entry.file, path: p };
+    if (entry.link) { const target = entry.link.node ?? this.nodes.get(this.canonical(entry.link.path)); if (target) return target; const bytes = entry.link.bytes?.(); return bytes ? { type: 'file', buf: bytes, size: bytes.length, mtime: this.now(), mode: 0o444, path: entry.link.path } : null; }
+    return null;
+  }
   isReadOnly(path) { const p = this.canonical(path); return [...this.readOnly].some(root => p === root || p.startsWith(root + '/')); }
   /** Returns 'ok' or a POSIX-style error name: ENOENT, EEXIST, ENOTDIR, EISDIR, EACCES. */
   mkdir(path) {
@@ -87,7 +103,12 @@ export class VirtualFileSystem {
     const created = this.put(p, { type: 'file', buf: new Uint8Array(0), size: 0, mtime: this.now(), mode: 0o660 }); parent.mtime = this.now(); this.notify(0x100, created, { self: false }); return 'ok';   // IN_CREATE
   }
   list(path) {
-    const p = this.canonical(path), node = this.nodes.get(p); if (!node) return null; if (node.type !== 'dir') return null;
+    const p = this.canonical(path), node = this.node(p); if (!node) return null; if (node.type !== 'dir') return null;
+    if (node.procNames) return [...node.procNames];
+    if (p === '/proc' && this.procfs) return [...new Set([...this.procfs.rootNames(), ...this.#children(p)])];   // hidepid: the app's own process only
+    return this.#children(p);
+  }
+  #children(p) {
     const prefix = p === '/' ? '/' : p + '/', names = [];
     for (const key of this.nodes.keys()) if (key !== p && key.startsWith(prefix) && !key.slice(prefix.length).includes('/')) names.push(key.slice(prefix.length));
     return names;
@@ -118,10 +139,12 @@ export class VirtualFileSystem {
   }
   /** Ensures a regular file at path exists (creating when `create`), truncating when `truncate`. Returns the node or an error name. */
   open(path, { create = false, truncate = false, write = false } = {}) {
-    const p = this.canonical(path); let node = this.nodes.get(p);
+    const p = this.canonical(path); let node = this.node(p);
     if (!node) { if (!create) return 'ENOENT'; const result = this.createFile(p); if (result !== 'ok') return result; node = this.nodes.get(p); }
     if (node.type === 'dir') return 'EISDIR';
-    if (write && this.isReadOnly(p)) return 'EACCES';
+    if (node.denyOpen) return node.denyOpen;
+    if (write && (this.isReadOnly(p) || node.generate)) return 'EACCES';
+    this.refresh(node);
     if (truncate) { node.size = 0; node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; this.notify(0x2, node); }   // IN_MODIFY
     return node;
   }
@@ -136,7 +159,7 @@ export class VirtualFileSystem {
     if (position > node.size) node.buf.fill(0, node.size, position);
     node.buf.set(source.subarray(offset, offset + length), position); node.size = Math.max(node.size, end); node.mtime = this.now(); node.rev = (node.rev ?? 0) + 1; if (this.observers.size && node.path) this.notify(0x2, node); return length;   // `rev` lets src/app-data-store.js see a change made within the same millisecond
   }
-  bytes(path) { const node = this.node(path); return node?.type === 'file' ? node.buf.slice(0, node.size) : null; }
+  bytes(path) { const node = this.refresh(this.node(path)); return node?.type === 'file' ? node.buf.slice(0, node.size) : null; }
   setBytes(path, bytes) { const node = this.open(path, { create: true, truncate: true, write: true }); if (typeof node === 'string') return node; this.writeAt(node, 0, bytes, 0, bytes.length); return 'ok'; }
   snapshot() {
     const out = [];

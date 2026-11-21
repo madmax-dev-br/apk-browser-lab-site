@@ -1,13 +1,13 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=7233e918dcc9';
-import { formatC, variadic, vaList } from './libc.js?v=7233e918dcc9';
-import { addSockets } from './sockets.js?v=7233e918dcc9';
-import { addMoreLibc } from './libc-more.js?v=7233e918dcc9';
-import { addSyscalls } from './syscalls.js?v=7233e918dcc9';
-import { addSignals } from './signals.js?v=7233e918dcc9';
-import { utf8 } from './text.js?v=7233e918dcc9';
+import { APKError } from '../apk-error.js?v=af8ff7411a95';
+import { formatC, variadic, vaList } from './libc.js?v=af8ff7411a95';
+import { addSockets } from './sockets.js?v=af8ff7411a95';
+import { addMoreLibc } from './libc-more.js?v=af8ff7411a95';
+import { addSyscalls } from './syscalls.js?v=af8ff7411a95';
+import { addSignals } from './signals.js?v=af8ff7411a95';
+import { utf8 } from './text.js?v=af8ff7411a95';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
 const decoder = utf8, encoder = new TextEncoder();
@@ -141,7 +141,12 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   // ---- directories and paths
   lib.getcwd = (p, c) => { const dst = n(c, 0) || p.malloc(256); putString(p, dst, n(c, 1) || 256, '/'); return dst; };
   lib.realpath = (p, c) => { const path = str(p, x(c, 0)), files = vfs(); if (!files.stat(path)) return setErrno(p, ENOENT) && 0; const canonical = files.canonical(path), dst = n(c, 1) || p.malloc(4096); putString(p, dst, 4096, canonical); return dst; };
-  lib.readlink = (p, c) => setErrno(p, EINVAL);
+  // readlink: /proc/self/exe and /proc/self/fd/<n> (procfs links); the VM file system has no symbolic links, so a file that exists is not one (EINVAL)
+  lib.readlink = (p, c) => {
+    const path = str(p, x(c, 0)), target = lib.__procfs?.readlink(p, path);
+    if (target) { const bytes = new TextEncoder().encode(target), size = Math.min(bytes.length, n(c, 2)); p.memory.copyIn(n(c, 1), bytes.subarray(0, size)); return size; }
+    return setErrno(p, vfs().stat(path) ? EINVAL : ENOENT);
+  };
   lib.rename = (p, c) => { try { vfs().rename(str(p, x(c, 0)), str(p, x(c, 1))); return 0; } catch { return setErrno(p, ENOENT); } };
   lib.rmdir = (p, c) => { const path = str(p, x(c, 0)); if (vfs().stat(path)?.type !== 'dir') return setErrno(p, ENOTDIR); vfs().delete(path); return 0; };
   lib.unlinkat = (p, c) => { const path = str(p, x(c, 1)); if (!vfs().stat(path)) return setErrno(p, ENOENT); vfs().delete(path); return 0; };
@@ -149,8 +154,8 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   lib.chmod = lib.fchmod = lib.chown = lib.fchown = lib.utimes = lib.utimensat = lib.futimens = () => 0;
   lib.mkstemp = (p, c) => { const ptr = n(c, 0), template = str(p, ptr), name = template.replace(/XXXXXX$/, Math.random().toString(36).slice(2, 8).padEnd(6, '0')); p.memory.copyIn(ptr, encoder.encode(name)); c.x[1] = BigInt(0o102); return lib.open(p, c); };
   const dirs = new Map();
-  lib.opendir = (p, c) => { const path = str(p, x(c, 0)); if (vfs().stat(path)?.type !== 'dir') return setErrno(p, ENOENT) && 0; const handle = p.malloc(16), entry = p.malloc(280); dirs.set(handle, { names: ['.', '..', ...vfs().list(path)], index: 0, entry }); return handle; };
-  lib.fdopendir = (p, c) => setErrno(p, EINVAL) && 0;
+  lib.opendir = (p, c) => { const path = str(p, x(c, 0)), names = lib.__dirNames(p, path); if (!names) return setErrno(p, vfs().stat(path) ? ENOTDIR : ENOENT) && 0; const handle = p.malloc(16), entry = p.malloc(280); dirs.set(handle, { names: ['.', '..', ...names], index: 0, entry }); return handle; };
+  lib.fdopendir = (p, c) => { const f = lib.__dirFd(n(c, 0)); if (!f) return setErrno(p, ENOTDIR) && 0; const handle = p.malloc(16), entry = p.malloc(280); dirs.set(handle, { names: ['.', '..', ...(f.names ?? [])], index: 0, entry }); return handle; };
   lib.readdir = (p, c) => { const d = dirs.get(n(c, 0)); if (!d || d.index >= d.names.length) return 0; const name = d.names[d.index++]; p.memory.fill(d.entry, 0, 280); p.memory.write64(d.entry, BigInt(d.index)); p.memory.setUint16(d.entry + 16, 280); putString(p, d.entry + 19, 256, String(name).split('/').pop()); return d.entry; };
   lib.closedir = (p, c) => { const d = dirs.get(n(c, 0)); if (d) { p.free(d.entry); dirs.delete(n(c, 0)); p.free(n(c, 0)); } return 0; };
   // scandir (bionic scandir.cpp): every entry of the directory that `filter` accepts (all of them when it is null), each copied into its own malloc'd dirent, the array of pointers
@@ -173,7 +178,7 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   };
   const direntName = (p, ptr) => decoder.decode(p.memory.cString(p.memory.readPtr(ptr) + 19));
   lib.alphasort = lib.alphasort64 = (p, c) => { const a = direntName(p, n(c, 0)), b = direntName(p, n(c, 1)); return a < b ? -1 : a > b ? 1 : 0; };
-  lib.statfs = lib.statvfs = lib.fstatfs = lib.fstatvfs = (p, c) => { p.memory.fill(n(c, 1), 0, 120); p.memory.write64(n(c, 1) + 8, 4096n); p.memory.write64(n(c, 1) + 16, 1n << 20n); p.memory.write64(n(c, 1) + 24, 1n << 19n); p.memory.write64(n(c, 1) + 32, 1n << 19n); return 0; };
+  lib.statfs = lib.statvfs = lib.fstatfs = lib.fstatvfs = lib.statfs64 = lib.statvfs64 = lib.fstatfs64 = lib.fstatvfs64 = (p, c) => { p.memory.fill(n(c, 1), 0, 120); p.memory.write64(n(c, 1) + 8, 4096n); p.memory.write64(n(c, 1) + 16, 1n << 20n); p.memory.write64(n(c, 1) + 24, 1n << 19n); p.memory.write64(n(c, 1) + 32, 1n << 19n); return 0; };
   // pathconf / fpathconf as bionic's libc/bionic/pathconf.cpp answers them from statfs of the file's filesystem (the virtual filesystem: one ext4-like volume, 4 KiB blocks,
   // 255-byte names): LINK_MAX of a filesystem bionic does not list, MAX_CANON/MAX_INPUT 255, PATH_MAX and PIPE_BUF 4096, the _POSIX_* options; the names bionic leaves
   // without a limit are -1 with errno untouched, an unknown name is EINVAL.

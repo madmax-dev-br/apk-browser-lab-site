@@ -1,9 +1,11 @@
-import { Blocked } from './scheduler.js?v=7233e918dcc9';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=7233e918dcc9';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=7233e918dcc9';
+import { Blocked } from './scheduler.js?v=af8ff7411a95';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=af8ff7411a95';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=af8ff7411a95';
+import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=af8ff7411a95';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
-// over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md). These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
+// over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md), or over the lab's CPU implementation of OpenGL ES 3.0 (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md) when the Worker has no
+// WebGL2 or the device setting "OpenGL ES on the CPU" asks for it: both are the same WebGL2-shaped object below this file, so every binding runs the same code on either. These are the natives of android_opengl_GLES20.cpp, android_opengl_GLES30.cpp, android_opengl_EGL14.cpp and
 // com_google_android_gles_jni_EGLImpl.cpp: the Java side (GLSurfaceView, EglHelper, the Renderer callbacks on the GL thread) is the original code.
 //
 //   EGL      one display; a fixed table of RGBA8888 / RGB888 / RGB565 configs, ES2 and ES3 renderable, window and pbuffer, chosen with the EGL 1.4 matching and sorting rules;
@@ -16,10 +18,10 @@ import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=7233e918
 //   GL       names are lab integers mapped to WebGL objects per share group; uniform locations are integers per program; ES 2.0 client-side vertex and index arrays (which WebGL
 //            forbids) are uploaded to scratch buffers at draw time, as an ES-on-desktop layer does; java.nio buffers are read and written where they are (native memory of a
 //            direct buffer, or the backing array of a heap buffer), as NIOAccess does for the original JNI. glGetError keeps the first error the lab itself raised, then WebGL's.
-//   Strings  GL_VERSION "OpenGL ES 3.0 (WebGL2 lab)", GL_SHADING_LANGUAGE_VERSION "OpenGL ES GLSL ES 3.00", GL_RENDERER the browser's (WEBGL_debug_renderer_info) when exposed.
+//   Strings  GL_VERSION "OpenGL ES 3.0 (WebGL2 lab)" / "OpenGL ES 3.0 (CPU lab)", GL_SHADING_LANGUAGE_VERSION "OpenGL ES GLSL ES 3.00", GL_RENDERER the browser's (WEBGL_debug_renderer_info) when
+//            exposed, or the CPU rasterizer's name; EGL_VERSION "1.4 WebGL2" / "1.4 CPU". Which implementation runs is decided at the first eglInitialize and recorded in the trace.
 // Not available, failing explicitly with UnsupportedOperationException naming the call: ES 1.x contexts and the GL10 fixed-function calls of GLImpl, glMapBufferRange /
-// glGetBufferPointerv / glUnmapBuffer (no mapped memory), program and shader binaries, pixmap surfaces, EGLImage and external textures. Without WebGL2 in the Worker (some browsers,
-// Node without a backend) eglInitialize refuses with the reason. No process.*.
+// glGetBufferPointerv / glUnmapBuffer (no mapped memory), program and shader binaries, pixmap surfaces, EGLImage and external textures. No process.*.
 const GLES10 = 'Landroid/opengl/GLES10;', GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', EGL14 = 'Landroid/opengl/EGL14;', EGLIMPL = 'Lcom/google/android/gles_jni/EGLImpl;', GLIMPL = 'Lcom/google/android/gles_jni/GLImpl;';
 const H = 'Landroid/opengl/EGLObjectHandle;->mHandle:J';
 const E14 = { display: 'Landroid/opengl/EGLDisplay;', config: 'Landroid/opengl/EGLConfig;', context: 'Landroid/opengl/EGLContext;', surface: 'Landroid/opengl/EGLSurface;' };
@@ -28,7 +30,7 @@ const E10_FIELD = { display: `${E10.display}->mEGLDisplay:J`, config: `${E10.con
 const J_DISPLAY = 'Ljavax/microedition/khronos/egl/EGLDisplay;', J_CONFIG = 'Ljavax/microedition/khronos/egl/EGLConfig;', J_CONTEXT = 'Ljavax/microedition/khronos/egl/EGLContext;', J_SURFACE = 'Ljavax/microedition/khronos/egl/EGLSurface;';
 const BUFFER = 'Ljava/nio/Buffer;', INT_BUFFER = 'Ljava/nio/IntBuffer;', FLOAT_BUFFER = 'Ljava/nio/FloatBuffer;', LONG_BUFFER = 'Ljava/nio/LongBuffer;', STRING = 'Ljava/lang/String;', OBJECT = 'Ljava/lang/Object;';
 const UOE = 'Ljava/lang/UnsupportedOperationException;', IAE = 'Ljava/lang/IllegalArgumentException;';
-export const GL_VERSION_STRING = 'OpenGL ES 3.0 (WebGL2 lab)', GLSL_VERSION_STRING = 'OpenGL ES GLSL ES 3.00', VSYNC_MS = 1000 / 60;
+export const GL_VERSION_STRING = 'OpenGL ES 3.0 (WebGL2 lab)', GL_VERSION_STRING_CPU = 'OpenGL ES 3.0 (CPU lab)', GLSL_VERSION_STRING = 'OpenGL ES GLSL ES 3.00', VSYNC_MS = 1000 / 60;
 
 // ---- EGL constants ---------------------------------------------------------------------------------------------------------------------------------------------------------
 const EGL = { SUCCESS: 0x3000, NOT_INITIALIZED: 0x3001, BAD_ACCESS: 0x3002, BAD_ALLOC: 0x3003, BAD_ATTRIBUTE: 0x3004, BAD_CONFIG: 0x3005, BAD_CONTEXT: 0x3006, BAD_CURRENT_SURFACE: 0x3007, BAD_DISPLAY: 0x3008,
@@ -190,12 +192,43 @@ const f = bits => bitsFloat(bits);
 // ---- per-runtime state -----------------------------------------------------------------------------------------------------------------------------------------------------
 const states = new WeakMap();
 const NAMESPACES = ['buffer', 'texture', 'framebuffer', 'renderbuffer', 'object', 'sampler', 'query', 'transformFeedback'];
-/** The WebGL2 backend of the platform: runtime.platform.glBackend ({ createContext() -> { gl, canvas } }), or one over OffscreenCanvas where the global has it. */
+/**
+ * The GL backend of a runtime: runtime.platform.glBackend ({ createContext() -> { gl, canvas, path? } }) when the host gives one (tests), else WebGL2 over OffscreenCanvas when
+ * the Worker has it and the device setting does not ask for the CPU (runtime.platform.glesPath === 'cpu'), else the lab's CPU implementation (src/cpu-gl/). Decided once per
+ * runtime, at the first eglInitialize; the trace records which one and why.
+ */
 function backendOf(r) {
   const own = r.platform?.glBackend; if (own) return own;
-  if (typeof OffscreenCanvas !== 'function') return null;
-  return { createContext(attributes) { const canvas = new OffscreenCanvas(1, 1), gl = canvas.getContext('webgl2', attributes); return gl ? { gl, canvas } : null; } };
+  const s = stateOf(r); if (s.backend) return s.backend;
+  let reason;
+  if (r.platform?.glesPath === 'cpu') reason = 'the device setting "OpenGL ES on the CPU" is on';
+  else if (typeof OffscreenCanvas !== 'function') reason = 'this Worker has no OffscreenCanvas';
+  else {
+    let probe = null; try { probe = new OffscreenCanvas(1, 1).getContext('webgl2'); } catch { probe = null; }
+    if (probe) {
+      try { probe.getExtension('WEBGL_lose_context')?.loseContext(); } catch { /* the probe goes away with its canvas */ }
+      s.backend = { path: 'webgl2', createContext(attributes) { const canvas = new OffscreenCanvas(1, 1), gl = canvas.getContext('webgl2', attributes); return gl ? { gl, canvas, path: 'webgl2' } : null; } };
+      r.record?.('OpenGL ES: WebGL2 of the browser (the GPU path)'); return s.backend;
+    }
+    reason = 'this browser\'s Worker has no WebGL2 context (no GPU, or the driver is blocklisted)';
+  }
+  s.backend = cpuBackend(r, reason); r.record?.(`OpenGL ES: the lab's CPU rasterizer (${reason})`);
+  return s.backend;
 }
+/** The CPU implementation as a backend: its frames become ImageBitmaps through a 2D OffscreenCanvas where the Worker has one (the page draws them as WebGL2's). */
+function cpuBackend(r, reason) {
+  let scratch = null;
+  const makeBitmap = (pixels, width, height) => {
+    if (typeof OffscreenCanvas !== 'function' || typeof ImageData !== 'function') return null;
+    try {
+      if (!scratch || scratch.width !== width || scratch.height !== height) { scratch = new OffscreenCanvas(width, height); scratch.context = scratch.getContext('2d'); }
+      if (!scratch.context) return null;
+      scratch.context.putImageData(new ImageData(pixels, width, height), 0, 0); return scratch.transferToImageBitmap();
+    } catch { return null; }
+  };
+  return { path: 'cpu', reason, createContext() { return createCpuWebGL2({ note: text => r.record?.(text), makeBitmap }); } };
+}
+const pathOf = context => context.group.path ?? 'webgl2';
 function stateOf(r) {
   let s = states.get(r);
   if (!s) {
@@ -212,10 +245,11 @@ const eglOk = (r, value = 1) => { setEglError(r, EGL.SUCCESS); return value; };
 const currentOf = r => stateOf(r).current.get(threadOf(r)) ?? null;
 
 function newGroup(r, created) {
-  const gl = created.gl, group = { gl, canvas: created.canvas, names: Object.fromEntries(NAMESPACES.map(kind => [kind, new Map()])), reverse: new WeakMap(), next: Object.fromEntries(NAMESPACES.map(kind => [kind, 1])),
+  const gl = created.gl, group = { gl, canvas: created.canvas, path: created.path === 'cpu' ? 'cpu' : 'webgl2', names: Object.fromEntries(NAMESPACES.map(kind => [kind, new Map()])), reverse: new WeakMap(), next: Object.fromEntries(NAMESPACES.map(kind => [kind, 1])),
     uniforms: new Map(), syncs: new Map(), nextSync: 1n, scratch: new Map(), extensions: [], renderer: null };
   for (const name of gl.getSupportedExtensions?.() ?? []) { if (!EXTENSIONS[name]) continue; try { if (gl.getExtension(name)) group.extensions.push(EXTENSIONS[name]); } catch { /* refused */ } }
-  try { const info = gl.getExtension?.('WEBGL_debug_renderer_info'); if (info) group.renderer = gl.getParameter(info.UNMASKED_RENDERER_WEBGL); } catch { /* hidden */ }
+  if (group.path === 'cpu') group.renderer = created.renderer ?? CPU_RENDERER;
+  else try { const info = gl.getExtension?.('WEBGL_debug_renderer_info'); if (info) group.renderer = gl.getParameter(info.UNMASKED_RENDERER_WEBGL); } catch { /* hidden */ }
   for (const parameter of ['UNPACK_FLIP_Y_WEBGL', 'UNPACK_PREMULTIPLY_ALPHA_WEBGL']) if (gl[parameter] !== undefined) gl.pixelStorei(gl[parameter], false);
   if (gl.UNPACK_COLORSPACE_CONVERSION_WEBGL !== undefined) gl.pixelStorei(gl.UNPACK_COLORSPACE_CONVERSION_WEBGL, gl.NONE ?? 0);
   return group;
@@ -224,7 +258,10 @@ function newContext(r, config, version, share) {
   const s = stateOf(r);
   let group = share?.group;
   if (!group) {
-    const backend = backendOf(r); const created = backend?.createContext({ alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+    const backend = backendOf(r); let created = backend?.createContext({ alpha: true, depth: false, stencil: false, antialias: false, premultipliedAlpha: false, preserveDrawingBuffer: false, powerPreference: 'high-performance' });
+    if (!created && backend?.path === 'webgl2') {   // the browser refused another WebGL2 context (too many, lost): this one runs on the CPU, said in the trace
+      created = cpuBackend(r, 'the browser refused a WebGL2 context').createContext(); r.record?.("OpenGL ES: an EGL context on the lab's CPU rasterizer (the browser refused a WebGL2 context)");
+    }
     if (!created) return null;
     group = newGroup(r, created); s.groups.push(group);
   }
@@ -286,11 +323,13 @@ function glFor(r, name) {
   return context;
 }
 const raise = (context, error) => { if (context.error === GL.NO_ERROR) context.error = error; };
+const versionString = c => (pathOf(c) === 'cpu' ? GL_VERSION_STRING_CPU : GL_VERSION_STRING);
+const rendererString = c => (pathOf(c) === 'cpu' ? c.group.renderer : c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2');
 /** glGetString of the current context (GLES20, and GLES10's, below). */
 function glGetString(r, c, gl, [name]) {
   switch (name) {
-    case GL.VERSION: return GL_VERSION_STRING; case GL.SHADING_LANGUAGE_VERSION: return GLSL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab';
-    case GL.RENDERER: return c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2'; case GL.EXTENSIONS: return c.group.extensions.join(' ');
+    case GL.VERSION: return versionString(c); case GL.SHADING_LANGUAGE_VERSION: return GLSL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab';
+    case GL.RENDERER: return rendererString(c); case GL.EXTENSIONS: return c.group.extensions.join(' ');
     default: raise(c, GL.INVALID_ENUM); return null;
   }
 }
@@ -649,7 +688,7 @@ function glesBindings(add) {
   both(S30, 'glGetInteger64i_v', ['(II[JI)V', `(II${LONG_BUFFER})V`], (r, c, gl, args) => { const v = gl.getIndexedParameter(args[0], args[1]); if (v === null || v === undefined) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'J', [typeof v === 'object' ? nameOf(c, 'buffer', v) : Number(v)], 'long'); });
   S20('glGetString', `(I)${STRING}`, glGetString, null);
   // GLES10 (the original class, all natives): glGetString / glGetIntegerv are the same GL entry points answered by the current context; the other GLES 1.x calls stay unbound and fail by name
-  add(GLES10, 'glGetString', `(I)${STRING}`, (r, c, gl, [name]) => { switch (name) { case GL.VERSION: return GL_VERSION_STRING; case GL.VENDOR: return 'APK Web Lab'; case GL.RENDERER: return c.group.renderer ? `WebGL2 (${c.group.renderer})` : 'WebGL2'; case GL.EXTENSIONS: return c.group.extensions.join(' '); default: raise(c, GL.INVALID_ENUM); return null; } }, null);
+  add(GLES10, 'glGetString', `(I)${STRING}`, (r, c, gl, [name]) => { switch (name) { case GL.VERSION: return versionString(c); case GL.VENDOR: return 'APK Web Lab'; case GL.RENDERER: return rendererString(c); case GL.EXTENSIONS: return c.group.extensions.join(' '); default: raise(c, GL.INVALID_ENUM); return null; } }, null);
   S30('glGetStringi', `(II)${STRING}`, (r, c, gl, [name, index]) => { if (name !== GL.EXTENSIONS) { raise(c, GL.INVALID_ENUM); return null; } if (index < 0 || index >= c.group.extensions.length) { raise(c, GL.INVALID_VALUE); return null; } return c.group.extensions[index]; }, null);
   // ---- ES 3.0 draws, queries, transform feedback, uniform blocks, syncs ----
   S30('glDrawArraysInstanced', '(IIII)V', (r, c, gl, [mode, first, count, instances]) => { uploadClientArrays(r, c, first + count); gl.drawArraysInstanced(mode, first, count, instances); });
@@ -708,13 +747,13 @@ function eglCore() {
     getDisplay: (r, id) => (id === 0 || id === 0n ? (eglOk(r), DISPLAY) : eglFail(r, EGL.BAD_PARAMETER, 0n)),
     initialize(r, display) {
       const s = stateOf(r); if (BigInt(display ?? 0n) !== DISPLAY) return eglFail(r, EGL.BAD_DISPLAY, null);
-      if (!backendOf(r)) r.throwJava(UOE, 'OpenGL ES needs WebGL2 in this browser\'s Worker (OffscreenCanvas with a "webgl2" context), which is not available here');
+      backendOf(r);   // WebGL2 or the CPU implementation, decided (and recorded) now
       s.initialized = true; s.initCount++; eglOk(r); return [1, 4];
     },
     terminate(r, display) { if (BigInt(display ?? 0n) !== DISPLAY) return eglFail(r, EGL.BAD_DISPLAY, 0); stateOf(r).initialized = false; return eglOk(r); },
     queryString(r, display, name) {
       if (!ready(r, display)) return null;
-      const value = { [EGL.VENDOR]: 'APK Web Lab', [EGL.VERSION]: '1.4 WebGL2', [EGL.EXTENSIONS]: 'EGL_KHR_create_context EGL_ANDROID_recordable', [EGL.CLIENT_APIS]: 'OpenGL_ES' }[name];
+      const value = { [EGL.VENDOR]: 'APK Web Lab', [EGL.VERSION]: backendOf(r)?.path === 'cpu' ? '1.4 CPU' : '1.4 WebGL2', [EGL.EXTENSIONS]: 'EGL_KHR_create_context EGL_ANDROID_recordable', [EGL.CLIENT_APIS]: 'OpenGL_ES' }[name];
       if (value === undefined) return eglFail(r, EGL.BAD_PARAMETER, null); eglOk(r); return value;
     },
     configs(r, display, attributes) { if (!ready(r, display)) return null; if (attributes === null) return [...EGL_CONFIGS]; const list = chooseConfigs(attributes); if (!list) return eglFail(r, EGL.BAD_ATTRIBUTE, null); eglOk(r); return list; },

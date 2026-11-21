@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=7233e918dcc9';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=7233e918dcc9';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=7233e918dcc9';
-import { HandleTable } from './handles.js?v=7233e918dcc9';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=7233e918dcc9';
-import { coreImports } from './boundary-imports.js?v=7233e918dcc9';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=7233e918dcc9';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=7233e918dcc9';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=7233e918dcc9';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=7233e918dcc9';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=7233e918dcc9';
-import { timedExports, timedBridge } from './core-timing.js?v=7233e918dcc9';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7233e918dcc9';
-import { Blocked } from '../../runtime/scheduler.js?v=7233e918dcc9';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=7233e918dcc9';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=7233e918dcc9';
-import { PaintRecords } from './paint-record.js?v=7233e918dcc9';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=af8ff7411a95';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=af8ff7411a95';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=af8ff7411a95';
+import { HandleTable } from './handles.js?v=af8ff7411a95';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=af8ff7411a95';
+import { coreImports } from './boundary-imports.js?v=af8ff7411a95';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=af8ff7411a95';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=af8ff7411a95';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=af8ff7411a95';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=af8ff7411a95';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=af8ff7411a95';
+import { timedExports, timedBridge } from './core-timing.js?v=af8ff7411a95';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=af8ff7411a95';
+import { Blocked } from '../../runtime/scheduler.js?v=af8ff7411a95';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=af8ff7411a95';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=af8ff7411a95';
+import { PaintRecords } from './paint-record.js?v=af8ff7411a95';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -112,7 +112,7 @@ const METHOD_KIND_UNBOUND = 0x7fff0003, METHOD_KIND_UNLINKED = 0x7fff0001;
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
 const OWN_STEP = Object.freeze({ kind: 'own', parked: null });   // CoreThreads' base step of a nested run with nothing parked (runOn)
 const VM_GC = 24, STRING = 'Ljava/lang/String;', CLASS_TYPE = 'Ljava/lang/Class;', CLASS_OBJECT_CLASS = 8, INITIALIZED = 2, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZED / CLASS_INITIALIZING
-const MODE = op => op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x70 || op === 0x76 ? 'direct' : 'virtual';
+const MODE = op => op === 0x71 || op === 0x77 ? 'static' : op === 0x6f || op === 0x75 ? 'super' : op === 0x70 || op === 0x76 ? 'direct' : op === 0xfa || op === 0xfb ? 'polymorphic' : 'virtual';
 const isNull = value => value === null || value === undefined || value === 0;
 const kindOf = type => type === 'J' || type === 'D' ? 'W' : type[0] === 'L' || type[0] === '[' ? 'L' : type;
 
@@ -537,7 +537,7 @@ export class WasmEngine {
     // Another thread runs its <clinit> (Method.invoke of a static method, a host read of a static): this thread waits for it on the JavaScript stack of the host call, as a
     // thread at an invoke-static waits in the core (INIT_BLOCKED); the nested run below would stop with the thread blocked instead. A failed initializer is the nested run's
     // NoClassDefFoundError, as before.
-    if (this.initPendingElsewhere(type) && this.runtime.scheduler?.resolveNested) this.runtime.scheduler.resolveNested(new Blocked({ ready: () => !this.initPendingElsewhere(type), reason: `class initialization of ${type}` }));
+    if (this.initPendingElsewhere(type) && this.runtime.scheduler?.resolveNested) this.runtime.scheduler.resolveNested(Object.assign(new Blocked({ ready: () => !this.initPendingElsewhere(type), reason: `class initialization of ${type}` }), { holder: () => this.threads.initializer(info.address) }));
     if (this.r32(info.address + CLASS.initState) === INITIALIZED) return;
     this.initMethod ??= this.linker.rawMethod(Uint16Array.of(0x000e), { registers: 0 });
     this.runNested(this.initMethod, [], 'V', info.address, 1);
@@ -581,12 +581,14 @@ export class WasmEngine {
     if (parked !== null) { owner.blocked = null; owner.state = 'runnable'; owner.coreWait = null; }
     if (++rt.nestedRuns === 1) sched.beginEvent(rt);
     owner.nestedDepth++;
+    // the host call this run is nested in (a deadlock between nested runs names both: Scheduler.checkNestedDeadlock); a <clinit> run says which class it initializes
+    const sites = owner.nestedSites ??= []; sites.push(initClass !== 0 ? `class initialization (${this.threads.className(initClass)}) in ${rt.lastHostCall ?? 'host code'}` : rt.lastHostCall ?? null);
     const cut = rt.coreCut; rt.coreCut = false;   // a nested run has an owner: it never yields to the slice deadline (CoreThreads.mustYield), so its quantum is not cut for it either
     let suspended = false, failure = null;
     try { return suspendable ? this.runSuspendable(owner, id, words, result, uncount, token) : this.runOn(owner, id, words, result, initClass, uncount, parked); }
     catch (error) { if (error === MAIN_SUSPEND && suspendable && this.suspended === token.run) suspended = true; else if (error !== MAIN_SUSPEND) failure = error; throw error; }
     finally {
-      rt.coreCut = cut; owner.nestedDepth--; rt.nestedRuns--; rt.thread = owner;
+      rt.coreCut = cut; owner.nestedDepth--; sites.pop(); rt.nestedRuns--; rt.thread = owner;
       if (giveBack !== null) giveBack();
       if (parked !== null) { owner.blocked = parked.blocked; owner.state = parked.state; owner.timedOut = parked.timedOut; owner.coreWait = parked.coreWait; }
       else if (failure !== null) sched.dropAbandonedWait(owner, failure);   // a wait this run's frames were in, left by an error that ended the run: it ends with them (a suspended run keeps its own)
@@ -759,7 +761,10 @@ export class WasmEngine {
     if (site === undefined) {
       const mi = this.linker.methodsAt.get(caller), entry = mi?.pool?.[constant];
       if (!entry) throw new APKError(`vmcore: no call site at method ${mi?.key ?? caller} constant ${constant}`);
-      const reference = mi.def.method.dex.method(entry.index), mode = MODE(op);
+      const dex = mi.def.method.dex, declared = dex.method(entry.index), mode = MODE(op);
+      // invoke-polymorphic: the call site's proto is the signature of the call (the JavaScript interpreter's site.target, src/interpreter.js)
+      const proto = entry.proto === undefined ? null : dex.proto(entry.proto);
+      const reference = proto === null ? declared : { owner: declared.owner, name: declared.name, parameters: proto.parameters, result: proto.result, signature: proto.signature, key: `${declared.owner}->${declared.name}${proto.signature}`, declared };
       site = { reference, mode, callerOwner: mi.owner.type, kinds: reference.parameters.map(kindOf), result: reference.result, resultKind: kindOf(reference.result), isStatic: mode === 'static', key: `${reference.owner}->${reference.name}${reference.signature}`,
         bridge: null, bridgeEpoch: -1, bridgeType: null, bridgePoly: null, native: null, nativeEpoch: -1, nativeType: null, stringInit: reference.owner === STRING && reference.name === '<init>',
         plumbing: LOOPER_PLUMBING.test(mi.owner.type),   // the caller is Looper/MessageQueue/Handler plumbing: its bridged calls leave no trace entry (APKRuntime.record)

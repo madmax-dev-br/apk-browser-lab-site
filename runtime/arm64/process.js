@@ -3,12 +3,13 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=7233e918dcc9';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=7233e918dcc9';
-import { Arm64Memory } from './memory.js?v=7233e918dcc9';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=7233e918dcc9';
-import { NativeThreads } from './threads.js?v=7233e918dcc9';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=7233e918dcc9';
+import { APKError } from '../apk-error.js?v=af8ff7411a95';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=af8ff7411a95';
+import { Arm64Memory } from './memory.js?v=af8ff7411a95';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=af8ff7411a95';
+import { NativeThreads } from './threads.js?v=af8ff7411a95';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=af8ff7411a95';
+import { APP_PID } from '../virtual-pids.js?v=af8ff7411a95';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);
 const HOST_STUBS = 65536;   // lab functions with a code stub (1 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)
@@ -20,7 +21,7 @@ export class Arm64Process {
   // `maxSteps`: the instructions one native call from Java (or one native thread) may run before the run ends as a runaway (the instruction budget). 5e10: libraries that
   // unpack or decompress their own code at startup run several billion per thread (one measured startup: 22e9 over four decompression threads, 5.5e9 each);
   // the wall-clock limits of the operation monitor still end a run that takes too long.
-  constructor({ readLibrary, host = {}, maxSteps = 5e10, log = () => {}, pid = 4321, queueTask = null, progress = undefined, translate = true, now = undefined } = {}) {
+  constructor({ readLibrary, host = {}, maxSteps = 5e10, log = () => {}, pid = APP_PID, queueTask = null, progress = undefined, translate = true, now = undefined } = {}) {
     this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE, translate });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
     this.cpu.progress = progress;   // (cpu) every 2^20 instructions of any thread (src/arm64/glue.js: the operation monitor's heartbeat)
@@ -34,7 +35,8 @@ export class Arm64Process {
     this.heap = { free: new Map(), sizes: new Map() };
     this.atexit = []; this.tlsModules = []; this.tlsSize = 0;
     // the main thread: stack and TLS
-    const stackSize = 1024 * 1024, stack = this.mapRegion(stackSize + 0x10000, 0x10000);
+    this.regions = [];
+    const stackSize = 1024 * 1024, stack = this.mapRegion(stackSize + 0x10000, 0x10000, '[stack]');
     this.cpu.sp = stack + stackSize; this.tlsBase = stack + stackSize; this.mainStack = { base: stack, size: stackSize };   // TLS area above the stack top
     this.tp = this.tlsBase + 0x100;   // thread pointer: bionic's TLS slots start here; static TLS blocks follow at tp+16 (variant 1)
     this.memory.write64(this.tp + 40, 0x2b992ddfa23249d6n);   // TLS_SLOT_STACK_GUARD (__stack_chk_guard)
@@ -48,16 +50,37 @@ export class Arm64Process {
   /** A new thread's TLS block at `tp`: the stack guard and every static TLS module's initial image (src/arm64/threads.js). */
   initThreadTls(tp) { this.memory.fill(tp - 0x100, 0, 0xf000); this.memory.write64(tp + 40, this.memory.read64(this.tp + 40)); for (const lib of this.order) if (lib.tls) this.memory.copyIn(tp + lib.tls.offset, lib.tls.image); }
   // ---- address space
-  mapRegion(size, align = 0x1000) {
+  // `name` is what /proc/self/maps calls the mapping (src/arm64/procfs.js): '' for an anonymous one, '[anon:...]' for a named one, null for a library (listed by its segments)
+  mapRegion(size, align = 0x1000, name = '', perms = 'rw-p') {
     let at = Math.ceil(this.nextMap / align) * align; const end = at + Math.ceil(size / 0x1000) * 0x1000;
     this.memory.ensure(end + 0x10000); this.nextMap = end;   // the address space only grows: a new region was never written, so it is already zero (and untouched pages stay unbacked)
+    if (name !== null) this.noteRegion(at, end, name, perms);
     return at;
+  }
+  /** Records a mapping for /proc/self/maps, page-aligned; one that continues the previous mapping with the same name and protection extends it, as the kernel merges VMAs. */
+  noteRegion(start, end, name = '', perms = 'rw-p') {
+    start = Math.floor(start / 0x1000) * 0x1000; end = Math.ceil(end / 0x1000) * 0x1000;
+    const last = this.regions.at(-1);
+    if (last && last.end >= start && last.start <= start && last.name === name && last.perms === perms) { last.end = Math.max(last.end, end); return; }
+    this.regions.push({ start, end, name, perms });
+  }
+  /** Is the page at `address` mapped (a library segment, a region of /proc/self/maps)? */
+  isMapped(address) {
+    for (const lib of this.order) if (address >= lib.base && address < lib.end) return true;
+    for (const r of this.regions) if (address >= r.start && address < r.end) return true;
+    return false;
+  }
+  /** munmap: the range leaves /proc/self/maps (the address space itself is never reused). */
+  unmapRegion(start, length) {
+    const end = start + Math.ceil(length / 0x1000) * 0x1000, out = [];
+    for (const r of this.regions) { if (r.end <= start || r.start >= end) { out.push(r); continue; } if (r.start < start) out.push({ ...r, end: start }); if (r.end > end) out.push({ ...r, start: end }); }
+    this.regions = out;
   }
   // malloc: size-class free lists over regions taken from the address space; 16-byte aligned, a 16-byte header holds the size
   malloc(size) {
     const need = Math.max(16, Math.ceil(Number(size) / 16) * 16), list = this.heap.free.get(need);
     let block = list?.pop();
-    if (block === undefined) { const region = this.mapRegion(need + 16, 16); block = region + 16; this.memory.write64(region, BigInt(need)); }
+    if (block === undefined) { const region = this.mapRegion(need + 16, 16, '[anon:libc_malloc]'); block = region + 16; this.memory.write64(region, BigInt(need)); }
     this.heap.sizes.set(block, need); return block;
   }
   free(ptr) { ptr = Number(ptr); if (!ptr) return; const size = this.heap.sizes.get(ptr); if (size === undefined) throw new APKError(`ARM64 native code: free() of 0x${ptr.toString(16)}, which malloc did not return (or freed twice)`, { kind: 'arm64-heap' }); this.heap.sizes.delete(ptr); (this.heap.free.get(size) ?? this.heap.free.set(size, []).get(size)).push(ptr); }
@@ -127,10 +150,13 @@ export class Arm64Process {
   // `bytes`: the ELF image when the caller has it (dlopen of a path, android_dlopen_ext from a descriptor); otherwise readLibrary finds it by soname
   load(soname, { via = 'dlopen', bytes: given = null } = {}) {
     if (this.libraries.has(soname)) return this.libraries.get(soname);
+    // bionic's find_loaded_library_by_soname: a DT_NEEDED or a dlopen by bare name is satisfied by a loaded library whose DT_SONAME it is, whatever file it came from
+    // (an app that unpacks a library to <name>.so_<pid> and System.load()s it, then loads others that need <name>.so)
+    { const loaded = !soname.includes('/') ? this.order.find(lib => lib.soname === soname) : null; if (loaded) return loaded; }
     if (SYSTEM_LIBRARIES.has(soname)) { const lib = { name: soname, soname, system: true, exports: new Map(), base: 0, end: 0 }; this.libraries.set(soname, lib); return lib; }
     const bytes = given ?? this.readLibrary(soname);
     if (!bytes) throw new APKError(`dlopen failed: library "${soname}" not found`, { kind: 'arm64-dlopen', soname });
-    const lib = mapLibrary(this, parseElf(bytes), soname); lib.via = via;
+    const lib = mapLibrary(this, parseElf(bytes), soname); lib.via = via; lib.path = this.libraryPath?.(soname) ?? soname;   // the file's path, as dladdr / dl_iterate_phdr report it
     this.libraries.set(soname, lib); this.order.push(lib);
     for (const needed of lib.needed) this.load(needed, { via: `DT_NEEDED of ${soname}` });
     relocate(this, lib, name => this.resolve(name, lib));

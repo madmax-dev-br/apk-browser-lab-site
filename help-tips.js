@@ -6,7 +6,7 @@
 //   - a static paragraph (p.cp-note without role="status", not listed in KEEP): its tab is named after the field that points at it (aria-describedby), the field right
 //     before it, the sub-section it sits in (data-help-title, legend or .cp-subtitle), or "Overview"; a debugging warning (p.cp-note.ov-warning) gets a "!" on its tab and on the icon.
 //   - texts inside [data-help-skip] are left where they are: a block that shows its own notes (the microG settings dialog, src/microg-settings-dialog.js).
-import { createModalHost } from './lab-modal.js?v=7233e918dcc9';
+import { createModalHost } from './lab-modal.js?v=af8ff7411a95';
 
 const KEEP = new Set(['perms-empty', 'vm-memory-device']);   // state messages without role="status": they say what to do next
 const OVERVIEW = 'Overview';

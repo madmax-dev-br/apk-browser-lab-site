@@ -4,9 +4,9 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=7233e918dcc9';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=7233e918dcc9';
-import { ART_BLOCKED } from './signals.js?v=7233e918dcc9';
+import { APKError } from '../apk-error.js?v=af8ff7411a95';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=af8ff7411a95';
+import { ART_BLOCKED } from './signals.js?v=af8ff7411a95';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 const PUMP_MS = 4;   // the delay of the next background pump while native threads can run
@@ -28,7 +28,7 @@ export class NativeThreads {
   /** The thread's pthread_t: the address of its pthread_internal_t (made on first use for the main and the Java threads), with its alternate signal stack. */
   selfOf(record = this.current) {
     if (record.self) return record.self;
-    const p = this.process, mem = p.memory, self = p.mapRegion(0x1000, 0x1000), alt = p.mapRegion(SIGNAL_STACK_SIZE, 0x1000), F = PTHREAD_INTERNAL;
+    const p = this.process, mem = p.memory, self = p.mapRegion(0x1000, 0x1000, `[anon:stack_and_tls:${record.tid}]`), alt = p.mapRegion(SIGNAL_STACK_SIZE, 0x1000, '[anon:thread signal stack]'), F = PTHREAD_INTERNAL;
     const stack = record.stack ?? { base: p.mainStack?.base ?? 0, size: p.mainStack?.size ?? 0 };
     mem.writeU32(self + F.tid, record.tid); mem.writeU32(self + F.cachedPid, p.pid);
     mem.writeU32(self + F.attrFlags, 0); mem.writePtr(self + F.stackBase, stack.base); mem.write64(self + F.stackSize, BigInt(stack.size)); mem.write64(self + F.guardSize, BigInt(GUARD_SIZE));
@@ -53,7 +53,7 @@ export class NativeThreads {
     let record = isMain ? this.threads.get(p.pid) : (this.javaRecords ??= new WeakMap()).get(javaThread);
     if (!record) {
       // its own interpreter state and stack (as a created thread): a native call of this Java thread can park it in a wait (callFromJava) while other Java threads call native code
-      const stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000), tp = region + stackSize + 0x100; p.initThreadTls(tp);
+      const stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000, `[anon:stack_and_tls:${this.nextTid}]`), tp = region + stackSize + 0x100; p.initThreadTls(tp);
       const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
       cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.nested = 0;
       record = { tid: this.nextTid++, cpu, ownCpu: true, state: 'running', tp, errno: tp - 0xf0, keys: new Map(), java: true, name: javaThread.name ?? null, stack: { base: region, size: stackSize } };
@@ -89,11 +89,11 @@ export class NativeThreads {
       resume: () => this.asJavaThread(javaThread, () => this.continueFromJava(javaThread, record, saved, options, park)) });
   }
   create(start, arg) {
-    const p = this.process, stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000), tp = region + stackSize + 0x100;
+    const p = this.process, stackSize = 512 * 1024, region = p.mapRegion(stackSize + 0x10000, 0x10000, `[anon:stack_and_tls:${this.nextTid}]`), tp = region + stackSize + 0x100;
     p.initThreadTls(tp);
     const cpu = new Arm64Cpu(p.memory, { host: (c, index) => p.dispatchHost(c, index), maxSteps: p.cpu.maxSteps });
     cpu.describe = p.cpu.describe; cpu.progress = p.cpu.progress; cpu.sp = region + stackSize; cpu.tpidr = BigInt(tp); cpu.x[0] = BigInt(arg); cpu.x[30] = BigInt(this.exitEntry); cpu.pc = Number(start); cpu.nested = 0;
-    const thread = { tid: this.nextTid++, cpu, state: 'runnable', tp, errno: tp - 0xf0, keys: new Map(), waiters: [], result: 0n, stack: { base: region, size: stackSize }, start: Number(start), arg: Number(arg), sigmask: this.current.sigmask ?? ART_BLOCKED };   // a new thread inherits its creator's signal mask
+    const thread = { tid: this.nextTid++, cpu, state: 'runnable', tp, errno: tp - 0xf0, keys: new Map(), waiters: [], result: 0n, stack: { base: region, size: stackSize }, start: Number(start), arg: Number(arg), sigmask: this.current.sigmask ?? ART_BLOCKED, parent: this.current };   // a new thread inherits its creator's signal mask
     this.threads.set(thread.tid, thread); this.log(`ARM64 native thread ${thread.tid} started at 0x${Number(start).toString(16)}`);
     const self = this.selfOf(thread);
     this.schedulePump();

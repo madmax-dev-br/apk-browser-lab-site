@@ -1,0 +1,26 @@
+Original Android 13 concurrent profile (libcore java.util.concurrent: TransferQueue, LinkedTransferQueue, BrokenBarrierException, Flow)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-concurrent-profile.sh   (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/linked-transfer-queue.test.mjs
+
+Contents: the pinned android-13.0.0_r1 libcore originals listed in framework-aosp/concurrent-sources.txt: java.util.concurrent.TransferQueue,
+LinkedTransferQueue (with its Node, Itr and LTQSpliterator), BrokenBarrierException and Flow (Publisher, Subscriber, Subscription, Processor).
+They run over the default DEX's AbstractQueue, Helpers, LockSupport, ThreadLocalRandom and the field updaters, exactly as the default DEX's
+Phaser, Exchanger and CompletableFuture do.
+
+Recorded source transform (framework-provenance.json, sourceTransforms): LinkedTransferQueue's VarHandle fields become the
+Atomic{Reference,Integer,Long}FieldUpdater of the same field with the same call shapes (scripts/varhandle_updaters.py, the function the
+java.time group of the default build applies to Phaser, Exchanger, CompletableFuture, StampedLock, ...): javac -source 8 has no VarHandle.
+No algorithmic line changes. The other three sources are compiled unchanged.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt); these classes
+(150 method references) do not fit in it. The loader (src/apk-loader.js) adds this DEX when the APK's DEX references TransferQueue,
+LinkedTransferQueue, BrokenBarrierException, CyclicBarrier (the default DEX's original, which throws BrokenBarrierException when a barrier
+breaks) or a java.util.concurrent.Flow type, or when the loader option enableConcurrentProfile is true.
+
+Still missing from java.util.concurrent (Android 13 API, not in this profile and not served by a host): ForkJoinPool (only commonPool(),
+getCommonPoolParallelism() = 1 and managedBlock are host methods: the VM has no work-stealing pool), the original ForkJoinTask (the default
+DEX holds a lab base class that refuses fork/join/invoke), RecursiveTask, RecursiveAction, CountedCompleter,
+ForkJoinPool.ForkJoinWorkerThreadFactory, and SubmissionPublisher (its BufferedSubscription needs ForkJoinPool.helpAsyncBlocker and the
+getAndBitwiseOr / array getAndSet / setRelease VarHandle forms that the updater transform does not map). A use of them fails naming the API.

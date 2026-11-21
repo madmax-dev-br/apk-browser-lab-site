@@ -1,10 +1,10 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=7233e918dcc9';
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import KEY_DATA from './camera-metadata-keys-data.js?v=7233e918dcc9';
-import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=7233e918dcc9';
-import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=7233e918dcc9';
-import { installCaptureIntents } from './camera-capture-intent.js?v=7233e918dcc9';
-import { installMediaCodecs } from './media-codec-host.js?v=7233e918dcc9';
+import { createHostRegistry, floatBits } from './host-contract.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import KEY_DATA from './camera-metadata-keys-data.js?v=af8ff7411a95';
+import { CAMERAS, cameraById, FORMAT, STREAM_SIZES, SENSOR_ARRAY, supportsSize, roundStreamSize } from './camera-frames.js?v=af8ff7411a95';
+import { installCameraSurfaces, SURFACE, IMAGE_READER, SURFACE_TEXTURE } from './camera-surface-host.js?v=af8ff7411a95';
+import { installCaptureIntents } from './camera-capture-intent.js?v=af8ff7411a95';
+import { installMediaCodecs } from './media-codec-host.js?v=af8ff7411a95';
 
 // android.hardware.camera2 for the browser VM (android-13.0.0_r1: CameraManager.java, impl/CameraDeviceImpl.java, impl/CameraCaptureSessionImpl.java, CaptureRequest.java,
 // CaptureResult.java, params/StreamConfigurationMap.java, params/OutputConfiguration.java, params/SessionConfiguration.java) and the camera capture Intents
@@ -384,6 +384,7 @@ export function createCameraHost(platform) {
   // ---- CameraCaptureSession ---------------------------------------------------------------------------------------------------------------------------------------------------
   type(SESSION, OBJECT, ['Ljava/lang/AutoCloseable;']); type(SESSION_IMPL, SESSION, [], { allocatable: true }); type(SESSION_CALLBACK, OBJECT, [], { allocatable: true }); type(CAPTURE_CALLBACK, OBJECT, [], { allocatable: true });
   def(SESSION_CALLBACK, '<init>', '()V', () => {}); def(CAPTURE_CALLBACK, '<init>', '()V', () => {});
+  def(SESSION, '<init>', '()V', () => {});   // public in the SDK (an app or library may subclass the session, e.g. a wrapper that delegates to the real one)
   for (const name of ['onReady', 'onActive', 'onClosed', 'onCaptureQueueEmpty']) def(SESSION_CALLBACK, name, `(${SESSION})V`, () => {});
   def(SESSION_CALLBACK, 'onSurfacePrepared', `(${SESSION}${SURFACE})V`, () => {});
   def(CAPTURE_CALLBACK, 'onCaptureStarted', `(${SESSION}${REQUEST}JJ)V`, () => {}); def(CAPTURE_CALLBACK, 'onCaptureProgressed', `(${SESSION}${REQUEST}${RESULT})V`, () => {});

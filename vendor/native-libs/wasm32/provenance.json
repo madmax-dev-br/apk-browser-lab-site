@@ -685,6 +685,16 @@
   },
   "reactNativeReleases": [
     {
+      "version": "0.86.3",
+      "provenance": "rn/0.86.3/provenance.json",
+      "sha256": "204ece621c1b91d3cb5cfce7dfb31eb6b6e2c11b09b7f54b89e77bdd11f47e25"
+    },
+    {
+      "version": "0.87.1",
+      "provenance": "rn/0.87.1/provenance.json",
+      "sha256": "ab12821ec68eb4c2705e7ae5efbb6af1fe53e9779e6c68e90e93fac8ae35163c"
+    },
+    {
       "version": "0.88.1",
       "provenance": "rn/0.88.1/provenance.json",
       "sha256": "aa84373a75edd82e2f307facfe96deede8f1ef830a4d68f1aaadd700dd59c8de"

@@ -1,11 +1,11 @@
-import { resolveIntentFields } from './intent-resolver.js?v=7233e918dcc9';
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { registerPackageValueFields } from './package-value-fields.js?v=7233e918dcc9';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7233e918dcc9';
-import { nativeHeap } from './vm-debug-host.js?v=7233e918dcc9';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=7233e918dcc9';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7233e918dcc9';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=7233e918dcc9';
+import { resolveIntentFields } from './intent-resolver.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { registerPackageValueFields } from './package-value-fields.js?v=af8ff7411a95';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=af8ff7411a95';
+import { nativeHeap } from './vm-debug-host.js?v=af8ff7411a95';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=af8ff7411a95';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=af8ff7411a95';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=af8ff7411a95';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -613,6 +613,18 @@ export function createAppServicesHost(platform) {
   def(CP, 'getContext', `()${CONTEXT}`, (r, _m, [self]) => r.object(self).providerContext ?? null);
   def(CP, 'isTemporary', '()Z', () => 0);
   def(CP, 'getCallingPackage', `()${STRING}`, r => pkgs()?.multi ? pkgs().callingPackage(r) : null); // the package of the cross-package call being served; outside one there is no caller
+  def(CP, 'getCallingPackageUnchecked', `()${STRING}`, r => pkgs()?.multi ? pkgs().callingPackage(r) : null);
+  // getCallingAttributionSource: the AttributionSource of the call being served (ContentProvider.mCallingAttributionSource: the caller's uid and package), null outside one.
+  // The lab's cross-package calls carry no attribution tag, so the source has none and getCallingAttributionTag is null.
+  const ATTRIBUTION = 'Landroid/content/AttributionSource;';
+  const callingSource = r => {
+    const P = pkgs(), name = P?.multi ? P.callingPackage(r) : null; if (!name) return null;
+    const source = r.allocate(ATTRIBUTION);
+    r.dispatch({ owner: ATTRIBUTION, name: '<init>', parameters: ['I', STRING, STRING, 'Ljava/util/Set;', ATTRIBUTION], result: 'V', signature: `(I${STRING}${STRING}Ljava/util/Set;${ATTRIBUTION})V` }, [source, P.callingIdentity(r).uid, name, null, null, null], 'direct');
+    return source;
+  };
+  def(CP, 'getCallingAttributionSource', `()${ATTRIBUTION}`, r => callingSource(r));
+  def(CP, 'getCallingAttributionTag', `()${STRING}`, () => null);
   for (const name of ['onLowMemory']) def(CP, name, '()V', () => {}); // ContentProvider's own empty ComponentCallbacks bodies
   def(CP, 'onTrimMemory', '(I)V', () => {}); def(CP, 'onConfigurationChanged', '(Landroid/content/res/Configuration;)V', () => {});
   def(CP, 'shutdown', '()V', r => r.record('LOG W ContentProvider: implement shutdown() only for tests'));

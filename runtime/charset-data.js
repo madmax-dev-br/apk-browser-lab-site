@@ -110,6 +110,52 @@ export const CHARSET_DATA = [
     "repertoire": "unicode"
   },
   {
+    "canonical": "UTF-32",
+    "icu": "UTF-32",
+    "aliases": [
+      "UTF-32",
+      "ISO-10646-UCS-4"
+    ],
+    "lookupAliases": [
+      "UTF-32",
+      "ISO-10646-UCS-4",
+      "ibm-1236",
+      "ibm-1237",
+      "csUCS4",
+      "ucs-4"
+    ],
+    "repertoire": "unicode"
+  },
+  {
+    "canonical": "UTF-32BE",
+    "icu": "UTF-32BE",
+    "aliases": [
+      "UTF-32BE"
+    ],
+    "lookupAliases": [
+      "UTF-32BE",
+      "UTF32_BigEndian",
+      "ibm-1232",
+      "ibm-1233",
+      "ibm-9424"
+    ],
+    "repertoire": "unicode"
+  },
+  {
+    "canonical": "UTF-32LE",
+    "icu": "UTF-32LE",
+    "aliases": [
+      "UTF-32LE"
+    ],
+    "lookupAliases": [
+      "UTF-32LE",
+      "UTF32_LittleEndian",
+      "ibm-1234",
+      "ibm-1235"
+    ],
+    "repertoire": "unicode"
+  },
+  {
     "canonical": "ISO-8859-1",
     "icu": "ISO-8859-1",
     "aliases": [

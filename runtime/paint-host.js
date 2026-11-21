@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=7233e918dcc9';
-import { colorLongToArgb } from './color-long.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=af8ff7411a95';
+import { colorLongToArgb } from './color-long.js?v=af8ff7411a95';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
@@ -41,6 +41,7 @@ for (const signature of [
   'getFontFeatureSettings()Ljava/lang/String;', 'setFontFeatureSettings(Ljava/lang/String;)V', 'getFontVariationSettings()Ljava/lang/String;', 'setFontVariationSettings(Ljava/lang/String;)Z',
   'isElegantTextHeight()Z', 'setElegantTextHeight(Z)V', 'getShadowLayerRadius()F', 'getShadowLayerDx()F', 'getShadowLayerDy()F', 'getShadowLayerColor()I',
   'hasGlyph(Ljava/lang/String;)Z', 'measureText(Ljava/lang/String;)F', 'measureText(Ljava/lang/String;II)F', 'measureText(Ljava/lang/CharSequence;II)F', 'measureText([CII)F',
+  'getTextWidths(Ljava/lang/String;[F)I', 'getTextWidths(Ljava/lang/String;II[F)I', 'getTextWidths(Ljava/lang/CharSequence;II[F)I', 'getTextWidths([CII[F)I',
 ]) keys.add(PAINT + '->' + signature);
 for (const signature of [
   `getFontMetrics()${METRICS}`, `getFontMetrics(${METRICS})F`,
@@ -364,6 +365,44 @@ export function createPaintHost() {
         if (nullish(args[1])) runtime.throwJava('Ljava/lang/NullPointerException;', 'string');
         if (!runtime.skiaHost?.hasGlyph) fail('Paint.hasGlyph requires the verified Skia font backend');
         return runtime.skiaHost.hasGlyph(runtime.stringCharacters(args[1]), paint) ? 1 : 0;
+      }
+      if (name === 'getTextWidths') {
+        // Paint.getTextWidths (android-13.0.0_r1 Paint.java): the argument checks of each overload, then nGetTextAdvances over [start, end) with the range as its own context and the
+        // paint's bidi flags: widths[0..] gets the advance of every UTF-16 unit (a cluster's advance on its first unit, 0 on the others) and the result is the unit count.
+        const kind = method.parameters[0], text = args[1], bounds = message => runtime.throwJava('Ljava/lang/IndexOutOfBoundsException;', message), arrayBounds = () => runtime.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;');
+        if (nullish(text)) runtime.throwJava('Ljava/lang/IllegalArgumentException;', 'text cannot be null');
+        const widths = args[args.length - 1];
+        if (nullish(widths)) runtime.throwJava('Ljava/lang/NullPointerException;', 'widths');
+        const out = runtime.array(widths), length = kind === '[C' ? runtime.array(text).elements.length : typeof text === 'string' ? text.length : runtime.dispatch({ owner: 'Ljava/lang/CharSequence;', name: 'length', parameters: [], result: 'I', signature: '()I' }, [text], 'virtual');
+        let start = 0, end = length;
+        if (kind === '[C') { const index = args[2], count = args[3]; if ((index | count) < 0 || index + count > length || count > out.elements.length) arrayBounds(); start = index; end = index + count; }
+        else {
+          if (method.parameters.length === 4) { start = args[2]; end = args[3]; }
+          if ((start | end | (end - start) | (length - end)) < 0) bounds(`start ${start}, end ${end}, length ${length}`);
+          if (end - start > out.elements.length) arrayBounds();
+        }
+        if (length === 0 || start === end) return 0;
+        if (end - start > 65536) fail('Paint.getTextWidths exceeds 65536 UTF16 units');
+        let content;
+        if (kind === '[C') content = String.fromCharCode(...runtime.array(text).elements.slice(start, end).map(v => v & 0xffff));
+        else if (typeof text === 'string') content = text.slice(start, end);
+        else { const buffer = runtime.newArray('[C', end - start); runtime.dispatch({ owner: 'Landroid/text/TextUtils;', name: 'getChars', parameters: ['Ljava/lang/CharSequence;', 'I', 'I', '[C', 'I'], result: 'V', signature: '(Ljava/lang/CharSequence;II[CI)V' }, [text, start, end, buffer, 0], 'static'); content = String.fromCharCode(...runtime.array(buffer).elements.map(v => v & 0xffff)); }
+        // the paint's bidi flags (mBidiFlags, Minikin's Bidi): FORCE_LTR / FORCE_RTL make one run of that direction. For the paragraph directions (LTR, RTL, DEFAULT_LTR, DEFAULT_RTL)
+        // a text whose strong characters all have the paragraph's direction is one run of it; a text that mixes levels needs Minikin's bidi itemization, which this boundary does not have.
+        const bidi = object.fields.get(`${PAINT}->mBidiFlags:I`) ?? 2;
+        const strongRtl = /[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe]|\ud802[\udc00-\udfff]|\ud83a[\udc00-\udfff]/.test(content), strongLtr = !strongRtl ? /\p{L}/u.test(content) : /[^\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufefe\ud800-\udfff\P{L}]/u.test(content);
+        let isRtl;
+        if (bidi === 4 || bidi === 5) isRtl = bidi === 5;
+        else {
+          const paragraphRtl = bidi === 1 || (bidi === 3 && !strongLtr) || (bidi === 2 && strongRtl && !strongLtr) || (bidi === 3 && strongRtl && !strongLtr);
+          if (paragraphRtl ? strongLtr : strongRtl) fail('Paint.getTextWidths of a text that mixes directions requires the Android Minikin bidi boundary');
+          isRtl = paragraphRtl;
+        }
+        pull(runtime, paint, args[0]); if (paint.hyphenEdit) fail('Text widths with Android hyphen editing require an implemented Minikin backend');
+        if (!runtime.skiaHost?.measureRunAdvances) fail('Paint.getTextWidths requires the verified Skia shaping backend');
+        const result = runtime.skiaHost.measureRunAdvances(content, { start: 0, end: content.length, isRtl }, paint);
+        for (let i = 0; i < content.length; i++) out.elements[i] = rawFloat(result.advances[i]);   // a float[] holds the float bits
+        runtime.record('HOST Paint.getTextWidths [original SkParagraph/SkShaper cluster advances]'); return content.length;
       }
       if (name === 'measureText') {
         // Paint.measureText = the advance of the whole run (Paint.getRunAdvance over [start, end) with the text as its own context); a null text is an NPE

@@ -29,12 +29,12 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=7233e918dcc9';
+import { Blocked } from '../../runtime/scheduler.js?v=af8ff7411a95';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7233e918dcc9';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=7233e918dcc9';
-import { CLASS } from './linker.js?v=7233e918dcc9';
-const CLASS_INIT_STATE = CLASS.initState;
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=af8ff7411a95';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=af8ff7411a95';
+import { CLASS } from './linker.js?v=af8ff7411a95';
+const CLASS_INIT_STATE = CLASS.initState, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZING
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
@@ -96,7 +96,7 @@ export class CoreThreads {
     const recordOf = thread => (thread ?? rt.thread ?? sched.mainThread()).core?.t ?? engine.t;
     rt.monitorTryEnter = (value, thread) => x.mon_enter(recordOf(thread), word(value)) === S.OK;
     rt.monitorFree = value => x.mon_owner(word(value) + 4, 0) === 0;
-    rt.monitorEnter = value => { while (!rt.monitorTryEnter(value)) sched.resolveNested(new Blocked({ ready: () => rt.monitorFree(value), reason: 'monitor' })); };
+    rt.monitorEnter = value => { while (!rt.monitorTryEnter(value)) sched.resolveNested(Object.assign(new Blocked({ ready: () => rt.monitorFree(value), reason: 'monitor' }), { holder: () => rt.monitorOwnerThread(value)?.thread ?? null })); };
     rt.monitorExit = (value, thread) => { if (x.mon_exit(recordOf(thread), word(value)) !== S.OK) rt.throwJava('Ljava/lang/IllegalMonitorStateException;', 'monitor not owned'); };
     rt.ownsMonitor = (value, thread) => { const t = recordOf(thread); return x.mon_owner(word(value) + 4, 0) === this.u32[(t + T.tid) >> 2]; };
     // Diagnostics (src/report-summary.js): the thread whose tid the lock word names, or null when nobody holds it; { tid, thread: null } for a tid no live thread has
@@ -164,8 +164,21 @@ export class CoreThreads {
     if (on) blocker = this.engine.refValue(on - 4);
     else if (phase !== 0) { const monitor = u32[(t + T.waitMonitor) >> 2]; if (monitor) blocker = this.engine.refValue(u32[monitor >> 2] - 4); }
     thread.blocked = new Blocked({ ready: () => this.u32[word] !== value, deadline, reason, blocker, roots: blocker === null ? [] : [blocker] });
+    // the thread that can end this wait, when one thread can (the one running the class's <clinit>, the monitor's owner): CoreThreads.waitFor reports a wait for a thread
+    // whose run is suspended beneath this one on the JavaScript stack instead of serving events and threads on top of it for ever
+    if (reason === 'class initialization') { const klass = u32[(t + T.blockWord) >> 2] - CLASS_INIT_STATE; thread.blocked.holder = () => this.initializer(klass); thread.blocked.what = () => this.className(klass); }
+    else if (on || phase === WAIT_REACQUIRE) { const lock = on || (u32[(t + T.waitMonitor) >> 2] ? u32[u32[(t + T.waitMonitor) >> 2] >> 2] : 0); if (lock) thread.blocked.holder = () => this.threadOfTid(this.x.mon_owner(lock, 0)); }
     thread.state = 'blocked'; thread.coreWait = { kind: 'core' }; this.stats.parks++;
   }
+  /** The thread running the <clinit> of the class at `klass` (null when none runs it now). */
+  initializer(klass) { const u32 = this.u32; if (u32[(klass + CLASS.initState) >> 2] !== CLASS_INITIALIZING) return null; return this.threadOfRecord(u32[(klass + CLASS.initThread) >> 2]); }
+  // (asked at every turn of a wait: no allocation)
+  threadOfRecord(t) { if (!t) return null; const main = this.sched.mainThread(); if (main.core?.t === t) return main; for (const thread of this.sched.threads) if (thread.core?.t === t) return thread; return null; }
+  threadOfTid(tid) {
+    if (!tid) return null; const u32 = this.u32, main = this.sched.mainThread(), of = thread => { const t = thread.core?.t; return t !== undefined && u32[(t + T.tid) >> 2] === tid; };
+    if (of(main)) return main; for (const thread of this.sched.threads) if (of(thread)) return thread; return null;
+  }
+  className(klass) { for (const [type, info] of this.engine.linker?.classes ?? []) if (info?.address === klass) return type; return `the class at 0x${(klass >>> 0).toString(16)}`; }
   /** A host's Blocked, met by a host step of the thread (`thread.core.steps` says where its value goes). */
   parkHost(thread, blocked) { thread.blocked = blocked; thread.waitSite = this.rt.lastHostCall ?? null; thread.state = 'blocked'; thread.coreWait = STEP_WAIT; this.stats.hostParks++; }
 
@@ -360,6 +373,12 @@ export class CoreThreads {
       // event pump returns to the browser's event loop (the page, its watchdog and a driver's wall clock see the wait) and resumes the event once the wait is over. Waits
       // that end in less (most: a skip of the VM clock, another thread's short work) keep the nested path.
       if (owner.state === 'blocked' && performance.now() - since >= LONG_WAIT_MS && engine.maySuspend(owner)) { engine.noteSuspend(owner, null, Math.round(performance.now() - since)); throw MAIN_SUSPEND; }
+      // A wait only a thread suspended beneath this run on the JavaScript stack can end (it runs the <clinit> this thread needs, or owns the monitor it enters): that thread
+      // goes on only once this run returns, and this run returns only once it goes on. Serving events and other threads on top of it never ends (a pump that never returned,
+      // seen as a background thread's host call waiting for a class another background thread initialized in a host call of its own): it is reported by name instead.
+      if (owner.state === 'blocked') sched.checkNestedDeadlock(owner);
+      // the operation's wall budget and heartbeat (src/operation-monitor.js) see every turn of a long wait, also one that serves no event
+      if (rt.monitor?.active) rt.monitor.tick();
       if (owner.state === 'blocked' || sched.starved) sched.serviceEvents();
       const choice = sched.pick(this.last ?? owner, owner);
       if (choice.thread === owner) { if (this.last !== owner) sched.switching(rt, this.last, owner); this.last = owner; rt.thread = owner; return; }

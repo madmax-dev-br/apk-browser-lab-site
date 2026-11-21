@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "profile": "net",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "d78dcae588c146108011a6c22a45787423ee20baae946e80d5e23f78592b3da4",
+  "bytes": 11432,
+  "methods": 101,
+  "classes": [
+    "Landroid/net/Credentials;",
+    "Landroid/net/MailTo;",
+    "Landroid/net/UrlQuerySanitizer$ValueSanitizer;",
+    "Landroid/net/UrlQuerySanitizer$IllegalCharacterValueSanitizer;",
+    "Landroid/net/UrlQuerySanitizer$ParameterValuePair;",
+    "Landroid/net/UrlQuerySanitizer;"
+  ],
+  "classCount": 6,
+  "algorithmPatches": [],
+  "sourceTransforms": [],
+  "compiledSources": [
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/net/UrlQuerySanitizer.java",
+      "localPath": "framework-aosp/upstream/android/net/UrlQuerySanitizer.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/UrlQuerySanitizer.java?format=TEXT",
+      "sha256": "ddf8a4246def2ff30ee605c887d44067c4b9ae6107f96f071ef6360f0d01e0d1",
+      "bytes": 31395,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/net/MailTo.java",
+      "localPath": "framework-aosp/upstream/android/net/MailTo.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/MailTo.java?format=TEXT",
+      "sha256": "dafb4eedd458cd66fb75dc074fda988da510de2b4e2af530b565d5e7da7454c6",
+      "bytes": 5455,
+      "license": "Apache-2.0"
+    },
+    {
+      "project": "platform/frameworks/base",
+      "tag": "android-13.0.0_r1",
+      "path": "core/java/android/net/Credentials.java",
+      "localPath": "framework-aosp/upstream/android/net/Credentials.java",
+      "url": "https://android.googlesource.com/platform/frameworks/base/+/android-13.0.0_r1/core/java/android/net/Credentials.java?format=TEXT",
+      "sha256": "24a925faae707fe84a7090712b77239001a980512f022cee096c6f18d15a9ccc",
+      "bytes": 1339,
+      "license": "Apache-2.0"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original android.net data classes (UrlQuerySanitizer and its nested sanitizers and ParameterValuePair, MailTo, Credentials) over the default DEX and the lab's Uri host",
+  "activationPolicy": "an installed package DEX references android.net.UrlQuerySanitizer (or a nested class), android.net.MailTo or android.net.Credentials (or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

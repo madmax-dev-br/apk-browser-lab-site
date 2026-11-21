@@ -1,0 +1,33 @@
+Original Android 13 invoke profile (libcore java.lang.invoke, sun.invoke.util, dalvik.system.EmulatedStackFrame)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-invoke-profile.sh       (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/method-handles.test.mjs
+
+Contents: the pinned android-13.0.0_r1 libcore originals listed in framework-aosp/invoke-sources.txt, compiled unchanged (no source transform):
+java.lang.invoke MethodHandles (with Lookup), MethodHandle, MethodHandleImpl, MethodHandleInfo, MethodHandleNatives, MethodHandleStatics, MethodType,
+MethodTypeForm, Transformers (bindTo, asType, spreaders, collectors, invokers, the combinators), CallSite, ConstantCallSite, MutableCallSite, VolatileCallSite,
+VarHandle and its libart implementations (FieldVarHandle, StaticFieldVarHandle, ArrayElementVarHandle, ByteArrayViewVarHandle, ByteBufferViewVarHandle),
+WrongMethodTypeException, LambdaConversionException, Stable; sun.invoke.util BytecodeDescriptor, Wrapper, VerifyAccess; dalvik.system.EmulatedStackFrame.
+D8 writes this DEX with --min-api 26 (DEX 038): the originals call MethodHandle.invoke / invokeExact, which exist only as invoke-polymorphic.
+
+Compile-only declarations (support/, never in the DEX): the java.time group's declarations of java.lang.Class, java.lang.reflect.Executable and Field
+(framework-aosp/support-javatime) with the hidden members of libcore the originals call: Class.getInstanceMethod, Executable.getArtMethod, Field.getArtField.
+
+The runtime's part (src/method-handles.js; ART: art/runtime/method_handles.cc, the interpreter's invoke-polymorphic, java_lang_invoke_MethodHandleImpl.cc):
+  - invoke-polymorphic (opcodes 0xfa / 0xfb) in the JavaScript interpreter (src/interpreter.js) and the WebAssembly core (vmcore/interp.c, linker.js
+    polymorphicMethod, host-bridge.js): MethodHandle.invoke / invokeExact with the call site's proto. An exact type match invokes the handle; invokeExact with
+    another type is WrongMethodTypeException; invoke with another type is asType(callsiteType) and the exact invocation. A Transformer handle gets an
+    EmulatedStackFrame of the call site's type and runs MethodHandle.transformInternal(frame); the other kinds invoke their member (virtual, interface, direct,
+    super, static, field get / put) as ART does.
+  - the natives of the originals: MethodHandle.invokeExactWithFrame (a handle with the arguments of a frame, its result into the frame),
+    MethodHandleImpl.getMemberInternal, and MethodHandle.invoke / invokeExact reached reflectively (UnsupportedOperationException, as on ART);
+  - the hidden reflection members of the lab's host classes: Executable.getArtMethod (the value Executable.artMethod reads), Field.getArtField,
+    Class.getInstanceMethod (libcore Class.java's search).
+  sun.reflect.Reflection.getCallerClass (MethodHandles.lookup) reads the core's frames on the WebAssembly engine.
+
+Not provided: the VarHandle access modes (get, set, compareAndSet ... on a VarHandle, and MethodHandles.varHandleInvoker / varHandleExactInvoker): they fail
+naming the API. Android 13's VerifyAccess allows no nestmate access to private members (ALLOW_NESTMATE_ACCESS is false), as on a device.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader (src/apk-loader.js) adds
+this DEX when the APK's DEX references a java.lang.invoke type, or when the loader option enableInvokeProfile is true.

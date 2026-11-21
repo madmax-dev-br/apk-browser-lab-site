@@ -4,7 +4,7 @@
 // There is no IP configuration to read in the browser VM, so LinkProperties carries the interface name and empty address / route / DNS lists, never invented ones.
 const DELIVERY = 'Lapkweb/bridge/TelephonyDelivery;';   // the Runnable that runs a platform closure (declared by telephony-host.js)
 const LINK_PROPERTIES = 'Landroid/net/LinkProperties;', STRING = 'Ljava/lang/String;', LIST = 'Ljava/util/List;', HANDLER = 'Landroid/os/Handler;', RUNNABLE = 'Ljava/lang/Runnable;';
-const MAX_TRANSPORT = 8, MAX_CAPABILITY = 35;
+const MAX_TRANSPORT = 8, MAX_CAPABILITY = 35, SPECIFIER = 'Landroid/net/NetworkSpecifier;', MATCH_ALL = 'Landroid/net/MatchAllNetworkSpecifier;';
 
 export function installNetworkCallbacks({ platform, registry, activeNetwork, capabilitiesFor, call, names, entries }) {
   const { def, type } = registry, { CONNECTIVITY, NETWORK, CAPABILITIES, CALLBACK, REQUEST, REQUEST_BUILDER } = names;
@@ -12,7 +12,10 @@ export function installNetworkCallbacks({ platform, registry, activeNetwork, cap
   type(LINK_PROPERTIES, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST, 'Ljava/lang/Object;', [], { allocatable: true }); type(REQUEST_BUILDER, 'Ljava/lang/Object;', [], { allocatable: true });
   // what the model's networks hold (NetworkCapabilities.hasCapability): INTERNET, NOT_RESTRICTED, TRUSTED, NOT_VPN, VALIDATED, NOT_ROAMING, FOREGROUND, NOT_CONGESTED, NOT_SUSPENDED, and NOT_METERED on Wi-Fi
   const holds = (caps, capability) => (capability === 11 ? (caps.metered ? 0 : 1) : [12, 13, 14, 15, 16, 18, 19, 20, 21].includes(capability) ? 1 : 0);
-  const satisfies = (request, caps) => { const wanted = request ?? { capabilities: new Set(), transports: new Set() }; return [...wanted.capabilities].every(c => holds(caps, c)) && (wanted.transports.size === 0 || wanted.transports.has(caps.transport)); };
+  // NetworkCapabilities.satisfiedByNetworkCapabilities: the capabilities and transports, and the specifier (satisfiedBySpecifier): the model's networks carry none, so a request's
+  // specifier decides through its own canBeSatisfiedBy(null)
+  const satisfies = (request, caps, r = null) => { const wanted = request ?? { capabilities: new Set(), transports: new Set() }; return [...wanted.capabilities].every(c => holds(caps, c)) && (wanted.transports.size === 0 || wanted.transports.has(caps.transport)) && specifierSatisfied(r, wanted.specifier); };
+  const specifierSatisfied = (r, specifier) => nullish(specifier) || (r !== null && !!call(r, specifier, SPECIFIER, 'canBeSatisfiedBy', [SPECIFIER], 'Z', [null]));
   const range = (r, value, max, label) => { if (value < 0 || value > max) r.throwJava('Ljava/lang/IllegalArgumentException;', `${label} ${value} out of range`); };
 
   // ---- NetworkRequest / NetworkRequest.Builder
@@ -24,15 +27,27 @@ export function installNetworkCallbacks({ platform, registry, activeNetwork, cap
   def(REQUEST_BUILDER, 'removeTransportType', `(I)${REQUEST_BUILDER}`, (r, _m, [self, t]) => { range(r, t, MAX_TRANSPORT, 'TransportType'); builder(r, self).transports.delete(t); return self; });
   def(REQUEST_BUILDER, 'clearCapabilities', `()${REQUEST_BUILDER}`, (r, _m, [self]) => { builder(r, self).capabilities.clear(); builder(r, self).transports.clear(); return self; });
   def(REQUEST_BUILDER, 'setIncludeOtherUidNetworks', `(Z)${REQUEST_BUILDER}`, (r, _m, [self]) => self);
-  def(REQUEST_BUILDER, 'build', `()${REQUEST}`, (r, _m, [self]) => { const request = r.makeObject(REQUEST), source = builder(r, self); r.object(request).request = { capabilities: new Set(source.capabilities), transports: new Set(source.transports) }; return request; });
+  // setNetworkSpecifier(NetworkSpecifier) (NetworkRequest.Builder, NetworkCapabilities.setNetworkSpecifier): a MatchAllNetworkSpecifier is refused, and a specifier needs exactly one transport
+  def(REQUEST_BUILDER, 'setNetworkSpecifier', `(${SPECIFIER})${REQUEST_BUILDER}`, (r, _m, [self, specifier]) => {
+    if (!nullish(specifier) && r.isSubtype(r.typeOf(specifier), MATCH_ALL)) r.throwJava('Ljava/lang/IllegalArgumentException;', 'A MatchAllNetworkSpecifier is not permitted');
+    if (!nullish(specifier) && builder(r, self).transports.size !== 1) r.throwJava('Ljava/lang/IllegalStateException;', 'Must have a single transport specified to use setNetworkSpecifier');
+    builder(r, self).specifier = nullish(specifier) ? null : specifier; return self;
+  });
+  def(REQUEST_BUILDER, 'build', `()${REQUEST}`, (r, _m, [self]) => { const request = r.makeObject(REQUEST), source = builder(r, self); r.object(request).request = { capabilities: new Set(source.capabilities), transports: new Set(source.transports), specifier: source.specifier ?? null }; return request; });
   const requestOf = (r, request) => (nullish(request) ? null : r.object(request).request ?? { capabilities: new Set(), transports: new Set() });
   def(REQUEST, 'hasCapability', '(I)Z', (r, _m, [self, c]) => (requestOf(r, self).capabilities.has(c) ? 1 : 0));
   def(REQUEST, 'hasTransport', '(I)Z', (r, _m, [self, t]) => (requestOf(r, self).transports.has(t) ? 1 : 0));
-  def(REQUEST, 'canBeSatisfiedBy', `(${CAPABILITIES})Z`, (r, _m, [self, caps]) => (!nullish(caps) && satisfies(requestOf(r, self), r.object(caps)) ? 1 : 0));
+  def(REQUEST, 'canBeSatisfiedBy', `(${CAPABILITIES})Z`, (r, _m, [self, caps]) => (!nullish(caps) && satisfies(requestOf(r, self), r.object(caps), r) ? 1 : 0));
+  // getNetworkSpecifier (the one the Builder set, else null), and the API 31 getCapabilities / getTransportTypes: the values in ascending order (NetworkCapabilities' bit sets unpacked)
+  def(REQUEST, 'getNetworkSpecifier', `()${SPECIFIER}`, (r, _m, [self]) => requestOf(r, self).specifier ?? null);
+  const ascending = (r, values) => { const sorted = [...values].sort((a, b) => a - b), array = r.newArray('[I', sorted.length); r.array(array).elements = sorted; return array; };
+  def(REQUEST, 'getCapabilities', '()[I', (r, _m, [self]) => ascending(r, requestOf(r, self).capabilities));
+  def(REQUEST, 'getTransportTypes', '()[I', (r, _m, [self]) => ascending(r, requestOf(r, self).transports));
   def(REQUEST, 'equals', '(Ljava/lang/Object;)Z', (r, _m, [self, other]) => {
     if (nullish(other) || !r.isSubtype(r.typeOf(other), REQUEST)) return 0;
     const a = requestOf(r, self), b = requestOf(r, other);
-    return a.capabilities.size === b.capabilities.size && a.transports.size === b.transports.size && [...a.capabilities].every(c => b.capabilities.has(c)) && [...a.transports].every(t => b.transports.has(t)) ? 1 : 0;
+    const sameSpecifier = nullish(a.specifier) ? nullish(b.specifier) : !nullish(b.specifier) && (a.specifier.ref === b.specifier.ref || !!call(r, a.specifier, 'Ljava/lang/Object;', 'equals', ['Ljava/lang/Object;'], 'Z', [b.specifier]));   // Objects.equals of the specifiers
+    return a.capabilities.size === b.capabilities.size && a.transports.size === b.transports.size && [...a.capabilities].every(c => b.capabilities.has(c)) && [...a.transports].every(t => b.transports.has(t)) && sameSpecifier ? 1 : 0;
   });
   def(REQUEST, 'hashCode', '()I', (r, _m, [self]) => { const q = requestOf(r, self); return [...q.capabilities].reduce((h, c) => (h * 31 + c) | 0, 17) ^ [...q.transports].reduce((h, t) => (h * 31 + t) | 0, 7); });
 
@@ -84,7 +99,7 @@ export function installNetworkCallbacks({ platform, registry, activeNetwork, cap
   const lose = (r, entry) => { const lost = entry.network; entry.network = null; post(r, entry, () => call(r, entry.callback, CALLBACK, 'onLost', [NETWORK], 'V', [lost])); };
   /** The active network changed (or a callback was just registered): bring every entry in line with the network it should be tracking. */
   const reconcile = (r, entry) => {
-    const network = activeNetwork(r), matches = network && satisfies(entry.request, r.object(capabilitiesFor(r, network)));
+    const network = activeNetwork(r), matches = network && satisfies(entry.request, r.object(capabilitiesFor(r, network)), r);
     if (entry.network && (!matches || entry.network.ref !== network.ref)) lose(r, entry);
     if (matches && !entry.network) announce(r, entry, network);
   };

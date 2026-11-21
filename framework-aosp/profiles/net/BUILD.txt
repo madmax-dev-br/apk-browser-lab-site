@@ -1,0 +1,18 @@
+Original Android 13 net profile (android.net.UrlQuerySanitizer, MailTo, Credentials)
+
+    scripts/build-aosp-framework.sh            (the default DEX first: this profile records its SHA-256)
+    scripts/build-aosp-net-profile.sh          (FRAMEWORK_BUILD=<dir of a default build>, ANDROID_ALL=<pinned jar> to reuse existing ones)
+    node --test --import ./tests/setup-javacrypto.mjs tests/url-query-sanitizer.test.mjs
+
+Contents: the pinned android-13.0.0_r1 frameworks/base originals listed in framework-aosp/net-sources.txt, compiled unchanged (no source transform):
+android.net.UrlQuerySanitizer (with ValueSanitizer, IllegalCharacterValueSanitizer and ParameterValuePair), android.net.MailTo and android.net.Credentials.
+They run over the default DEX (android.net.ParseException, TextUtils) and the lab's Uri host.
+
+Why a profile: the default framework DEX is at the 64K method-reference limit of one DEX file (framework-aosp/BUILD.txt). The loader (src/apk-loader.js)
+adds this DEX when the APK's DEX references one of these classes, or when the loader option enableNetProfile is true.
+
+The other android.net classes of the Android 13 API that the lab neither ships nor hosts (scanned against framework.dex, the profiles and the hosts):
+LocalSocket and LocalServerSocket (Unix-domain sockets of the device), DnsResolver, InetAddresses, Proxy, CaptivePortal, VpnService and VpnManager,
+IpSec*, Ikev2VpnProfile, LinkAddress, RouteInfo, StaticIpConfiguration, IpConfiguration, SocketKeepalive, TelephonyNetworkSpecifier and
+EthernetNetworkSpecifier (Connectivity module), http.SslCertificate and http.HttpResponseCache, nsd.NsdServiceInfo, the android.net.wifi data classes
+(Wifi module), android.net.sip, android.net.rtp streams, android.net.vcn and android.net.ipsec.ike. A use of one fails naming it.

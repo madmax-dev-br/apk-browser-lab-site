@@ -1,21 +1,22 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { ACCESSORS as HIDDEN_ACCESSORS, hiddenReflection } from './hidden-members.js?v=7233e918dcc9';
-import { constantField, nonConstantField } from './framework-constants.js?v=7233e918dcc9';
-import { JavaException } from './apk-runtime.js?v=7233e918dcc9';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=7233e918dcc9';
-import { buildElfDescriptor } from './native-descriptor.js?v=7233e918dcc9';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=7233e918dcc9';
-import { NativeLinker, LinkError } from './native-linker.js?v=7233e918dcc9';
-import { hostFunction } from './wasm-host-function.js?v=7233e918dcc9';
-import { parseWasm } from './wasm-dylink.js?v=7233e918dcc9';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=7233e918dcc9';
-import { BUCKET, inBucket } from './time-breakdown.js?v=7233e918dcc9';
-import { Blocked } from './scheduler.js?v=7233e918dcc9';
-import { registerWasmMemory } from './unsafe-native.js?v=7233e918dcc9';
-import { writeSkPath } from './skia-path-layout.js?v=7233e918dcc9';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=7233e918dcc9';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=7233e918dcc9';
-import { withVariants } from './native-provider-variants.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { ACCESSORS as HIDDEN_ACCESSORS, hiddenReflection } from './hidden-members.js?v=af8ff7411a95';
+import { constantField, nonConstantField } from './framework-constants.js?v=af8ff7411a95';
+import { JavaException } from './apk-runtime.js?v=af8ff7411a95';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=af8ff7411a95';
+import { buildElfDescriptor } from './native-descriptor.js?v=af8ff7411a95';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=af8ff7411a95';
+import { NativeLinker, LinkError } from './native-linker.js?v=af8ff7411a95';
+import { hostFunction } from './wasm-host-function.js?v=af8ff7411a95';
+import { parseWasm } from './wasm-dylink.js?v=af8ff7411a95';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=af8ff7411a95';
+import { BUCKET, inBucket } from './time-breakdown.js?v=af8ff7411a95';
+import { Blocked } from './scheduler.js?v=af8ff7411a95';
+import { registerWasmMemory, registerNativeHeap } from './unsafe-native.js?v=af8ff7411a95';
+import { installDirectBuffers } from './direct-buffers.js?v=af8ff7411a95';
+import { writeSkPath } from './skia-path-layout.js?v=af8ff7411a95';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=af8ff7411a95';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=af8ff7411a95';
+import { withVariants } from './native-provider-variants.js?v=af8ff7411a95';
 
 // JNI -> WebAssembly bridge.
 //
@@ -207,6 +208,9 @@ export class JniBridge {
     this.linker = linker;
     try { linker.load(BASE_SONAME); } catch (error) { this.linker = null; r.throwJava('Ljava/lang/UnsatisfiedLinkError;', `dlopen failed: ${BASE_SONAME}: ${error.message}`, { kind: 'native-library-instantiate' }); }
     registerWasmMemory(this.runtime, linker.memory);
+    // the wasm32 libraries' heap is the process's native memory when the app has no ARM64 process (src/unsafe-native.js nativeHeap): direct buffers and Unsafe memory live there
+    registerNativeHeap(this.runtime, { kind: 'wasm32', malloc: bytes => linker.malloc(bytes), free: address => linker.free(address), map: bytes => linker.malloc(bytes), unmap: address => linker.free(address), owns: address => address > 0 && address < 0x100000000 });
+    installDirectBuffers(this.runtime);
     this.proc = { memory: linker.memory, table: linker.table, malloc: linker.malloc, free: linker.free, allocations: new Map(), envPtr: 0, vmPtr: 0 };
     this.#installEnv(this.proc);
     return this.proc;
@@ -363,7 +367,7 @@ export class JniBridge {
     const longName = `${shortName}__${mangle(method.signature.slice(1, method.signature.indexOf(')')))}`;
     for (const lib of this.libraries.values()) for (const symbol of [shortName, longName]) {
       const fn = lib.exports[symbol] ?? lib.exports['_' + symbol];
-      if (typeof fn === 'function') { const binding = { lib, fn, symbol }; this.registered.set(key, binding); return binding; }
+      if (typeof fn === 'function') { const binding = { lib, fn, symbol }; this.registered.set(key, binding); if (fn.address !== undefined) lib.jniIds?.nativeBound(sanitizeAlias(method.owner), method.name, method.signature, fn.address); return binding; }   // ART's dlsym lookup binds it: the ArtMethod's data_ is the function now
     }
     return null;
   }
@@ -424,6 +428,32 @@ export class JniBridge {
   }
   /** The jmethodID of a reflected Method / Constructor member, the value FromReflectedMethod answers for it (and ART's Executable.artMethod: the same ArtMethod*). */
   methodIdOf(member) { return this.#methodId({ ...member.method, static: !!(member.flags & 8) }); }
+  /**
+   * Executable.artMethod of a reflected member: on ART the address of the method's ArtMethod. With the app's ARM64 native process, that is the ArtMethod the lab lays out
+   * in it (src/arm64/art-runtime.js; the process starts if the app has arm64-v8a libraries); without one there is no ART memory to point into and the value is the
+   * bridge's jmethodID of the member (what FromReflectedMethod gives the lab's wasm32 libraries).
+   */
+  artMethodOf(member) {
+    const index = this.#methodId({ ...member.method, static: !!(member.flags & 8) });
+    this.runtime.arm64?.startProcess?.();
+    const art = this.libraries.get('<arm64-v8a>')?.art;
+    return art ? art.methodAddress(this.methodIds[index]) : index;
+  }
+  // jmethodID / jfieldID as one library sees them: the bridge's index for the lab's wasm32 libraries, ART's ArtMethod* / ArtField* (or its opaque odd indices for a debuggable
+  // app) for the ARM64 process (lib.jniIds, src/arm64/art-runtime.js)
+  #methodHandle(lib, info) { const index = this.#methodId(info); return lib.jniIds ? lib.jniIds.methodHandle(this.methodIds[index], index) : index; }
+  #methodInfo(lib, handle) { if (!lib.jniIds) return this.methodIds[handle]; const info = lib.jniIds.methodInfo(Number(handle)); return info ? this.methodIds[this.#methodId(info)] : undefined; }
+  #fieldHandle(lib, info) { const index = this.#fieldId(info); return lib.jniIds ? lib.jniIds.fieldHandle(this.fieldIds[index], index) : index; }
+  #fieldInfo(lib, handle) { if (!lib.jniIds) return this.fieldIds[handle]; const info = lib.jniIds.fieldInfo(Number(handle)); return info ? this.fieldIds[this.#fieldId(info)] : undefined; }
+  /** The jfieldID of a reflected Field member, the value FromReflectedField answers for it to the lab's wasm32 libraries. */
+  fieldIdOf(member) { return this.#fieldId({ ...member.field, static: !!(member.flags & 8) }); }
+  /** ART's Field.artField of a reflected member: the ArtField the lab lays out in the ARM64 process (as artMethodOf), or the bridge's jfieldID without one. */
+  artFieldOf(member) {
+    const index = this.#fieldId({ ...member.field, static: !!(member.flags & 8) });
+    this.runtime.arm64?.startProcess?.();
+    const art = this.libraries.get('<arm64-v8a>')?.art;
+    return art ? art.fieldAddress(this.fieldIds[index]) : index;
+  }
   #methodId(info) { let id = this.methodIdByKey.get(info.key); if (!id) { id = this.methodIds.length; this.methodIds.push(info); this.methodIdByKey.set(info.key, id); } return id; }
   #fieldId(info) { const key = info.key + (info.static ? '#s' : ''); let id = this.fieldIdByKey.get(key); if (!id) { id = this.fieldIds.length; this.fieldIds.push(info); this.fieldIdByKey.set(key, id); } return id; }
   /**
@@ -497,6 +527,8 @@ export class JniBridge {
     // this message. The lab stops the run the same way, naming the function and the argument, instead of continuing with a pending exception ART never raises.
     const jniAbort = (fn, argument, cause = null) => { throw new APKError(`JNI DETECTED ERROR IN APPLICATION: ${argument} == null in call to ${fn} (ART aborts the process here, with or without CheckJNI)${cause ? `; the null came from a failed lookup the native code did not check: ${cause}` : ''}`, { kind: 'jni-abort', function: fn, argument, ...(cause ? { cause } : {}) }); };
     const h = {};
+    // a region copy of n > 0 elements to or from address 0: what native code passed is a null buffer, a segmentation fault on a device
+    const nullBuffer = (fn, length) => { throw new APKError(`JNI ${fn}: ${length} elements to copy at address 0 (a NULL buffer from native code; a segmentation fault on a device)`, { kind: 'jni-null-buffer', function: fn }); };
 
     // -- version / classes
     h.GetVersion = () => 0x10008;
@@ -540,13 +572,13 @@ export class JniBridge {
       const type = self.#classType(cls), name = cString(namePtr), signature = cString(sigPtr), info = self.#findMethod(type, name, signature);
       if (!info || (name !== '<init>' && info.static !== isStatic && !info.host)) { r.record?.(`JNI Get${isStatic ? 'Static' : ''}MethodID ${type} ${name}${signature}: ${info ? 'static-ness differs' : 'no such method'} (NoSuchMethodError)`); self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return 0; }
       r.initialize?.(type);
-      return self.#methodId({ ...info, static: isStatic });
+      return self.#methodHandle(lib, { ...info, static: isStatic });
     };
     h.GetMethodID = memberId(false); h.GetStaticMethodID = memberId(true);
     const fieldId = (isStatic) => (_env, cls, namePtr, sigPtr) => {
       const info = self.#findField(self.#classType(cls), cString(namePtr), cString(sigPtr), isStatic);
       if (!info) { self.lastFieldIdFailure = `Get${isStatic ? 'Static' : ''}FieldID ${self.#classType(cls)} ${cString(namePtr)} ${cString(sigPtr)}: no such field`; r.record?.(`JNI ${self.lastFieldIdFailure} (NoSuchFieldError)`); self.#throwNew('Ljava/lang/NoSuchFieldError;', cString(namePtr)); return 0; }
-      return self.#fieldId(info);
+      return self.#fieldHandle(lib, info);
     };
     h.GetFieldID = fieldId(false); h.GetStaticFieldID = fieldId(true);
 
@@ -586,7 +618,7 @@ export class JniBridge {
       const nonvirtual = mode === 'nonvirtual', mid = rest[nonvirtual ? 1 : 0], argPtr = rest[nonvirtual ? 2 : 1];
       const fn = `Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${callTypeName(resultType)}Method${kind === 'A' ? 'A' : ''}`;
       if (mode !== 'static' && !objOrCls) jniAbort(fn, 'obj'); if (!mid) jniAbort(fn, 'mid');
-      const info = self.methodIds[mid]; if (!info) throw new APKError(`Invalid jmethodID ${typeof mid === 'number' ? '0x' + mid.toString(16) : String(mid)} in Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${resultType ?? ''}Method${kind === 'A' ? 'A' : ''} (the bridge has handed out ${self.methodIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(mid) });
+      const info = self.#methodInfo(lib, mid); if (!info) throw new APKError(`Invalid jmethodID ${typeof mid === 'number' ? '0x' + mid.toString(16) : String(mid)} in Call${mode === 'static' ? 'Static' : mode === 'nonvirtual' ? 'Nonvirtual' : ''}${resultType ?? ''}Method${kind === 'A' ? 'A' : ''} (the bridge has handed out ${self.methodIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(mid) });
       const raw = kind === 'A' ? jvalues(info.parameters, argPtr) : varargs(info.parameters, argPtr);
       const values = info.parameters.map((type, i) => toVM(type, raw[i]));
       const words = r.argumentWords(info.parameters, values, mode === 'static' ? {} : { receiver: self.#value(objOrCls) });
@@ -607,7 +639,8 @@ export class JniBridge {
     }
     h.AllocObject = (_env, cls) => self.#local(r.allocate(self.#classType(cls)));
     const newObject = (kind) => (_env, cls, mid, argPtr) => {
-      const info = self.methodIds[mid], type = self.#classType(cls);
+      const info = self.#methodInfo(lib, mid), type = self.#classType(cls);
+      if (!info) throw new APKError(`Invalid jmethodID 0x${Number(mid).toString(16)} in NewObject`, { kind: 'jni-invalid-reference', id: Number(mid) });
       const raw = kind === 'A' ? jvalues(info.parameters, argPtr) : varargs(info.parameters, argPtr);
       const object = r.allocate(type);
       r.dispatch({ ...info, owner: info.owner }, r.argumentWords(info.parameters, info.parameters.map((t, i) => toVM(t, raw[i])), { receiver: object }), 'direct');
@@ -616,14 +649,14 @@ export class JniBridge {
     h.NewObject = newObject('V'); h.NewObjectV = newObject('V'); h.NewObjectA = newObject('A');
 
     // -- reflection <-> IDs (FromReflectedMethod / FromReflectedField / ToReflectedMethod / ToReflectedField): the reflected object carries the member the lab resolved for it
-    h.FromReflectedMethod = (_env, obj) => { if (!obj) jniAbort('FromReflectedMethod', 'jlr_method'); const member = r.object(self.#value(obj)).member; if (!member?.method) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Method or Constructor'); return 0; } return self.#methodId({ ...member.method, static: !!(member.flags & 8) }); };
-    h.FromReflectedField = (_env, obj) => { if (!obj) jniAbort('FromReflectedField', 'jlr_field'); const member = r.object(self.#value(obj)).member; if (!member?.field) { self.lastFieldIdFailure = 'FromReflectedField of an object that is not a java.lang.reflect.Field'; self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Field'); return 0; } return self.#fieldId({ ...member.field, static: !!(member.flags & 8) }); };
-    h.ToReflectedMethod = (_env, _cls, id, isStatic) => { const info = self.methodIds[id]; if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject(info.name === '<init>' ? 'constructor' : 'method', { method: info, flags: 1 | (isStatic ? 8 : 0) })); };
-    h.ToReflectedField = (_env, _cls, id, isStatic) => { const f = self.fieldIds[id]; if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject('field', { field: f, flags: 1 | (isStatic ? 8 : 0) })); };
+    h.FromReflectedMethod = (_env, obj) => { if (!obj) jniAbort('FromReflectedMethod', 'jlr_method'); const member = r.object(self.#value(obj)).member; if (!member?.method) { self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Method or Constructor'); return 0; } return self.#methodHandle(lib, { ...member.method, static: !!(member.flags & 8) }); };
+    h.FromReflectedField = (_env, obj) => { if (!obj) jniAbort('FromReflectedField', 'jlr_field'); const member = r.object(self.#value(obj)).member; if (!member?.field) { self.lastFieldIdFailure = 'FromReflectedField of an object that is not a java.lang.reflect.Field'; self.#throwNew('Ljava/lang/IllegalArgumentException;', 'not a java.lang.reflect.Field'); return 0; } return self.#fieldHandle(lib, { ...member.field, static: !!(member.flags & 8) }); };
+    h.ToReflectedMethod = (_env, _cls, id, isStatic) => { const info = self.#methodInfo(lib, id); if (!info) throw new APKError('Invalid jmethodID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject(info.name === '<init>' ? 'constructor' : 'method', { method: info, flags: 1 | (isStatic ? 8 : 0) })); };
+    h.ToReflectedField = (_env, _cls, id, isStatic) => { const f = self.#fieldInfo(lib, id); if (!f) throw new APKError('Invalid jfieldID', { kind: 'jni-invalid-reference' }); return self.#local(r.reflectionObject('field', { field: f, flags: 1 | (isStatic ? 8 : 0) })); };
 
     // -- fields
     // A null jfieldID is what a failed GetFieldID/FromReflectedField answered: ART aborts on it in every build; the abort names that failed lookup, the cause to look at.
-    const fieldRef = (id, fn) => { if (!id) jniAbort(fn, 'fid', self.lastFieldIdFailure); const f = self.fieldIds[id]; if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
+    const fieldRef = (id, fn) => { if (!id) jniAbort(fn, 'fid', self.lastFieldIdFailure); const f = self.#fieldInfo(lib, id); if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
     for (const [name, code] of callTypes.slice(0, 9)) {
       // A field the VM models with live state (src/hidden-members.js ACCESSORS: Executable.artMethod, Field.accessFlags, ActivityThread.mH ...) reads and writes that state, as Field.get / set do
       h[`Get${name}Field`] = (_env, obj, id) => { if (!obj) jniAbort(`Get${name}Field`, 'obj'); const f = fieldRef(id, `Get${name}Field`); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const accessor = HIDDEN_ACCESSORS.get(f.key); if (accessor) return toJNI(code, accessor.get(r, self.#value(obj))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
@@ -672,7 +705,7 @@ export class JniBridge {
       const object = r.object(v); if (!r.isSubtype(object.type, BUFFER)) return null;
       return r.dispatch({ owner: BUFFER, name: 'isDirect', parameters: [], result: 'Z', signature: '()Z' }, r.argumentWords([], [], { receiver: v }), 'virtual') ? object : null;
     };
-    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); if (!object) return 0; const address = BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n); if (lib.pointerSize === 8) return lib.memory.contains(Number(address)) ? Number(address) : 0; return Number(BigInt.asUintN(32, address)); };   // an ARM64 library sees only buffers over its own memory
+    h.GetDirectBufferAddress = (_env, buf) => { const object = directBuffer(buf); if (!object) return 0; const address = BigInt(object.fields.get('Ljava/nio/Buffer;->address:J') ?? 0n); if (lib.pointerSize === 8) return lib.memory.contains(Number(address)) ? Number(address) : 0; return address > 0n && address < 0x100000000n && Number(address) < lib.memory.buffer.byteLength ? Number(address) : 0; };   // each library sees the buffers over its own process's memory; any other is NULL ("the memory region is undefined"), never a truncated address
     h.GetDirectBufferCapacity = (_env, buf) => { const object = directBuffer(buf); return object ? BigInt(object.fields.get('Ljava/nio/Buffer;->capacity:I') ?? 0) : -1n; };
     h.NewObjectArray = (_env, length, cls, init) => {
       if (length < 0) { self.#throwNew('Ljava/lang/NegativeArraySizeException;', String(length)); return 0; }
@@ -698,10 +731,14 @@ export class JniBridge {
       };
       h[`Get${name}ArrayRegion`] = (_env, a, start, length, out) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
+        if (length === 0) return;   // a zero-length region touches no memory (its buffer may be NULL), as on ART
+        if (!out) nullBuffer(`Get${name}ArrayRegion`, length);
         copyOut(view(), offset(out), array.cells, start, length);
       };
       h[`Set${name}ArrayRegion`] = (_env, a, start, length, src) => {
         const array = arrayOf(a); if (start < 0 || length < 0 || start + length > array.elements.length) return outOfBounds(`length=${array.elements.length}; regionStart=${start}; regionLength=${length}`);
+        if (length === 0) return;
+        if (!src) nullBuffer(`Set${name}ArrayRegion`, length);
         copyIn(view(), offset(src), array.cells, start, length);
       };
     }
@@ -719,13 +756,13 @@ export class JniBridge {
         // ART's RegisterNatives finds the method in the class or, through FindVirtualMethod, in a superclass (reanimated registers NativeProxyCommon.installJSIBindings on NativeProxy); the binding belongs to the declaring class
         const info = self.#findMethod(type, name, signature), owner = info && !info.host ? info.owner : type, def = r.classes.get(owner)?.methods.get(name + signature);
         if (!def || !(def.flags & 0x100)) { self.#throwNew('Ljava/lang/NoSuchMethodError;', name); return JNI_ERR; }
-        if (wide) { if (!index) { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; } self.registered.set(`${owner}->${name}${signature}`, { lib, address: index, symbol: `<RegisterNatives ${name}${signature} 0x${index.toString(16)}>` }); continue; }
+        if (wide) { if (!index) { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; } self.registered.set(`${owner}->${name}${signature}`, { lib, address: index, symbol: `<RegisterNatives ${name}${signature} 0x${index.toString(16)}>` }); lib.jniIds?.nativeBound(owner, name, signature, index); continue; }
         const fn = lib.table.get(index); if (typeof fn !== 'function') { self.#throwNew('Ljava/lang/NoSuchMethodError;', `${name}: null function pointer`); return JNI_ERR; }
         self.registered.set(`${owner}->${name}${signature}`, { lib, fn, symbol: `<RegisterNatives ${name}${signature}>` });
       }
       return JNI_OK;
     };
-    h.UnregisterNatives = (_env, cls) => { const type = self.#classType(cls); for (const key of [...self.registered.keys()]) if (key.startsWith(type + '->')) self.registered.delete(key); return JNI_OK; };
+    h.UnregisterNatives = (_env, cls) => { const type = self.#classType(cls); for (const key of [...self.registered.keys()]) if (key.startsWith(type + '->')) { self.registered.delete(key); const member = key.slice(type.length + 2), paren = member.indexOf('('); lib.jniIds?.nativeBound(type, member.slice(0, paren), member.slice(paren), null); } return JNI_OK; };
     return h;
   }
 }

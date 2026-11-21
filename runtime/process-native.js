@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { lookup } from './libcore-io-native.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { lookup } from './libcore-io-native.js?v=af8ff7411a95';
 
 // The natives under java.lang.ProcessBuilder / Process (libcore ojluni UNIXProcess.java, ProcessEnvironment.java; UNIXProcess_md.c semantics for the child that fails before exec):
 // the virtual device's file system holds no executables, so starting a program fails the way a device does when it cannot run one, with the errno text the child reports:
@@ -19,9 +19,11 @@ export function createProcessNativeBindings() {
     runtime.array(outer).elements = entries.flatMap(([name, value]) => [name, String(value)].map(text => { const array = runtime.newArray('[B', 0); runtime.array(array).elements = Array.from(encoder.encode(text), v => (v << 24) >> 24); return array; }));
     return outer;
   });
-  bindings.set(FORK, (runtime, [, prog, , , , , dir]) => {
-    const fail = errno => runtime.throwJava('Ljava/io/IOException;', `error=${errno}, ${ERRNO_TEXT[errno]}`);
+  bindings.set(FORK, (runtime, [, prog, argBlock, , , , dir]) => {
     const fs = runtime.platform.javaIo.fs(), program = C_STRING(runtime.array(prog).elements);
+    // the trace names what the app tried to run (UNIXProcess passes the arguments after argv[0] as one NUL-separated block) and how the start ended
+    const args = argBlock === null || argBlock === 0 ? '' : new TextDecoder().decode(Uint8Array.from(runtime.array(argBlock).elements, v => v & 255)).split('\0').filter(Boolean).join(' ');
+    const fail = errno => { runtime.record?.(`EXEC ${program}${args ? ' ' + args.slice(0, 200) : ''}: error=${errno}, ${ERRNO_TEXT[errno]}`); return runtime.throwJava('Ljava/io/IOException;', `error=${errno}, ${ERRNO_TEXT[errno]}`); };
     let cwd = '/';
     if (dir !== null && dir !== 0) {
       cwd = C_STRING(runtime.array(dir).elements); const found = lookup(fs, cwd);

@@ -1,7 +1,8 @@
-import { gcRoot } from './heap-gc.js?v=7233e918dcc9';
-import { Invoke } from './interpreter.js?v=7233e918dcc9';
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=7233e918dcc9';
+import { procFdFile } from './libcore-io-native.js?v=af8ff7411a95';
+import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
+import { Invoke } from './interpreter.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=af8ff7411a95';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -522,10 +523,10 @@ export function createSystemServicesHost(platform) {
 
   // ---- Runtime.nativeLoad: the primitive under System.load and SoLoader's SoFileLoader (libcore Runtime.java; returns null on success, else the dlopen error text)
   const nativeLoad = (r, _m, [filename]) => {
-    const path = r.stringCharacters(filename);
+    const link = procFdFile(r, r.stringCharacters(filename)), path = link?.path ?? r.stringCharacters(filename);   // a /proc/self/fd/<n> link: the file that descriptor has open (an unlinked one too)
     try {
-      if (r.jni?.loadPath(path, 'Runtime.nativeLoad')) return null;
-      if (r.arm64?.load('load', path)) return null;   // an arm64-v8a library run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
+      if (!link?.deleted && r.jni?.loadPath(path, 'Runtime.nativeLoad')) return null;
+      if (r.arm64?.load('load', path, link?.deleted ? link.bytes() : null)) return null;   // an arm64-v8a library run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (r.stubNativeLibrary(path)) return null;
       return `dlopen failed: library "${path}" is not a native library of this device (no wasm32 module is registered for it)`;
     } catch (error) {

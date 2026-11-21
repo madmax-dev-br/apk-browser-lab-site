@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { throwNew } from './java-throw.js?v=7233e918dcc9';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=7233e918dcc9';
-import { networkOf, isIpLiteral } from './network-native.js?v=7233e918dcc9';
-import { Blocked } from './scheduler.js?v=7233e918dcc9';
-import { installUdp } from './udp-native.js?v=7233e918dcc9';
-import { createLoopback } from './loopback-socket.js?v=7233e918dcc9';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=7233e918dcc9';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { throwNew } from './java-throw.js?v=af8ff7411a95';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=af8ff7411a95';
+import { networkOf, isIpLiteral } from './network-native.js?v=af8ff7411a95';
+import { Blocked } from './scheduler.js?v=af8ff7411a95';
+import { installUdp } from './udp-native.js?v=af8ff7411a95';
+import { createLoopback } from './loopback-socket.js?v=af8ff7411a95';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=af8ff7411a95';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=af8ff7411a95';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -27,9 +27,37 @@ let inodeCounter = 0x4000;
 export function state(runtime) {
   if (runtime.libcoreIo) return runtime.libcoreIo;
   const std = (name, acc) => ({ kind: 'std', name, acc, offset: 0, append: false, ownerTag: 0n, refs: 1 });
-  return runtime.libcoreIo = { table: new Map([[0, { desc: std('stdin', C.O_RDONLY), cloexec: false }], [1, { desc: std('stdout', C.O_WRONLY), cloexec: false }], [2, { desc: std('stderr', C.O_WRONLY), cloexec: false }]]), umask: 0o077, lines: new Map() };
+  const io = runtime.libcoreIo = { table: new Map([[0, { desc: std('stdin', C.O_RDONLY), cloexec: false }], [1, { desc: std('stdout', C.O_WRONLY), cloexec: false }], [2, { desc: std('stderr', C.O_WRONLY), cloexec: false }]]), umask: 0o077, lines: new Map() };
+  // the app's /proc (src/procfs.js) lists Java's descriptors in fd/ and resolves their links
+  runtime.platform?.javaIo?.fs?.()?.procfs?.attachJava({ file: n => javaFdFile(runtime, n), list: () => [...io.table.keys()] }, line => runtime.record?.(line));
+  return io;
 }
 const files = runtime => runtime.platform.javaIo.fs();
+/** The file Java's descriptor `n` has open (the standard streams of an app process are /dev/null), or null (not open, or not a file). */
+export function javaFdPath(runtime, n) { return javaFdFile(runtime, n)?.path ?? null; }
+/**
+ * The file Java's descriptor `n` has open: { path, deleted, bytes() }. A file unlinked after it was opened stays readable through the descriptor (its inode lives on),
+ * `deleted` true, as Linux shows it ("<path> (deleted)" in /proc/self/fd).
+ */
+export function javaFdFile(runtime, n) {
+  const entry = state(runtime).table.get(n); if (!entry) return null;
+  const desc = entry.desc; if (desc.kind === 'std') return { path: '/dev/null', deleted: false, bytes: () => new Uint8Array(0) };
+  if (!desc.path) return null;
+  const node = desc.node ?? null, current = files(runtime).node?.(desc.path) ?? null;
+  return { path: desc.path, deleted: !!node && current !== node, node, bytes: () => node?.type === 'file' ? node.buf.slice(0, node.size) : files(runtime).bytes(desc.path) };
+}
+/**
+ * The target of a /proc/self/fd/<n> link (also /proc/<pid>/fd/<n>, /proc/self/task/<tid>/fd/<n>, /proc/thread-self/fd/<n>) of the app's process: the file the descriptor has open,
+ * from Java's descriptor table or the ARM64 native process's (src/procfs.js); null when the path is not such a link or the descriptor names no file. Opening the link
+ * (System.load, dlopen, open) opens that file, as on Linux.
+ */
+export function procFdTarget(runtime, path) { return procFdFile(runtime, path)?.path ?? null; }
+/** The file behind a /proc/self/fd/<n> link: { path, deleted, node?, bytes() } (the app's /proc, src/procfs.js), or null. */
+export function procFdFile(runtime, path) {
+  state(runtime);   // Java's descriptors are attached to the /proc model
+  const entry = files(runtime).procfs?.lookup(files(runtime).canonical(String(path)));
+  return entry?.link && /\/fd\/\d+$/.test(String(path)) ? entry.link : null;
+}
 
 /** Constructs an original framework object through one of its constructors (wide arguments are packed into register pairs the way bytecode passes them). */
 function construct(runtime, owner, parameters, args) {
@@ -51,10 +79,10 @@ const requireString = (runtime, value) => { if (value === null) runtime.throwJav
 // ---- path / node helpers ----------------------------------------------------------------------------------------------------------------------
 /** Resolves a path against the VFS: the node, or the errno name a lookup would fail with (ENOENT, or ENOTDIR when a parent component is a regular file). */
 export function lookup(fs, path) {
-  const canonical = fs.canonical(path.startsWith('/') ? path : '/' + path), node = fs.nodes.get(canonical);
+  const canonical = fs.canonical(path.startsWith('/') ? path : '/' + path), node = fs.node(canonical);   // fs.node: the app's /proc too (src/procfs.js)
   if (node) return { node, path: canonical };
   for (let cursor = fs.parentOf(canonical); ; cursor = fs.parentOf(cursor)) {
-    const ancestor = fs.nodes.get(cursor);
+    const ancestor = fs.node(cursor);
     if (ancestor) return { error: ancestor.type === 'dir' ? 'ENOENT' : 'ENOTDIR', path: canonical };
     if (cursor === '/') return { error: 'ENOENT', path: canonical };
   }
@@ -180,7 +208,9 @@ function open(runtime, path, flags, mode) {
     if (acc !== C.O_RDONLY) err(runtime, 'open', 'EISDIR');
     return allocateFd(runtime, { kind: 'dir', node, path: found.path, acc, offset: 0, append: false, ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
   }
-  if ((acc !== C.O_RDONLY && (fs.isReadOnly(found.path) || !(node.mode & 0o200))) || (acc !== C.O_WRONLY && !(node.mode & 0o400))) err(runtime, 'open', 'EACCES');
+  if (node.denyOpen) err(runtime, 'open', node.denyOpen);   // exists, but the app's SELinux domain may not open it (src/procfs.js)
+  if ((acc !== C.O_RDONLY && (fs.isReadOnly(found.path) || !(node.mode & 0o200) || node.generate)) || (acc !== C.O_WRONLY && !(node.mode & 0o400))) err(runtime, 'open', 'EACCES');
+  fs.refresh?.(node);   // a procfs file: its content as of this open
   if ((flags & C.O_TRUNC) && acc !== C.O_RDONLY) { node.size = 0; node.mtime = fs.now(); if (!created) fs.notify(0x2, node); }   // a file the open just created is not truncated (O_TRUNC is dropped for FMODE_CREATED)
   const number = allocateFd(runtime, { kind: 'file', node, path: found.path, acc, offset: 0, append: !!(flags & C.O_APPEND), ownerTag: 0n, refs: 0 }, 0, !!(flags & C.O_CLOEXEC));
   if (number < 0) err(runtime, 'open', 'EMFILE');
@@ -297,17 +327,8 @@ export function createLibcoreIoNativeBindings() {
     const desc = entryOf(runtime, 'getsockname', fdRef).desc; if (desc.kind !== 'socket') err(runtime, 'getsockname', 'ENOTSOCK');
     return udp.boundAddress(runtime, desc);
   });
-  // ---- network interfaces (libcore_io_Linux.cpp getifaddrs / if_nametoindex / ioctlFlags / ioctlMTU, under java.net.NetworkInterface). The virtual device has the loopback
-  // interface and one Wi-Fi interface, wlan0, which is up with the 10.0.2.15/24 address WifiManager and ConnectivityManager report while connectivity is online and
-  // down without an address while it is offline. Per interface the kernel lists an AF_PACKET entry (the hardware address) and one entry per IP address.
-  const IFF_UP = 0x1, IFF_BROADCAST = 0x2, IFF_LOOPBACK = 0x8, IFF_RUNNING = 0x40, IFF_MULTICAST = 0x1000;
-  const interfaces = runtime => {
-    const online = runtime.platform.device?.connectivity !== 'offline';
-    return [
-      { name: 'lo', index: 1, flags: IFF_UP | IFF_LOOPBACK | IFF_RUNNING, mtu: 65536, mac: [0, 0, 0, 0, 0, 0], addresses: [{ addr: [127, 0, 0, 1], mask: [255, 0, 0, 0], broadcast: null }, { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], broadcast: null }] },
-      { name: 'wlan0', index: 2, flags: online ? IFF_UP | IFF_BROADCAST | IFF_RUNNING | IFF_MULTICAST : IFF_BROADCAST | IFF_MULTICAST, mtu: 1500, mac: [2, 0, 0, 0, 0, 0], addresses: online ? [{ addr: [10, 0, 2, 15], mask: [255, 255, 255, 0], broadcast: [10, 0, 2, 255] }] : [] },
-    ];
-  };
+  // ---- network interfaces (libcore_io_Linux.cpp getifaddrs / if_nametoindex / ioctlFlags / ioctlMTU, under java.net.NetworkInterface): the device's interfaces, deviceInterfaces below
+  const interfaces = deviceInterfaces;
   const address = (runtime, bytes) => bytes === null ? null : runtime.dispatch({ owner: INET, name: 'getByAddress', parameters: ['[B'], result: INET, signature: `([B)${INET}` }, [byteArray(runtime, bytes)], 'static');
   const IFADDRS = 'Landroid/system/StructIfaddrs;';
   L(`getifaddrs()[${IFADDRS}`, runtime => {
@@ -513,7 +534,8 @@ export function createLibcoreIoNativeBindings() {
   L('chmod(Ljava/lang/String;I)V', (runtime, [, path, mode]) => { const { fs, node, path: resolved } = mutate(runtime, 'chmod', path); if (fs.isReadOnly(resolved)) err(runtime, 'chmod', 'EPERM'); node.mode = mode & 0o7777; fs.notify(0x4, node); });   // IN_ATTRIB
   L('fchmod(Ljava/io/FileDescriptor;I)V', (runtime, [, fdRef, mode]) => { const desc = entryOf(runtime, 'fchmod', fdRef).desc; if (desc.kind === 'std') err(runtime, 'fchmod', 'EINVAL'); desc.node.mode = mode & 0o7777; });
   L('realpath(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => mutate(runtime, 'realpath', path).path);
-  L('readlink(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => { mutate(runtime, 'readlink', path); err(runtime, 'readlink', 'EINVAL'); });   // exists, but no path is a symbolic link here
+  L('readlink(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, path]) => { const text = path === null ? null : runtime.stringCharacters(path), link = text === null ? null : (state(runtime), files(runtime).procfs?.readlink(files(runtime).canonical(text))); if (link) return link;   // procfs links (src/procfs.js): fd/<n>, exe
+    mutate(runtime, 'readlink', path); err(runtime, 'readlink', 'EINVAL'); });   // exists, but no path is a symbolic link here
   L('umaskImpl(I)I', (runtime, [, mask]) => { const st = state(runtime), old = st.umask; st.umask = mask & 0o777; return old; });
   L('strerror(I)Ljava/lang/String;', (runtime, [, errno]) => STRERROR[errno] ?? `Unknown error ${errno}`);
 
@@ -521,7 +543,7 @@ export function createLibcoreIoNativeBindings() {
   const ids = name => L(`${name}()I`, runtime => runtime.platform.virtualProcess.uid);
   ['getuid', 'geteuid', 'getgid', 'getegid'].forEach(ids);
   for (const name of ['getpid', 'gettid']) L(`${name}()I`, runtime => runtime.platform.virtualProcess.pid);
-  L('getppid()I', () => 1);                                                   // zygote's pid on a booted device
+  L('getppid()I', runtime => runtime.platform.virtualProcess.ppid);           // zygote's pid: every app process is forked from it (src/virtual-pids.js)
   L('getenv(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, name]) => runtime.platform.environment[requireString(runtime, name)] ?? null);
   L('environ()[Ljava/lang/String;', runtime => { const entries = Object.entries(runtime.platform.environment).map(([k, v]) => `${k}=${v}`), array = runtime.newArray('[Ljava/lang/String;', entries.length); runtime.array(array).elements = entries; return array; });
   L('sysconf(I)J', (runtime, [, name]) => {
@@ -678,13 +700,13 @@ export function createLibcoreIoNativeBindings() {
   add(FILE_CHANNEL, 'map0(IJJ)J', (runtime, [self, prot, position, length]) => {
     const fdRef = runtime.object(self).fields.get(`${FILE_CHANNEL}->fd:${FD}`), desc = descOf(runtime, fdRef, false);
     if (desc.kind !== 'file') ioError(runtime, 'ENODEV');
-    const address = allocateNativeBlock(runtime, Number(length)), at = Number(position);
+    const address = allocateNativeBlock(runtime, Number(length), { name: desc.path ?? '' }), at = Number(position);   // the process's memory, listed under the file's path (/proc/self/maps)
     pull(runtime, desc, at, address, Number(length)); maps(runtime).set(address, { address, node: desc.node, position: at, length: Number(length), prot });
     return address;
   });
   add(FILE_CHANNEL, 'unmap0(JJ)I', (runtime, [address]) => {
     const mapping = maps(runtime).get(address); if (!mapping) return -1;
-    writeBack(runtime, mapping); maps(runtime).delete(address); freeNativeBlock(runtime, address); return 0;
+    writeBack(runtime, mapping); maps(runtime).delete(address); freeNativeBlock(runtime, address, { length: mapping.length }); return 0;
   });
   add(FILE_CHANNEL, 'transferTo0(Ljava/io/FileDescriptor;JJLjava/io/FileDescriptor;)J', () => BigInt(IOS_UNSUPPORTED_CASE));   // sendfile(2) unavailable: FileChannelImpl falls back to its read/write copy loop
   add(MAPPED, 'isLoaded0(JJI)Z', () => 1);                                     // arena memory is always resident
@@ -829,4 +851,16 @@ export function createLibcoreIoNativeBindings() {
     source.offset += length; target.offset += length;
   });
   return bindings;
+}
+
+// The network interfaces of the virtual device (libcore's getifaddrs / if_nametoindex / ioctl under java.net.NetworkInterface, and the ARM64 process's netlink and ioctl,
+// src/arm64/netlink.js). The virtual device has the loopback interface and one Wi-Fi interface, wlan0, which is up with the 10.0.2.15/24 address WifiManager and ConnectivityManager report while connectivity is online and
+// down without an address while it is offline. Per interface the kernel lists an AF_PACKET entry (the hardware address) and one entry per IP address.
+const IFF_UP = 0x1, IFF_BROADCAST = 0x2, IFF_LOOPBACK = 0x8, IFF_RUNNING = 0x40, IFF_MULTICAST = 0x1000;
+export function deviceInterfaces(runtime) {
+  const online = runtime.platform.device?.connectivity !== 'offline';
+  return [
+    { name: 'lo', index: 1, flags: IFF_UP | IFF_LOOPBACK | IFF_RUNNING, mtu: 65536, mac: [0, 0, 0, 0, 0, 0], addresses: [{ addr: [127, 0, 0, 1], mask: [255, 0, 0, 0], broadcast: null }, { addr: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1], mask: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255], broadcast: null }] },
+    { name: 'wlan0', index: 2, flags: online ? IFF_UP | IFF_BROADCAST | IFF_RUNNING | IFF_MULTICAST : IFF_BROADCAST | IFF_MULTICAST, mtu: 1500, mac: [2, 0, 0, 0, 0, 0], addresses: online ? [{ addr: [10, 0, 2, 15], mask: [255, 255, 255, 0], broadcast: [10, 0, 2, 255] }] : [] },
+  ];
 }

@@ -13,9 +13,9 @@
 // `get(key)` answers the type's default (0, 0n, null) before a store, and iteration, `size` and `clear()` cover the whole layout. Keys outside the layout live in an extra Map on the
 // facade, as `fieldExtra` does today. Host state hung on the record (any own property) lives on the facade object itself, the JavaScript companion of the memory record: the facade is
 // cached per id, so the same properties are seen across reads, and it is dropped when the object is freed (RecordSpace.release).
-import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=7233e918dcc9';
-import { HandleTable, IdTable } from './handles.js?v=7233e918dcc9';
-import { stringText, writeStringUnits } from './strings.js?v=7233e918dcc9';
+import { cellsClassOf, NO_FIELDS } from '../../runtime/java-arrays.js?v=af8ff7411a95';
+import { HandleTable, IdTable } from './handles.js?v=af8ff7411a95';
+import { stringText, writeStringUnits } from './strings.js?v=af8ff7411a95';
 
 // Field kinds: the descriptor letters of a field type (Z B S C I J F D), L for a reference.
 const KIND = { Z: 0, B: 1, S: 2, C: 3, I: 4, F: 5, J: 6, D: 7, L: 8 };
@@ -70,6 +70,9 @@ export class StringCache {
     const hit = this.cache.get(address);
     if (hit !== undefined) { this.hits++; return hit; }
     this.misses++; const text = this.decode(this.space.fresh(), address); this.cache.set(address, text);
+    // the text -> address side learns it too (when no record holds that text yet): a host that keeps the text and hands it back (a reference a field updater stored, a collection
+    // element) gives back the same object, so that the core's `==` on it holds as on ART (LinkedTransferQueue.awaitMatch compares its node's item with the element it put there)
+    if (!this.byText.has(text)) this.byText.set(text, address);
     if (this.exportRecord !== null) this.exportRecord(address);
     return text;
   }

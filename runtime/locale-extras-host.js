@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=7233e918dcc9';
-import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=7233e918dcc9';
+import { createHostRegistry } from './host-contract.js?v=af8ff7411a95';
+import { ISO_COUNTRIES, ISO_LANGUAGES } from './iso-codes-data.js?v=af8ff7411a95';
 
 // java.util.Locale beyond the first host pass (libcore Locale.java, android-13.0.0_r1): the ISO code tables, 3-letter codes, extensions (BCP 47 -u- / -x- and any singleton),
 // stripExtensions, setDefault, and Locale.Builder with IllformedLocaleException; plus Calendar week dates and Calendar.Builder. Locale objects are the platform's (one per canonical language tag, platform.locale).
@@ -57,6 +57,13 @@ export function createLocaleExtrasHost(platform) {
   const stringArray = (r, values) => { const array = r.newArray(`[${STRING}`, values.length); r.array(array).elements = values; return array; };
   def(LOCALE, 'getISOCountries', `()[${STRING}`, r => stringArray(r, Object.keys(ISO_COUNTRIES)), { static: true });
   def(LOCALE, 'getISOLanguages', `()[${STRING}`, r => stringArray(r, Object.keys(ISO_LANGUAGES)), { static: true });
+  // Locale.getAvailableLocales (libcore: ICU.getAvailableLocales, the locales ICU has data for, sorted by locale id): the languages of the ISO table that the host's ICU (Intl)
+  // has locale data for (a lookup match of the bare language), in ICU's order. Intl enumerates no locales, so region and script variants (af_NA, sr_Latn, ...) are not listed.
+  let available = null;
+  def(LOCALE, 'getAvailableLocales', `()[${LOCALE}`, r => {
+    available ??= [...new Set(Object.keys(ISO_LANGUAGES).flatMap(language => Intl.DateTimeFormat.supportedLocalesOf([language], { localeMatcher: 'lookup' })).map(tag => Intl.getCanonicalLocales(tag)[0]))].sort();   // iw/in/ji are he/id/yi
+    const array = r.newArray(`[${LOCALE}`, available.length); r.array(array).elements = available.map(tag => platform.locale(r, tag)); return array;
+  }, { static: true });
   const missing = (r, what, value) => r.throwJava('Ljava/util/MissingResourceException;', `Couldn't find 3-letter ${what} code for ${value}`);
   def(LOCALE, 'getISO3Country', `()${STRING}`, (r, _m, [self]) => { const country = r.object(self).localeData?.country ?? ''; if (country === '') return ''; const three = ISO_COUNTRIES[country.toUpperCase()]; if (!three) missing(r, 'country', country); return three; });
   def(LOCALE, 'getISO3Language', `()${STRING}`, (r, _m, [self]) => { const language = r.object(self).localeData?.language ?? ''; if (language === '') return ''; const three = ISO_LANGUAGES[language.toLowerCase()]; if (three === undefined || three === '') { if (language.length === 3) return language; missing(r, 'language', language); } return three; });

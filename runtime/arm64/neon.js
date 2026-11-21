@@ -138,6 +138,8 @@ function threeDifferent(cpu, word) {
   switch (opcode) {
     case 0b0000: out = a.map((x, i) => (ext(x) + ext(b[i])) & mask); break;                 // UADDL / SADDL
     case 0b0010: out = a.map((x, i) => (ext(x) - ext(b[i])) & mask); break;                 // USUBL / SSUBL
+    case 0b0001: { const wa = lanes(cpu, rn, wide, count); out = b.map((y, i) => (wa[i] + ext(y)) & mask); break; }   // UADDW / SADDW: wide Vn + the extended (low or high) half of Vm
+    case 0b0011: { const wa = lanes(cpu, rn, wide, count); out = b.map((y, i) => (wa[i] - ext(y)) & mask); break; }   // USUBW / SSUBW
     case 0b1100: out = a.map((x, i) => ux(u ? x * b[i] : sx(x, esize) * sx(b[i], esize), wide)); break;   // UMULL / SMULL
     case 0b1000: out = a.map((x, i) => (acc[i] + ux(u ? x * b[i] : sx(x, esize) * sx(b[i], esize), wide)) & mask); break;   // UMLAL / SMLAL
     case 0b1010: out = a.map((x, i) => (acc[i] - ux(u ? x * b[i] : sx(x, esize) * sx(b[i], esize), wide)) & mask); break;   // UMLSL / SMLSL
@@ -155,20 +157,41 @@ function twoRegMisc(cpu, word, scalar) {
     const esize = 8 << size, half = lanes(cpu, rn, esize, 128 / esize).slice(bit(word, 30) ? 64 / esize : 0, (bit(word, 30) ? 2 : 1) * 64 / esize);
     setLanes(cpu, rd, esize * 2, half.map(v => (v << BigInt(esize)) & ones(esize * 2))); return true;
   }
+  // FCVTN / FCVTN2 (narrow: double -> single, single -> half), FCVTXN / FCVTXN2 (double -> single, round to odd), FCVTL / FCVTL2 (widen) -- vector forms
+  if (!scalar && (size >> 1) === 0 && ((opcode === 0b10110) || (!u && opcode === 0b10111))) {
+    const sz = size & 1, high = bit(word, 30), wide = sz ? 64 : 32, narrow = sz ? 32 : 16, count = 64 / narrow;
+    if (opcode === 0b10110) {
+      if (u && !sz) return false;   // FCVTXN needs sz = 1
+      const values = (sz ? flanes(cpu, rn, 64, 2) : flanes(cpu, rn, 32, 4)).map(x => sz ? (u ? toSingleRoundOdd(x) : f32Bits(x)) : f16Bits(x));
+      setLanes(cpu, rd, narrow, high ? [...lanes(cpu, rd, narrow, count), ...values] : values); return true;   // FCVTN2 keeps the lower half, FCVTN clears the upper
+    }
+    const source = lanes(cpu, rn, narrow, 2 * count).slice(high ? count : 0, high ? 2 * count : count);
+    setFlanes(cpu, rd, wide, source.map(bits => sz ? f32FromBits(bits) : f16FromBits(bits))); return true;
+  }
   // floating point two-register forms
-  if (opcode >= 0b01100 && (size & 2 || [0b11101, 0b11011, 0b11010, 0b11100, 0b01111, 0b11111].includes(opcode) || [0b01100, 0b01101, 0b01110].includes(opcode))) {
+  if (opcode >= 0b01100 && (size & 2 || [0b11000, 0b11001, 0b11101, 0b11011, 0b11010, 0b11100, 0b01111, 0b11111].includes(opcode) || [0b01100, 0b01101, 0b01110].includes(opcode))) {
     const esize = size & 1 ? 64 : 32, count = scalar ? 1 : (bit(word, 30) ? 128 : 64) / esize, key = `${u}${size >> 1}${opcode}`;
     const fr = esize === 32 ? Math.fround : x => x;
     if (key === '0029' || key === '1029') { const a = lanes(cpu, rn, esize, count); setFlanes(cpu, rd, esize, a.map(v => fr(u ? Number(v) : Number(sx(v, esize))))); return true; }   // SCVTF / UCVTF (vector)
     const a = flanes(cpu, rn, esize, count);
-    const toInt = (x, signed) => { const t = Math.trunc(x); if (isNaN(t)) return 0n; const min = signed ? -(2 ** (esize - 1)) : 0, max = signed ? 2 ** (esize - 1) - 1 : 2 ** esize - 1; return ux(BigInt(t <= min ? min : t >= max ? max : t), esize); };
+    const toInt = (x, signed, round = Math.trunc) => { const t = round(x); if (isNaN(t)) return 0n; const min = signed ? -(2 ** (esize - 1)) : 0, max = signed ? 2 ** (esize - 1) - 1 : 2 ** esize - 1; return ux(BigInt(t <= min ? min : t >= max ? max : t), esize); };
     switch (key) {
       case '0127': setLanes(cpu, rd, esize, a.map(x => toInt(x, true))); return true;   // FCVTZS
+      // FRINT<N|M|P|Z|A|X|I> (round to an integral value) and FCVT<N|M|A|P><S|U> (to an integer with that rounding); X and I use FPCR's mode, round to nearest even by default
+      case '0024': case '1025': case '1125': setFlanes(cpu, rd, esize, a.map(x => fr(roundEven(x)))); return true;   // FRINTN / FRINTX / FRINTI
+      case '0025': setFlanes(cpu, rd, esize, a.map(x => fr(Math.floor(x)))); return true;   // FRINTM
+      case '0124': setFlanes(cpu, rd, esize, a.map(x => fr(Math.ceil(x)))); return true;    // FRINTP
+      case '0125': setFlanes(cpu, rd, esize, a.map(x => fr(Math.trunc(x)))); return true;   // FRINTZ
+      case '1024': setFlanes(cpu, rd, esize, a.map(x => fr(roundAway(x)))); return true;    // FRINTA
+      case '0026': case '1026': setLanes(cpu, rd, esize, a.map(x => toInt(x, !u, roundEven))); return true;   // FCVTNS / FCVTNU
+      case '0027': case '1027': setLanes(cpu, rd, esize, a.map(x => toInt(x, !u, Math.floor))); return true;  // FCVTMS / FCVTMU
+      case '0028': case '1028': setLanes(cpu, rd, esize, a.map(x => toInt(x, !u, roundAway))); return true;   // FCVTAS / FCVTAU
+      case '0126': case '1126': setLanes(cpu, rd, esize, a.map(x => toInt(x, !u, Math.ceil))); return true;   // FCVTPS / FCVTPU
       case '1127': setLanes(cpu, rd, esize, a.map(x => toInt(x, false))); return true;  // FCVTZU
       case '0115': setFlanes(cpu, rd, esize, a.map(Math.abs)); return true;             // FABS
       case '1115': setFlanes(cpu, rd, esize, a.map(x => -x)); return true;              // FNEG
       case '1131': setFlanes(cpu, rd, esize, a.map(x => fr(Math.sqrt(x)))); return true; // FSQRT
-      case '0126': setLanes(cpu, rd, esize, a.map(x => x === 0 ? ones(esize) : 0n)); return true;   // FCMEQ #0
+      case '0113': setLanes(cpu, rd, esize, a.map(x => x === 0 ? ones(esize) : 0n)); return true;   // FCMEQ #0 (opcode 01101; the key '0126' is FCVTPS)
       case '0112': setLanes(cpu, rd, esize, a.map(x => x > 0 ? ones(esize) : 0n)); return true;     // FCMGT #0
       case '1112': setLanes(cpu, rd, esize, a.map(x => x >= 0 ? ones(esize) : 0n)); return true;    // FCMGE #0
       case '1113': setLanes(cpu, rd, esize, a.map(x => x <= 0 ? ones(esize) : 0n)); return true;    // FCMLE #0
@@ -198,6 +221,7 @@ function twoRegMisc(cpu, word, scalar) {
       void u; setLanes(cpu, rd, esize, [...base, ...narrow]); return true;
     }
     case '02': case '12': { const wide = esize * 2, pairs = Array.from({ length: count / 2 }, (_, i) => u ? a[2 * i] + a[2 * i + 1] : ux(sx(a[2 * i], esize) + sx(a[2 * i + 1], esize), wide)); setLanes(cpu, rd, wide, pairs); return true; }   // SADDLP / UADDLP
+    case '06': case '16': { const wide = esize * 2, acc = lanes(cpu, rd, wide, count / 2), pairs = Array.from({ length: count / 2 }, (_, i) => ux(acc[i] + (u ? a[2 * i] + a[2 * i + 1] : sx(a[2 * i], esize) + sx(a[2 * i + 1], esize)), wide)); setLanes(cpu, rd, wide, pairs); return true; }   // SADALP / UADALP: the pairwise sums added to the destination's wide lanes
     default: return false;
   }
   setLanes(cpu, rd, esize, out, total); return true;
@@ -341,3 +365,43 @@ function structures(cpu, word, at) {
   if (post) cpu.wsp(rn, BigInt(base + (rm === 31 ? bytes : Number(cpu.r(rm)))));
   void at; return true;
 }
+
+// IEEE-754 conversions for FCVTN / FCVTL (round to nearest even, as the default FPCR rounding mode)
+const conv = new DataView(new ArrayBuffer(8));
+function f32Bits(x) { conv.setFloat32(0, x, true); return BigInt(conv.getUint32(0, true)); }
+function f32FromBits(bits) { conv.setUint32(0, Number(bits), true); return conv.getFloat32(0, true); }
+/** FCVTXN: double -> single rounded to odd (the result's least significant bit is set when the conversion was inexact), so a later rounding to half is correct. */
+function toSingleRoundOdd(x) {
+  if (!Number.isFinite(x)) return f32Bits(x);
+  conv.setFloat32(0, x, true); let bits = conv.getUint32(0, true); const back = conv.getFloat32(0, true);
+  if (back !== x) {   // inexact: take the truncation toward zero, then force the low bit
+    if (Math.abs(back) > Math.abs(x)) bits = (bits - 1) >>> 0;
+    bits = (bits | 1) >>> 0;
+  }
+  return BigInt(bits);
+}
+function f16Bits(x) {
+  conv.setFloat32(0, x, true); const f = conv.getUint32(0, true), sign = (f >>> 16) & 0x8000, exp = (f >>> 23) & 0xff, mant = f & 0x7fffff;
+  if (exp === 0xff) return BigInt(sign | 0x7c00 | (mant ? 0x200 | (mant >>> 13) : 0));   // infinity, or a quiet NaN keeping the top payload bits
+  let e = exp - 127 + 15;
+  if (e >= 0x1f) return BigInt(sign | 0x7c00);   // overflow: infinity
+  if (e <= 0) {   // subnormal half (or zero)
+    if (e < -10) return BigInt(sign);
+    const m = mant | 0x800000, shift = 14 - e, half = m >>> shift, rest = m & ((1 << shift) - 1), mid = 1 << (shift - 1);
+    return BigInt(sign | (half + (rest > mid || (rest === mid && (half & 1)) ? 1 : 0)));
+  }
+  let half = (e << 10) | (mant >>> 13); const rest = mant & 0x1fff;
+  if (rest > 0x1000 || (rest === 0x1000 && (half & 1))) half++;   // may carry into the exponent (to infinity), as rounding does
+  return BigInt(sign | half);
+}
+function f16FromBits(bits) {
+  const h = Number(bits), sign = h & 0x8000 ? -1 : 1, exp = (h >>> 10) & 0x1f, mant = h & 0x3ff;
+  if (exp === 0) return sign * mant * 2 ** -24;
+  if (exp === 0x1f) return mant ? NaN : sign * Infinity;
+  return sign * (1 + mant / 1024) * 2 ** (exp - 15);
+}
+
+/** Round to nearest, ties to even (the default rounding of FPCR); keeps -0 and infinities. */
+function roundEven(x) { if (!Number.isFinite(x)) return x; const r = Math.round(x); return (Math.abs(x % 1) === 0.5 && r % 2 !== 0 ? r - 1 : r) || (x < 0 ? -0 : 0); }
+/** Round to nearest, ties away from zero (FRINTA, FCVTA*). */
+function roundAway(x) { if (!Number.isFinite(x)) return x; return (Math.sign(x) * Math.round(Math.abs(x))) || (x < 0 ? -0 : 0); }

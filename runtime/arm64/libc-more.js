@@ -1,11 +1,12 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=7233e918dcc9';
-import { BLOCKED } from './cpu.js?v=7233e918dcc9';
-import { formatC, variadic } from './libc.js?v=7233e918dcc9';
-import { lookup } from '../libcore-io-native.js?v=7233e918dcc9';
-import { utf8 } from './text.js?v=7233e918dcc9';
+import { APKError } from '../apk-error.js?v=af8ff7411a95';
+import { BLOCKED } from './cpu.js?v=af8ff7411a95';
+import { formatC, variadic } from './libc.js?v=af8ff7411a95';
+import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=af8ff7411a95';
+import { restrictedNetlink } from './netlink.js?v=af8ff7411a95';
+import { utf8 } from './text.js?v=af8ff7411a95';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -55,8 +56,28 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.inet_aton = (p, c) => { const parts = str(p, x(c, 0)).split('.').map(Number); if (parts.length !== 4 || parts.some(v => !(v >= 0 && v <= 255))) return 0; parts.forEach((b, i) => { p.memory.setByte(n(c, 1) + i, b); }); return 1; };
   lib.inet_ntoa = (p, c) => p.allocString([0, 8, 16, 24].map(s => (n(c, 0) >>> s) & 255).join('.'));
   lib.getnameinfo = (p, c) => { const ip = [...p.memory.bytes(n(c, 0) + 4, 4)].join('.'), port = p.memory.uint16(n(c, 0) + 2, false); if (n(c, 2)) { const b = encoder.encode(ip); p.memory.copyIn(n(c, 2), b); p.memory.setByte(n(c, 2) + b.length, 0); } if (n(c, 4)) { const b = encoder.encode(String(port)); p.memory.copyIn(n(c, 4), b); p.memory.setByte(n(c, 4) + b.length, 0); } return 0; };
-  lib.getifaddrs = (p, c) => { p.memory.writePtr(n(c, 0), 0); return 0; };   // the app's process sees no interface addresses it could use directly (the network is the relay)
-  lib.freeifaddrs = () => {};
+  // getifaddrs as bionic builds it from the kernel's netlink answers (src/arm64/netlink.js) over the device's interfaces: for an app targeting API 30+ only the address
+  // entries (RTM_GETLINK is denied: no AF_PACKET entries, no hardware addresses), the flags as SIOCGIFFLAGS gives them; below API 30 an AF_PACKET entry per interface first.
+  // struct ifaddrs (arm64): ifa_next @0, ifa_name @8, ifa_flags @16, ifa_addr @24, ifa_netmask @32, ifa_broadaddr @40, ifa_data @48; one malloc block per entry.
+  lib.getifaddrs = (p, c) => {
+    const entries = [], restricted = restrictedNetlink(runtime);
+    const inet = bytes => { if (!bytes) return null; const v4 = bytes.length === 4, b = new Uint8Array(v4 ? 16 : 28); b[0] = v4 ? 2 : 10; b.set(bytes, v4 ? 4 : 8); return b; };
+    const packet = (face, mac) => { const b = new Uint8Array(20); b[0] = 17; new DataView(b.buffer).setInt32(4, face.index, true); new DataView(b.buffer).setUint16(8, face.name === 'lo' ? 772 : 1, true); b[11] = 6; b.set(mac, 12); return b; };   // struct sockaddr_ll
+    for (const face of deviceInterfaces(runtime)) {
+      if (!restricted) entries.push({ face, addr: packet(face, face.mac), mask: null, broadcast: face.name === 'lo' ? null : packet(face, [255, 255, 255, 255, 255, 255]) });
+      for (const a of face.addresses) entries.push({ face, addr: inet(a.addr), mask: inet(a.mask), broadcast: inet(a.broadcast) });
+    }
+    let head = 0;
+    for (const entry of entries.reverse()) {
+      const name = encoder.encode(entry.face.name), parts = [entry.addr, entry.mask, entry.broadcast], size = 56 + 32 + parts.reduce((k, b) => k + (b ? 32 : 0), 0), at = p.malloc(size);
+      p.memory.fill(at, 0, size); p.memory.writePtr(at, head); p.memory.writePtr(at + 8, at + 56); p.memory.copyIn(at + 56, name); p.memory.writeU32(at + 16, entry.face.flags);
+      let next = at + 88; parts.forEach((b, i) => { if (!b) return; p.memory.copyIn(next, b); p.memory.writePtr(at + 24 + 8 * i, next); next += 32; });
+      head = at;
+    }
+    p.memory.writePtr(n(c, 0), head); return 0;
+  };
+  lib.freeifaddrs = (p, c) => { for (let at = n(c, 0); at; ) { const next = p.memory.readPtr(at); p.free(at); at = next; } };
+  lib.android_get_application_target_sdk_version = () => Number(runtime?.targetSdkVersion ?? 33);
   // ---- time
   lib.ctime = (p, c) => { const d = new Date(Number(BigInt.asIntN(64, p.memory.read64(n(c, 0)))) * 1000); return p.allocString(d.toUTCString() + '\n'); };
   lib.strptime = (p, c) => { const s = str(p, x(c, 0)), f = str(p, x(c, 1)), tm = n(c, 2); const re = f.replace(/%([YmdHMSjy%])/g, (_, k) => k === 'Y' ? '(\\d{4})' : k === '%' ? '%' : k === 'j' ? '(\\d{1,3})' : '(\\d{1,2})').replace(/%[a-zA-Z]/g, '(\\S+)'); const m = new RegExp('^' + re).exec(s); if (!m) return 0; const keys = [...f.matchAll(/%([a-zA-Z%])/g)].map(k => k[1]).filter(k => k !== '%'); keys.forEach((k, i) => { const v = Number(m[i + 1]); const at = { S: 0, M: 1, H: 2, d: 3, m: 4, Y: 5, y: 5, j: 7 }[k]; if (at === undefined) return; p.memory.writeU32(tm + 4 * at, k === 'm' ? v - 1 : k === 'Y' ? v - 1900 : k === 'y' ? (v < 69 ? v + 100 : v) : k === 'j' ? v - 1 : v); }); return n(c, 0) + encoder.encode(m[0]).length; };
@@ -70,7 +91,7 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.sched_getcpu = () => 0; lib.pthread_gettid_np = (p, c) => p.threads.byPthread(n(c, 0))?.tid ?? -1; lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
   lib.__libc_current_sigrtmin = () => 34; lib.__libc_current_sigrtmax = () => 64;
   lib.sigwait = () => 0;   // the sigset_t functions, sigaction64 and sigprocmask64: src/arm64/signals.js
-  lib.posix_fadvise = lib.mlock = lib.munlock = lib.mincore = () => 0;
+  lib.posix_fadvise = lib.mlock = lib.munlock = () => 0;   // mincore: src/arm64/libc.js (residency of mapped pages)
   lib.mremap = (p, c) => { const old = n(c, 0), oldSize = n(c, 1), size = n(c, 2), at = p.mapRegion(size, 0x1000); p.memory.copyIn(at, p.memory.bytes(old, Math.min(oldSize, size)).slice()); return at; };
   lib.memfd_create = (p, c) => { const path = `/memfd/${str(p, x(c, 0))}-${Date.now()}`; c.x[0] = BigInt(p.allocString(path)); c.x[1] = 0o102n; return lib.open(p, c); };
   lib.truncate = (p, c) => { c.x[0] = BigInt(lib.open(p, { x: [x(c, 0), 2n] })); return lib.ftruncate(p, c); };
@@ -104,5 +125,31 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.posix_spawnp = (p, c) => { const path = str(p, x(c, 1)), errno = programErrno(path); record('posix_spawnp', path, errno); return errno; };
   for (const name of ['posix_spawnattr_init', 'posix_spawnattr_destroy', 'posix_spawnattr_setflags', 'posix_spawnattr_setsigmask', 'posix_spawnattr_setsigdefault', 'posix_spawn_file_actions_init', 'posix_spawn_file_actions_destroy', 'posix_spawn_file_actions_adddup2', 'posix_spawn_file_actions_addclose', 'posix_spawn_file_actions_addopen']) lib[name] = () => 0;
   for (const name of ['fork', 'vfork', 'pclose', 'waitpid', 'wait', 'ptrace', 'timer_create', 'timer_settime', 'timer_delete', 'inotify_init1', 'inotify_add_watch', 'splice', 'sendfile', 'sendfile64', 'alarm']) lib[name] = notProvided(name);
+  // ---- libz.so checksums (zlib crc32.c / adler32.c): crc32 / crc32_z (the reflected CRC-32, polynomial 0xedb88320), adler32 / adler32_z, and their _combine forms. A NULL buffer
+  // answers the initial value (0 for crc32, 1 for adler32), as zlib does. zlib's stream functions (inflate, deflate ...) are not provided by the lab and fail by name.
+  const CRC_TABLE = new Uint32Array(256).map((_, i) => { let c = i; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc32 = (crc, bytes) => { let c = (crc ^ 0xffffffff) >>> 0; for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const adler32 = (adler, bytes) => { let a = adler & 0xffff, b = (adler >>> 16) & 0xffff; for (let i = 0; i < bytes.length; i++) { a = (a + bytes[i]) % 65521; b = (b + a) % 65521; } return ((b << 16) | a) >>> 0; };
+  lib.crc32 = lib.crc32_z = (p, c) => { const buf = n(c, 1); if (!buf) return 0; return crc32(Number(c.x[0] & 0xffffffffn), p.memory.bytes(buf, n(c, 2))); };
+  lib.adler32 = lib.adler32_z = (p, c) => { const buf = n(c, 1); if (!buf) return 1; return adler32(Number(c.x[0] & 0xffffffffn), p.memory.bytes(buf, n(c, 2))); };
+  // crc32_combine(crc1, crc2, len2): the CRC of the concatenation, by the GF(2) matrix method of zlib's crc32_combine_
+  const gf2Times = (mat, vec) => { let sum = 0; for (let i = 0; vec; i++, vec >>>= 1) if (vec & 1) sum ^= mat[i]; return sum >>> 0; };
+  const gf2Square = (square, mat) => { for (let i = 0; i < 32; i++) square[i] = gf2Times(mat, mat[i]); };
+  lib.crc32_combine = lib.crc32_combine64 = (p, c) => {
+    let crc1 = Number(c.x[0] & 0xffffffffn), len2 = Number(BigInt.asIntN(64, c.x[2])); const crc2 = Number(c.x[1] & 0xffffffffn);
+    if (len2 <= 0) return crc1;
+    const even = new Array(32), odd = new Array(32); odd[0] = 0xedb88320; let row = 1; for (let i = 1; i < 32; i++) { odd[i] = row; row <<= 1; }
+    gf2Square(even, odd); gf2Square(odd, even);
+    do { gf2Square(even, odd); if (len2 & 1) crc1 = gf2Times(even, crc1); len2 = Math.floor(len2 / 2); if (!len2) break; gf2Square(odd, even); if (len2 & 1) crc1 = gf2Times(odd, crc1); len2 = Math.floor(len2 / 2); } while (len2);
+    return (crc1 ^ crc2) >>> 0;
+  };
+  lib.adler32_combine = lib.adler32_combine64 = (p, c) => {   // zlib adler32_combine_
+    const adler1 = Number(c.x[0] & 0xffffffffn), adler2 = Number(c.x[1] & 0xffffffffn), len2 = Number(BigInt.asIntN(64, c.x[2])), BASE = 65521;
+    if (len2 < 0) return 0xffffffff;
+    const rem = len2 % BASE; let sum1 = adler1 & 0xffff, sum2 = (rem * sum1) % BASE;
+    sum1 += (adler2 & 0xffff) + BASE - 1; sum2 += ((adler1 >>> 16) & 0xffff) + ((adler2 >>> 16) & 0xffff) + BASE - rem;
+    if (sum1 >= BASE) sum1 -= BASE; if (sum1 >= BASE) sum1 -= BASE; if (sum2 >= (BASE << 1)) sum2 -= (BASE << 1); if (sum2 >= BASE) sum2 -= BASE;
+    return ((sum2 << 16) | sum1) >>> 0;
+  };
   return lib;
 }

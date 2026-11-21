@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -10,7 +10,9 @@ import { APKError } from './apk-error.js?v=7233e918dcc9';
 //   * Java arrays. Their byte image is the little-endian concatenation of the elements, with ART's layout constants: data starts at offset 12 (16 for long[]/double[]),
 //     index scale = element size. Reads and writes of any width at any offset are served from the elements, so Unsafe.getLong(byte[], off) works like on a device.
 //   * Plain objects. Field offsets are small stable integers handed out per field (Field.getOffset(), Unsafe.objectFieldOffset) and resolved back to the field slot.
-//   * Native memory: a lab arena (Unsafe.allocateMemory) plus the address ranges of non-movable arrays (VMRuntime.addressOf). The VM never exposes host pointers.
+//   * Native memory: the process's native heap (Unsafe.allocateMemory, ByteBuffer.allocateDirect, FileChannel.map) plus the address ranges of non-movable arrays (VMRuntime.addressOf).
+//     The heap is the app's native process when it has one, as on a device, where all of these are ordinary native memory that any native code reads and writes at the same
+//     address: the ARM64 process's malloc / mmap (src/arm64/), else the lab's wasm32 libraries' malloc (src/native-linker.js), else a lab arena. The VM never exposes host pointers.
 const ARRAY_BASE = { '[Z': 12, '[B': 12, '[C': 12, '[S': 12, '[I': 12, '[F': 12, '[J': 16, '[D': 16 };
 const ELEMENT_SIZE = { Z: 1, B: 1, C: 2, S: 2, I: 4, F: 4, J: 8, D: 8 };
 const REFERENCE_BASE = 12, REFERENCE_SIZE = 4;
@@ -88,9 +90,25 @@ function arenaGrow(memory, needed) {
   if (size > 512 * 1024 * 1024) fail('Native memory arena limit (512 MiB) exceeded', 'native-memory-exhausted');
   const grown = new Uint8Array(size); grown.set(memory.arena); memory.arena = grown;
 }
-function allocateNative(runtime, bytes) {
+/**
+ * The native heap of the app's process (registerNativeHeap): the ARM64 process's (started on first use when the app has arm64-v8a libraries), else the wasm32 libraries' process
+ * once it exists, else null (the arena).
+ */
+function nativeHeap(runtime) {
+  const memory = state(runtime);
+  if (!memory.heaps?.arm64) runtime.arm64?.startProcess?.();   // the app's native process exists from its start on a device
+  return memory.heaps?.arm64 ?? memory.heaps?.wasm32 ?? null;
+}
+const heapOf = (runtime, address) => { const heaps = state(runtime).heaps; if (!heaps) return null; for (const heap of [heaps.arm64, heaps.wasm32]) if (heap?.owns(address)) return heap; return null; };
+/** Registers a native process's heap: { kind, malloc(bytes) -> address, free(address), map(bytes, name) -> address, unmap(address, bytes), owns(address) } (src/arm64/glue.js, src/jni-host.js). */
+export function registerNativeHeap(runtime, heap) { (state(runtime).heaps ??= {})[heap.kind] = heap; }
+/** Where the process's native memory is: 'arm64', 'wasm32' or 'arena' (direct buffers follow it, src/jni-host.js). */
+export function nativeHeapKind(runtime) { return nativeHeap(runtime)?.kind ?? 'arena'; }
+function allocateNative(runtime, bytes, { name = null } = {}) {
   const memory = state(runtime), size = Number(bytes);
   if (!Number.isSafeInteger(size) || size < 0) runtime.throwJava('Ljava/lang/IllegalArgumentException;', `Unsafe.allocateMemory(${bytes})`);
+  const heap = nativeHeap(runtime);
+  if (heap) { const address = name !== null ? heap.map(Math.max(1, size), name) : heap.malloc(Math.max(1, size)); if (!address) runtime.throwJava('Ljava/lang/OutOfMemoryError;', `native allocation of ${size} bytes failed`); return BigInt(address); }
   const rounded = Math.max(16, (size + 15) & ~15);
   let start = null;
   const reuse = memory.free.findIndex(block => block.size >= rounded && block.size <= rounded * 2);
@@ -98,7 +116,8 @@ function allocateNative(runtime, bytes) {
   else { start = memory.top; memory.top += rounded; arenaGrow(memory, memory.top); }
   memory.blocks.set(start, rounded); return ARENA_BASE + BigInt(start);
 }
-function freeNative(runtime, address) {
+function freeNative(runtime, address, { length = null } = {}) {
+  { const heap = heapOf(runtime, Number(address)); if (heap) { if (length !== null) heap.unmap(Number(address), length); else heap.free(Number(address)); return; } }
   const memory = state(runtime), start = Number(BigInt(address) - ARENA_BASE);
   if (!memory.blocks.has(start)) { if (address === 0n) return; fail(`Unsafe.freeMemory of an address that is not a live allocation: ${address}`, 'native-memory-invalid-free'); }
   memory.free.push({ start, size: memory.blocks.get(start) }); memory.blocks.delete(start);
@@ -151,9 +170,10 @@ export function registerArm64Memory(runtime, memory) {
 export function readNativeBytes(runtime, address, count) { return readNative(runtime, BigInt(address), count); }
 /** Writes bytes at a native address (arena or pinned array); the counterpart of readNativeBytes for natives that fill a direct buffer. */
 export function writeNativeBytes(runtime, address, bytes) { writeNative(runtime, BigInt(address), bytes); }
-/** Allocates / frees a block of native arena memory (Unsafe.allocateMemory / freeMemory) for natives that hand a raw address to Java, e.g. a memory-mapped file. */
-export function allocateNativeBlock(runtime, bytes) { return allocateNative(runtime, bytes); }
-export function freeNativeBlock(runtime, address) { freeNative(runtime, address); }
+/** Allocates / frees a block of the process's native memory (as Unsafe.allocateMemory / freeMemory) for natives that hand a raw address to Java. `name`: a file mapping
+ *  (FileChannel.map), page-aligned and listed under that name in /proc/self/maps; its free passes `length`. */
+export function allocateNativeBlock(runtime, bytes, options) { return allocateNative(runtime, bytes, options); }
+export function freeNativeBlock(runtime, address, options) { freeNative(runtime, address, options); }
 export function fieldOffset(runtime, key) {
   const memory = state(runtime);
   let offset = memory.offsets.get(key);
@@ -288,9 +308,13 @@ export function createUnsafeNativeBindings() {
     });
   }
   // memmove between any two array/native images (byte offsets measured from the start of the data)
+  // Each side is a byte[] or a direct ByteBuffer (libcore_io_Memory.cpp ScopedBytes: the array's elements, else GetDirectBufferAddress of the buffer, whose address is its memory's)
   add(MEMORY, 'memmove(Ljava/lang/Object;ILjava/lang/Object;IJ)V', (runtime, [dst, dstOffset, src, srcOffset, byteCount]) => {
-    const count = Number(byteCount), s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst);
-    checkRange(runtime, s, s.base + srcOffset, count); checkRange(runtime, d, d.base + dstOffset, count); writeArray(d, d.base + dstOffset, readArray(s, s.base + srcOffset, count));
+    const count = Number(byteCount), side = value => runtime.object(value).cells !== undefined ? { info: arrayInfo(runtime, value) } : { address: BigInt.asIntN(64, BigInt(runtime.object(value).fields.get('Ljava/nio/Buffer;->address:J') ?? 0n)) };
+    const s = side(src), d = side(dst);
+    if (s.info) checkRange(runtime, s.info, s.info.base + srcOffset, count); if (d.info) checkRange(runtime, d.info, d.info.base + dstOffset, count);
+    const bytes = s.info ? readArray(s.info, s.info.base + srcOffset, count) : readNative(runtime, s.address + BigInt(srcOffset), count);
+    if (d.info) writeArray(d.info, d.info.base + dstOffset, bytes); else writeNative(runtime, d.address + BigInt(dstOffset), bytes);
   });
   // libcore_io_Memory.cpp: the byte[] side's offset is in bytes, the other array's offset is an ELEMENT index (scaled by sizeofElements); byteCount is bytes on both sides.
   // (HeapByteBuffer.getUnchecked(pos, char[] dst, dstOffset, length) passes dstOffset in chars: a CharBuffer view's get(char[], off, len) with off > 0 lands at dst[off].)

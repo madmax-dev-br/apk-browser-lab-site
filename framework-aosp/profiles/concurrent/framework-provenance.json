@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "profile": "concurrent",
+  "enabledByDefault": false,
+  "artifact": "framework.dex",
+  "tag": "android-13.0.0_r1",
+  "sha256": "cf43c4c375154025317fbdee29b304f7560a6a5d13eee41972f541b5c3f9b9c5",
+  "bytes": 18176,
+  "methods": 150,
+  "classes": [
+    "Ljava/util/concurrent/BrokenBarrierException;",
+    "Ljava/util/concurrent/Flow$Subscriber;",
+    "Ljava/util/concurrent/Flow$Publisher;",
+    "Ljava/util/concurrent/Flow$Processor;",
+    "Ljava/util/concurrent/Flow$Subscription;",
+    "Ljava/util/concurrent/Flow;",
+    "Ljava/util/concurrent/LinkedTransferQueue$$ExternalSyntheticBackportWithForwarding0;",
+    "Ljava/util/concurrent/LinkedTransferQueue$$ExternalSyntheticLambda1;",
+    "Ljava/util/concurrent/LinkedTransferQueue$$ExternalSyntheticLambda2;",
+    "Ljava/util/concurrent/LinkedTransferQueue$$ExternalSyntheticLambda3;",
+    "Ljava/util/concurrent/LinkedTransferQueue$Itr;",
+    "Ljava/util/concurrent/LinkedTransferQueue$LTQSpliterator;",
+    "Ljava/util/concurrent/LinkedTransferQueue$Node;",
+    "Ljava/util/concurrent/TransferQueue;",
+    "Ljava/util/concurrent/LinkedTransferQueue;"
+  ],
+  "classCount": 15,
+  "algorithmPatches": [],
+  "sourceTransforms": [
+    {
+      "path": "java/util/concurrent/LinkedTransferQueue.java",
+      "kind": "varhandle-to-field-updaters",
+      "inputSha256": "cfff6079dfbb253e5c7b72952b94a3693a8c8bac21d1ab9a42adede07fe68be7",
+      "outputSha256": "4c088d188cb94da7ca4ea67c48015e5b7dc5531af64d4c7f890329eae7c769c0"
+    }
+  ],
+  "compiledSources": [
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/TransferQueue.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/TransferQueue.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/TransferQueue.java?format=TEXT",
+      "sha256": "f3ab2d318ace0a8c2df5e808622936ab46c6ab00d277f78867bbb52d2de10323",
+      "bytes": 7461,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/LinkedTransferQueue.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/LinkedTransferQueue.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/LinkedTransferQueue.java?format=TEXT",
+      "sha256": "cfff6079dfbb253e5c7b72952b94a3693a8c8bac21d1ab9a42adede07fe68be7",
+      "bytes": 69770,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/BrokenBarrierException.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/BrokenBarrierException.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/BrokenBarrierException.java?format=TEXT",
+      "sha256": "a1a4fa19fd56aa3b60ace76ea69a58f0db8d624e786e8adea0d707ac6ba7ec4d",
+      "bytes": 2335,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    },
+    {
+      "project": "platform/libcore",
+      "tag": "android-13.0.0_r1",
+      "path": "ojluni/src/main/java/java/util/concurrent/Flow.java",
+      "localPath": "framework-aosp/upstream/java/util/concurrent/Flow.java",
+      "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/util/concurrent/Flow.java?format=TEXT",
+      "sha256": "6cfb7d4a2f766ddb3a76126d34cd019c25c2a71c464bc9f26f1c20dfc8b75632",
+      "bytes": 13277,
+      "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+    }
+  ],
+  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "compileOnlyDeclarationsPackaged": false,
+  "integrationStatus": "Original libcore java.util.concurrent classes (TransferQueue, LinkedTransferQueue, BrokenBarrierException, Flow) over the default DEX's AbstractQueue, LockSupport, field updaters and Helpers",
+  "activationPolicy": "an installed package DEX references java.util.concurrent.TransferQueue, LinkedTransferQueue, BrokenBarrierException, CyclicBarrier or a java.util.concurrent.Flow type (or explicit loader option)",
+  "correspondingSource": "source-bundle.zip",
+  "licenses": [
+    "../../LICENSE",
+    "../../NOTICE"
+  ]
+}

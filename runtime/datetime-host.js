@@ -1,8 +1,10 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { gcRoot } from './heap-gc.js?v=7233e918dcc9';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=7233e918dcc9';
-import { JavaException } from './apk-runtime.js?v=7233e918dcc9';
-import { bestDateTimePattern } from './date-skeleton.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=af8ff7411a95';
+import { JavaException } from './apk-runtime.js?v=af8ff7411a95';
+import { bestDateTimePattern } from './date-skeleton.js?v=af8ff7411a95';
+import { Invoke } from './interpreter.js?v=af8ff7411a95';
+import { Blocked } from './scheduler.js?v=af8ff7411a95';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).
@@ -36,15 +38,21 @@ export function createDateTimeHost(platform) {
 
   // ---- java.time interplay (libcore Date.toInstant/from, TimeZone.toZoneId; the java.time classes themselves are the original libcore sources in the framework DEX)
   const INSTANT = 'Ljava/time/Instant;', ZONE_ID = 'Ljava/time/ZoneId;';
-  const call = (r, owner, name, signature, args, mode = 'static') => { const { parameters, result } = parseSignature(signature); return r.dispatch({ owner, name, parameters, result, signature }, mode === 'static' ? r.argumentWords(parameters, args) : r.argumentWords(parameters, args.slice(1), { receiver: args[0] }), mode); };
-  def(DATE, 'toInstant', `()${INSTANT}`, (r, _m, [self]) => call(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [time(r, self)]));
-  def(DATE, 'from', `(${INSTANT})${DATE}`, (r, _m, [instant]) => {
-    let millis; try { millis = call(r, INSTANT, 'toEpochMilli', '()J', [instant], 'virtual'); } catch (error) {
+  // These natives call the libcore java.time code as continuations of the calling thread (Invoke), never as a run nested on the JavaScript stack: ZoneId.of initializes
+  // ZoneRulesProvider (the tz rules) and may wait for another thread doing it. A nested run of a background thread that waited there sat above the run of the thread
+  // initializing it, which could then never go on (each waited for the other: a pump that never returned). A continuation parks the thread like any Java call.
+  const invoke = (r, owner, name, signature, args, mode = 'static', then = null, onError = null, roots = []) => { const { parameters, result } = parseSignature(signature); const step = new Invoke({ owner, name, parameters, result, signature }, mode === 'static' ? r.argumentWords(parameters, args) : r.argumentWords(parameters, args.slice(1), { receiver: args[0] }), mode, then, onError); if (roots.length) step.roots = roots; return step; };
+  // A static field host code reads initializes its class first; while another thread runs that <clinit> the call parks its thread and runs again after it (Blocked.retry), as
+  // Method.invoke of a static method does (apk-runtime.js reflectionInvoke), instead of waiting for it nested in this host call.
+  const afterInit = (r, type, run) => r.initPendingElsewhere?.(type) ? new Blocked({ ready: () => !r.initPendingElsewhere(type), retry: true, reason: `class initialization of ${type}`, finish: run }) : run();
+  def(DATE, 'toInstant', `()${INSTANT}`, (r, _m, [self]) => invoke(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [time(r, self)]));
+  def(DATE, 'from', `(${INSTANT})${DATE}`, (r, _m, [instant]) => invoke(r, INSTANT, 'toEpochMilli', '()J', [instant], 'virtual',
+    millis => { const date = r.allocate(DATE); r.object(date).dateMillis = BigInt(millis); return date; },
+    error => {   // Date.from: catch (ArithmeticException ex) { throw new IllegalArgumentException(ex); }
       if (!(error instanceof JavaException) || r.object(error.value).type !== 'Ljava/lang/ArithmeticException;') throw error;
-      const wrapper = r.allocate('Ljava/lang/IllegalArgumentException;'); call(r, 'Ljava/lang/IllegalArgumentException;', '<init>', '(Ljava/lang/Throwable;)V', [wrapper, error.value], 'direct'); r.throwJavaReference(wrapper, null);
-    }
-    const date = r.allocate(DATE); r.object(date).dateMillis = BigInt(millis); return date;
-  }, { static: true });
+      const wrapper = r.allocate('Ljava/lang/IllegalArgumentException;');
+      return invoke(r, 'Ljava/lang/IllegalArgumentException;', '<init>', '(Ljava/lang/Throwable;)V', [wrapper, error.value], 'direct', () => r.throwJavaReference(wrapper, null), null, [wrapper]);
+    }), { static: true });
 
   // ---- time zones ---------------------------------------------------------------------------------------------------------------------------------------
   const two = n => String(n).padStart(2, '0');
@@ -112,7 +120,9 @@ export function createDateTimeHost(platform) {
   def(ZONE, 'getTimeZone', `(${STRING})${ZONE}`, (r, _m, [id]) => { const n = r.stringCharacters(id); return zone(r, validZone(n) || /^GMT[+-]\d{1,2}(:?\d{2})?$/.test(n) ? n : 'GMT'); }, { static: true }); // unknown ids fall back to GMT, like TimeZone.getTimeZone
   def(ZONE, 'getDefault', `()${ZONE}`, r => zone(r, defaultZone().id), { static: true });
   def(ZONE, 'setDefault', `(${ZONE})V`, (r, _m, [z]) => { overrideDefault = z === null ? null : zid(r, z); }, { static: true });
-  def(ZONE, 'toZoneId', `()${ZONE_ID}`, (r, _m, [self]) => call(r, ZONE_ID, 'of', `(${STRING}Ljava/util/Map;)${ZONE_ID}`, [zid(r, self), r.readStatic({ owner: ZONE_ID, name: 'SHORT_IDS', type: 'Ljava/util/Map;' })]));
+  // TimeZone.toZoneId: ZoneId.of(getID(), ZoneId.SHORT_IDS)
+  const toZoneId = (r, self) => afterInit(r, ZONE_ID, () => invoke(r, ZONE_ID, 'of', `(${STRING}Ljava/util/Map;)${ZONE_ID}`, [zid(r, self), r.readStatic({ owner: ZONE_ID, name: 'SHORT_IDS', type: 'Ljava/util/Map;' })]));
+  def(ZONE, 'toZoneId', `()${ZONE_ID}`, (r, _m, [self]) => toZoneId(r, self));
   def(ZONE, 'getID', `()${STRING}`, (r, _m, [self]) => zid(r, self));
   // createGmtOffsetString(includeGmt, includeMinuteSeparator, offsetMillis) (hidden, libcore): "GMT" + sign + two-digit hours [+ ':'] + two-digit minutes, minutes truncated toward zero
   def(ZONE, 'createGmtOffsetString', '(ZZI)Ljava/lang/String;', (_r, _m, [includeGmt, separator, millis]) => {
@@ -153,7 +163,7 @@ export function createDateTimeHost(platform) {
   });
   def(ZONE, 'getAvailableIDs', `()[${STRING}`, r => { const ids = [...new Set([...Intl.supportedValuesOf('timeZone'), 'GMT', 'UTC'])].sort(), array = r.newArray(`[${STRING}`, ids.length); r.array(array).elements = ids; return array; }, { static: true });
   def(ZONE, 'getAvailableIDs', `(I)[${STRING}`, (r, _m, [raw]) => { const ids = [...new Set([...Intl.supportedValuesOf('timeZone'), 'GMT', 'UTC'])].filter(id => rawOf(id) === raw).sort(), array = r.newArray(`[${STRING}`, ids.length); r.array(array).elements = ids; return array; }, { static: true });
-  def(ZONE, 'getTimeZone', `(${ZONE_ID})${ZONE}`, (r, _m, [zoneId]) => { if (zoneId === null) r.throwJava('Ljava/lang/NullPointerException;', 'zoneId == null'); const id = r.stringCharacters(call(r, ZONE_ID, 'getId', `()${STRING}`, [zoneId], 'virtual')); return zone(r, validZone(id) ? id : 'GMT'); }, { static: true });
+  def(ZONE, 'getTimeZone', `(${ZONE_ID})${ZONE}`, (r, _m, [zoneId]) => { if (zoneId === null) r.throwJava('Ljava/lang/NullPointerException;', 'zoneId == null'); return invoke(r, ZONE_ID, 'getId', `()${STRING}`, [zoneId], 'virtual', value => { const id = r.stringCharacters(value); return zone(r, validZone(id) ? id : 'GMT'); }); }, { static: true });
   for (const [name, signature] of [['setID', `(${STRING})V`], ['setRawOffset', '(I)V']]) def(ZONE, name, signature, () => { throw new APKError(`TimeZone.${name}: the virtual device shares one TimeZone object per id; mutating a zone is not modelled`, { kind: 'unsupported-timezone-mutation' }); });
   def(ZONE, 'toString', `()${STRING}`, (r, _m, [self]) => `libcore.util.ZoneInfo[id="${zid(r, self)}"]`);
   def(ZONE, 'equals', `(${OBJECT})Z`, (r, _m, [self, o]) => o !== null && typeof o === 'object' && r.object(o).tzId === zid(r, self) ? 1 : 0); def(ZONE, 'hashCode', '()I', (r, _m, [self]) => [...zid(r, self)].reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0));
@@ -483,7 +493,7 @@ export function createDateTimeHost(platform) {
     def(owner, 'getDisplayName', `(II${LOCALE_T})${STRING}`, (r, _m, [self, field, style]) => { const f = loadFields(settle(r, self)); const long = (style & 3) !== 1;
       if (field === F.MONTH) return long ? MONTHS[f[F.MONTH]] : MONTHS[f[F.MONTH]].slice(0, 3); if (field === F.DAY_OF_WEEK) return long ? WEEKDAYS[f[F.DAY_OF_WEEK] - 1] : WEEKDAYS[f[F.DAY_OF_WEEK] - 1].slice(0, 3);
       if (field === F.AM_PM) return f[F.AM_PM] ? 'PM' : 'AM'; if (field === F.ERA) return f[F.ERA] ? (long ? 'AD' : 'AD') : 'BC'; return null; });
-    def(owner, 'toInstant', `()${INSTANT}`, (r, _m, [self]) => call(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [BigInt(settle(r, self).time)]));
+    def(owner, 'toInstant', `()${INSTANT}`, (r, _m, [self]) => invoke(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [BigInt(settle(r, self).time)]));
     def(owner, 'getCalendarType', `()${STRING}`, () => 'gregory');
     def(owner, 'toString', `()${STRING}`, (r, _m, [self]) => { const c = settle(r, self); return `java.util.GregorianCalendar[time=${c.time},areFieldsSet=true,lenient=${c.lenient},zone=${c.zone},firstDayOfWeek=${c.first},minimalDaysInFirstWeek=${c.minimal}]`; });
   }
@@ -507,6 +517,10 @@ export function createDateTimeHost(platform) {
   });
   def(GREGORIAN, 'getGregorianChange', `()${DATE}`, (r, _m, [self]) => { const d = r.allocate(DATE); r.object(d).dateMillis = r.object(self).gregorianChange ?? GREGORIAN_CUTOVER; return d; });
   def(GREGORIAN, 'isLeapYear', '(I)Z', (r, _m, [, year]) => ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 1 : 0);
-  def(GREGORIAN, 'toZonedDateTime', `()Ljava/time/ZonedDateTime;`, (r, _m, [self]) => call(r, 'Ljava/time/ZonedDateTime;', 'ofInstant', `(${INSTANT}${ZONE_ID})Ljava/time/ZonedDateTime;`, [call(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [BigInt(settle(r, self).time)]), call(r, 'Ljava/time/ZoneId;', 'of', `(${STRING})${ZONE_ID}`, [cal(r, self).zone])]));
+  def(GREGORIAN, 'toZonedDateTime', `()Ljava/time/ZonedDateTime;`, (r, _m, [self]) => {   // ZonedDateTime.ofInstant(Instant.ofEpochMilli(getTimeInMillis()), ZoneId.of(zone))
+    const c = settle(r, self);
+    return invoke(r, INSTANT, 'ofEpochMilli', `(J)${INSTANT}`, [BigInt(c.time)], 'static', instant => invoke(r, ZONE_ID, 'of', `(${STRING})${ZONE_ID}`, [c.zone], 'static',
+      zoneId => invoke(r, 'Ljava/time/ZonedDateTime;', 'ofInstant', `(${INSTANT}${ZONE_ID})Ljava/time/ZonedDateTime;`, [instant, zoneId]), null, [instant]));
+  });
   return { ...registry, interfaces: registry.interfacesOf };
 }

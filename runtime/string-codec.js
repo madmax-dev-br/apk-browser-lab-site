@@ -1,11 +1,11 @@
-import { lookupCharset } from './charset-native.js?v=7233e918dcc9';
+import { lookupCharset } from './charset-native.js?v=af8ff7411a95';
 
-// java.lang.String <-> byte[] conversion for the six charsets of the curated Android13 ICU profile
-// (UTF-8, UTF-16, UTF-16BE, UTF-16LE, ISO-8859-1, US-ASCII), following the Android/Java REPLACE actions:
-//  - encode: unmappable characters and unpaired surrogates become '?' (UTF-16 family: U+FFFD);
+// java.lang.String <-> byte[] conversion for the charsets of the curated Android13 ICU profile
+// (UTF-8, UTF-16, UTF-16BE, UTF-16LE, UTF-32, UTF-32BE, UTF-32LE, ISO-8859-1, US-ASCII), following the Android/Java REPLACE actions:
+//  - encode: unmappable characters and unpaired surrogates become '?' (UTF-16 and UTF-32 families: U+FFFD; ICU's UTF-16 and UTF-32 write a byte-order mark first);
 //  - decode: malformed input becomes U+FFFD per maximal subpart.
 // Charsets outside the profile are NOT approximated: the caller must surface an explicit failure.
-export const SUPPORTED_CODECS = new Set(['UTF-8', 'UTF-16', 'UTF-16BE', 'UTF-16LE', 'ISO-8859-1', 'US-ASCII']);
+export const SUPPORTED_CODECS = new Set(['UTF-8', 'UTF-16', 'UTF-16BE', 'UTF-16LE', 'UTF-32', 'UTF-32BE', 'UTF-32LE', 'ISO-8859-1', 'US-ASCII']);
 export const canonicalCharset = name => lookupCharset(name)?.canonical ?? null;
 
 /** Splits a UTF-16 string into code points, mapping an unpaired surrogate to -1. */
@@ -35,6 +35,10 @@ export function encodeString(text, charset) {
       if (unit >= 0xd800 && unit < 0xdc00 && i + 1 < text.length && (text.charCodeAt(i + 1) & 0xfc00) === 0xdc00) { put(unit); put(text.charCodeAt(++i)); }
       else put(unit >= 0xd800 && unit < 0xe000 ? 0xfffd : unit);
     }
+  } else if (charset === 'UTF-32' || charset === 'UTF-32BE' || charset === 'UTF-32LE') {
+    const little = charset === 'UTF-32LE', put = point => little ? out.push(point & 255, point >> 8 & 255, point >> 16 & 255, 0) : out.push(0, point >> 16 & 255, point >> 8 & 255, point & 255);
+    if (charset === 'UTF-32') put(0xfeff);
+    for (const point of codePoints(text)) put(point < 0 ? 0xfffd : point);
   } else throw new Error('Unsupported codec ' + charset);
   return Int8Array.from(out);
 }
@@ -58,6 +62,16 @@ export function decodeBytes(bytes, charset) {
       else text += unit >= 0xd800 && unit < 0xe000 ? '�' : String.fromCharCode(unit);
     }
     return (bytes.length - from) % 2 ? text + '�' : text;
+  }
+  if (charset === 'UTF-32' || charset === 'UTF-32BE' || charset === 'UTF-32LE') {   // a unit beyond U+10FFFF or a surrogate is malformed (U+FFFD), as is a trailing partial unit
+    let little = charset === 'UTF-32LE', from = 0;
+    if (charset === 'UTF-32' && bytes.length >= 4) { if (bytes[0] === 0 && bytes[1] === 0 && bytes[2] === 0xfe && bytes[3] === 0xff) from = 4; else if (bytes[0] === 0xff && bytes[1] === 0xfe && bytes[2] === 0 && bytes[3] === 0) { from = 4; little = true; } }
+    let text = '';
+    for (let i = from; i + 3 < bytes.length; i += 4) {
+      const point = little ? (bytes[i] | bytes[i + 1] << 8 | bytes[i + 2] << 16 | bytes[i + 3] << 24) >>> 0 : (bytes[i] << 24 | bytes[i + 1] << 16 | bytes[i + 2] << 8 | bytes[i + 3]) >>> 0;
+      text += point > 0x10ffff || (point >= 0xd800 && point < 0xe000) ? '\ufffd' : String.fromCodePoint(point);
+    }
+    return (bytes.length - from) % 4 ? text + '\ufffd' : text;
   }
   throw new Error('Unsupported codec ' + charset);
 }

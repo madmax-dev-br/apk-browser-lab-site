@@ -1,39 +1,41 @@
-import STATIC_SHIMS from './shim-static-methods.js?v=7233e918dcc9';
-import { VMClock } from './vm-clock.js?v=7233e918dcc9';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=7233e918dcc9';
-import { OperationMonitor } from './operation-monitor.js?v=7233e918dcc9';
-import { ExecutionProfile } from './execution-profile.js?v=7233e918dcc9';
-import { SamplingProfiler } from './sampling-profiler.js?v=7233e918dcc9';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=7233e918dcc9';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=7233e918dcc9';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=7233e918dcc9';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=7233e918dcc9';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=7233e918dcc9';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=7233e918dcc9';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=7233e918dcc9';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=7233e918dcc9';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=7233e918dcc9';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=7233e918dcc9';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=7233e918dcc9';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=7233e918dcc9';
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=7233e918dcc9';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=7233e918dcc9';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=7233e918dcc9';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=7233e918dcc9';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=7233e918dcc9';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=7233e918dcc9';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=7233e918dcc9';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=7233e918dcc9';
+import { procFdFile } from './libcore-io-native.js?v=af8ff7411a95';
+import STATIC_SHIMS from './shim-static-methods.js?v=af8ff7411a95';
+import { VMClock } from './vm-clock.js?v=af8ff7411a95';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=af8ff7411a95';
+import { OperationMonitor } from './operation-monitor.js?v=af8ff7411a95';
+import { ExecutionProfile } from './execution-profile.js?v=af8ff7411a95';
+import { SamplingProfiler } from './sampling-profiler.js?v=af8ff7411a95';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=af8ff7411a95';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=af8ff7411a95';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=af8ff7411a95';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=af8ff7411a95';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=af8ff7411a95';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=af8ff7411a95';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=af8ff7411a95';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=af8ff7411a95';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=af8ff7411a95';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=af8ff7411a95';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=af8ff7411a95';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { invokePolymorphic } from './method-handles.js?v=af8ff7411a95';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=af8ff7411a95';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=af8ff7411a95';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=af8ff7411a95';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=af8ff7411a95';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=af8ff7411a95';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=af8ff7411a95';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=af8ff7411a95';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=af8ff7411a95';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=7233e918dcc9';
-import { ProcessStartPending } from './package-registry.js?v=7233e918dcc9';
-import { bootClassLacksMember } from './boot-class-members.js?v=7233e918dcc9';
-export { APKError } from './apk-error.js?v=7233e918dcc9';
-import { BinaryReader } from './binary-reader.js?v=7233e918dcc9';
-import { recordCollection } from './runtime-stats.js?v=7233e918dcc9';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=7233e918dcc9';
-import { scrollsItself } from './scrolling-view.js?v=7233e918dcc9';
+import { Scheduler, Blocked } from './scheduler.js?v=af8ff7411a95';
+import { ProcessStartPending } from './package-registry.js?v=af8ff7411a95';
+import { bootClassLacksMember } from './boot-class-members.js?v=af8ff7411a95';
+export { APKError } from './apk-error.js?v=af8ff7411a95';
+import { BinaryReader } from './binary-reader.js?v=af8ff7411a95';
+import { recordCollection } from './runtime-stats.js?v=af8ff7411a95';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=af8ff7411a95';
+import { scrollsItself } from './scrolling-view.js?v=af8ff7411a95';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -386,7 +388,7 @@ export class DexProgram {
       if (bootBytes > 128 * 1024 * 1024) fail('Framework DEX layer exceeds 128 MiB');
       this.bootFiles.push({ filename, dex }); this.bootDexes.add(dex);
       for (const name of dex.classes.keys()) {
-        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/apache\/http\/|org\/apache\/commons\/(?:codec|logging)\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|telephony|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|util\/(?:calendar|logging|locale\/provider))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
+        if (!/^L(?:android\/|java\/|javax\/|dalvik\/|libcore\/|org\/json\/|org\/xmlpull\/|org\/xml\/sax\/|org\/w3c\/dom\/|org\/apache\/harmony\/xml\/|org\/apache\/http\/|org\/apache\/commons\/(?:codec|logging)\/|org\/ccil\/cowan\/tagsoup\/|dev\/apkweb\/(?:media|net|view|os|pm|util|keystore|services)\/|com\/(?:android\/(?:internal|icu|telephony|okhttp|org\/(?:conscrypt|bouncycastle|kxml2))|google\/android\/(?:collect|gles_jni)|sun\/(?:nio\/file|security))\/|jdk\/(?:internal\/(?:util|misc|math|vm\/annotation)|net)\/|sun\/(?:misc|net|nio\/(?:cs|ch|fs)|security|invoke\/util|util\/(?:calendar|logging|locale\/provider))\/)/.test(name)) fail(`Unapproved framework namespace: ${name}`);
         if (this.bootClasses.has(name)) fail(`Duplicate framework class: ${name}`);
         this.bootClasses.set(name, dex);
       }
@@ -644,7 +646,7 @@ for (const name of ['Method', 'Constructor', 'Field']) EXTERNAL_INTERFACES.set(`
 addBridge('java/lang/reflect/Member', ['getName()Ljava/lang/String;', 'getDeclaringClass()Ljava/lang/Class;', 'getModifiers()I']);
 addBridge('java/lang/reflect/AccessibleObject', ['setAccessible(Z)V', 'isAccessible()Z', 'trySetAccessible()Z']);
 addBridge('java/lang/reflect/Executable', ['getParameterTypes()[Ljava/lang/Class;', 'getParameterCount()I']);
-addBridge('java/lang/reflect/Method', ['invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;', 'getReturnType()Ljava/lang/Class;', 'isSynthetic()Z', 'isBridge()Z']);
+addBridge('java/lang/reflect/Method', ['invoke(Ljava/lang/Object;[Ljava/lang/Object;)Ljava/lang/Object;', 'getReturnType()Ljava/lang/Class;', 'isSynthetic()Z', 'isBridge()Z', 'getDefaultValue()Ljava/lang/Object;']);
 addBridge('java/lang/reflect/Constructor', ['newInstance([Ljava/lang/Object;)Ljava/lang/Object;']);
 addBridge('java/lang/reflect/Field', ['getType()Ljava/lang/Class;', 'get(Ljava/lang/Object;)Ljava/lang/Object;', 'set(Ljava/lang/Object;Ljava/lang/Object;)V']);
 for (const [type, name] of [['I', 'Int'], ['J', 'Long'], ['Z', 'Boolean'], ['B', 'Byte'], ['S', 'Short'], ['C', 'Char'], ['F', 'Float'], ['D', 'Double']]) {
@@ -1134,7 +1136,7 @@ export const LOOPER_PLUMBING = /^Landroid\/os\/(?:Looper|MessageQueue|Handler|Me
 // monomorphic load. Added one by one while the app runs, each addition was a new hidden class, and the interpreter's loads on the runtime went megamorphic (about 14 % of the
 // interpreter's time on a Compose flow). tests/interpreter-fast-paths.test.mjs fails when a launch adds a property that is not listed. `key in runtime` is not used for any of them.
 export const LATE_RUNTIME_PROPERTIES = Object.freeze([
-  'hostTaskTrace', 'labDefaultSslContext', 'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
+  'directBuffersInstalled', 'directBufferNoted', 'onClassInitialized', 'hostTaskTrace', 'labDefaultSslContext', 'subtypeEpoch', 'subtypeMemo', 'ancestorSets', 'ancestorEpoch', 'parentEpoch', 'parentMemo', 'hostInterfacesEpoch', 'hostInterfacesMemo', 'overrideMemo', 'externalMemo', 'resolveEpoch', 'resolveCache', 'hostMethodRefs', 'methodEvidence',
   'traceMuted', 'allProgs', 'lastHostCall', 'mainThread', 'objectInitIsPlain', 'targetSdkVersion', 'canvasCompatibilityVersion', 'frameworkRuntimeConfigured', 'resolvableMemo',
   'dedupeHiddenApiWarnings', 'unicodeCaseBackend', 'traceDropped', 'constructedStringUnits', 'runtimeObject', 'internedStrings', 'nativeMemory', 'inheritableLocals', 'allocationSamples',
   'caughtExceptions', 'boxCache', 'activityType', 'ephemeronMaps', 'lastResourceCall', 'timeUnits', 'applicationClassLoader', 'methodEvidenceTruncated', 'icuRegexMetadata', 'icuBreakMetadata',
@@ -1435,10 +1437,10 @@ export class APKRuntime {
     const next = i => {
       for (; i < order.length; i++) {
         const t = order[i], initializer = this.classes.get(t).methods.get('<clinit>()V');
-        if (!initializer) { this.initialized.set(t, { status: 'initialized' }); continue; }
+        if (!initializer) { this.initialized.set(t, { status: 'initialized' }); this.onClassInitialized?.(t); continue; }
         if (!initializer.code) fail(`Missing class initializer code: ${t}`);
         const index = i;
-        return new Invoke(initializer.method, [], 'static', () => { this.initialized.set(t, { status: 'initialized' }); return next(index + 1); },
+        return new Invoke(initializer.method, [], 'static', () => { this.initialized.set(t, { status: 'initialized' }); this.onClassInitialized?.(t); return next(index + 1); },
           error => { throw this.initFailed(order, index, error, release); });
       }
       release(); return undefined;
@@ -2223,6 +2225,8 @@ export class APKRuntime {
     if (this.depth + currentThread(this).frames.length >= this.maxCallDepth) this.throwJava('Ljava/lang/StackOverflowError;', 'stack size 1MB');
     this.depth++;
     try {
+      // invoke-polymorphic (MethodHandle.invoke / invokeExact, the VarHandle access modes): `method` carries the call site's proto (src/method-handles.js)
+      if (mode === 'polymorphic') return invokePolymorphic(this, method, args);
       if(mode==='virtual'&&!isNull(args[0])&&typeof args[0]!=='string'){
         const proxy=this.vmObject(args[0]);if(proxy.annotationValues){
           this.record(`ANNOTATION ${methodKey(method)} [DEX metadata]`);
@@ -2294,7 +2298,7 @@ export class APKRuntime {
     this.executionByOrigin.host.calls++;
     this.record(resolution.hostText ??= `HOST ${method.key} [AOSP:${method.dex.filename}]`); this.lastHostCall = method.key; this.monitor.hostEnter(method.key, method);
     const tb = this.tb, previousBucket = tb.callBegin(resolution, method.key), startedAt = tb.last, runs = tb.runs; let result; try { result = binding(this, this.hostArguments(method, args, mode), method); } finally { tb.callEnd(resolution, previousBucket, startedAt, runs); } this.hostCall = null;   // a framework native counts in the host table as a bridged call does
-    if (result && typeof result.then === 'function') fail(`Framework native binding must be synchronous: ${method.key}`);
+    if (result && typeof result.then === 'function' && !(result instanceof Invoke)) fail(`Framework native binding must be synchronous: ${method.key}`);   // a host step that calls Java (an Invoke, whose continuation is `then`) is synchronous
     return hostReturn(method, result);
   }
   /**
@@ -2606,6 +2610,28 @@ export class APKRuntime {
     const method=this.objectOverride(obj.type,'toString()Ljava/lang/String;')??this.externalObjectMethod(obj.type,'toString',[],'Ljava/lang/String;');
     if(method){const text=this.dispatch(method,[value],'virtual');return isNull(text)?'null':this.stringCharacters(text);}
     return `${obj.type.startsWith('[') ? obj.type.replaceAll('/', '.') : dottedName(obj.type)}@${obj.id.toString(16)}`;
+  }
+  /**
+   * javaString for a native that returns a host step: the Java code the text needs (the object's own toString(), libcore FloatingDecimal for a float or a double) runs as a
+   * continuation of the calling thread (an Invoke) and then(text) makes the native's result; every other value is converted at once. As a run nested on the JavaScript stack,
+   * a background thread whose toString() waited for a class another thread was initializing in a nested run of its own (StringBuilder.append of an object on both) could
+   * never go on: the one beneath could only continue once the one on top returned (Scheduler.checkNestedDeadlock).
+   */
+  javaStringStep(value, type, then) {
+    if (type === 'F' || type === 'D') {
+      const owner = 'Ljdk/internal/math/FloatingDecimal;';
+      if (!this.dex.bootClasses?.has(owner)) fail('Java Float/Double decimal conversion needs the original libcore FloatingDecimal in the framework DEX');
+      return new Invoke({ owner, name: 'toJavaFormatString', parameters: [type], result: 'Ljava/lang/String;', signature: `(${type})Ljava/lang/String;` }, this.argumentWords([type], [value]), 'static', text => then(this.stringCharacters(text)));
+    }
+    if (type.startsWith('L') && !isNull(value) && typeof value === 'object') {
+      const obj = this.object(value);
+      if (obj.boxed !== undefined) { if (obj.primitiveType === 'F' || obj.primitiveType === 'D') return this.javaStringStep(obj.boxed, obj.primitiveType, then); }
+      else if (obj.type !== 'Ljava/lang/String;' && obj.type !== 'Ljava/lang/StringBuilder;' && obj.type !== 'Ljava/lang/StringBuffer;') {
+        const method = this.objectOverride(obj.type, 'toString()Ljava/lang/String;') ?? this.externalObjectMethod(obj.type, 'toString', [], 'Ljava/lang/String;');
+        if (method) return new Invoke(method, [value], 'virtual', text => then(isNull(text) ? 'null' : this.stringCharacters(text)));
+      }
+    }
+    return then(this.javaString(value, type));
   }
   objectOverride(type, signature) {
     this.parent(type);   // refreshes the memo tables when the class graph changed
@@ -3442,16 +3468,17 @@ export class APKRuntime {
       const zero = name.endsWith('0'); if (zero) name = name.slice(0, -1);
       const requested = args[staticCall ? 0 : zero ? 2 : 1];
       if (isNull(requested)) this.throwJava('Ljava/lang/NullPointerException;', name === 'load' ? 'filename == null' : 'nativeLibraryName == null');
-      const text = this.stringCharacters(requested);
+      let text = this.stringCharacters(requested);
+      const link = name === 'load' ? procFdFile(this, text) : null; if (link) text = link.path;   // System.load("/proc/self/fd/<n>"): the file that descriptor has open (an unlinked one too), as dlopen opens it
       if (name === 'loadLibrary' && text.includes('/')) this.throwJava('Ljava/lang/UnsatisfiedLinkError;', 'Directory separator should not appear in library name: ' + text);
       // A companion package's code (src/package-registry.js) never links the app's libraries, and its own are not offered to JNI.
       // The class that calls System.loadLibrary decides whose library it is: framework code (Conscrypt's javacrypto, media_jni ...) loads the platform's own libraries for any package.
       const directOwner = this.currentMethod?.owner, frameworkCaller = !!directOwner && this.platform?.packages?.multi && this.platform.packages.entryOfClass(this, directOwner) === null;
       if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { const custom = this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); this.throwJava('Ljava/lang/UnsatisfiedLinkError;', typeof custom === 'string' ? custom : `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); } }
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
-      if (this.jni && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
+      if (this.jni && !link?.deleted && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
       if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
-      if (this.arm64?.load(name, text)) return undefined;   // the APK's own arm64-v8a library, run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
+      if (this.arm64?.load(name, text, link?.deleted ? link.bytes() : null)) return undefined;   // the APK's own arm64-v8a library, run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (this.stubNativeLibrary(text)) return undefined;
       this.libraryNotFound(name, text);   // no ABI of the APK packages it: Android's own UnsatisfiedLinkError ("dlopen failed: library ... not found")
       this.nativeRequired(key, text);
@@ -3716,8 +3743,8 @@ export class APKRuntime {
     if(method.owner==='Ljava/lang/String;'&&staticCall){
       if(method.parameters[0]==='Ljava/lang/Object;'&&!isNull(args[0])){
         if(this.isStringValue(args[0]))return args[0];const object=this.object(args[0]),method=this.objectOverride(object.type,'toString()Ljava/lang/String;')??this.externalObjectMethod(object.type,'toString',[],'Ljava/lang/String;');
-        if(method){const value=this.dispatch(method,[args[0]],'virtual');if(!isNull(value))this.stringCharacters(value);return value;}
-      }return this.javaString(args[0],method.parameters[0]);
+        if(method)return new Invoke(method,[args[0]],'virtual',value=>{if(!isNull(value))this.stringCharacters(value);return value;});   // obj.toString() as a continuation of the calling thread (see javaStringStep)
+      }return this.javaStringStep(args[0],method.parameters[0],text=>text);
     }
     if (method.owner === 'Ljava/lang/Integer;' && staticCall) {
       if (name === 'toString') return String(int(args[0]));
@@ -3934,6 +3961,12 @@ export class APKRuntime {
       if (name === 'getDeclaringClass') return this.classObject(owner);
       if (name === 'getModifiers') return member.flags & 0xffff;
       if (name === 'getReturnType') return this.classObject(member.method.result);
+      if (name === 'getDefaultValue') {   // Method.getDefaultValue: the AnnotationDefault value of an annotation type's member (boxed when primitive), null for any other method
+        if (member.kind !== 'method' || member.method.parameters?.length) return null;
+        const defaults = this.classAnnotations(owner, 2).find(a => a.type === 'Ldalvik/annotation/AnnotationDefault;')?.values.get('value');
+        if (defaults?.encoded !== 'annotation' || !defaults.values.has(member.method.name)) return null;
+        return this.boxPrimitive(member.method.result, this.materialize(defaults.values.get(member.method.name), member.method.result));
+      }
       if (name === 'isSynthetic') return member.flags & 0x1000 ? 1 : 0;
       if (name === 'isBridge') return member.flags & 0x40 ? 1 : 0;
       if (name === 'invoke') return this.reflectionInvoke(member, obj.accessible, args[1], args[2]);
@@ -4443,8 +4476,9 @@ export class APKRuntime {
         if (method.parameters[0] === 'I' && int(args[1]) < 0) this.throwJava('Ljava/lang/IllegalArgumentException;', 'negative StringBuilder capacity');
         if (method.parameters[0] === 'Ljava/lang/CharSequence;') {   // StringBuilder(CharSequence): the sequence's text (NPE for null)
           if (isNull(args[1])) this.throwJava('Ljava/lang/NullPointerException;', null);
-          obj.builder = typeof args[1] === 'string' ? args[1] : this.stringCharacters(this.dispatch({ owner: 'Ljava/lang/Object;', name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [args[1]], 'virtual'));
-          return undefined;
+          if (typeof args[1] === 'string') { obj.builder = args[1]; return undefined; }
+          // seq.toString() as a continuation of the calling thread (see javaStringStep)
+          return new Invoke({ owner: 'Ljava/lang/Object;', name: 'toString', parameters: [], result: 'Ljava/lang/String;', signature: '()Ljava/lang/String;' }, [args[1]], 'virtual', text => { obj.builder = this.stringCharacters(text); return undefined; });
         }
         obj.builder = typeof args[1] === 'string' ? args[1] : ''; return undefined;
       }
@@ -4493,10 +4527,13 @@ export class APKRuntime {
         let piece;
         if (method.parameters[1] === '[C') { const array = this.array(args[2]), ranged = method.parameters.length === 4, from = ranged ? int(args[3]) : 0, count = ranged ? int(args[4]) : array.elements.length; if (from < 0 || count < 0 || from > array.elements.length - count) bad('Ljava/lang/StringIndexOutOfBoundsException;', 'Invalid char-array insert range'); piece = utf16String(array.elements.slice(from, from + count)); }
         else if (method.parameters.length === 4) { const seq = isNull(args[2]) ? 'null' : this.javaString(args[2], 'Ljava/lang/CharSequence;'), from = int(args[3]), to = int(args[4]); if (from < 0 || to < from || to > seq.length) bad('Ljava/lang/IndexOutOfBoundsException;', `start ${from}, end ${to}, length ${seq.length}`); piece = seq.slice(from, to); }
-        else piece = this.javaString(args[2], method.parameters[1]);
+        else return this.javaStringStep(args[2], method.parameters[1], piece => {   // insert(offset, String.valueOf(x)): the text first, then the bounds against the builder of then
+          const now = obj.builder ?? ''; if (offset > now.length) bad('Ljava/lang/StringIndexOutOfBoundsException;', `offset ${offset}, length ${now.length}`);
+          obj.builder = limit(now.slice(0, offset) + piece + now.slice(offset)); return args[0];
+        });
         obj.builder = limit(text.slice(0, offset) + piece + text.slice(offset)); return args[0];
       }
-      if (name === 'append') { const value = this.javaString(args[1], method.parameters[0]); if ((obj.builder ?? '').length + value.length > 4000000) fail('StringBuilder length limit exceeded'); obj.builder = (obj.builder ?? '') + value; return args[0]; }
+      if (name === 'append') return this.javaStringStep(args[1], method.parameters[0], value => { if ((obj.builder ?? '').length + value.length > 4000000) fail('StringBuilder length limit exceeded'); obj.builder = (obj.builder ?? '') + value; return args[0]; });
       if (name === 'charAt') { const value = obj.builder ?? '', index = int(args[1]); if (index < 0 || index >= value.length) this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;', String(index)); return value.charCodeAt(index); }
       if (name === 'subSequence') { const value = obj.builder ?? '', start = int(args[1]), end = int(args[2]); if (start < 0 || end < start || end > value.length) this.throwJava('Ljava/lang/StringIndexOutOfBoundsException;', 'Invalid builder subsequence'); return value.slice(start, end); }
       if (name === 'toString') return obj.builder ?? '';

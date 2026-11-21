@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { gcRoot } from './heap-gc.js?v=7233e918dcc9';
-import { Blocked } from './scheduler.js?v=7233e918dcc9';
+import { APP_PID, SYSTEM_SERVER_PID } from './virtual-pids.js?v=af8ff7411a95';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { gcRoot } from './heap-gc.js?v=af8ff7411a95';
+import { Blocked } from './scheduler.js?v=af8ff7411a95';
 
 /**
  * Thrown by a host method that needs another package's process while that process starts on the main thread (ensureProcess off the main thread): the Java call site that
@@ -9,8 +10,8 @@ import { Blocked } from './scheduler.js?v=7233e918dcc9';
 export class ProcessStartPending extends Error {
   constructor(blocked) { super(blocked.reason); this.name = 'ProcessStartPending'; this.blocked = blocked; }
 }
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7233e918dcc9';
-import { AndroidResources } from './android-resources.js?v=7233e918dcc9';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=af8ff7411a95';
+import { AndroidResources } from './android-resources.js?v=af8ff7411a95';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.
@@ -29,7 +30,7 @@ import { AndroidResources } from './android-resources.js?v=7233e918dcc9';
 
 const APPLICATION = 'Landroid/app/Application;', APP_CONTEXT = 'Landroid/app/ContextImpl;', APPLICATION_INFO = 'Landroid/content/pm/ApplicationInfo;', STRING = 'Ljava/lang/String;';
 const PACKAGE_MANAGER = 'Landroid/content/pm/PackageManager;';
-const FIRST_UID = 10001, FIRST_PID = 2;
+const FIRST_UID = 10001, FIRST_PID = APP_PID + 1;   // a second package's process is forked from zygote after the app's (src/virtual-pids.js)
 const isFalse = value => value === false || value === 0 || value === 'false';
 const isTrue = value => value === true || value === 0xffffffff || value === -1 || value === 'true' || (Number.isInteger(value) && value !== 0);
 const descriptorOf = name => `L${name.replaceAll('.', '/')};`;
@@ -54,7 +55,7 @@ export function createPackageRegistry(platform) {
 
   // system_server (uid 1000): the caller of a transaction the device's own services make into a package (AccountManagerService binding an account authenticator, src/account-sessions.js).
   // It is not an installed package (no code, no Context); it holds every permission, as ActivityManager.checkComponentPermission grants SYSTEM_UID.
-  const system = Object.freeze({ main: false, system: true, systemServer: true, name: 'android', uid: 1000, pid: 900, manifest: Object.freeze({ usesPermissions: [], declaredPermissions: [], componentDetails: [] }), signingCertificates: () => [] });
+  const system = Object.freeze({ main: false, system: true, systemServer: true, name: 'android', uid: 1000, pid: SYSTEM_SERVER_PID, manifest: Object.freeze({ usesPermissions: [], declaredPermissions: [], componentDetails: [] }), signingCertificates: () => [] });
   const entries = () => [main, ...companions.values()];
   const byName = name => name === main.name ? main : companions.get(name) ?? null;
   const byUid = uid => entries().find(entry => entry.uid === uid) ?? null;

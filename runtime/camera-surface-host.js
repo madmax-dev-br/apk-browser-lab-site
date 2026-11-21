@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=7233e918dcc9';
-import { bitsFloat, floatBits } from './host-contract.js?v=7233e918dcc9';
-import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=7233e918dcc9';
-import { ByteCells, IntCells } from './java-arrays.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=af8ff7411a95';
+import { bitsFloat, floatBits } from './host-contract.js?v=af8ff7411a95';
+import { FORMAT, rgbaToYuv420, withExifOrientation, exifOrientation } from './camera-frames.js?v=af8ff7411a95';
+import { IntCells } from './java-arrays.js?v=af8ff7411a95';
+import { allocateNativeBlock, freeNativeBlock, writeNativeBytes } from './unsafe-native.js?v=af8ff7411a95';
 
 // The consumers a camera stream ends in (android-13.0.0_r1 TextureView.java, SurfaceView.java, SurfaceHolder.java, ImageReader.java, Image.java), over the lab's frame path:
 //
@@ -267,10 +268,15 @@ export function installCameraSurfaces({ platform, registry, post, targetFor }) {
     const read = name => r.object(rect).fields.get(`${RECT}->${name}:I`) ?? 0, left = Math.max(0, read('left')), top = Math.max(0, read('top')), right = Math.min(image.frame.width, read('right')), bottom = Math.min(image.frame.height, read('bottom'));
     image.crop = left < right && top < bottom ? [left, top, right, bottom] : [0, 0, 0, 0];   // Rect.intersect with the image bounds, empty when they do not meet
   });
-  def(IMAGE_IMPL, 'close', '()V', (r, _m, [self]) => { const image = r.object(self).image; if (image.closed) return; image.closed = true; image.frame.rgba = null; image.frame = null; image.planes = null; const reader = readerOf(r, image.reader); if (reader.acquired > 0) reader.acquired--; });
-  const bytes = (r, data) => r.newArray('[B', data.length, new ByteCells(data.buffer, data.byteOffset, data.length));   // the Java byte[] is a view of the frame's own memory: no copy
-  const plane = (r, array, offset, length, rowStride, pixelStride) => {
-    const wrapped = callStatic(r, BYTE_BUFFER, 'wrap', ['[B', 'I', 'I'], BYTE_BUFFER, [array, offset, length]), sliced = call(r, wrapped, BYTE_BUFFER, 'slice', [], BYTE_BUFFER), readOnly = call(r, sliced, BYTE_BUFFER, 'asReadOnlyBuffer', [], BYTE_BUFFER);
+  def(IMAGE_IMPL, 'close', '()V', (r, _m, [self]) => { const image = r.object(self).image; if (image.closed) return; image.closed = true; for (const block of image.blocks ?? []) freeNativeBlock(r, block); image.blocks = null;   // the planes' native memory goes back, as the buffer does to the queue
+    image.frame.rgba = null; image.frame = null; image.planes = null; const reader = readerOf(r, image.reader); if (reader.acquired > 0) reader.acquired--; });
+  // Image.Plane.getBuffer is a direct ByteBuffer over the image's native memory, as the graphics buffer is on a device: native code (GetDirectBufferAddress) reads the pixels at its
+  // address. The frame's bytes are written once into a block of the process's native memory (src/unsafe-native.js: the native process's heap when the app has one), freed by Image.close.
+  const block = (r, image, data) => { const address = allocateNativeBlock(r, Math.max(1, data.length)); writeNativeBytes(r, address, data); (image.blocks ??= []).push(address); return address; };
+  const plane = (r, address, offset, length, rowStride, pixelStride) => {
+    const direct = r.allocate('Ljava/nio/DirectByteBuffer;');
+    r.dispatch({ owner: 'Ljava/nio/DirectByteBuffer;', name: '<init>', parameters: ['J', 'I'], result: 'V', signature: '(JI)V' }, r.argumentWords(['J', 'I'], [BigInt.asIntN(64, address + BigInt(offset)), length], { receiver: direct }), 'direct');
+    const readOnly = call(r, direct, BYTE_BUFFER, 'asReadOnlyBuffer', [], BYTE_BUFFER);
     const ref = r.makeObject(PLANE_IMPL); r.object(ref).plane = { buffer: readOnly, rowStride, pixelStride }; return ref;
   };
   /** The JPEG stream of a captured frame: libjpeg-turbo at the request's JPEG_QUALITY, then the Exif Orientation of JPEG_ORIENTATION. */
@@ -282,9 +288,9 @@ export function installCameraSurfaces({ platform, registry, post, targetFor }) {
   def(IMAGE_IMPL, 'getPlanes', `()[${PLANE}`, (r, _m, [self]) => {
     const image = imageOf(r, self); if (image.planes) return image.planes;
     const frame = image.frame, planes = [];
-    if (frame.format === FORMAT.JPEG) { const data = encodeJpeg(r, frame); planes.push(plane(r, bytes(r, data), 0, data.length, 0, 0)); }
+    if (frame.format === FORMAT.JPEG) { const data = encodeJpeg(r, frame); planes.push(plane(r, block(r, image, data), 0, data.length, 0, 0)); }
     else if (frame.format === FORMAT.YUV_420_888) {
-      const yuv = rgbaToYuv420(frame.rgba, frame.width, frame.height), luma = bytes(r, yuv.y), chroma = bytes(r, yuv.vu), span = yuv.vu.length - 1;
+      const yuv = rgbaToYuv420(frame.rgba, frame.width, frame.height), luma = block(r, image, yuv.y), chroma = block(r, image, yuv.vu), span = yuv.vu.length - 1;
       planes.push(plane(r, luma, 0, yuv.y.length, frame.width, 1), plane(r, chroma, 1, span, yuv.chromaRowStride, 2), plane(r, chroma, 0, span, yuv.chromaRowStride, 2));   // U starts at the odd bytes of the interleaved V,U plane
     }   // PRIVATE: an opaque buffer has no planes
     const array = r.newArray(`[${PLANE}`, planes.length); r.array(array).elements = planes; image.planes = array; return array;

@@ -1,0 +1,196 @@
+{
+  "schemaVersion": 2,
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "linking": "Relocatable wasm32 shared libraries (wasm-ld -shared / -pie, dylink.0) linked by src/native-linker.js into one memory + one table per process; libc/libc++/libc++abi/libunwind are the single base module libc++_shared.so.",
+  "jniHeader": "OpenJDK 21 include/jni.h (GPLv2 + Classpath Exception, header only; identical JNI ABI to Android)",
+  "scope": "Lab-built wasm32 libraries from upstream sources at the exact versions of the Wellhub apps (react-android 0.79.4, fbjni 0.7.0). Never derived from an APK.",
+  "flags": "-fPIC -fwasm-exceptions -frtti -fexceptions -O2 -sSIDE_MODULE=1 (base: wasm-ld --experimental-pic -pie --export-dynamic over Emscripten's PIC system libraries)",
+  "libraries": {
+    "libfbjni.so": {
+      "soname": "libfbjni.so",
+      "abi": "wasm32",
+      "file": "libfbjni.wasm",
+      "bytes": 90279,
+      "sha256": "b55d5863aa9992abfbc06ef75ec6d780aa1c2d87b0e4aafa3a8c8762fac45b88",
+      "needed": [
+        "libandroid.so",
+        "liblog.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebookincubator/fbjni",
+      "tag": "v0.7.0",
+      "commit": "474795fa9ff0dda60b838871171be935432bae16",
+      "license": "licenses/fbjni-Apache-2.0.txt",
+      "sources": [
+        "cxx/fbjni/*.cpp",
+        "cxx/fbjni/detail/*.cpp",
+        "cxx/lyra/lyra.cpp",
+        "cxx/lyra/lyra_exceptions.cpp (cxx/lyra/cxa_throw.cpp NOT built)"
+      ],
+      "ports": [
+        "scripts/wasm/fbjni-compat.cpp: pthread_getname_np (single main thread) and lyra::detail::getExceptionTraceHolder with std::rethrow_exception instead of the Bionic cxa_throw interposer"
+      ],
+      "requires": {
+        "reactNative": "0.87.1"
+      }
+    },
+    "libjsi.so": {
+      "soname": "libjsi.so",
+      "abi": "wasm32",
+      "file": "libjsi.wasm",
+      "bytes": 843353,
+      "sha256": "9ddff26a82f777a35521a639d413257995b14fd65a5a9e563d1575aaa510478c",
+      "needed": [
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/react-native",
+      "tag": "v0.87.1",
+      "commit": "a59eff64fa907ed6e919fafe6cbd26d1d54c2de3",
+      "license": "licenses/react-native-MIT.txt",
+      "sources": [
+        "packages/react-native/ReactCommon/jsi/CMakeLists.txt: jsi/*.cpp (jsi.cpp, JSIDynamic.cpp, jsilib-posix.cpp, jsilib-windows.cpp) + folly_runtime + glog, as the Android build links them",
+        "third-party-ndk trees assembled like ReactAndroid/build.gradle.kts (scripts/wasm/prepare-rn-deps.py), SHA-256-pinned: boost 1.83.0 (headers), double-conversion 1.1.6, folly v2024.11.18.00, fast_float 8.0.0, fmt 12.1.0, glog 0.3.5 (versions of 0.87.1's gradle/libs.versions.toml, the same as 0.88.1's)"
+      ],
+      "ports": [
+        "scripts/wasm/rn/CMakeLists.txt: Emscripten toolchain, -DANDROID (NDK define) and the CMake variable ANDROID the NDK toolchain sets (0.87.1's CMake files branch on it, as 0.88's do: RN_SERIALIZABLE_STATE, the jni_lib_merge JNI_OnLoad renaming, the Android platform selector), imported targets for the prefab packages fbjni/hermes-engine (hermesvm)/jsc-android, android/log as the lab ports, ANDROID_ABI=wasm32; link-time optimization (check_ipo_supported in 0.87.1's top-level file) cleared on every target",
+        "scripts/wasm/lab-link.mjs: shared-library link rule: DT_NEEDED recorded in link order, --defsym=JNI_OnLoad=JNI_OnLoad_Weak as a forwarding function, duplicate archives removed",
+        "scripts/wasm/ports/include/lab-bionic.h (force-included): __unused attribute macro, dirname(const char*), FE_OVERFLOW/FE_UNDERFLOW values (wasm has no FP exception flags)",
+        "scripts/wasm/ports/include/sys/endian.h (musl <endian.h>) and android/{log,asset_manager,asset_manager_jni}.h (declarations of the public NDK API)",
+        "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (as for fmt 11.0.2); folly/lang/Exception.h gives make_exception_ptr_with_arg_::dtor the WebAssembly C++ ABI destructor type void*(void*) under __wasm__ (Exception.cpp, compiled into folly_runtime by 0.86, 0.87 and 0.88, passes it to libc++abi's __cxa_init_primary_exception); boost has no asm (header-only)",
+        "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)",
+        "HERMES_V1_ENABLED=1: 0.87.1's react-native-flags.cmake defines it on every target unconditionally (Hermes V1 is the only Hermes of 0.87); the -DHERMES_V1_ENABLED=1 scripts/wasm/build-reactnative.sh passes for Hermes V1 releases is not read"
+      ],
+      "requires": {
+        "reactNative": "0.87.1"
+      }
+    },
+    "libreactnative.so": {
+      "soname": "libreactnative.so",
+      "abi": "wasm32",
+      "file": "libreactnative.wasm",
+      "bytes": 7683452,
+      "sha256": "c74dd7101333d6884056121dab27c99b5818d6259c6fa907b7e75df248469f9d",
+      "needed": [
+        "libandroid.so",
+        "libfbjni.so",
+        "libjsi.so",
+        "liblog.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/react-native",
+      "tag": "v0.87.1",
+      "commit": "a59eff64fa907ed6e919fafe6cbd26d1d54c2de3",
+      "license": "licenses/react-native-MIT.txt",
+      "sources": [
+        "packages/react-native/ReactAndroid/src/main/jni/CMakeLists.txt included unmodified through scripts/wasm/rn/CMakeLists.txt: the OBJECT libraries merged into target `reactnative` (bridgeless ... yoga, 87 of them, see that file)",
+        "third-party-ndk trees assembled like ReactAndroid/build.gradle.kts (scripts/wasm/prepare-rn-deps.py), SHA-256-pinned: boost 1.83.0 (headers), double-conversion 1.1.6, folly v2024.11.18.00, fast_float 8.0.0, fmt 12.1.0, glog 0.3.5 (versions of 0.87.1's gradle/libs.versions.toml, the same as 0.88.1's)",
+        "React Native core codegen output (library FBReactNativeSpec, CMake target react_codegen_rncore): @react-native/codegen 0.87.1 (npm, integrity-pinned) run over packages/react-native/src with RN's generate-specs-cli.js"
+      ],
+      "ports": [
+        "scripts/wasm/rn/CMakeLists.txt: Emscripten toolchain, -DANDROID (NDK define) and the CMake variable ANDROID the NDK toolchain sets (0.87.1's CMake files branch on it, as 0.88's do: RN_SERIALIZABLE_STATE, the jni_lib_merge JNI_OnLoad renaming, the Android platform selector), imported targets for the prefab packages fbjni/hermes-engine (hermesvm)/jsc-android, android/log as the lab ports, ANDROID_ABI=wasm32; link-time optimization (check_ipo_supported in 0.87.1's top-level file) cleared on every target",
+        "scripts/wasm/lab-link.mjs: shared-library link rule: DT_NEEDED recorded in link order, --defsym=JNI_OnLoad=JNI_OnLoad_Weak as a forwarding function, duplicate archives removed",
+        "scripts/wasm/ports/include/lab-bionic.h (force-included): __unused attribute macro, dirname(const char*), FE_OVERFLOW/FE_UNDERFLOW values (wasm has no FP exception flags)",
+        "scripts/wasm/ports/include/sys/endian.h (musl <endian.h>) and android/{log,asset_manager,asset_manager_jni}.h (declarations of the public NDK API)",
+        "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (as for fmt 11.0.2); folly/lang/Exception.h gives make_exception_ptr_with_arg_::dtor the WebAssembly C++ ABI destructor type void*(void*) under __wasm__ (Exception.cpp, compiled into folly_runtime by 0.86, 0.87 and 0.88, passes it to libc++abi's __cxa_init_primary_exception); boost has no asm (header-only)",
+        "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)",
+        "scripts/wasm/ports/oscompat-wasm.cpp: facebook::react::oscompat::getCurrentProcessId/getCurrentThreadId (ReactCommon/oscompat compiles only for __linux__/__ANDROID__)",
+        "HERMES_V1_ENABLED=1: 0.87.1's react-native-flags.cmake defines it on every target unconditionally (Hermes V1 is the only Hermes of 0.87); the -DHERMES_V1_ENABLED=1 scripts/wasm/build-reactnative.sh passes for Hermes V1 releases is not read"
+      ],
+      "requires": {
+        "reactNative": "0.87.1"
+      }
+    },
+    "libhermesvm.so": {
+      "soname": "libhermesvm.so",
+      "abi": "wasm32",
+      "file": "libhermesvm.wasm",
+      "bytes": 2099941,
+      "sha256": "f99c51fc264a1cc7d016e77fd7a725e26f8cacd485532b35e488573d6cd9b617",
+      "needed": [
+        "libjsi.so",
+        "libfbjni.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/hermes",
+      "tag": "hermes-v250829098.0.17",
+      "commit": "3477757eb2475555cf8d8df24bfb1deb0613880d",
+      "license": "licenses/hermes-MIT.txt",
+      "sources": [
+        "Hermes V1: CMakeLists.txt target hermesvm (lib/CMakeLists.txt: the whole hermesvm_a archive, API/hermes, lib/VM, lib/Platform/Intl/PlatformIntlAndroid.cpp, lib/Platform/Unicode/PlatformUnicodeJava.cpp, ...) with the options ReactAndroid/hermes-engine/build.gradle.kts of React Native 0.87.1 passes (Hermes V1 on, the default of its Gradle plugin) for Android: HERMES_IS_ANDROID, HERMES_BUILD_SHARED_JSI, HERMES_ENABLE_INTL, HERMESVM_HEAP_HV_MODE=HEAP_HV_PREFER32, MinSizeRel, -DJSI_DIR=ReactCommon/jsi, HERMES_ENABLE_DEBUGGER=False",
+        "hermesc (host tool the build needs, imported through ImportHostCompilers.cmake) is built natively with the host compiler and is not part of the output",
+        "the Hermes commit 0.86.3 and 0.87.1 both pin (hermes-v250829098.0.17), built for each release against React Native 0.87.1's own ReactCommon/jsi and with HERMES_RELEASE_VERSION \"for RN 0.87.1\""
+      ],
+      "ports": [
+        "scripts/wasm/build-hermes.sh: Emscripten toolchain, SHARED libraries enabled (scripts/wasm/shared-libs.cmake), DT_NEEDED written by scripts/wasm/lab-link.mjs",
+        "HERMESVM_ALLOW_CONCURRENT_GC=OFF (no threads in the module; Android's libhermes runs Hades with a background thread), HERMESVM_ALLOW_INLINE_ASM=OFF, HERMES_CHECK_NATIVE_STACK=OFF (same options as the isolated proof, hermes-proof/)",
+        "fbjni as CMake package for find_package(fbjni) pointing at the lab libfbjni.so; scripts/wasm/ports/include/lab-bionic.h force-included; -Wno-error and -fwasm-exceptions appended through EMCC_CFLAGS",
+        "scripts/wasm/patch-hermes.py: the sampling-profiler platform gate (include/hermes/VM/Profiler/SamplingProfilerDefs.h) stays open under -DAPKWEB_SAMPLING_PROFILER_OBJECT, as for libhermes"
+      ],
+      "requires": {
+        "reactNative": "0.87.1",
+        "hermesBytecodeVersion": 98
+      }
+    },
+    "libhermestooling.so": {
+      "soname": "libhermestooling.so",
+      "abi": "wasm32",
+      "file": "libhermestooling.wasm",
+      "bytes": 982036,
+      "sha256": "68ba1026a19a29279730b191c97d61b71f9a389a5d17b12280146e8c3b56c516",
+      "needed": [
+        "libreactnative.so",
+        "libjsi.so",
+        "libhermesvm.so",
+        "libandroid.so",
+        "libfbjni.so",
+        "liblog.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/react-native",
+      "tag": "v0.87.1",
+      "commit": "a59eff64fa907ed6e919fafe6cbd26d1d54c2de3",
+      "license": "licenses/react-native-MIT.txt",
+      "sources": [
+        "packages/react-native/ReactAndroid/src/main/jni/react/hermes/tooling/CMakeLists.txt: target hermestooling = bridgelesshermes + hermes_executor + hermes_executor_common + hermes_inspector_modern + hermesinstancejni + jni_lib_merge_glue + jsijniprofiler, built by the same unmodified ReactAndroid CMake as libreactnative"
+      ],
+      "ports": [
+        "scripts/wasm/rn/CMakeLists.txt: Emscripten toolchain, -DANDROID (NDK define) and the CMake variable ANDROID the NDK toolchain sets (0.87.1's CMake files branch on it, as 0.88's do: RN_SERIALIZABLE_STATE, the jni_lib_merge JNI_OnLoad renaming, the Android platform selector), imported targets for the prefab packages fbjni/hermes-engine (hermesvm)/jsc-android, android/log as the lab ports, ANDROID_ABI=wasm32; link-time optimization (check_ipo_supported in 0.87.1's top-level file) cleared on every target",
+        "scripts/wasm/lab-link.mjs: shared-library link rule: DT_NEEDED recorded in link order, --defsym=JNI_OnLoad=JNI_OnLoad_Weak as a forwarding function, duplicate archives removed",
+        "scripts/wasm/ports/include/lab-bionic.h (force-included): __unused attribute macro, dirname(const char*), FE_OVERFLOW/FE_UNDERFLOW values (wasm has no FP exception flags)",
+        "scripts/wasm/ports/include/sys/endian.h (musl <endian.h>) and android/{log,asset_manager,asset_manager_jni}.h (declarations of the public NDK API)",
+        "scripts/wasm/prepare-rn-deps.py: double-conversion utils.h architecture list gains __wasm__; fmt base.h disables consteval under Emscripten (as for fmt 11.0.2); folly/lang/Exception.h gives make_exception_ptr_with_arg_::dtor the WebAssembly C++ ABI destructor type void*(void*) under __wasm__ (Exception.cpp, compiled into folly_runtime by 0.86, 0.87 and 0.88, passes it to libc++abi's __cxa_init_primary_exception); boost has no asm (header-only)",
+        "-Wno-error on the compile line (RN builds with -Wall -Werror under NDK clang 18; Emscripten's clang 20 warns about more)",
+        "HERMES_V1_ENABLED=1: 0.87.1's react-native-flags.cmake defines it on every target unconditionally (Hermes V1 is the only Hermes of 0.87); the -DHERMES_V1_ENABLED=1 scripts/wasm/build-reactnative.sh passes for Hermes V1 releases is not read"
+      ],
+      "requires": {
+        "reactNative": "0.87.1"
+      }
+    },
+    "libappmodules.so@a5375e64e587": {
+      "soname": "libappmodules.so",
+      "abi": "wasm32",
+      "file": "apps/a5375e64e587/libappmodules.wasm",
+      "bytes": 17388,
+      "sha256": "582a9573ff1451f781e48dcd9abac51029fbbf7978c068de684801c95a251a93",
+      "needed": [
+        "libfbjni.so",
+        "libjsi.so",
+        "libreactnative.so",
+        "libc++_shared.so"
+      ],
+      "upstream": "https://github.com/facebook/react-native",
+      "tag": "v0.87.1",
+      "commit": "a59eff64fa907ed6e919fafe6cbd26d1d54c2de3",
+      "license": "licenses/react-native-MIT.txt",
+      "sources": [
+        "packages/react-native/ReactAndroid/cmake-utils/default-app-setup/OnLoad.cpp",
+        "autolinking.cpp and autolinking.h generated by the probe's own Gradle build (task generateAutolinkingNewArchitectureFiles of @react-native/gradle-plugin 0.87.1, scripts/wasm/gen-rn-probe-autolinking.sh)"
+      ],
+      "ports": [
+        "target appmodules_rnhello in scripts/wasm/rn/CMakeLists.txt (React Native 0.87.1 tree), linked against the finished libjsi and libreactnative of 0.87.1, compiled with target_compile_reactnative_options as 0.87.1's ReactNative-application.cmake compiles an app library (RN_SERIALIZABLE_STATE, HERMES_V1_ENABLED=1)"
+      ],
+      "apkSha256": "a5375e64e587ac72b42a216ad431742e12a4ac77d5457e13e4909ed3c2457284",
+      "scope": "fixtures/rn-probe-0.87.1.apk only (the synthetic React Native 0.87.1 probe, scripts/build-rn-probe.sh): its libappmodules.so is React Native 0.87.1's template (cmake-utils/default-app-setup/OnLoad.cpp, which registers the core TurboModules through FBReactNativeSpec_ModuleProvider) with no autolinked libraries. It is NOT offered to any other APK."
+    }
+  }
+}
