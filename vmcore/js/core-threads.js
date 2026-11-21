@@ -29,11 +29,11 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=e3ff4f2e305f';
+import { Blocked } from '../../runtime/scheduler.js?v=d6bc8426c03e';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=e3ff4f2e305f';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=e3ff4f2e305f';
-import { CLASS } from './linker.js?v=e3ff4f2e305f';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d6bc8426c03e';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=d6bc8426c03e';
+import { CLASS } from './linker.js?v=d6bc8426c03e';
 const CLASS_INIT_STATE = CLASS.initState, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZING
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
@@ -179,6 +179,35 @@ export class CoreThreads {
     if (of(main)) return main; for (const thread of this.sched.threads) if (of(thread)) return thread; return null;
   }
   className(klass) { for (const [type, info] of this.engine.linker?.classes ?? []) if (info?.address === klass) return type; return `the class at 0x${(klass >>> 0).toString(16)}`; }
+  /**
+   * x.run_nested of method `id` on `thread`'s record with argument words `words` (written to the record's argument area), class `init` to initialize first (0: the method's
+   * own, for a static one). `stackTop`/`depth`: the record's live stack and call depth the run starts above (what the caller published). Remembered in thread.core.entry: a run
+   * whose entry needs a class another thread is initializing -- the method's class or one of its superclasses -- stops before its first frame (THREAD_BLOCKED with Thread.frame
+   * 0, vmcore/abi.h: "call run() again"), and advance() parks the thread until that class is ready and then starts the run again (parkEntry).
+   */
+  runEntry(thread, id, words, init, stackTop, depth) {
+    const t = thread.core.t, u32 = this.u32, args = (t + this.engine.argsOffset) >> 2;
+    for (let i = 0; i < words.length; i++) u32[args + i] = words[i] >>> 0;
+    const entry = thread.core.entry ??= { method: 0, words: null, init: 0, stackTop: 0, depth: 0 };   // one per thread, reused (a few thousand nested runs a frame); parkEntry takes it. No key the host root walk reads as an object id (heap-gc.js ID_KEY): `method`, not `id`
+    entry.method = id; entry.words = words; entry.init = init; entry.stackTop = stackTop; entry.depth = depth;
+    const status = this.x.run_nested(t, id, t + this.engine.argsOffset, init) >>> 0;
+    if (status !== S.THREAD_BLOCKED) entry.words = null;   // only a run that may start again keeps its argument words (no stale words outlive the run they were for)
+    return status;
+  }
+  /**
+   * The run of thread.core.entry stopped before its first frame: the class it initializes first (or a superclass of it) is being initialized by another thread. The thread waits
+   * for that class like a thread at an invoke-static waits in the core (parkCore: the class's initState word, the thread running its <clinit> as the holder), and resume()
+   * starts the run again. Meanwhile the record's stack covers the frames below the run and the entry frame, whose registers hold the arguments (the collector scans
+   * [stackBase, stackTop) conservatively); the run's own start (finish) had dropped both.
+   */
+  parkEntry(thread) {
+    const entry = thread.core.entry, t = thread.core.t, u32 = this.u32; thread.core.entry = null;
+    const base = entry.stackTop !== 0 && entry.stackTop !== u32[(t + 4) >> 2] ? entry.stackTop : u32[(t + 4) >> 2];   // abi.h Thread.stackBase (+4); run_nested's base frame
+    const registers = this.engine.linker.methodList[entry.method]?.registers ?? 0;
+    u32[(t + T.stackTop) >> 2] = Math.min(base + 4 * (3 + registers), u32[(t + 8) >> 2]); u32[(t + T.depth) >> 2] = entry.depth;   // FRAME_WORDS = 3; Thread.stackEnd (+8)
+    this.parkCore(thread);
+    thread.coreWait = { kind: 'entry', entry };
+  }
   /** A host's Blocked, met by a host step of the thread (`thread.core.steps` says where its value goes). */
   parkHost(thread, blocked) { thread.blocked = blocked; thread.waitSite = this.rt.lastHostCall ?? null; thread.state = 'blocked'; thread.coreWait = STEP_WAIT; this.stats.hostParks++; }
 
@@ -188,6 +217,11 @@ export class CoreThreads {
     if (wait === null || wait === undefined) return null;
     if (wait.kind === 'yield') return x.resume(t) >>> 0;
     const blocked = thread.blocked, timedOut = thread.timedOut === true; thread.blocked = null; thread.state = 'runnable';
+    if (wait.kind === 'entry') {   // parkEntry: the class is ready (or its initializer failed): the run starts again from the same stack
+      const entry = wait.entry; thread.core.deadline = undefined;
+      this.u32[(t + T.stackTop) >> 2] = entry.stackTop; this.u32[(t + T.depth) >> 2] = entry.depth;
+      return this.runEntry(thread, entry.method, entry.words, entry.init, entry.stackTop, entry.depth);
+    }
     if (wait.kind === 'core') {
       thread.core.deadline = undefined;
       if (timedOut && this.u32[(t + T.waitPhase) >> 2] === WAIT_LISTED) x.thr_wait_timeout(t);
@@ -249,7 +283,7 @@ export class CoreThreads {
       }
     } finally { if (engine.pins.length > mark) engine.pins.length = mark; }   // what the steps keep is in thread.core.steps, the record or thread.blocked (roots)
     if (action === null || action === PARKED) return action;
-    return (action.how !== undefined ? this.x.resume_host(thread.core.t, action.how) : this.x.run_nested(thread.core.t, action.id, thread.core.t + engine.argsOffset, 0)) >>> 0;
+    return action.how !== undefined ? this.x.resume_host(thread.core.t, action.how) >>> 0 : this.runEntry(thread, action.id, action.words, 0, action.stackTop, action.depth);
   }
   /** A DEX body a host step handed back: a run on the thread's record above its live frames (whose registers of the record come back when it ends: leave()). */
   enter(thread, pending) {
@@ -260,8 +294,8 @@ export class CoreThreads {
     thread.core.steps.push({ kind: 'run', t, result: pending.method.result ?? pending.method.signature.slice(pending.method.signature.indexOf(')') + 1),
       saved: { frame: u32[(t + T.frame) >> 2], pc: u32[(t + T.pc) >> 2], depth: u32[(t + T.depth) >> 2], stackTop: u32[(t + T.stackTop) >> 2], throwing: u32[(t + T.throwing) >> 2],
         status: u32[(t + T.status) >> 2], detail: u32[(t + T.detail) >> 2], result: view.getBigUint64(t + T.result, true) } });
-    words.forEach((w, i) => { u32[((t + engine.argsOffset) >> 2) + i] = w >>> 0; });
-    return { id: mi.id };
+    const saved = thread.core.steps[thread.core.steps.length - 1].saved;
+    return { id: mi.id, words, stackTop: saved.stackTop, depth: saved.depth };   // runEntry writes the words
   }
   /** The run of the thread's top step ended with `status`: the record is the caller's again, and the value or the exception goes on through the steps below. */
   leave(thread, status) {
@@ -329,7 +363,7 @@ export class CoreThreads {
           if (this.mustYield(thread, owner)) { thread.coreWait = { kind: 'yield' }; thread.state = 'runnable'; this.stats.yields++; return YIELD; }
           status = x.resume(t) >>> 0; continue;
         case S.THREAD_BLOCKED:
-          if (!this.u32[(t + T.frame) >> 2]) break;   // run() did not start (a stopped world: never in green threads)
+          if (!this.u32[(t + T.frame) >> 2]) { if (thread.core.entry === null || thread.core.entry === undefined) break; this.parkEntry(thread); return PARKED; }   // the run did not start: it starts again (parkEntry)
           this.parkCore(thread); return PARKED;
         case S.HOST_BLOCKED: {   // a host answered a step at a call site (a wait, a call into Java): the invoke is complete but for its value
           const parked = engine.takeParked();

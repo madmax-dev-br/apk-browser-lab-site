@@ -1,9 +1,9 @@
 // The APK's ZIP container (central directory, bounded entry expansion with CRC checks), apart from the loader so the page can open an archive (an App Bundle's
 // base module, src/aab-bundle.js) without loading the VM. src/apk-loader.js re-exports it. Imports only the light ZIP helpers and APKError.
-import { APKError } from './apk-error.js?v=e3ff4f2e305f';
-import { BinaryReader } from './binary-reader.js?v=e3ff4f2e305f';
-import { inflateRaw } from './inflate.js?v=e3ff4f2e305f';
-import { crc32, inflateEntry } from './zip-entry.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=d6bc8426c03e';
+import { BinaryReader } from './binary-reader.js?v=d6bc8426c03e';
+import { inflateRaw } from './inflate.js?v=d6bc8426c03e';
+import { crc32, inflateEntry } from './zip-entry.js?v=d6bc8426c03e';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });

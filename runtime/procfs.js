@@ -25,10 +25,10 @@
 // - /proc/meminfo: MemTotal, MemFree, MemAvailable (the device's memory and what the app's process does not hold of it, as ActivityManager.getMemoryInfo reports them);
 //   Buffers, Cached, SwapCached, SwapTotal and SwapFree are 0 (the virtual device has no page cache and no swap); the kernel's other counters are left out
 // Anything else under the app's process directory is ENOENT, and the trace says the lab does not model it (once per path).
-import { ZYGOTE_EXECUTABLE } from './virtual-pids.js?v=e3ff4f2e305f';
-import { ART_BLOCKED } from './arm64/signals.js?v=e3ff4f2e305f';
-import { mountsText, procVersionText, appSecurityContext } from './system-image.js?v=e3ff4f2e305f';
-import { processMappings, smapsRollupText, statmText, statusMemoryLines, processMemory, deviceMemory, processCpuMs, PAGE_SIZE } from './process-memory.js?v=e3ff4f2e305f';
+import { ZYGOTE_EXECUTABLE } from './virtual-pids.js?v=d6bc8426c03e';
+import { ART_BLOCKED } from './arm64/signals.js?v=d6bc8426c03e';
+import { mountsText, procVersionText, appSecurityContext } from './system-image.js?v=d6bc8426c03e';
+import { processMappings, smapsRollupText, statmText, statusMemoryLines, processMemory, deviceMemory, processCpuMs, PAGE_SIZE } from './process-memory.js?v=d6bc8426c03e';
 
 const encoder = new TextEncoder();
 const text = value => encoder.encode(value);

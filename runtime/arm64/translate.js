@@ -20,9 +20,9 @@
 //  - Invalidation: a page's translations and decoded instructions go when the page is written by the interpreter or a lab function (src/arm64/decode-cache.js), when it is
 //    mprotect'ed or unmapped, and translated stores to such a page leave the translated code before storing, so the interpreter's write drops them first. Code written or
 //    unpacked at run time is decoded again before it runs.
-import { decodeBitMasks } from './cpu.js?v=e3ff4f2e305f';
-import { DecodeCache } from './decode-cache.js?v=e3ff4f2e305f';
-import { Code, OP, SIMD, T, V, moduleBytes } from './wasm-emit.js?v=e3ff4f2e305f';
+import { decodeBitMasks } from './cpu.js?v=d6bc8426c03e';
+import { DecodeCache } from './decode-cache.js?v=d6bc8426c03e';
+import { Code, OP, SIMD, T, V, moduleBytes } from './wasm-emit.js?v=d6bc8426c03e';
 
 const PAGE = 4096, SLOT = 1024, MAX_SLOTS = 4096;
 // slot layout (bytes from the slot's start)

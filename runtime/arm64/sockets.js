@@ -10,13 +10,13 @@
 // netlink.js); AF_PACKET and raw IP sockets need CAP_NET_RAW, which an app does not have (EPERM). The same functions serve the raw system calls (src/arm64/syscalls.js):
 // socket, socketpair, bind, listen, accept/accept4, connect, getsockname, getpeername, sendto, recvfrom, setsockopt, getsockopt, shutdown, sendmsg, recvmsg, sendmmsg,
 // recvmmsg, with the kernel's flags (MSG_DONTWAIT, MSG_PEEK, MSG_TRUNC, SOCK_NONBLOCK) and errno values.
-import { APKError } from '../apk-error.js?v=e3ff4f2e305f';
-import { createRouteSocket, restrictedNetlink } from './netlink.js?v=e3ff4f2e305f';
-import { createJavaSockets } from './java-sockets.js?v=e3ff4f2e305f';
-import { deviceInterfaces, allocateFd, release } from '../libcore-io-native.js?v=e3ff4f2e305f';
-import { BLOCKED } from './cpu.js?v=e3ff4f2e305f';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=e3ff4f2e305f';
-import { utf8 } from './text.js?v=e3ff4f2e305f';
+import { APKError } from '../apk-error.js?v=d6bc8426c03e';
+import { createRouteSocket, restrictedNetlink } from './netlink.js?v=d6bc8426c03e';
+import { createJavaSockets } from './java-sockets.js?v=d6bc8426c03e';
+import { deviceInterfaces, allocateFd, release } from '../libcore-io-native.js?v=d6bc8426c03e';
+import { BLOCKED } from './cpu.js?v=d6bc8426c03e';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=d6bc8426c03e';
+import { utf8 } from './text.js?v=d6bc8426c03e';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;

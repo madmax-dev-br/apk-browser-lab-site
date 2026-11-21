@@ -1,12 +1,12 @@
-import { resolveIntentFields } from './intent-resolver.js?v=e3ff4f2e305f';
-import { APKError } from './apk-error.js?v=e3ff4f2e305f';
-import { registerPackageValueFields } from './package-value-fields.js?v=e3ff4f2e305f';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=e3ff4f2e305f';
-import { nativeHeap } from './vm-debug-host.js?v=e3ff4f2e305f';
-import { debugHeapStats, processMappings, deviceMemory, MEMORY_INFO_FIELDS, NUM_CORE_HEAP, NUM_HEAP, HEAP } from './process-memory.js?v=e3ff4f2e305f';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=e3ff4f2e305f';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=e3ff4f2e305f';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=e3ff4f2e305f';
+import { resolveIntentFields } from './intent-resolver.js?v=d6bc8426c03e';
+import { APKError } from './apk-error.js?v=d6bc8426c03e';
+import { registerPackageValueFields } from './package-value-fields.js?v=d6bc8426c03e';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=d6bc8426c03e';
+import { nativeHeap } from './vm-debug-host.js?v=d6bc8426c03e';
+import { debugHeapStats, processMappings, deviceMemory, MEMORY_INFO_FIELDS, NUM_CORE_HEAP, NUM_HEAP, HEAP } from './process-memory.js?v=d6bc8426c03e';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=d6bc8426c03e';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=d6bc8426c03e';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=d6bc8426c03e';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager

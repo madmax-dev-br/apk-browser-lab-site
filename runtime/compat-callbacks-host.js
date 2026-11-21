@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=e3ff4f2e305f';
-import { COMPAT_CHANGES } from './compat-config-data.js?v=e3ff4f2e305f';
+import { createHostRegistry } from './host-contract.js?v=d6bc8426c03e';
+import { COMPAT_CHANGES } from './compat-config-data.js?v=d6bc8426c03e';
 
 // The app process's compatibility callbacks: on a device ActivityThread.handleBindApplication calls AppCompatCallbacks.install(data.disabledCompatChanges), which hands
 // libcore's android.compat.Compatibility a BehaviorChangeDelegate (Compatibility.setBehaviorChangeDelegate). From then on Compatibility.isChangeEnabled (and

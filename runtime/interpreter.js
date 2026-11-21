@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=e3ff4f2e305f';
-import { BUCKET } from './time-breakdown.js?v=e3ff4f2e305f';
-import { Blocked, QUANTUM } from './scheduler.js?v=e3ff4f2e305f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=e3ff4f2e305f';
+import { APKError } from './apk-error.js?v=d6bc8426c03e';
+import { BUCKET } from './time-breakdown.js?v=d6bc8426c03e';
+import { Blocked, QUANTUM } from './scheduler.js?v=d6bc8426c03e';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=d6bc8426c03e';
 
 // Frame-based DEX interpreter.
 //
@@ -622,7 +622,26 @@ export function missingResultCall(dex, u, pc) {
 export function currentThread(rt) { return rt.thread ?? rt.scheduler.mainThread(); }
 
 /** Runs `method` to completion on the current thread; the entry point behind APKRuntime.execute(). */
-const EMPTY_MONITORS = Symbol('no monitors held');
+/** The monitors `thread` holds and their recursion counts (Map<monitor id, count>), or null when it holds none: what runNested puts back if its frames unwind without monitor-exit. */
+function heldBy(rt, thread) {
+  let held = null;
+  if (rt.monitors !== undefined && rt.monitors !== null) for (const [id, monitor] of rt.monitors) if (monitor.owner === thread) (held ??= new Map()).set(id, monitor.count);
+  return held;
+}
+/**
+ * A non-Java failure (an internal error, the main Looper's LooperYield) unwound `thread`'s frames of an outermost run without their monitor-exits: the monitors that thread holds go
+ * back to what it held when the run began (`held`, heldBy). Only that thread's: the other threads that ran inside the run as guests keep their frames, and so their monitors.
+ * Putting the whole table back (as the lab once did) gave a monitor that one guest had released and another had entered since back to its earlier owner: the new owner's
+ * monitor-exit threw IllegalMonitorStateException, and its synchronized block's handler looped on it.
+ */
+function releaseUnwound(rt, thread, held) {
+  if (rt.monitors === undefined || rt.monitors === null) return;
+  for (const [id, monitor] of rt.monitors) {
+    if (monitor.owner !== thread) continue;
+    const count = held === null ? undefined : held.get(id);
+    if (count === undefined) rt.monitors.delete(id); else monitor.count = count;
+  }
+}
 export function runNested(rt, method, code, args) {
   if (rt.nestedRuns === 0) { rt.thread = rt.scheduler.mainThread(); rt.platform?.looperHost?.autoStart(rt); }   // host events (UI, Looper) run on the main thread; the process's main Looper exists before the first Java code runs
   const thread = rt.thread, base = thread.frames.length;
@@ -638,12 +657,12 @@ export function runNested(rt, method, code, args) {
   // IllegalMonitorStateException (a real app at HandlerThread.getLooper, 500 k exceptions). The outer wait's condition is re-checked by the scheduler's wake() once it is back.
   const parked = thread.blocked !== null ? { blocked: thread.blocked, kind: thread.blockKind, state: thread.state, timedOut: thread.timedOut } : null;
   if (parked !== null) { thread.blocked = null; thread.state = 'runnable'; }
-  // A non-Java failure that escapes the outermost run leaves monitors in an undefined state; reset them to what they were when the event began.
-  const checkpoint = rt.nestedRuns === 1 ? (rt.monitors?.size ? new Map(rt.monitors) : EMPTY_MONITORS) : null;
+  // A non-Java failure that escapes the outermost run unwinds this thread's frames without their monitor-exits: its monitors go back to what it held when the run began.
+  const outermost = rt.nestedRuns === 1, held = outermost ? heldBy(rt, thread) : null;
   const directSite = noteReentry(rt), dstart = rt.dstart, dlimit = rt.dlimit;
   let failure = null;
   try { return runLoop(rt, thread, base); }
-  catch (error) { failure = error; if (checkpoint && !(error instanceof JavaException)) rt.monitors = checkpoint === EMPTY_MONITORS ? new Map() : checkpoint; throw error; }
+  catch (error) { failure = error; if (outermost && !(error instanceof JavaException)) releaseUnwound(rt, thread, held); throw error; }
   finally {
     rt.t2Site = directSite; rt.dstart = dstart; rt.dlimit = dlimit; if (rt.nestedRuns === 1) foldDirectCalls(rt);
     thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread;
