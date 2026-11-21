@@ -1,66 +1,67 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=d6bc8426c03e';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d6bc8426c03e';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=d6bc8426c03e';
-import { drawFrameGraph } from './frame-graph.js?v=d6bc8426c03e';
-import { clientIdentityStatus } from './client-identity.js?v=d6bc8426c03e';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=d6bc8426c03e';
-import { initCollapsibleSections } from './panel-sections.js?v=d6bc8426c03e';
-import { warmupLabel } from './warmup.js?v=d6bc8426c03e';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d6bc8426c03e';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=d6bc8426c03e';
-import { initHelpTips } from './help-tips.js?v=d6bc8426c03e';
-import { createToolDock } from './tool-dock.js?v=d6bc8426c03e';
-import { createPermissionsPanel } from './permissions-panel.js?v=d6bc8426c03e';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=d6bc8426c03e';
-import { createAppDataPanel } from './app-data-panel.js?v=d6bc8426c03e';
-import { createCameraLab } from './camera-lab.js?v=d6bc8426c03e';
-import { createOverridesPanel } from './overrides-panel.js?v=d6bc8426c03e';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=d6bc8426c03e';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d6bc8426c03e';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=d6bc8426c03e';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=d6bc8426c03e';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=d6bc8426c03e';
-import { MICROG_SERVICES } from './microg-services.js?v=d6bc8426c03e';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=d6bc8426c03e';
-import { createOrientationLock } from './orientation-lock.js?v=d6bc8426c03e';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d6bc8426c03e';
-import { createHostMapPanel } from './host-map-panel.js?v=d6bc8426c03e';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d6bc8426c03e';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d6bc8426c03e';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d6bc8426c03e';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d6bc8426c03e';
-import { createDeviceView, createViewState } from './device-view.js?v=d6bc8426c03e';
-import { createTaskSwitcher } from './task-switcher.js?v=d6bc8426c03e';
-import { createDeviceZoom } from './device-zoom.js?v=d6bc8426c03e';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d6bc8426c03e';
-import { formatApiGapReport } from './api-gap-scan.js?v=d6bc8426c03e';
-import { createLogcatPanel } from './logcat-panel.js?v=d6bc8426c03e';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d6bc8426c03e';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d6bc8426c03e';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d6bc8426c03e';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=d6bc8426c03e';
-import { createAppPalette } from './app-palette.js?v=d6bc8426c03e';
-import { createScreenRecorder } from './screen-recorder.js?v=d6bc8426c03e';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=d6bc8426c03e';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d6bc8426c03e';
-import { createAdb } from './adb-commands.js?v=d6bc8426c03e';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=d6bc8426c03e';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=d6bc8426c03e';
-import { createAdbTerminal } from './adb-terminal.js?v=d6bc8426c03e';
-import { memorySummary } from './worker-memory.js?v=d6bc8426c03e';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d6bc8426c03e';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=d6bc8426c03e';
-import { createModalHost } from './lab-modal.js?v=d6bc8426c03e';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=d6bc8426c03e';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=d6bc8426c03e';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d6bc8426c03e';
-import { createDragLayer } from './lab-drag.js?v=d6bc8426c03e';
-import { createLabScroll } from './lab-scroll.js?v=d6bc8426c03e';
-import { createGlSurfaces } from './gl-surfaces.js?v=d6bc8426c03e';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d6bc8426c03e';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d6bc8426c03e';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d6bc8426c03e';
-import { resolveIntentFields } from './intent-resolver.js?v=d6bc8426c03e';
+import { APKWorkerClient } from './apk-worker-client.js?v=efe50e99a19d';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=efe50e99a19d';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=efe50e99a19d';
+import { drawFrameGraph } from './frame-graph.js?v=efe50e99a19d';
+import { clientIdentityStatus } from './client-identity.js?v=efe50e99a19d';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=efe50e99a19d';
+import { initCollapsibleSections } from './panel-sections.js?v=efe50e99a19d';
+import { warmupLabel } from './warmup.js?v=efe50e99a19d';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=efe50e99a19d';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=efe50e99a19d';
+import { initHelpTips } from './help-tips.js?v=efe50e99a19d';
+import { initControlPanelUI } from './control-panel-ui.js?v=efe50e99a19d';
+import { createToolDock } from './tool-dock.js?v=efe50e99a19d';
+import { createPermissionsPanel } from './permissions-panel.js?v=efe50e99a19d';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=efe50e99a19d';
+import { createAppDataPanel } from './app-data-panel.js?v=efe50e99a19d';
+import { createCameraLab } from './camera-lab.js?v=efe50e99a19d';
+import { createOverridesPanel } from './overrides-panel.js?v=efe50e99a19d';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=efe50e99a19d';
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=efe50e99a19d';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=efe50e99a19d';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=efe50e99a19d';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=efe50e99a19d';
+import { MICROG_SERVICES } from './microg-services.js?v=efe50e99a19d';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=efe50e99a19d';
+import { createOrientationLock } from './orientation-lock.js?v=efe50e99a19d';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=efe50e99a19d';
+import { createHostMapPanel } from './host-map-panel.js?v=efe50e99a19d';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=efe50e99a19d';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=efe50e99a19d';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=efe50e99a19d';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=efe50e99a19d';
+import { createDeviceView, createViewState } from './device-view.js?v=efe50e99a19d';
+import { createTaskSwitcher } from './task-switcher.js?v=efe50e99a19d';
+import { createDeviceZoom } from './device-zoom.js?v=efe50e99a19d';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=efe50e99a19d';
+import { formatApiGapReport } from './api-gap-scan.js?v=efe50e99a19d';
+import { createLogcatPanel } from './logcat-panel.js?v=efe50e99a19d';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=efe50e99a19d';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=efe50e99a19d';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=efe50e99a19d';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=efe50e99a19d';
+import { createAppPalette } from './app-palette.js?v=efe50e99a19d';
+import { createScreenRecorder } from './screen-recorder.js?v=efe50e99a19d';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=efe50e99a19d';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=efe50e99a19d';
+import { createAdb } from './adb-commands.js?v=efe50e99a19d';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=efe50e99a19d';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=efe50e99a19d';
+import { createAdbTerminal } from './adb-terminal.js?v=efe50e99a19d';
+import { memorySummary } from './worker-memory.js?v=efe50e99a19d';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=efe50e99a19d';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=efe50e99a19d';
+import { createModalHost } from './lab-modal.js?v=efe50e99a19d';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=efe50e99a19d';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=efe50e99a19d';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=efe50e99a19d';
+import { createDragLayer } from './lab-drag.js?v=efe50e99a19d';
+import { createLabScroll } from './lab-scroll.js?v=efe50e99a19d';
+import { createGlSurfaces } from './gl-surfaces.js?v=efe50e99a19d';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=efe50e99a19d';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=efe50e99a19d';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=efe50e99a19d';
+import { resolveIntentFields } from './intent-resolver.js?v=efe50e99a19d';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -568,7 +569,7 @@ const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => sta
       url, status: entry.status ?? 200, reason: entry.reason ?? '', headers: headers.length ? headers : [{ name: 'Content-Type', value: entry.contentType ?? 'application/json' }], body: entry.responseBody ?? '' });
   },
   redirectHost: entry => {
-    for (const id of ['control-panel', 'cp-sec-hostmap']) { const section = $(id); if (section) section.open = true; }   // the Controls card and the section, so the destination field can take the focus
+    for (const id of ['control-panel', 'cp-sec-network']) { const section = $(id); if (section) section.open = true; }   // the Controls card and the section, so the destination field can take the focus
     hostMapPanel.addRule(`${entry.scheme ? entry.scheme + '://' : ''}${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}`);
   } });   // src/netlog-panel.js; "Allow" types the host into the Device field, the same path as typing it
 apkVM.onNetlog = message => { netlogPanel.push(message); pluginHost.netlog(message); };
@@ -884,7 +885,7 @@ const permissionsPanel = createPermissionsPanel({ $, vm: apkVM, location: { get:
 const filesPanel = createSharedFilesPanel({ $, vm: apkVM });   // "Device files": the shared storage the file pickers and MediaStore read (src/shared-files-panel.js)
 // "App data": the app's SharedPreferences and SQLite databases, viewed and edited in modals (src/app-data-panel.js, src/app-storage.js); read when the section is opened and after a run
 const appDataPanel = createAppDataPanel({ $, vm: apkVM, modals: modalHost, ready: () => state.runtime === apkVM && state.launchAttempted && !state.busy, render: snapshot => renderSnapshot(snapshot) });
-$('cp-sec-appdata')?.addEventListener('toggle', () => { if ($('cp-sec-appdata').open) appDataPanel.refresh(); });
+$('cp-sec-data')?.addEventListener('toggle', () => { if ($('cp-sec-data').open) appDataPanel.refresh(); });
 const cameraLab = createCameraLab({ $, vm: apkVM });   // the device's cameras: source, frames for the VM, the camera screen of the capture Intents
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
 methodHooksPanel = createMethodHooksPanel({ $, vm: apkVM, trace: appendTrace, removePageRow: key => overridesPanel.removeKey(key), getPackage: () => state.inventory?.packageName ?? null });
@@ -901,7 +902,7 @@ const microgServicesPanel = createMicrogServicesPanel({ $, onChange: services =>
 // "microG settings…" (src/microg-settings-dialog.js): the microG blocks above move into a tabbed dialog while it is open, and back.
 const microgSettings = createMicrogSettingsDialog({ $, modalHost, overview: () => {
   const on = deviceState.settings?.microg === true, running = !!state.runtime && state.loadedMicrog !== undefined;
-  if (!on) return 'With microG is off (Device section): these settings are saved and apply once it is on and the APK is reopened.';
+  if (!on) return 'With microG is off (Controls › Device › Google services): these settings are saved and apply once it is on and the APK is reopened.';
   return running && state.loadedMicrog !== true ? 'With microG is on, but the open APK runs without it: reopen the APK to apply.' : 'With microG is on.';
 } });
 window.apkLabMicrogSettings = microgSettings;   // test and console access: .open(tab), .close(), .isOpen
@@ -988,7 +989,7 @@ const waitIdle = async (ms = 60000) => { for (const until = Date.now() + ms; (st
 const mcpControls = {
   async appData(payload) {
     if (state.runtime !== apkVM || !state.launchAttempted) throw new Error('No app is running: open and start an app first.');
-    await waitIdle(); const { appData, snapshot } = await apkVM.appStorage(payload); if (snapshot) renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open && payload.op !== 'overview') appDataPanel.refresh(); return appData;
+    await waitIdle(); const { appData, snapshot } = await apkVM.appStorage(payload); if (snapshot) renderSnapshot(snapshot); if ($('cp-sec-data')?.open && payload.op !== 'overview') appDataPanel.refresh(); return appData;
   },
   device(set = null) {
     const pick = settings => Object.fromEntries(DEVICE_KEYS_MCP.filter(key => settings[key] !== undefined).map(key => [key, settings[key]]));
@@ -1274,10 +1275,10 @@ const beginMcpWatch = () => { if (mcpWatchStarted) { mcpLink.nudge(); return; } 
 localNetworkAccess().then(access => {
   if (access === 'granted' || access === 'unsupported') { beginMcpWatch(); return; }
   if (mcpWatchStarted) return;
-  $('mcp-status').textContent = access === 'denied' ? 'This browser blocks the page from reaching this computer (site settings › Local network access): the bridge cannot be reached.' : 'Opening this section looks for the bridge (the browser asks once to let this page reach your computer).';
+  $('mcp-status').textContent = access === 'denied' ? 'This browser blocks the page from reaching this computer (site settings › Local network access): the bridge cannot be reached.' : 'Opening "Connect an agent" looks for the bridge (the browser asks once to let this page reach your computer).';
   $('mcp-status').dataset.state = access === 'denied' ? 'error' : '';
 }, () => beginMcpWatch());
-$('cp-sec-mcp')?.addEventListener('toggle', () => { if ($('cp-sec-mcp').open) beginMcpWatch(); });
+$('cp-mcp-setup')?.addEventListener('toggle', () => { if ($('cp-mcp-setup').open) beginMcpWatch(); });   // Controls › Extensions › MCP › Connect an agent
 document.addEventListener?.('visibilitychange', () => { if (document.visibilityState === 'visible' && mcpWatchStarted) mcpLink.nudge(); });
 // "Plugins" (src/plugins-panel.js): global list, output cards under the device
 // Bottom tool dock (src/tool-dock.js): Execution log, Logcat, Network, Compose and Plugins as Android Studio-like tool windows, hidden until an icon is clicked
@@ -1336,7 +1337,7 @@ const DEVICE_REGIONS = Object.keys(ISO_COUNTRIES).map(code => [code, `${displayN
 const DEVICE_ZONES = [['', 'Follow the browser'], ['America/Sao_Paulo', 'São Paulo (UTC−3)'], ['UTC', 'UTC'], ['America/New_York', 'New York'], ['Europe/London', 'London'], ['Europe/Paris', 'Paris'], ['Asia/Kolkata', 'India (UTC+5:30)'], ['Asia/Tokyo', 'Tokyo'], ['Australia/Sydney', 'Sydney']];
 const DEVICE_SCREENS = [['phone', 'Phone · 411 × 914 dp'], ['compact', 'Compact · 360 × 800 dp'], ['large', 'Large · 412 × 892 dp'], ['small', 'Small · 320 × 640 dp'], ['tablet', 'Tablet · 800 × 1280 dp'], ['custom', 'Custom…']];
 const fillSelect = (select, entries) => { select.replaceChildren(...entries.map(([value, label]) => { const option = document.createElement('option'); option.value = value; option.textContent = label; return option; })); };
-// "Internet" in the preview bar: the device's connectivity in one click (Controls › Device › Connectivity, applied live). Off is "No connection"; on is the mode it had before.
+// "Internet" in the preview bar: the device's connectivity in one click (Controls › Network › Connectivity, applied live). Off is "No connection"; on is the mode it had before.
 let lastOnlineConnectivity = 'online';
 function syncNetworkToggle(settings) {
   const button = $('network-toggle'); if (!button) return; const offline = settings.connectivity === 'offline';
@@ -1383,7 +1384,7 @@ async function syncRunProxy() {
   catch (error) { appendTrace(`Network proxy: not changed before the launch (${error?.message ?? error})`); }
 }
 relayDetector.check().catch(() => {});
-$('cp-sec-device')?.addEventListener('toggle', () => { if ($('cp-sec-device').open) refreshRelay(); });
+$('cp-sec-network')?.addEventListener('toggle', () => { if ($('cp-sec-network').open) refreshRelay(); });
 function writeDevicePanel(settings) {
   syncNetworkToggle(settings);
   $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2)}×`;
@@ -1541,7 +1542,7 @@ async function runAPKOnce(retried = false) {
   if (!state.bootVisible) showBoot('Starting the app…');   // a run after a failure reopens the APK first, and the end of that load hides the overlay: the launch gets it back
   const token = beginOperation('Trying to start the Activity…');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
-  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-appdata')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
+  try { const snapshot = await state.runtime.launch(activity, { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-data')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
   catch (error) {
     // The Worker was still inside an earlier operation (a run that failed while it kept working): start over once in a fresh Worker instead of reporting "already busy".
     if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando|processing/i.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }
@@ -1668,7 +1669,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape' && !$
 $('back-button').addEventListener('click', backAPK);
 $('recreate-activity')?.addEventListener('click', () => reloadActivity('recreate'));   // the toolbar no longer has this button; lab.reloadActivity still recreates
 /** "Reopen" in the toolbar: the app starts from zero, as after killing its process. The running VM's Worker is terminated (nothing it held stays in memory), the APK is opened
- *  again in a fresh Worker and the launcher Activity starts; app data on the virtual device is kept or cleared as Controls › Execution says. lab.reloadActivity / the MCP
+ *  again in a fresh Worker and the launcher Activity starts; app data on the virtual device is kept or cleared as Controls › Files and data › App data says. lab.reloadActivity / the MCP
  *  `reload` tool keep their in-VM modes (recreate, reopen). */
 function reopenApp() {
   if (!state.currentSource || state.busy || state.runStarting) return;
@@ -1696,4 +1697,4 @@ const catalogReady = loadScenarioCatalog();
 notifyParent('apk-lab-ready');
 if (params.get('demo') === '1') catalogReady.then(() => runDemo());   // after the catalog check: a site without APKs has no demo
 initDevicePanel();
-initCollapsibleSections($('control-panel')); initHelpTips($('control-panel'), { modalHost });   // all sections collapsed; one "?" per section opens its explanations in a dialog (src/help-tips.js)
+initCollapsibleSections($('control-panel')); initHelpTips($('control-panel'), { modalHost }); initControlPanelUI($('control-panel'));   // all sections collapsed; the "Find a control" box and each section's one-line summary (src/control-panel-ui.js); one "?" per section opens its explanations in a dialog (src/help-tips.js)

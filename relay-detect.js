@@ -83,7 +83,7 @@ export function effectiveProxy(customUrl, detection) {
 
 /** One line for the execution log: which proxy a run uses. */
 export function describeProxyForTrace(proxy) {
-  if (proxy?.source === 'custom') return `Network proxy: custom proxy ${proxy.host ?? proxy.url} (Controls › Device › Proxy)`;
+  if (proxy?.source === 'custom') return `Network proxy: custom proxy ${proxy.host ?? proxy.url} (Controls › Network › Proxy)`;
   if (proxy?.source === 'auto') return `Network proxy: APK Lab Relay at ${proxy.host}${proxy.version ? ` ${proxy.version}` : ''} (found automatically)`;
   return 'Network proxy: none (no relay running on 127.0.0.1:8787, Proxy field empty): the browser fetches each URL directly, CORS applies';
 }

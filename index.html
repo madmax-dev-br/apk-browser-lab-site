@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=d6bc8426c03e") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=d6bc8426c03e">
-  <link rel="stylesheet" href="./lab-theme.css?v=d6bc8426c03e">
-  <meta name="apk-browser-build" content="d6bc8426c03e">
+  <style>@import url("./styles.css?v=efe50e99a19d") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=efe50e99a19d">
+  <link rel="stylesheet" href="./lab-theme.css?v=efe50e99a19d">
+  <meta name="apk-browser-build" content="efe50e99a19d">
 </head>
 <body>
   <header class="topbar">
@@ -46,239 +46,281 @@
         <section class="controls controls-card" aria-label="Controls">
           <details id="control-panel" class="device-panel control-panel" open>
             <summary><h2 class="rail-title">Controls</h2><span id="device-summary" class="quiet-badge" title="Screen and orientation of the virtual device">411 × 914 · portrait</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-            <details class="cp-group" id="cp-sec-look" data-section="look">
-              <summary><h3 id="cp-look-title">Appearance</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <div class="cp-grid">
-                <label for="dev-dark">Dark theme</label><input id="dev-dark" type="checkbox">
-                <label for="look-app-colors" title="The page around the device takes the colours of the open app (read from its launcher icon), with a reveal from the device. The app itself is not changed">Page in the app's colors</label><input id="look-app-colors" type="checkbox" checked>
-                <label for="dev-layout-bounds" title="Android developer option (debug.layout), drawn as Android draws it: each View's bounds in red with blue corner marks and its margins in magenta; each Compose LayoutNode in red and each layout modifier in blue">Show layout bounds</label><input id="dev-layout-bounds" type="checkbox">
-                <label for="dev-frame-graph" title="Developer option modeled on Android's Profile HWUI rendering (on screen as bars): one stacked bar per frame (VM events, raster, snapshot, transfer, page, put) with the 16.7 ms line, and the frames per second over the last 20 s with current, average and minimum FPS and the janky frames. An idle screen is shown as idle, not as 0 FPS. Drawn by the page over the screen; the app and the screenshots do not see it">Show frame rate</label><input id="dev-frame-graph" type="checkbox">
-                <label for="dev-font">Font scale <output id="dev-font-out">1.00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05">
-                <label for="dev-locale">Language</label><select id="dev-locale"></select>
-                <label for="dev-region">Region</label><select id="dev-region" title="The country of the device locale (Locale.getDefault, Configuration.locale): dates, numbers, currency and -rBR resources. The emulator SIM (TelephonyManager) stays the US one, as in the Android emulator"></select>
-                <label for="dev-orientation">Orientation</label><select id="dev-orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
-                <p id="dev-orientation-lock" class="cp-note cp-orientation-lock" role="status" hidden></p>
-                <label for="dev-screen">Screen</label><select id="dev-screen"></select>
-                <div id="dev-custom-screen" class="cp-custom-screen" hidden><div class="cp-custom-row"><label for="dev-custom-w">Width</label><input id="dev-custom-w" type="number" min="1" max="4096" step="1" inputmode="numeric"><span aria-hidden="true">×</span><label for="dev-custom-h">Height</label><input id="dev-custom-h" type="number" min="1" max="4096" step="1" inputmode="numeric"><select id="dev-custom-unit" aria-label="Unit"><option value="dp">dp</option><option value="px">px</option></select></div><p id="dev-custom-msg" class="cp-note" role="status" aria-live="polite"></p></div>
-                <label for="dev-nav">Navigation</label><select id="dev-nav"><option value="gesture">Gestures</option><option value="buttons">3 buttons</option></select>
-                <label for="dev-animator">Animation scale</label><select id="dev-animator"><option value="0">Off</option><option value="0.5">0.5×</option><option value="1">1× (default)</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select>
-              </div>
-            </div></details>
+            <div class="cp-filter" role="search">
+              <label for="cp-filter" class="visually-hidden">Find a control</label>
+              <input id="cp-filter" type="search" spellcheck="false" autocomplete="off" placeholder="Find a control (proxy, memory, camera…)" aria-describedby="cp-filter-status" aria-controls="control-panel">
+              <p id="cp-filter-status" class="cp-filter-status" role="status" aria-live="polite"></p>
+            </div>
             <details class="cp-group" id="cp-sec-device" data-section="device">
-              <summary><h3 id="cp-device-title">Device</h3><span id="dev-microg-summary" class="cp-badge" title="The &quot;With microG&quot; option, at the end of this section">no microG</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <div class="cp-grid">
-                <label for="dev-hour24">24-hour clock</label><input id="dev-hour24" type="checkbox">
-                <label for="dev-tz">Time zone</label><select id="dev-tz"></select>
-                <label for="dev-battery">Battery <output id="dev-battery-out">80%</output></label><input id="dev-battery" type="range" min="0" max="100" step="1">
-                <label for="dev-charging">Charging</label><input id="dev-charging" type="checkbox">
-                <label for="dev-network">Connectivity</label><select id="dev-network"><option value="online">Wi‑Fi (unmetered)</option><option value="metered">Mobile data (metered)</option><option value="offline">No connection</option></select>
-                <label for="dev-hosts-all">Allow all hosts</label><input id="dev-hosts-all" type="checkbox" aria-describedby="dev-hosts-note">
-                <label for="dev-hosts">Allowed network hosts</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, *.cdn.example.com" aria-describedby="dev-hosts-note">
-                <label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="empty: the APK Lab Relay, found by itself" aria-describedby="dev-proxy-note">
-                <label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" aria-describedby="dev-relay-channel-note">
-                <label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note">
-                <label for="dev-arm64">Run ARM64 native code <em class="vm-memory-hint">experimental</em></label><input id="dev-arm64" type="checkbox" aria-describedby="dev-arm64-note">
-                <label for="dev-arm64-translate">Translate hot ARM64 code</label><input id="dev-arm64-translate" type="checkbox" checked aria-describedby="dev-arm64-translate-note">
-                <label for="dev-gles-cpu">OpenGL ES on the CPU</label><input id="dev-gles-cpu" type="checkbox" aria-describedby="dev-gles-cpu-note">
-                <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
+              <summary><h3 id="cp-device-title">Device</h3><span id="cp-sum-device" class="cp-badge cp-sum" title="Screen, orientation and the device options that are on"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-screen" aria-labelledby="cp-sub-screen-title"><h4 class="cp-subtitle" id="cp-sub-screen-title">Screen</h4>
+                <div class="cp-item"><label for="dev-screen">Screen</label><select id="dev-screen"></select></div>
+                <div id="dev-custom-screen" class="cp-custom-screen" hidden><div class="cp-custom-row"><label for="dev-custom-w">Width</label><input id="dev-custom-w" type="number" min="1" max="4096" step="1" inputmode="numeric"><span aria-hidden="true">×</span><label for="dev-custom-h">Height</label><input id="dev-custom-h" type="number" min="1" max="4096" step="1" inputmode="numeric"><select id="dev-custom-unit" aria-label="Unit"><option value="dp">dp</option><option value="px">px</option></select></div><p id="dev-custom-msg" class="cp-note" role="status" aria-live="polite"></p></div>
+                <div class="cp-item" data-keywords="rotate landscape portrait"><label for="dev-orientation">Orientation</label><select id="dev-orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select><p id="dev-orientation-lock" class="cp-note cp-orientation-lock" role="status" hidden></p></div>
+                <div class="cp-item" data-keywords="buttons gestures"><label for="dev-nav">Navigation</label><select id="dev-nav"><option value="gesture">Gestures</option><option value="buttons">3 buttons</option></select></div>
+                <div class="cp-item" data-keywords="text size"><label for="dev-font">Font scale <output id="dev-font-out">1.00×</output></label><input id="dev-font" type="range" min="0.85" max="2" step="0.05"></div>
+                <div class="cp-item" data-keywords="night mode"><label for="dev-dark">Dark theme</label><input id="dev-dark" type="checkbox" role="switch"></div>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <div class="cp-item" data-keywords="animator duration"><label for="dev-animator">Animation scale</label><select id="dev-animator"><option value="0">Off</option><option value="0.5">0.5×</option><option value="1">1× (default)</option><option value="2">2×</option><option value="5">5×</option><option value="10">10×</option></select></div>
+                </details>
+              </section>
+              <section class="cp-sub" id="cp-sub-locale" aria-labelledby="cp-sub-locale-title"><h4 class="cp-subtitle" id="cp-sub-locale-title">Language and time</h4>
+                <div class="cp-item" data-keywords="locale"><label for="dev-locale">Language</label><select id="dev-locale"></select></div>
+                <div class="cp-item" data-keywords="country locale"><label for="dev-region">Region</label><select id="dev-region" title="The country of the device locale (Locale.getDefault, Configuration.locale): dates, numbers, currency and -rBR resources. The emulator SIM (TelephonyManager) stays the US one, as in the Android emulator"></select></div>
+                <div class="cp-item" data-keywords="timezone clock"><label for="dev-tz">Time zone</label><select id="dev-tz"></select></div>
+                <div class="cp-item" data-keywords="clock"><label for="dev-hour24">24-hour clock</label><input id="dev-hour24" type="checkbox" role="switch"></div>
+              </section>
+              <section class="cp-sub" id="cp-sub-battery" aria-labelledby="cp-sub-battery-title"><h4 class="cp-subtitle" id="cp-sub-battery-title">Battery</h4>
+                <div class="cp-item"><label for="dev-battery">Battery level <output id="dev-battery-out">80%</output></label><input id="dev-battery" type="range" min="0" max="100" step="1"></div>
+                <div class="cp-item" data-keywords="power"><label for="dev-charging">Charging</label><input id="dev-charging" type="checkbox" role="switch"></div>
+              </section>
+              <section class="cp-sub" id="cp-sub-hardware" aria-labelledby="cp-sub-hardware-title"><h4 class="cp-subtitle" id="cp-sub-hardware-title">CPU and graphics</h4>
+                <div class="cp-item" data-keywords="abi arm64-v8a native libraries so jni"><label for="dev-arm64">Run ARM64 native code <em class="vm-memory-hint">experimental</em></label><input id="dev-arm64" type="checkbox" role="switch" aria-describedby="dev-arm64-note"></div>
+                <p id="dev-arm64-note" class="cp-note">Run ARM64 native code: the app's own arm64-v8a libraries (from the APK and its splits) run in the lab's ARM64 interpreter, instruction by instruction, with the C library and JNI the lab provides; the device then reports arm64-v8a among its ABIs. Off: they cannot run, as before. An instruction, libc function or system call the interpreter does not have ends in an explicit error naming it. Read when the APK is opened.</p>
+                <div class="cp-item" data-keywords="gl gles opengl webgl gpu software rasterizer"><label for="dev-gles-cpu">OpenGL ES on the CPU</label><input id="dev-gles-cpu" type="checkbox" role="switch" aria-describedby="dev-gles-cpu-note"></div>
+                <p id="dev-gles-cpu-note" class="cp-note">OpenGL ES on the CPU: apps that draw with OpenGL ES (games, maps, video filters, Flutter) render with the lab's software rasterizer instead of the browser's WebGL2, as a phone emulator without a GPU does. Off (default): WebGL2 when this browser's Worker has it, the CPU rasterizer otherwise; the trace says which one ran. Read when the APK is opened.</p>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <div class="cp-item" data-keywords="arm64 jit wasm"><label for="dev-arm64-translate">Translate hot ARM64 code</label><input id="dev-arm64-translate" type="checkbox" role="switch" checked aria-describedby="dev-arm64-translate-note"></div>
+                  <p id="dev-arm64-translate-note" class="cp-note">Translate hot ARM64 code (on by default): with Run ARM64 native code, code that runs often (loops that unpack, decompress, hash or copy) is compiled to WebAssembly and runs tens of times faster; it does exactly what the interpreter does, and what it does not translate the interpreter runs. Off: every instruction is interpreted. Read when the APK is opened.</p>
+                </details>
+              </section>
+              <section class="cp-sub" id="cp-sub-microg" aria-labelledby="cp-sub-microg-title"><h4 class="cp-subtitle" id="cp-sub-microg-title">Google services<span id="dev-microg-summary" class="cp-badge" title="The &quot;With microG&quot; option">no microG</span></h4>
+                <div class="cp-item" data-keywords="play services gms google account push firebase fcm"><label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" role="switch" aria-describedby="dev-microg-note"></div>
                 <div class="cp-microg-open"><button id="dev-microg-settings" class="cp-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-describedby="dev-microg-settings-summary">microG settings…</button><span id="dev-microg-settings-summary" class="cp-microg-settings-summary" role="status">services: all off</span></div>
-              </div>
-              <fieldset class="cp-core cp-custom-identity" id="dev-id">
-                <legend>Custom device identity <em id="dev-id-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></legend>
-                <label class="cp-check" for="dev-id-on"><input id="dev-id-on" type="checkbox" aria-describedby="dev-id-status"><span>Use a custom identity<small>Off (default): the device keeps the lab's own identity. On: the names you type here replace the lab's product names everywhere the device reports them, as on a device whose build had those names: android.os.Build, the ro.product.* system properties and their ro.product.system.* copies, the fingerprint and ro.build.description (rebuilt by the build's own rules), getprop, adb devices -l and native code. The build itself (type, tags, Android release, SDK level, build id, security patch) stays the lab's. An empty field keeps the lab's value, shown greyed in it. The lab never fills these fields in. The page, the execution log and the diagnostics summary mark the identity as custom. Applies when the APK is opened again.</small></span></label>
-                <label class="cp-field" for="dev-id-manufacturer"><span>Manufacturer<small>ro.product.manufacturer, Build.MANUFACTURER: any printable text, at most 91 bytes</small></span><input id="dev-id-manufacturer" data-identity-field="manufacturer" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-manufacturer-error"><span id="dev-id-manufacturer-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-brand"><span>Brand<small>ro.product.brand, Build.BRAND, the first part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-brand" data-identity-field="brand" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-brand-error"><span id="dev-id-brand-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-model"><span>Model<small>ro.product.model, Build.MODEL (also in the WebView's user agent and adb devices -l): any printable text, at most 91 bytes</small></span><input id="dev-id-model" data-identity-field="model" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-model-error"><span id="dev-id-model-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-device"><span>Device<small>ro.product.device, Build.DEVICE, ro.build.product, the third part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-device" data-identity-field="device" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-device-error"><span id="dev-id-device-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-name"><span>Product name<small>ro.product.name, Build.PRODUCT, the second part of the fingerprint, ro.build.description and ro.build.flavor: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-name" data-identity-field="name" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-name-error"><span id="dev-id-name-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-board"><span>Board (optional)<small>ro.product.board, Build.BOARD: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-board" data-identity-field="board" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-board-error"><span id="dev-id-board-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <label class="cp-field" for="dev-id-hardware"><span>Hardware (optional)<small>ro.hardware and ro.boot.hardware, Build.HARDWARE: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-hardware" data-identity-field="hardware" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-hardware-error"><span id="dev-id-hardware-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
-                <p id="dev-id-status" class="cp-note" role="status"></p>
-                <button id="dev-id-reset" class="cp-button" type="button">Reset to the lab's identity</button>
-              </fieldset>
-              <p id="dev-identity" class="cp-note" role="status">Identity (fixed, the same for every app): Android 13 (API 33), user build, release-keys.</p>
-              <p id="dev-proxy-note" class="cp-note" role="status"></p>
-              <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
-              <p id="dev-client-cert-status" class="cp-note" role="status"></p>
-              <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay on this computer (which answers the lab's pages only), only for these hosts, and live there in memory only. Other hosts never see them.</p>
-              <p id="dev-arm64-translate-note" class="cp-note">Translate hot ARM64 code (on by default): with Run ARM64 native code, code that runs often (loops that unpack, decompress, hash or copy) is compiled to WebAssembly and runs tens of times faster; it does exactly what the interpreter does, and what it does not translate the interpreter runs. Off: every instruction is interpreted. Read when the APK is opened.</p>
-              <p id="dev-arm64-note" class="cp-note">Run ARM64 native code: the app's own arm64-v8a libraries (from the APK and its splits) run in the lab's ARM64 interpreter, instruction by instruction, with the C library and JNI the lab provides; the device then reports arm64-v8a among its ABIs. Off: they cannot run, as before. An instruction, libc function or system call the interpreter does not have ends in an explicit error naming it. Read when the APK is opened.</p>
-              <p id="dev-gles-cpu-note" class="cp-note">OpenGL ES on the CPU: apps that draw with OpenGL ES (games, maps, video filters, Flutter) render with the lab's software rasterizer instead of the browser's WebGL2, as a phone emulator without a GPU does. Off (default): WebGL2 when this browser's Worker has it, the CPU rasterizer otherwise; the trace says which one ran. Read when the APK is opened.</p>
-              <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (microG settings, below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
-              <div id="dev-microg-settings-store" class="cp-microg-store" data-help-skip hidden>
-                <div id="dev-microg-tab-services" data-microg-tab="services" data-title="Services">
-                  <fieldset id="dev-microg-services" class="cp-microg-services">
-                    <legend class="cp-subtitle">microG services</legend>
-                    <p class="cp-note">Each switch is microG's own (the one its settings screen has) and is off by default. Turning one on lets microG's code talk to that service's servers, as on a phone with microG: the requests show in Network, the change is recorded in the trace and saved with these settings. Nothing is faked: a token, a registration or a license only comes from the real server. Contribution of location data and microG's other data-donation switches stay off and are not offered.</p>
-                    <div id="dev-microg-service-list" class="cp-grid cp-microg-service-list"></div>
-                    <p id="dev-microg-services-status" class="cp-note" role="status"></p>
-                    <div id="dev-microg-account" class="cp-microg-account">
-                      <button id="add-microg-account" class="cp-button" type="button" disabled>Add Google account (microG)</button>
-                      <p class="cp-note">Opens microG's sign-in screen on the device, as Settings › Accounts › Add account does on a phone with microG. You type your own Google email and password into Google's page there: they go to Google (accounts.google.com) through the APK Lab Relay, which serves that page to the device, and nowhere else. microG keeps the account with its data on this device (Clear microG data removes it). Needs Device registration on and the relay as the Proxy; the requests show in Network.</p>
-                      <p id="dev-microg-account-status" class="cp-note" role="status"></p>
+                <p id="dev-microg-note" class="cp-note">With microG: the device gets microG 0.3.18 (an open-source replacement for Google Play services, built here from source) and its Play Store. Apps that use Play services find it and get microG's local answers; what microG leaves unimplemented, and what needs native code or a microG screen, ends in an explicit error. microG's online services (microG settings, below) are off by default, as microG ships them; each one you turn on talks to its own servers. Off (default), the device has no Play services. Applies when the APK is reopened.</p>
+                <div id="dev-microg-settings-store" class="cp-microg-store" data-help-skip hidden>
+                  <div id="dev-microg-tab-services" data-microg-tab="services" data-title="Services">
+                    <fieldset id="dev-microg-services" class="cp-microg-services">
+                      <legend class="cp-subtitle">microG services</legend>
+                      <p class="cp-note">Each switch is microG's own (the one its settings screen has) and is off by default. Turning one on lets microG's code talk to that service's servers, as on a phone with microG: the requests show in Network, the change is recorded in the trace and saved with these settings. Nothing is faked: a token, a registration or a license only comes from the real server. Contribution of location data and microG's other data-donation switches stay off and are not offered.</p>
+                      <div id="dev-microg-service-list" class="cp-grid cp-microg-service-list"></div>
+                      <p id="dev-microg-services-status" class="cp-note" role="status"></p>
+                      <div id="dev-microg-account" class="cp-microg-account">
+                        <button id="add-microg-account" class="cp-button" type="button" disabled>Add Google account (microG)</button>
+                        <p class="cp-note">Opens microG's sign-in screen on the device, as Settings › Accounts › Add account does on a phone with microG. You type your own Google email and password into Google's page there: they go to Google (accounts.google.com) through the APK Lab Relay, which serves that page to the device, and nowhere else. microG keeps the account with its data on this device (Clear microG data removes it). Needs Device registration on and the relay as the Proxy; the requests show in Network.</p>
+                        <p id="dev-microg-account-status" class="cp-note" role="status"></p>
+                      </div>
+                    </fieldset>
+                  </div>
+                  <div id="dev-microg-tab-data" data-microg-tab="data" data-title="Data">
+                    <div id="dev-microg-data" class="cp-microg-data"><span class="cp-subtitle">microG data</span>
+                      <p class="cp-note">microG's data (its device registration, accounts, settings and databases) is kept between reloads as data of this device, shared by every app you open with microG, while "Keep app data between reloads" (Data › App data) is on. Clearing it does not stop the running device: microG keeps what it has in memory until the APK is reopened.</p>
+                      <button id="clear-microg-data" class="cp-button" type="button" disabled>Clear microG data</button>
+                      <p id="dev-microg-data-status" class="cp-note" role="status"></p>
                     </div>
-                  </fieldset>
-                </div>
-                <div id="dev-microg-tab-data" data-microg-tab="data" data-title="Data">
-                  <div id="dev-microg-data" class="cp-microg-data"><span class="cp-subtitle">microG data</span>
-                    <p class="cp-note">microG's data (its device registration, accounts, settings and databases) is kept between reloads as data of this device, shared by every app you open with microG, while "Keep app data between reloads" (Storage) is on. Clearing it does not stop the running device: microG keeps what it has in memory until the APK is reopened.</p>
-                    <button id="clear-microg-data" class="cp-button" type="button" disabled>Clear microG data</button>
-                    <p id="dev-microg-data-status" class="cp-note" role="status"></p>
+                  </div>
+                  <div id="dev-microg-tab-apis" data-microg-tab="apis" data-title="APIs">
+                    <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
+                  </div>
+                  <div id="dev-microg-tab-entries" data-microg-tab="entries" data-title="Entry points">
+                    <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
+                    <div id="dev-microg-entries" class="cp-microg-entries" hidden>
+                      <ul id="dev-microg-entry-list" class="cp-list"></ul>
+                    </div>
+                    <p id="dev-microg-entries-empty" class="cp-note" role="status">No entry points listed yet: they appear while an APK runs with microG.</p>
                   </div>
                 </div>
-                <div id="dev-microg-tab-apis" data-microg-tab="apis" data-title="APIs">
-                  <div id="dev-microg-apis" class="cp-microg-apis"><span class="cp-subtitle">APIs with microG</span><ul id="dev-microg-api-list" class="cp-list"></ul></div>
+              </section>
+              <section class="cp-sub" id="cp-sub-identity" aria-labelledby="cp-sub-identity-title"><h4 class="cp-subtitle" id="cp-sub-identity-title">Identity</h4>
+                <p id="dev-identity" class="cp-note" role="status">Identity (fixed, the same for every app): Android 13 (API 33), user build, release-keys.</p>
+                <fieldset class="cp-core cp-custom-identity" id="dev-id" data-keywords="manufacturer brand model device product name board hardware build fingerprint">
+                  <legend>Custom device identity <em id="dev-id-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></legend>
+                  <label class="cp-check" for="dev-id-on"><input id="dev-id-on" type="checkbox" role="switch" aria-describedby="dev-id-status"><span>Use a custom identity<small>Off (default): the device keeps the lab's own identity. On: the names you type here replace the lab's product names everywhere the device reports them, as on a device whose build had those names: android.os.Build, the ro.product.* system properties and their ro.product.system.* copies, the fingerprint and ro.build.description (rebuilt by the build's own rules), getprop, adb devices -l and native code. The build itself (type, tags, Android release, SDK level, build id, security patch) stays the lab's. An empty field keeps the lab's value, shown greyed in it. The lab never fills these fields in. The page, the execution log and the diagnostics summary mark the identity as custom. Applies when the APK is opened again.</small></span></label>
+                  <p id="dev-id-status" class="cp-note" role="status"></p>
+                  <details class="cp-advanced cp-id-fields"><summary>Names (manufacturer, brand, model…)</summary>
+                  <label class="cp-field" for="dev-id-manufacturer"><span>Manufacturer<small>ro.product.manufacturer, Build.MANUFACTURER: any printable text, at most 91 bytes</small></span><input id="dev-id-manufacturer" data-identity-field="manufacturer" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-manufacturer-error"><span id="dev-id-manufacturer-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-brand"><span>Brand<small>ro.product.brand, Build.BRAND, the first part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-brand" data-identity-field="brand" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-brand-error"><span id="dev-id-brand-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-model"><span>Model<small>ro.product.model, Build.MODEL (also in the WebView's user agent and adb devices -l): any printable text, at most 91 bytes</small></span><input id="dev-id-model" data-identity-field="model" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-model-error"><span id="dev-id-model-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-device"><span>Device<small>ro.product.device, Build.DEVICE, ro.build.product, the third part of the fingerprint: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-device" data-identity-field="device" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-device-error"><span id="dev-id-device-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-name"><span>Product name<small>ro.product.name, Build.PRODUCT, the second part of the fingerprint, ro.build.description and ro.build.flavor: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-name" data-identity-field="name" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-name-error"><span id="dev-id-name-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-board"><span>Board (optional)<small>ro.product.board, Build.BOARD: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-board" data-identity-field="board" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-board-error"><span id="dev-id-board-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  <label class="cp-field" for="dev-id-hardware"><span>Hardware (optional)<small>ro.hardware and ro.boot.hardware, Build.HARDWARE: letters, digits, "_" and "-" only, at most 91 bytes</small></span><input id="dev-id-hardware" data-identity-field="hardware" type="text" spellcheck="false" autocomplete="off" placeholder="" aria-describedby="dev-id-hardware-error"><span id="dev-id-hardware-error" class="cp-id-error" role="status" data-state="error" hidden></span></label>
+                  </details>
+                  <button id="dev-id-reset" class="cp-button" type="button">Reset to the lab's identity</button>
+                </fieldset>
+              </section>
+            </div></details>
+            <details class="cp-group" id="cp-sec-network" data-section="network">
+              <summary><h3 id="cp-network-title">Network</h3><span id="cp-sum-network" class="cp-badge cp-sum" title="Connectivity, proxy or relay, redirects and mocks in effect"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-connection" aria-labelledby="cp-sub-connection-title"><h4 class="cp-subtitle" id="cp-sub-connection-title">Connection</h4>
+                <div class="cp-item" data-keywords="internet wifi wi-fi mobile data metered offline airplane"><label for="dev-network">Connectivity</label><select id="dev-network"><option value="online">Wi‑Fi (unmetered)</option><option value="metered">Mobile data (metered)</option><option value="offline">No connection</option></select></div>
+                <div class="cp-item" data-keywords="allowlist whitelist domains"><label for="dev-hosts-all">Allow all hosts</label><input id="dev-hosts-all" type="checkbox" role="switch" aria-describedby="dev-hosts-note"></div>
+                <div class="cp-item cp-stack" data-keywords="allowlist whitelist domains"><label for="dev-hosts">Allowed network hosts</label><input id="dev-hosts" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, *.cdn.example.com" aria-describedby="dev-hosts-note"></div>
+                <p id="dev-hosts-note" class="cp-note">With "Allow all hosts" on (default) any name can be reached, still subject to CORS on the server (or to a proxy of your own). Off, only the hosts in the list are reachable and, with no hosts in the list, every name fails as on an offline phone.</p>
+              </section>
+              <section class="cp-sub" id="cp-sub-proxy" aria-labelledby="cp-sub-proxy-title"><h4 class="cp-subtitle" id="cp-sub-proxy-title">Proxy and relay</h4>
+                <div class="cp-item cp-stack" data-keywords="relay cors http"><label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="empty: the APK Lab Relay, found by itself" aria-describedby="dev-proxy-note"><p id="dev-proxy-note" class="cp-note" role="status"></p></div>
+                <div class="cp-item" data-keywords="relay multiplex websocket"><label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" role="switch" aria-describedby="dev-relay-channel-note"><p id="dev-relay-channel-note" class="cp-note" role="status"></p></div>
+                <div class="cp-item cp-stack" data-keywords="mtls tls client certificate keystore keymanager"><label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note"><p id="dev-client-cert-status" class="cp-note" role="status"></p></div>
+                <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay on this computer (which answers the lab's pages only), only for these hosts, and live there in memory only. Other hosts never see them.</p>
+              </section>
+              <section class="cp-sub" id="cp-sub-hostmap" aria-labelledby="cp-hostmap-title" data-keywords="redirect hosts etc hosts rewrite port localhost"><h4 class="cp-subtitle" id="cp-hostmap-title">Redirect hosts<span id="hm-summary" class="cp-badge">0 active</span></h4>
+                <p class="cp-note">Each rule sends the app's requests for one host to another destination, like an /etc/hosts entry that can also change the port and scheme. The app still sees the original URL; only the request the browser makes goes to the destination, and it does not need to be in “Allowed network hosts” (offline mode still applies). Source: <code>https://api.example.com</code>, <code>api.example.com</code>, <code>host:port</code> or <code>*.domain</code>. Destination: <code>host</code>, <code>host:port</code> or <code>http(s)://host:port</code>; without a scheme, <code>localhost</code> and <code>127.0.0.1</code> use http. A local server must answer CORS for the lab page (or use the CORS relay with <code>--allow-private</code>). Applies immediately, counts the responses of each rule and marks the requests in the Network panel.</p>
+                <ul id="hm-list" class="lr-list hm-list" aria-label="Host redirects, the first match wins"></ul>
+                <p id="hm-status" class="cp-note lr-status" role="status" aria-live="polite">No hosts redirected.</p>
+                <div class="lr-foot"><button id="hm-add" class="cp-button lr-add" type="button">Add redirect</button></div>
+              </section>
+              <section class="cp-sub" id="cp-sub-mocks" aria-labelledby="cp-mocks-title" data-keywords="endpoint mocks stub response fake server http"><h4 class="cp-subtitle" id="cp-mocks-title">Endpoint mocks<span id="em-summary" class="cp-badge">0 active</span></h4>
+                <p class="cp-note ov-warning">Debugging tool: an app request that matches a mock in the list is <b>answered by the lab</b> with the configured response and does not go to the network. The first active mock that matches, in list order, answers, ahead of the allowed hosts list, offline mode, Redirect hosts and the Proxy. Applies to HttpURLConnection, OkHttp and other clients over java.net.Socket, and to DownloadManager; WebView pages are loaded by the browser and do not go through the mocks. Each response is counted, marked in the Network panel (and in the HAR), cited in the Summary, and the first one of each mock logs a warning in Logcat.</p>
+                <ul id="em-list" class="lr-list em-list" aria-label="Endpoint mocks, in priority order"></ul>
+                <p id="em-status" class="cp-note lr-status" role="status" aria-live="polite">No mocks.</p>
+                <div class="lr-foot"><button id="em-add" class="cp-button lr-add" type="button">Add mock</button><span class="lr-quiet"><button id="em-import" class="lr-link" type="button">Import</button><button id="em-export" class="lr-link" type="button" disabled hidden>Export</button></span><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
+              </section>
+            </div></details>
+            <details class="cp-group" id="cp-sec-app" data-section="app">
+              <summary><h3 id="cp-app-title">App</h3><span id="cp-sum-app" class="cp-badge cp-sum" title="Permissions granted and what the cameras see"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-perms" aria-labelledby="cp-perms-title" data-keywords="permissions runtime dangerous grant revoke"><h4 class="cp-subtitle" id="cp-perms-title">Permissions<span id="perms-summary" class="cp-badge">no app</span></h4>
+                <p id="perms-empty" class="cp-note">Open an APK to see the runtime (dangerous) permissions the app requests in its manifest.</p>
+                <div id="perms-list" class="perms-list"></div>
+                <p id="perms-note" class="cp-note" role="status" aria-live="polite">"Ask" is Android's default: the permission is not granted and requestPermissions shows the dialog over the phone. On Android, revoking a permission while the app is open kills the app process; here the revocation applies immediately and the app keeps running (reopen the APK to see it start again without the permission).</p>
+                <button id="perms-reset" class="cp-button" type="button" disabled>Reset this app's permissions</button>
+              </section>
+              <section class="cp-sub" id="cp-sub-location" aria-labelledby="cp-sub-location-title" data-keywords="gps location latitude longitude"><h4 class="cp-subtitle" id="cp-sub-location-title">Simulated location</h4>
+                <div class="cp-item" data-keywords="gps"><label for="loc-enabled">Device location on</label><input id="loc-enabled" type="checkbox" role="switch"></div>
+                <div class="cp-coords">
+                  <label class="cp-field" for="loc-lat"><span>Latitude</span><input id="loc-lat" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-23.5505"></label>
+                  <label class="cp-field" for="loc-lon"><span>Longitude</span><input id="loc-lon" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-46.6333"></label>
+                  <label class="cp-field" for="loc-acc"><span>Accuracy (m)</span><input id="loc-acc" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="10"></label>
                 </div>
-                <div id="dev-microg-tab-entries" data-microg-tab="entries" data-title="Entry points">
-                  <p class="cp-note">Entry points of the functions that need a Google server (check-in, account token, push, SafetyNet, Play Integrity, DroidGuard, licensing, billing). With the service turned on (microG services), microG's own code runs and the call is recorded once. With it off and without a mock, each call logs a "not implemented" failure and microG's body runs (it refuses). To mock from here, give a constant value for the return type (a reference accepts only <code>null</code> or <code>"text"</code>); rich values (Bundle, byte[], object) are only available through the Node API (<code>platform.microg.mock</code>). Some entry points deliver the result through a callback/coroutine: a value mock is counted as a hit but does not feed the result.</p>
-                  <div id="dev-microg-entries" class="cp-microg-entries" hidden>
-                    <ul id="dev-microg-entry-list" class="cp-list"></ul>
-                  </div>
-                  <p id="dev-microg-entries-empty" class="cp-note" role="status">No entry points listed yet: they appear while an APK runs with microG.</p>
+                <p id="loc-note" class="cp-note" role="status" aria-live="polite">With the permission granted and location on, LocationManager delivers this position (getLastKnownLocation and requestLocationUpdates). The Google Play services location client fails explicitly on a device without Play services; with the "With microG" option (Device section), microG's fused location delivers this position too.</p>
+              </section>
+              <section class="cp-sub" id="cp-sub-sms" aria-labelledby="cp-sub-sms-title" data-keywords="sms text message otp code"><h4 class="cp-subtitle" id="cp-sub-sms-title">Incoming SMS</h4>
+                <div class="cp-item cp-stack"><label for="sms-from">From</label><input id="sms-from" type="text" inputmode="tel" spellcheck="false" autocomplete="off" placeholder="+15550100" value="+15550100"></div>
+                <div class="cp-item cp-stack"><label for="sms-body">Message</label><textarea id="sms-body" rows="2" spellcheck="false" placeholder="Your code is 123456"></textarea></div>
+                <button id="sms-send" class="cp-button" type="button" disabled>Receive this SMS</button>
+                <p id="sms-note" class="cp-note" role="status" aria-live="polite">The device's radio receives the message and broadcasts SMS_RECEIVED to the apps that hold RECEIVE_SMS (with microG on, its SMS Retriever and SMS User Consent read it and pass it to the app that asked). The device has no default SMS app: nothing is stored in the SMS inbox.</p>
+              </section>
+              <section class="cp-sub" id="cp-sub-camera" aria-labelledby="cp-camera-title" data-keywords="camera webcam photo video"><h4 class="cp-subtitle" id="cp-camera-title">Camera<span id="cam-summary" class="cp-badge">test pattern</span></h4>
+                <label class="cp-field" for="cam-source"><span>What the cameras see<small>Applies to the back (0) and front (1, mirrored preview) cameras; changes immediately</small></span><select id="cam-source" aria-describedby="cam-note"><option value="pattern">Generated test pattern</option><option value="webcam">Computer webcam</option><option value="image">Image from computer…</option><option value="video">Video from computer…</option></select></label>
+                <input id="cam-file" type="file" hidden>
+                <div class="cam-monitor-row"><canvas id="cam-monitor" class="cam-monitor" width="150" height="200" role="img" aria-label="What the device cameras see now"></canvas><p id="cam-label" class="cp-note" role="status" aria-live="polite"></p></div>
+                <p id="cam-error" class="cp-note cam-error" role="alert" hidden></p>
+                <p id="cam-status" class="cp-note" role="status"></p>
+                <p id="cam-note" class="cp-note">The webcam is only requested from the browser when you choose it here (the permission prompt is the browser's own). <b>Frames stay in the browser</b>: they go from the page to the VM, which runs in this tab, and nothing is sent out. With an image or a video, the file is also read only here. The app still needs the <code>CAMERA</code> permission (App › Permissions) to open the camera.</p>
+              </section>
+            </div></details>
+            <details class="cp-group" id="cp-sec-data" data-section="data">
+              <summary><h3 id="cp-data-title">Files and data</h3><span id="cp-sum-data" class="cp-badge cp-sum" title="Files on the device and the app's stored data"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-files" aria-labelledby="cp-files-title" data-keywords="files photos documents storage upload"><h4 class="cp-subtitle" id="cp-files-title">Device files<span id="files-summary" class="cp-badge">none</span></h4>
+                <div id="files-drop" class="files-drop"><p>Drag photos, videos and documents here</p><button id="files-add" class="cp-button" type="button">Add files…</button><input id="files-input" type="file" multiple hidden></div>
+                <ul id="files-list" class="files-list" aria-labelledby="cp-files-title" hidden></ul>
+                <p id="files-note" class="cp-note" role="status" aria-live="polite"></p>
+                <button id="files-clear" class="cp-button" type="button" disabled>Remove all</button>
+              </section>
+              <section class="cp-sub" id="cp-sub-appdata" aria-labelledby="cp-appdata-title" data-keywords="sharedpreferences sqlite database storage cache"><h4 class="cp-subtitle" id="cp-appdata-title">App data<span id="appdata-summary" class="cp-badge">—</span></h4>
+                <p id="appdata-note" class="cp-note" role="status" aria-live="polite">Open and start an app to see the data it stored.</p>
+                <button id="appdata-open" class="cp-button primary" type="button" aria-haspopup="dialog" disabled>Open app data</button>
+                <div id="app-data-row" class="app-data-row">
+                  <label class="cp-check" for="keep-app-data"><input id="keep-app-data" type="checkbox" role="switch" checked><span>Keep app data between reloads<small>The app's SharedPreferences, SQLite databases, files and cache, per package and certificate</small></span></label>
+                  <p id="app-data-usage" class="cp-note" role="status" aria-live="polite">App data: open an APK to see usage.</p>
+                  <button id="clear-app-data" class="cp-button" type="button" disabled>Clear app data</button>
                 </div>
-              </div>
-              <p id="dev-hosts-note" class="cp-note">With "Allow all hosts" on (default) any name can be reached, still subject to CORS on the server (or to a proxy of your own). Off, only the hosts in the list are reachable and, with no hosts in the list, every name fails as on an offline phone.</p>
-            </div></details>
-            <details class="cp-group" id="cp-sec-perms" data-section="perms">
-              <summary><h3 id="cp-perms-title">Permissions</h3><span id="perms-summary" class="cp-badge">no app</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p id="perms-empty" class="cp-note">Open an APK to see the runtime (dangerous) permissions the app requests in its manifest.</p>
-              <div id="perms-list" class="perms-list"></div>
-              <p id="perms-note" class="cp-note" role="status" aria-live="polite">"Ask" is Android's default: the permission is not granted and requestPermissions shows the dialog over the phone. On Android, revoking a permission while the app is open kills the app process; here the revocation applies immediately and the app keeps running (reopen the APK to see it start again without the permission).</p>
-              <span class="cp-subtitle perms-loc-title">Simulated location</span>
-              <div class="cp-grid">
-                <label for="loc-enabled">Device location on</label><input id="loc-enabled" type="checkbox">
-                <label for="loc-lat">Latitude</label><input id="loc-lat" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-23.5505">
-                <label for="loc-lon">Longitude</label><input id="loc-lon" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="-46.6333">
-                <label for="loc-acc">Accuracy (m)</label><input id="loc-acc" type="text" inputmode="decimal" spellcheck="false" autocomplete="off" placeholder="10">
-              </div>
-              <p id="loc-note" class="cp-note" role="status" aria-live="polite">With the permission granted and location on, LocationManager delivers this position (getLastKnownLocation and requestLocationUpdates). The Google Play services location client fails explicitly on a device without Play services; with the "With microG" option (Device section), microG's fused location delivers this position too.</p>
-              <span class="cp-subtitle perms-loc-title">Incoming SMS</span>
-              <div class="cp-grid">
-                <label for="sms-from">From</label><input id="sms-from" type="text" inputmode="tel" spellcheck="false" autocomplete="off" placeholder="+15550100" value="+15550100">
-                <label for="sms-body">Message</label><textarea id="sms-body" rows="2" spellcheck="false" placeholder="Your code is 123456"></textarea>
-              </div>
-              <button id="sms-send" class="cp-button" type="button" disabled>Receive this SMS</button>
-              <p id="sms-note" class="cp-note" role="status" aria-live="polite">The device's radio receives the message and broadcasts SMS_RECEIVED to the apps that hold RECEIVE_SMS (with microG on, its SMS Retriever and SMS User Consent read it and pass it to the app that asked). The device has no default SMS app: nothing is stored in the SMS inbox.</p>
-              <button id="perms-reset" class="cp-button" type="button" disabled>Reset this app's permissions</button>
-            </div></details>
-            <details class="cp-group" id="cp-sec-files" data-section="files">
-              <summary><h3 id="cp-files-title">Device files</h3><span id="files-summary" class="cp-badge">none</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <div id="files-drop" class="files-drop"><p>Drag photos, videos and documents here</p><button id="files-add" class="cp-button" type="button">Add files…</button><input id="files-input" type="file" multiple hidden></div>
-              <ul id="files-list" class="files-list" aria-labelledby="cp-files-title" hidden></ul>
-              <p id="files-note" class="cp-note" role="status" aria-live="polite"></p>
-              <button id="files-clear" class="cp-button" type="button" disabled>Remove all</button>
-            </div></details>
-            <details class="cp-group" id="cp-sec-appdata" data-section="appdata">
-              <summary><h3 id="cp-appdata-title">App data</h3><span id="appdata-summary" class="cp-badge">—</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p id="appdata-note" class="cp-note" role="status" aria-live="polite">Open and start an app to see the data it stored.</p>
-              <button id="appdata-open" class="cp-button primary" type="button" aria-haspopup="dialog" disabled>Open app data</button>
-            </div></details>
-            <details class="cp-group" id="cp-sec-camera" data-section="camera">
-              <summary><h3 id="cp-camera-title">Camera</h3><span id="cam-summary" class="cp-badge">test pattern</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <label class="cp-field" for="cam-source"><span>What the cameras see<small>Applies to the back (0) and front (1, mirrored preview) cameras; changes immediately</small></span><select id="cam-source" aria-describedby="cam-note"><option value="pattern">Generated test pattern</option><option value="webcam">Computer webcam</option><option value="image">Image from computer…</option><option value="video">Video from computer…</option></select></label>
-              <input id="cam-file" type="file" hidden>
-              <div class="cam-monitor-row"><canvas id="cam-monitor" class="cam-monitor" width="150" height="200" role="img" aria-label="What the device cameras see now"></canvas><p id="cam-label" class="cp-note" role="status" aria-live="polite"></p></div>
-              <p id="cam-error" class="cp-note cam-error" role="alert" hidden></p>
-              <p id="cam-status" class="cp-note" role="status"></p>
-              <p id="cam-note" class="cp-note">The webcam is only requested from the browser when you choose it here (the permission prompt is the browser's own). <b>Frames stay in the browser</b>: they go from the page to the VM, which runs in this tab, and nothing is sent out. With an image or a video, the file is also read only here. The app still needs the <code>CAMERA</code> permission (Permissions section) to open the camera.</p>
+              </section>
             </div></details>
             <details class="cp-group" id="cp-sec-run" data-section="run">
-              <summary><h3 id="cp-run-title">Execution</h3><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <label class="cp-field" for="vm-engine"><span>VM engine <em id="vm-engine-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>What runs the app's code; applies when the APK is opened again</small></span><select id="vm-engine" aria-describedby="vm-engine-note"><option value="wasm">WebAssembly core (default)</option><option value="js">JavaScript VM</option></select></label>
-              <p id="vm-engine-note" class="cp-note" role="status"></p>
-              <label class="cp-check" for="vm-load-image"><input id="vm-load-image" type="checkbox"><span>Load image<small>Off by default. Keeps, in this browser's private storage, the expanded DEX files and compiled XML of an APK after its launch (of an APK set: of the base and its splits together), so the next open of the same APK reads them instead of expanding them (a few tens of ms on a large APK, for about the APK's DEX size in storage). The APK is not changed; the image is checked (content hash, lab build, checksums) before each use, and the diagnostics summary says whether it was used, written or refused. Applies when the APK is opened again</small></span></label>
-              <label class="cp-field" for="vm-memory"><span>VM memory <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>Java heap budget; applies when the APK is opened again</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
-              <p id="vm-memory-note" class="cp-note">This number is the Java heap budget (VM objects and arrays; the other budgets grow with it). The browser uses more than that: DEX tables, CanvasKit, rasters and one JavaScript object per Java object. A tab above ~2–4 GiB may be killed by the browser. The engine limit is 2,097,152 objects (4 GiB is capped to it).</p>
-              <p id="vm-memory-device" class="cp-note"></p>
-              <fieldset class="cp-core" id="vm-core">
-                <legend>Wasm core memory <em id="vm-core-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></legend>
-                <label class="cp-field cp-core-mode" for="vm-core-mode"><span>Mode<small>how the heap and threads use memory</small></span><select id="vm-core-mode" aria-describedby="vm-core-note"><option value="dynamic">Dynamic (default)</option><option value="fixed">Fixed</option></select></label>
-                <div class="cp-core-grid">
-                  <label for="vm-core-heap" data-fixed>Java heap<small>MiB · 64 to 1536</small></label><input id="vm-core-heap" data-fixed type="number" inputmode="numeric" min="64" max="1536" step="32" aria-describedby="vm-core-note">
-                  <label for="vm-core-meta">Metaspace<small>MiB · 64 to 1024</small></label><input id="vm-core-meta" type="number" inputmode="numeric" min="64" max="1024" step="32" aria-describedby="vm-core-note">
-                  <label for="vm-core-threads" data-fixed>Live threads<small>16 to 1000 · 1 MiB each</small></label><input id="vm-core-threads" data-fixed type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
-                </div>
-                <p id="vm-core-total" class="cp-note" role="status"></p>
-                <p id="vm-core-usage" class="cp-note" hidden></p>
-                <p id="vm-core-note" class="cp-note">Only applies with the "WebAssembly core" engine (the default), when the APK is opened again. <strong>Dynamic</strong>: the heap starts small and grows as the app keeps objects alive, and each new thread takes 1 MiB; the two share, with no boundary between them, everything above the metaspace. <strong>Fixed</strong>: heap, metaspace and threads each get the size set here, and exceeding a ceiling fails naming it. Metaspace (linked classes and methods, grows with the app size) is a size in both modes. Memory is at most 2048 MiB and only takes RAM when used; the diagnostics summary shows how much of each part is in use.</p>
-                <button id="vm-core-reset" class="cp-button" type="button">Restore core defaults</button>
-              </fieldset>
-              <label class="cp-field" for="vm-event-time"><span>Maximum time per event<small>How long the VM waits for an event to finish before ending it with the report; applies immediately</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
-              <p id="vm-event-note" class="cp-note">The VM runs the app's code many times slower than a device. A startup with hundreds of threads can exceed the default 25 s without being stuck: the "Instruction budget exceeded" report shows the threads still advancing. A longer time lets it finish; a real infinite loop is still ended with a report, only later.</p>
-              <label class="cp-field" for="vm-raster-scale"><span>Resolution while moving<small>While the screen moves (animation, scrolling, transition), the frame is drawn at this scale and redrawn sharp when it stops; applies immediately</small></span><select id="vm-raster-scale"><option value="1">100% (default, always sharp)</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
-              <label class="cp-field" for="vm-raster-still"><span>Resolution when still<small>The scale of the final frame, when the screen stops moving. Below 100% the screen is slightly less sharp and each frame costs less; applies immediately</small></span><select id="vm-raster-still"><option value="1">100% (default)</option><option value="0.9">90%</option><option value="0.8">80%</option></select></label>
-              <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox"><span>New screen starts at low resolution<small>The first frame of a new Activity or window is drawn at the moving resolution and redrawn sharp when the screen stops; applies immediately</small></span></label>
-              <label class="cp-field" for="vm-renderer"><span>Rendering<small>Where screen content (Compose, Canvas) is drawn. GPU uses WebGL in the Worker and falls back to CPU by itself if it fails; applies immediately</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (default)</option><option value="cpu">CPU</option></select></label>
-              <p id="vm-renderer-status" class="cp-note" role="status">In use: CPU</p>
-              <label class="cp-field" for="tolerate-missing"><span>Tolerant mode<small>Missing Android APIs become <code>STUB-VOID</code>/<code>STUB-RETURN</code> in the log instead of stopping the app</small></span><select id="tolerate-missing"><option value="off">Off (strict)</option><option value="void">Void methods only</option><option value="primitives" selected>void and primitives (0, false)</option><option value="all">All types (0, false, null)</option></select></label>
-              <label class="cp-check" for="native-version-mismatch"><input id="native-version-mismatch" type="checkbox"><span>Allow native library version mismatch<small>The lab's React Native native libraries are built for one release (0.79.4). On, an app of another React Native or Hermes version gets them anyway instead of an <code>UnsatisfiedLinkError</code>: it may fail later where the versions differ. Recorded as <code>NATIVE VERSION MISMATCH ALLOWED</code> in the log and the summary. Applies when the APK is reopened</small></span></label>
-              <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox"><span>Strict crash mode<small>A fatal exception in any thread ends the app (as on Android). Off, it is recorded as <code>FATAL (tolerated)</code> in the summary and only the thread that failed ends</small></span></label>
-              <div id="app-data-row" class="app-data-row">
-                <label class="cp-check" for="keep-app-data"><input id="keep-app-data" type="checkbox" checked><span>Keep app data between reloads<small>The app's SharedPreferences, SQLite databases, files and cache, per package and certificate</small></span></label>
-                <p id="app-data-usage" class="cp-note" role="status" aria-live="polite">App data: open an APK to see usage.</p>
-                <button id="clear-app-data" class="cp-button" type="button" disabled>Clear app data</button>
-              </div>
+              <summary><h3 id="cp-run-title">Execution</h3><span id="cp-sum-run" class="cp-badge cp-sum" title="Engine, rendering and tolerant mode"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-engine" aria-labelledby="cp-sub-engine-title"><h4 class="cp-subtitle" id="cp-sub-engine-title">Engine and memory</h4>
+                <label class="cp-field" for="vm-engine"><span>VM engine <em id="vm-engine-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>What runs the app's code; applies when the APK is opened again</small></span><select id="vm-engine" aria-describedby="vm-engine-note"><option value="wasm">WebAssembly core (default)</option><option value="js">JavaScript VM</option></select></label>
+                <p id="vm-engine-note" class="cp-note" role="status"></p>
+                <fieldset class="cp-core" id="vm-core" data-keywords="memory heap metaspace threads wasm">
+                  <legend>Wasm core memory <em id="vm-core-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></legend>
+                  <label class="cp-field cp-core-mode" for="vm-core-mode"><span>Mode<small>how the heap and threads use memory</small></span><select id="vm-core-mode" aria-describedby="vm-core-note"><option value="dynamic">Dynamic (default)</option><option value="fixed">Fixed</option></select></label>
+                  <div class="cp-core-grid">
+                    <label for="vm-core-heap" data-fixed>Java heap<small>MiB · 64 to 1536</small></label><input id="vm-core-heap" data-fixed type="number" inputmode="numeric" min="64" max="1536" step="32" aria-describedby="vm-core-note">
+                    <label for="vm-core-meta">Metaspace<small>MiB · 64 to 1024</small></label><input id="vm-core-meta" type="number" inputmode="numeric" min="64" max="1024" step="32" aria-describedby="vm-core-note">
+                    <label for="vm-core-threads" data-fixed>Live threads<small>16 to 1000 · 1 MiB each</small></label><input id="vm-core-threads" data-fixed type="number" inputmode="numeric" min="16" max="1000" step="10" aria-describedby="vm-core-note">
+                  </div>
+                  <p id="vm-core-total" class="cp-note" role="status"></p>
+                  <p id="vm-core-usage" class="cp-note" hidden></p>
+                  <p id="vm-core-note" class="cp-note">Only applies with the "WebAssembly core" engine (the default), when the APK is opened again. <strong>Dynamic</strong>: the heap starts small and grows as the app keeps objects alive, and each new thread takes 1 MiB; the two share, with no boundary between them, everything above the metaspace. <strong>Fixed</strong>: heap, metaspace and threads each get the size set here, and exceeding a ceiling fails naming it. Metaspace (linked classes and methods, grows with the app size) is a size in both modes. Memory is at most 2048 MiB and only takes RAM when used; the diagnostics summary shows how much of each part is in use.</p>
+                  <button id="vm-core-reset" class="cp-button" type="button">Restore core defaults</button>
+                </fieldset>
+                <label class="cp-field" for="vm-memory"><span>VM memory <em id="vm-memory-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em><small>Java heap budget of the JavaScript VM; applies when the APK is opened again</small></span><select id="vm-memory" aria-describedby="vm-memory-note"></select></label>
+                <p id="vm-memory-note" class="cp-note">This number is the Java heap budget (VM objects and arrays; the other budgets grow with it). The browser uses more than that: DEX tables, CanvasKit, rasters and one JavaScript object per Java object. A tab above ~2–4 GiB may be killed by the browser. The engine limit is 2,097,152 objects (4 GiB is capped to it).</p>
+                <p id="vm-memory-device" class="cp-note"></p>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <label class="cp-check" for="vm-load-image"><input id="vm-load-image" type="checkbox" role="switch"><span>Load image<small>Off by default. Keeps, in this browser's private storage, the expanded DEX files and compiled XML of an APK after its launch (of an APK set: of the base and its splits together), so the next open of the same APK reads them instead of expanding them (a few tens of ms on a large APK, for about the APK's DEX size in storage). The APK is not changed; the image is checked (content hash, lab build, checksums) before each use, and the diagnostics summary says whether it was used, written or refused. Applies when the APK is opened again</small></span></label>
+                </details>
+              </section>
+              <section class="cp-sub" id="cp-sub-rendering" aria-labelledby="cp-sub-rendering-title"><h4 class="cp-subtitle" id="cp-sub-rendering-title">Rendering</h4>
+                <label class="cp-field" for="vm-renderer"><span>Rendering<small>Where screen content (Compose, Canvas) is drawn. GPU uses WebGL in the Worker and falls back to CPU by itself if it fails; applies immediately</small></span><select id="vm-renderer" aria-describedby="vm-renderer-status"><option value="gpu">GPU (default)</option><option value="cpu">CPU</option></select></label>
+                <p id="vm-renderer-status" class="cp-note" role="status">In use: CPU</p>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <label class="cp-field" for="vm-raster-scale"><span>Resolution while moving<small>While the screen moves (animation, scrolling, transition), the frame is drawn at this scale and redrawn sharp when it stops; applies immediately</small></span><select id="vm-raster-scale"><option value="1">100% (default, always sharp)</option><option value="0.75">75%</option><option value="0.5">50%</option><option value="0.35">35%</option><option value="0.25">25%</option></select></label>
+                  <label class="cp-field" for="vm-raster-still"><span>Resolution when still<small>The scale of the final frame, when the screen stops moving. Below 100% the screen is slightly less sharp and each frame costs less; applies immediately</small></span><select id="vm-raster-still"><option value="1">100% (default)</option><option value="0.9">90%</option><option value="0.8">80%</option></select></label>
+                  <label class="cp-check" for="vm-raster-navigation"><input id="vm-raster-navigation" type="checkbox" role="switch"><span>New screen starts at low resolution<small>The first frame of a new Activity or window is drawn at the moving resolution and redrawn sharp when the screen stops; applies immediately</small></span></label>
+                </details>
+              </section>
+              <section class="cp-sub" id="cp-sub-errors" aria-labelledby="cp-sub-errors-title"><h4 class="cp-subtitle" id="cp-sub-errors-title">Errors and limits</h4>
+                <label class="cp-field" for="tolerate-missing"><span>Tolerant mode<small>Missing Android APIs become <code>STUB-VOID</code>/<code>STUB-RETURN</code> in the log instead of stopping the app</small></span><select id="tolerate-missing"><option value="off">Off (strict)</option><option value="void">Void methods only</option><option value="primitives" selected>void and primitives (0, false)</option><option value="all">All types (0, false, null)</option></select></label>
+                <label class="cp-check" for="strict-crash"><input id="strict-crash" type="checkbox" role="switch"><span>Strict crash mode<small>A fatal exception in any thread ends the app (as on Android). Off, it is recorded as <code>FATAL (tolerated)</code> in the summary and only the thread that failed ends</small></span></label>
+                <label class="cp-field" for="vm-event-time"><span>Maximum time per event<small>How long the VM waits for an event to finish before ending it with the report; applies immediately</small></span><select id="vm-event-time" aria-describedby="vm-event-note"></select></label>
+                <p id="vm-event-note" class="cp-note">The VM runs the app's code many times slower than a device. A startup with hundreds of threads can exceed the default 25 s without being stuck: the "Instruction budget exceeded" report shows the threads still advancing. A longer time lets it finish; a real infinite loop is still ended with a report, only later.</p>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <label class="cp-check" for="native-version-mismatch"><input id="native-version-mismatch" type="checkbox" role="switch"><span>Allow native library version mismatch<small>The lab's React Native native libraries are built for one release (0.79.4). On, an app of another React Native or Hermes version gets them anyway instead of an <code>UnsatisfiedLinkError</code>: it may fail later where the versions differ. Recorded as <code>NATIVE VERSION MISMATCH ALLOWED</code> in the log and the summary. Applies when the APK is reopened</small></span></label>
+                </details>
+              </section>
+            </div></details>
+            <details class="cp-group" id="cp-sec-debug" data-section="debug">
+              <summary><h3 id="cp-debug-title">Debugging</h3><span id="cp-sum-debug" class="cp-badge cp-sum" title="Developer options and method or activity changes in effect"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-devopts" aria-labelledby="cp-sub-devopts-title"><h4 class="cp-subtitle" id="cp-sub-devopts-title">Developer options</h4>
+                <div class="cp-item" data-keywords="debug layout views compose overlay"><label for="dev-layout-bounds" title="Android developer option (debug.layout), drawn as Android draws it: each View's bounds in red with blue corner marks and its margins in magenta; each Compose LayoutNode in red and each layout modifier in blue">Show layout bounds</label><input id="dev-layout-bounds" type="checkbox" role="switch"></div>
+                <div class="cp-item" data-keywords="fps profile hwui frames jank performance"><label for="dev-frame-graph" title="Developer option modeled on Android's Profile HWUI rendering (on screen as bars): one stacked bar per frame (VM events, raster, snapshot, transfer, page, put) with the 16.7 ms line, and the frames per second over the last 20 s with current, average and minimum FPS and the janky frames. An idle screen is shown as idle, not as 0 FPS. Drawn by the page over the screen; the app and the screenshots do not see it">Show frame rate</label><input id="dev-frame-graph" type="checkbox" role="switch"></div>
+              </section>
+              <section class="cp-sub" id="cp-sub-overrides" aria-labelledby="cp-overrides-title" data-keywords="method returns override hook stub value"><h4 class="cp-subtitle" id="cp-overrides-title">Method returns<span id="ov-summary" class="cp-badge">0 active</span></h4>
+                <p class="cp-note ov-warning">Debugging tool: while active, the body of the chosen method <b>does not run</b> and the call returns the value you typed. Applies to the next calls, without reloading. Each replaced call is counted, logged in Logcat (warning, tag <code>APKWebLab</code>) and listed in the Summary.</p>
+                <div class="ov-search"><label for="ov-search">Search for a method in the APK classes</label><input id="ov-search" type="search" spellcheck="false" autocomplete="off" placeholder="part of the class or method" aria-controls="ov-results"><ul id="ov-results" class="ov-results" hidden></ul></div>
+                <ul id="ov-list" class="ov-list"></ul>
+                <p id="ov-status" class="cp-note" role="status" aria-live="polite">No returns replaced.</p>
+                <button id="ov-add" class="cp-button" type="button">+ Add</button>
+              </section>
+              <section class="cp-sub" id="cp-sub-ignored" aria-labelledby="cp-ignored-title" data-keywords="ignored activities block startactivity intent"><h4 class="cp-subtitle" id="cp-ignored-title">Ignored activities<span id="ia-summary" class="cp-badge">0 active</span></h4>
+                <p class="cp-note ov-warning">Debugging tool: when the app asks to open an Activity from the list, the request is validated and then <b>discarded</b> (no screen opens, and a caller waiting for a result gets none). Applies to startActivity, startActivityForResult, startActivities and PendingIntent; the app launch and the deep links in this panel are not affected. Each discarded launch is counted, logged in Logcat and cited in the Summary.</p>
+                <div class="ov-search"><label for="ia-filter">Manifest activities (click to add)</label><input id="ia-filter" type="search" spellcheck="false" autocomplete="off" placeholder="filter by name" aria-controls="ia-available"><ul id="ia-available" class="ov-results ia-available" aria-label="Activities declared in the manifest"></ul></div>
+                <datalist id="ia-options"></datalist>
+                <ul id="ia-list" class="ov-list"></ul>
+                <p id="ia-status" class="cp-note" role="status" aria-live="polite">No activities ignored.</p>
+                <button id="ia-add" class="cp-button" type="button">+ Add</button>
+              </section>
+            </div></details>
+            <details class="cp-group" id="cp-sec-ext" data-section="ext">
+              <summary><h3 id="cp-ext-title">Extensions</h3><span id="cp-sum-ext" class="cp-badge cp-sum" title="Plugins running and the agent bridge (MCP)"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
+              <section class="cp-sub" id="cp-sub-plugins" aria-labelledby="cp-plugins-title" data-keywords="plugins scripts javascript"><h4 class="cp-subtitle" id="cp-plugins-title">Plugins<span id="pl-summary" class="cp-badge">0 running</span></h4>
+                <p class="cp-note">Your own JavaScript snippets that observe the current screen, the Compose tree, the ViewModels, Logcat and the network, and show the result in the <b>Plugins</b> panel below the device. Each enabled plugin runs in its own Web Worker and only reads: nothing writes to the app or calls its code. With no plugin enabled, nothing runs. API in docs/PLUGINS.md.</p>
+                <p class="cp-note ov-warning">A plugin's code runs with this page's origin (it can use fetch like any script of the page). Use only code you wrote or reviewed.</p>
+                <ul id="pl-list" class="lr-list pl-list" aria-label="Plugins, in panel order"></ul>
+                <p id="pl-status" class="cp-note lr-status" role="status" aria-live="polite">No plugins.</p>
+                <div class="lr-foot"><button id="pl-add" class="cp-button lr-add" type="button">Add plugin</button><span class="lr-quiet"><button id="pl-import" class="lr-link" type="button">Import</button><button id="pl-export" class="lr-link" type="button" disabled hidden>Export</button></span><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
+                <details class="cp-advanced"><summary>Advanced</summary>
+                  <div class="pl-power"><label for="pl-power">Plugin power</label><select id="pl-power" aria-describedby="pl-power-note"><option value="normal">Normal</option><option value="high">High</option><option value="max">Max</option></select></div>
+                  <p id="pl-power-note" class="cp-note">Normal: about 4 % of the VM thread for plugin reads, one query at a time. Raise it for plugins that scan the heap, read many objects or watch a lot: reads get more time and shorter pauses; a tap still waits for at most one query.</p>
+                  <p id="pl-power-stats" class="cp-note" aria-live="off"></p>
+                </details>
+              </section>
+              <section class="cp-sub" id="cp-sub-mcp" aria-labelledby="cp-mcp-title" data-keywords="mcp agent claude codex cursor bridge automation adb"><h4 class="cp-subtitle" id="cp-mcp-title">MCP<span id="mcp-summary" class="cp-badge">off</span></h4>
+                <p class="cp-note">Connects this page to an agent (Claude Code, Claude Desktop or another MCP client): it can take a screenshot of the screen or of a component, tap, type and read the output of the plugins, the Compose tree, the ViewModels, Logcat and the network of the app open here, install an APK from your computer, open and close the apps on the home screen, and run here the <code>adb</code> commands you use on an emulator. A small bridge (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) keeps running on your computer and the agent connects to it through an address; this page finds the bridge and connects by itself, with no token (see <a href="plugins.html#mcp">how it works</a>).</p>
+                <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Looking for the bridge…</p>
+                <details class="cp-advanced cp-mcp-setup" id="cp-mcp-setup"><summary>Connect an agent</summary>
+                  <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">1. Run in a terminal and leave it open</span><button id="mcp-copy" type="button" class="cp-button">Copy</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
+                  <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox" role="switch"><span>Accept agents from other machines on the network<small>Off by default. The bridge also listens on this computer's local IP and shows the addresses on start. With it on, any machine on the network can drive the lab, without a token or password, and the traffic is unencrypted. Use only on networks you trust.</small></span></label>
+                  <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-agent-title">2. Connect the agent to this address</span><button id="mcp-copy-agent" type="button" class="cp-button">Copy</button></div><div id="mcp-agent-pick" class="mcp-agent-pick" role="group" aria-label="Agent"><button type="button" class="cp-button" data-agent="claude" aria-pressed="true">Claude</button><button type="button" class="cp-button" data-agent="codex" aria-pressed="false">Codex</button><button type="button" class="cp-button" data-agent="cursor" aria-pressed="false">Cursor</button></div><p id="mcp-agent-where" class="cp-note mcp-agent-where"></p><pre class="mcp-config-json" aria-labelledby="mcp-agent-title"><code id="mcp-agent-command"></code></pre><a id="mcp-agent-link" class="mcp-agent-link" hidden>Add to Cursor with one click</a></div>
+                  <label class="cp-field" for="mcp-url"><span>Bridge address on this machine<small>the page looks for the bridge here and connects by itself while it runs; default port 8790 (another port goes in the command)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
+                  <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button">Connect</button></div>
+                </details>
+              </section>
+            </div></details>
+            <p id="cp-filter-empty" class="cp-filter-empty" hidden>No control matches. Try another word, or clear the search.</p>
+            <div class="cp-footer" id="cp-footer">
+              <div class="cp-item" data-keywords="appearance theme page colors colours"><label for="look-app-colors" title="The page around the device takes the colours of the open app (read from its launcher icon), with a reveal from the device. The app itself is not changed">Page in the app's colors</label><input id="look-app-colors" type="checkbox" role="switch" checked></div>
               <p id="device-status" class="cp-note" role="status" aria-live="polite">Changes reach the app as on Android: Configuration, re-selected resources and a recreated Activity or onConfigurationChanged.</p>
               <button id="device-reset" class="cp-button" type="button">Restore defaults</button>
-            </div></details>
-          <details class="cp-group" id="cp-sec-overrides" data-section="overrides">
-              <summary><h3 id="cp-overrides-title">Method returns</h3><span id="ov-summary" class="cp-badge">0 active</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note ov-warning">Debugging tool: while active, the body of the chosen method <b>does not run</b> and the call returns the value you typed. Applies to the next calls, without reloading. Each replaced call is counted, logged in Logcat (warning, tag <code>APKWebLab</code>) and listed in the Summary.</p>
-              <div class="ov-search"><label for="ov-search">Search for a method in the APK classes</label><input id="ov-search" type="search" spellcheck="false" autocomplete="off" placeholder="part of the class or method" aria-controls="ov-results"><ul id="ov-results" class="ov-results" hidden></ul></div>
-              <ul id="ov-list" class="ov-list"></ul>
-              <p id="ov-status" class="cp-note" role="status" aria-live="polite">No returns replaced.</p>
-              <button id="ov-add" class="cp-button" type="button">+ Add</button>
-            </div></details>
-          <details class="cp-group" id="cp-sec-ignored" data-section="ignored">
-              <summary><h3 id="cp-ignored-title">Ignored activities</h3><span id="ia-summary" class="cp-badge">0 active</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note ov-warning">Debugging tool: when the app asks to open an Activity from the list, the request is validated and then <b>discarded</b> (no screen opens, and a caller waiting for a result gets none). Applies to startActivity, startActivityForResult, startActivities and PendingIntent; the app launch and the deep links in this panel are not affected. Each discarded launch is counted, logged in Logcat and cited in the Summary.</p>
-              <div class="ov-search"><label for="ia-filter">Manifest activities (click to add)</label><input id="ia-filter" type="search" spellcheck="false" autocomplete="off" placeholder="filter by name" aria-controls="ia-available"><ul id="ia-available" class="ov-results ia-available" aria-label="Activities declared in the manifest"></ul></div>
-              <datalist id="ia-options"></datalist>
-              <ul id="ia-list" class="ov-list"></ul>
-              <p id="ia-status" class="cp-note" role="status" aria-live="polite">No activities ignored.</p>
-              <button id="ia-add" class="cp-button" type="button">+ Add</button>
-            </div></details>
-          <details class="cp-group" id="cp-sec-hostmap" data-section="hostmap">
-              <summary><h3 id="cp-hostmap-title">Redirect hosts</h3><span id="hm-summary" class="cp-badge">0 active</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Each rule sends the app's requests for one host to another destination, like an /etc/hosts entry that can also change the port and scheme. The app still sees the original URL; only the request the browser makes goes to the destination, and it does not need to be in “Allowed network hosts” (offline mode still applies). Source: <code>https://api.example.com</code>, <code>api.example.com</code>, <code>host:port</code> or <code>*.domain</code>. Destination: <code>host</code>, <code>host:port</code> or <code>http(s)://host:port</code>; without a scheme, <code>localhost</code> and <code>127.0.0.1</code> use http. A local server must answer CORS for the lab page (or use the CORS relay with <code>--allow-private</code>). Applies immediately, counts the responses of each rule and marks the requests in the Network panel.</p>
-              <ul id="hm-list" class="ov-list hm-list" aria-label="Host redirects, the first match wins"></ul>
-              <p id="hm-status" class="cp-note" role="status" aria-live="polite">No hosts redirected.</p>
-              <button id="hm-add" class="cp-button" type="button">+ Add</button>
-            </div></details>
-          <details class="cp-group" id="cp-sec-mocks" data-section="mocks">
-              <summary><h3 id="cp-mocks-title">Endpoint mocks</h3><span id="em-summary" class="cp-badge">0 active</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note ov-warning">Debugging tool: an app request that matches a mock in the list is <b>answered by the lab</b> with the configured response and does not go to the network. The first active mock that matches, in list order, answers, ahead of the allowed hosts list, offline mode, Redirect hosts and the Proxy. Applies to HttpURLConnection, OkHttp and other clients over java.net.Socket, and to DownloadManager; WebView pages are loaded by the browser and do not go through the mocks. Each response is counted, marked in the Network panel (and in the HAR), cited in the Summary, and the first one of each mock logs a warning in Logcat.</p>
-              <ul id="em-list" class="ov-list em-list" aria-label="Endpoint mocks, in priority order"></ul>
-              <p id="em-status" class="cp-note" role="status" aria-live="polite">No mocks.</p>
-              <div class="em-actions"><button id="em-add" class="cp-button" type="button">+ Add</button><button id="em-export" class="cp-button" type="button" disabled>Export</button><button id="em-import" class="cp-button" type="button">Import</button><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
-            </div></details>
-          <details class="cp-group" id="cp-sec-plugins" data-section="plugins">
-              <summary><h3 id="cp-plugins-title">Plugins</h3><span id="pl-summary" class="cp-badge">0 running</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Your own JavaScript snippets that observe the current screen, the Compose tree, the ViewModels, Logcat and the network, and show the result in the <b>Plugins</b> panel below the device. Each enabled plugin runs in its own Web Worker and only reads: nothing writes to the app or calls its code. With no plugin enabled, nothing runs. API in docs/PLUGINS.md.</p>
-              <p class="cp-note ov-warning">A plugin's code runs with this page's origin (it can use fetch like any script of the page). Use only code you wrote or reviewed.</p>
-              <div class="pl-power"><label for="pl-power">Plugin power</label><select id="pl-power" aria-describedby="pl-power-note"><option value="normal">Normal</option><option value="high">High</option><option value="max">Max</option></select></div>
-              <p id="pl-power-note" class="cp-note">Normal: about 4 % of the VM thread for plugin reads, one query at a time. Raise it for plugins that scan the heap, read many objects or watch a lot: reads get more time and shorter pauses; a tap still waits for at most one query.</p>
-              <p id="pl-power-stats" class="cp-note" aria-live="off"></p>
-              <ul id="pl-list" class="ov-list pl-list" aria-label="Plugins, in panel order"></ul>
-              <p id="pl-status" class="cp-note" role="status" aria-live="polite">No plugins.</p>
-              <div class="em-actions"><button id="pl-add" class="cp-button" type="button">+ Add</button><button id="pl-export" class="cp-button" type="button" disabled>Export</button><button id="pl-import" class="cp-button" type="button">Import</button><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
-            </div></details>
-          <details class="cp-group" id="cp-sec-mcp" data-section="mcp">
-              <summary><h3 id="cp-mcp-title">MCP</h3><span id="mcp-summary" class="cp-badge">off</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
-              <p class="cp-note">Connects this page to an agent (Claude Code, Claude Desktop or another MCP client): it can take a screenshot of the screen or of a component, tap, type and read the output of the plugins, the Compose tree, the ViewModels, Logcat and the network of the app open here, install an APK from your computer, open and close the apps on the home screen, and run here the <code>adb</code> commands you use on an emulator. A small bridge (<a href="tools/lab-mcp.mjs" download>lab-mcp.mjs</a>, Node.js) keeps running on your computer and the agent connects to it through an address; this page finds the bridge and connects by itself, with no token (see <a href="plugins.html#mcp">how it works</a>).</p>
-              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-config-title">1. Run in a terminal and leave it open</span><button id="mcp-copy" type="button" class="cp-button">Copy</button></div><pre class="mcp-config-json" aria-labelledby="mcp-config-title"><code id="mcp-config-json"></code></pre></div>
-              <label class="cp-check" for="mcp-lan"><input id="mcp-lan" type="checkbox"><span>Accept agents from other machines on the network<small>Off by default. The bridge also listens on this computer's local IP and shows the addresses on start. With it on, any machine on the network can drive the lab, without a token or password, and the traffic is unencrypted. Use only on networks you trust.</small></span></label>
-              <div class="mcp-config"><div class="mcp-config-head"><span id="mcp-agent-title">2. Connect the agent to this address</span><button id="mcp-copy-agent" type="button" class="cp-button">Copy</button></div><div id="mcp-agent-pick" class="mcp-agent-pick" role="group" aria-label="Agent"><button type="button" class="cp-button" data-agent="claude" aria-pressed="true">Claude</button><button type="button" class="cp-button" data-agent="codex" aria-pressed="false">Codex</button><button type="button" class="cp-button" data-agent="cursor" aria-pressed="false">Cursor</button></div><p id="mcp-agent-where" class="cp-note mcp-agent-where"></p><pre class="mcp-config-json" aria-labelledby="mcp-agent-title"><code id="mcp-agent-command"></code></pre><a id="mcp-agent-link" class="mcp-agent-link" hidden>Add to Cursor with one click</a></div>
-              <label class="cp-field" for="mcp-url"><span>Bridge address on this machine<small>the page looks for the bridge here and connects by itself while it runs; default port 8790 (another port goes in the command)</small></span><input id="mcp-url" type="url" value="http://127.0.0.1:8790" autocomplete="off" spellcheck="false"></label>
-              <div class="em-actions"><button id="mcp-connect" type="button" class="cp-button">Connect</button></div>
-              <p id="mcp-status" class="cp-note" role="status" aria-live="polite">Looking for the bridge…</p>
-            </div></details>
+            </div>
           </details>
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Execution)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Device; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
-        <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Method changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code> and Controls › Method returns). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="reopen-activity" class="back-button reload-activity" type="button" hidden title="Reopen: ends the VM and opens the app from zero in a new one, as after killing its process (nothing of the previous run stays in memory; app data follows Controls › Files and data)">Reopen</button><button id="back-button" class="back-button" hidden>Back</button><button id="network-toggle" class="back-button network-toggle" type="button" aria-pressed="false" title="Device internet: when off, the app sees the device with no connection (ConnectivityManager with no network, every connection fails), as in airplane mode. It is the Connectivity option in Controls › Network; applies immediately">Internet</button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Method changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code> and Controls › Debugging › Method returns). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
@@ -339,33 +381,42 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=d6bc8426c03e"></script>
+  <script type="module" src="./app.js?v=efe50e99a19d"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
-    <p id="em-dialog-help" class="em-help">When an app request matches this mock, the lab answers with the status, headers and body below, without going to the network.</p>
+    <p id="em-dialog-help" class="em-help">A request of the app that matches gets this response from the lab, without the network.</p>
     <form id="em-form" novalidate>
       <fieldset class="em-fieldset"><legend>Request</legend>
-        <label class="em-field em-wide" for="em-name"><span>Name <small>optional; shown in the Network panel and in the Summary</small></span><input id="em-name" type="text" autocomplete="off" spellcheck="false" maxlength="120"></label>
         <label class="em-field" for="em-method"><span>Method</span><select id="em-method" aria-describedby="em-err-method"></select></label>
         <label class="em-field" for="em-query"><span>Query</span><select id="em-query" aria-describedby="em-err-query"><option value="ignore">Ignore</option><option value="exact">Exact</option></select></label>
         <small id="em-err-method" class="em-error" hidden></small><small id="em-err-query" class="em-error" hidden></small>
         <label class="em-field em-wide" for="em-url"><span>URL or path</span><input id="em-url" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" placeholder="https://api.example.com/v1/users/* or /v1/users/*" aria-describedby="em-url-help em-err-url" required></label>
-        <small id="em-url-help" class="em-help em-wide">Full URL (<code>https://host/path</code>) or just the path (<code>/path</code>, any host). <code>*</code> matches one segment, <code>**</code> several; <code>*.domain</code> in the host. Without a port, any port. Exact query: the same parameters in any order (a <code>*</code> value accepts any value).</small>
         <small id="em-err-url" class="em-error em-wide" hidden></small>
-        <label class="em-field em-wide" for="em-body-contains"><span>Request body contains <small>optional; text the body sent by the app must have</small></span><input id="em-body-contains" type="text" autocomplete="off" spellcheck="false"></label>
+        <details class="em-more em-wide"><summary>Pattern syntax and more conditions</summary>
+          <small id="em-url-help" class="em-help">Full URL (<code>https://host/path</code>) or just the path (<code>/path</code>, any host). <code>*</code> matches one segment, <code>**</code> several; <code>*.domain</code> in the host. Without a port, any port. Exact query: the same parameters in any order (a <code>*</code> value accepts any value).</small>
+          <label class="em-field" for="em-body-contains"><span>Request body contains</span><input id="em-body-contains" type="text" autocomplete="off" spellcheck="false" placeholder="Optional text the app's request body must have"></label>
+          <label class="em-field" for="em-name"><span>Name</span><input id="em-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" placeholder="Optional; shown in the Network panel and the Summary"></label>
+        </details>
       </fieldset>
       <fieldset class="em-fieldset"><legend>Response</legend>
         <label class="em-field" for="em-status-code"><span>Status</span><input id="em-status-code" type="number" inputmode="numeric" min="200" max="599" step="1" aria-describedby="em-err-status"></label>
-        <label class="em-field" for="em-reason"><span>Message <small>empty: the status default</small></span><input id="em-reason" type="text" autocomplete="off" placeholder="OK" aria-describedby="em-err-status"></label>
-        <small id="em-err-status" class="em-error em-wide" hidden></small>
-        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title"><span id="em-headers-title" class="em-label">Headers</span><ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button">Add header</button><small id="em-err-headers" class="em-error" hidden></small></div>
-        <label class="em-field em-wide" for="em-body"><span>Body</span><textarea id="em-body" rows="8" spellcheck="false" autocomplete="off" aria-describedby="em-body-hint em-err-body"></textarea></label>
-        <div class="em-wide em-body-tools"><button id="em-body-file-button" type="button" class="cp-button">Load from file…</button><input id="em-body-file" type="file" hidden><button id="em-body-file-clear" type="button" class="cp-button" hidden>Remove file</button><button id="em-body-format" type="button" class="cp-button" hidden>Format JSON</button><span id="em-body-file-info" class="em-help" role="status"></span></div>
-        <small id="em-body-hint" class="em-hint em-wide" role="status" aria-live="polite"></small>
-        <small id="em-err-body" class="em-error em-wide" hidden></small>
-        <label class="em-field" for="em-delay"><span>Delay (ms) <small>the response arrives after this time</small></span><input id="em-delay" type="number" inputmode="numeric" min="0" max="600000" step="1" aria-describedby="em-err-delay"></label>
-        <small id="em-err-delay" class="em-error em-wide" hidden></small>
+        <label class="em-field" for="em-delay"><span>Delay (ms)</span><input id="em-delay" type="number" inputmode="numeric" min="0" max="600000" step="1" aria-describedby="em-err-delay"></label>
+        <label class="em-field em-wide" for="em-reason"><span>Status message</span><input id="em-reason" type="text" autocomplete="off" placeholder="Empty: the status default (OK, Not Found…)" aria-describedby="em-err-status"></label>
+        <small id="em-err-status" class="em-error em-wide" hidden></small><small id="em-err-delay" class="em-error em-wide" hidden></small>
+        <div class="em-wide em-headers-box" role="group" aria-labelledby="em-headers-title">
+          <div class="ce-head"><span id="em-headers-title" class="em-label">Headers</span><span class="ce-tools"><button id="em-headers-mode" type="button" class="ce-tool" aria-pressed="false">Edit as JSON</button></span></div>
+          <ul id="em-headers" class="em-headers"></ul><button id="em-header-add" type="button" class="cp-button ce-add">Add header</button>
+          <div id="em-headers-json-box" class="em-headers-json" hidden><div class="ce" data-lang="json"><div class="ce-gutter" aria-hidden="true"><div id="em-headers-json-gutter" class="ce-gutter-lines"></div></div><div class="ce-main"><pre class="ce-hl" aria-hidden="true"><code id="em-headers-json-hl"></code></pre><textarea id="em-headers-json" class="ce-input" rows="5" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-labelledby="em-headers-title" aria-describedby="em-headers-json-status em-err-headers"></textarea></div></div><div id="em-headers-json-large" class="ce-large" hidden><span id="em-headers-json-large-text"></span></div><div class="ce-bar"><span id="em-headers-json-status" class="ce-status" role="status" aria-live="polite"></span><span id="em-headers-json-pos" class="ce-pos" aria-hidden="true"></span></div></div>
+          <small id="em-err-headers" class="em-error" hidden></small>
+        </div>
+        <div class="em-wide em-body-box">
+          <div class="ce-head"><label id="em-body-label" for="em-body" class="em-label">Body</label><span class="ce-tools"><button id="em-body-format" type="button" class="ce-tool" hidden>Format</button><button id="em-body-minify" type="button" class="ce-tool" hidden>Minify</button><button id="em-body-file-button" type="button" class="ce-tool">Load file…</button><input id="em-body-file" type="file" hidden><button id="em-body-download" type="button" class="ce-tool" hidden>Download</button><button id="em-body-clear" type="button" class="ce-tool" hidden>Clear</button></span></div>
+          <div class="ce" data-lang="json"><div class="ce-gutter" aria-hidden="true"><div id="em-body-gutter" class="ce-gutter-lines"></div></div><div class="ce-main"><pre class="ce-hl" aria-hidden="true"><code id="em-body-hl"></code></pre><textarea id="em-body" class="ce-input" rows="10" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-labelledby="em-body-label" aria-describedby="em-body-status em-body-hint em-err-body"></textarea></div></div><div id="em-body-large" class="ce-large" hidden><span id="em-body-large-text"></span></div><div class="ce-bar"><span id="em-body-status" class="ce-status" role="status" aria-live="polite"></span><span id="em-body-pos" class="ce-pos" aria-hidden="true"></span></div>
+          <div class="em-body-file"><span id="em-body-file-info" class="em-help" role="status"></span><button id="em-body-file-clear" type="button" class="ce-tool" hidden>Remove file</button></div>
+          <small id="em-body-hint" class="em-hint" role="status" aria-live="polite"></small>
+          <small id="em-err-body" class="em-error" hidden></small>
+        </div>
       </fieldset>
       <p id="em-err-form" class="em-error" role="alert" hidden></p>
       <div class="em-buttons"><button id="em-cancel" type="button" class="cp-button">Cancel</button><button id="em-save" type="submit" class="cp-button primary">Save</button></div>
@@ -377,14 +428,21 @@
     <div class="em-card-head"><h2 id="pl-dialog-title">Add plugin</h2><button id="pl-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
     <p id="pl-dialog-help" class="em-help">Your own JavaScript that uses the <code>lab</code> object to observe and control the open app. <a href="plugins.html#exemplos" target="_blank" rel="noopener">See ready-made examples</a></p>
     <form id="pl-form" novalidate>
-      <label class="em-field em-wide" for="pl-name"><span>Name</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
-      <p id="pl-package-note" class="em-help pl-package-note" hidden><span id="pl-package-text"></span> <button id="pl-package-clear" type="button" class="cp-button">Apply to any app</button></p>
-      <div class="pl-fields">
-        <label class="em-field" for="pl-updates"><span>Output updates <small>automatic: the blocks follow the plugin; manual: they stay still until Update on the card</small></span><select id="pl-updates"><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
-        <label class="em-field" for="pl-height"><span>Block height <small>limited scrolls above 320 px; fixed uses the height in px</small></span><span class="pl-height-row"><select id="pl-height"><option value="wrap">Limited (320 px)</option><option value="auto">Full content</option><option value="fixed">Fixed</option></select><input id="pl-height-px" type="number" min="80" max="2000" step="20" value="240" aria-label="Fixed block height in px" hidden></span></label>
+      <div class="pl-top">
+        <label class="em-field" for="pl-name"><span>Name</span><input id="pl-name" type="text" autocomplete="off" spellcheck="false" maxlength="120" required aria-describedby="pl-err-name"></label>
+        <details class="em-more pl-display"><summary>Output display</summary>
+          <div class="pl-fields">
+            <label class="em-field" for="pl-updates"><span>Updates <small>automatic: the blocks follow the plugin; manual: they stay still until Refresh on the card</small></span><select id="pl-updates"><option value="auto">Automatic</option><option value="manual">Manual</option></select></label>
+            <label class="em-field" for="pl-height"><span>Block height <small>limited scrolls above 320 px; fixed uses the height in px</small></span><span class="pl-height-row"><select id="pl-height"><option value="wrap">Limited (320 px)</option><option value="auto">Full content</option><option value="fixed">Fixed</option></select><input id="pl-height-px" type="number" min="80" max="2000" step="20" value="240" aria-label="Fixed block height in px" hidden></span></label>
+          </div>
+        </details>
       </div>
       <small id="pl-err-name" class="em-error" hidden></small>
-      <label class="em-field em-wide" for="pl-code"><span>Code <small>Tab inserts spaces; Esc closes</small></span><textarea id="pl-code" class="pl-code" rows="18" spellcheck="false" autocomplete="off" autocapitalize="off" wrap="off" aria-describedby="pl-err-code"></textarea></label>
+      <p id="pl-package-note" class="em-help pl-package-note" hidden><span id="pl-package-text"></span> <button id="pl-package-clear" type="button" class="cp-button">Apply to any app</button></p>
+      <div class="pl-code-box">
+        <div class="ce-head"><label id="pl-code-label" for="pl-code" class="em-label">Code</label><span class="ce-keys">Tab indents. Ctrl+M lets Tab move the focus.</span></div>
+        <div class="ce" data-lang="json"><div class="ce-gutter" aria-hidden="true"><div id="pl-code-gutter" class="ce-gutter-lines"></div></div><div class="ce-main"><pre class="ce-hl" aria-hidden="true"><code id="pl-code-hl"></code></pre><textarea id="pl-code" class="ce-input pl-code" rows="18" wrap="off" spellcheck="false" autocomplete="off" autocapitalize="off" aria-labelledby="pl-code-label" aria-describedby="pl-code-status pl-err-code"></textarea></div></div><div id="pl-code-large" class="ce-large" hidden><span id="pl-code-large-text"></span></div><div class="ce-bar"><span id="pl-code-status" class="ce-status" role="status" aria-live="polite"></span><span id="pl-code-pos" class="ce-pos" aria-hidden="true"></span></div>
+      </div>
       <small id="pl-err-code" class="em-error" hidden></small>
       <div class="em-buttons"><button id="pl-cancel" type="button" class="cp-button">Cancel</button><button id="pl-save" type="submit" class="cp-button primary">Save</button></div>
     </form>

@@ -1,4 +1,4 @@
-// The Appearance section's Orientation select (src/index.html #dev-orientation) while the Activity on top fixes its orientation (android:screenOrientation in its manifest entry, or
+// The Device section's Orientation select (src/index.html #dev-orientation) while the Activity on top fixes its orientation (android:screenOrientation in its manifest entry, or
 // setRequestedOrientation at run time; the Worker snapshot's orientationLock, src/android-platform.js orientationLock). On a phone, turning the device changes nothing then, so
 // the control is disabled and says why; it comes back when an Activity that rotates is on top, the app is in the background or no app runs. The device itself already
 // follows the app's request (the effective device, src/device-state-host.js); the user's choice stays saved and applies again when the lock goes. No timer of its own.

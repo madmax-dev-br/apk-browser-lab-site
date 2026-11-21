@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How APK Browser Lab runs an Android APK in the browser: from the file to the screen, threads and time, memory, rendering, network, native code, tools and limitations.">
-  <link rel="stylesheet" href="./site-pages.css?v=d6bc8426c03e">
-  <link rel="stylesheet" href="./lab-tokens.css?v=d6bc8426c03e">
+  <link rel="stylesheet" href="./site-pages.css?v=efe50e99a19d">
+  <link rel="stylesheet" href="./lab-tokens.css?v=efe50e99a19d">
 </head>
 <body>
   <header class="topbar">
@@ -259,9 +259,9 @@ curl -O https://madmax-dev-br.github.io/apk-browser-lab-site/tools/cors-relay.mj
 node cors-relay.mjs
 # options: --port 8787 · --origin &lt;page origin&gt; (repeatable)</code></pre></div>
             You can also download the files directly: <a href="./tools/cors-relay.mjs" download>cors-relay.mjs</a> and <a href="./tools/relay-webview.cjs" download>relay-webview.cjs</a> (its WebView part), in the same folder.
-            On the default port (8787) there is nothing to copy: the page finds the relay by itself and <b>Controls › Device › Proxy</b> says "Relay found at 127.0.0.1:8787 (automatic)"; the page looks again before each app is opened, so a relay started later is used from the next launch, and the execution log names the proxy each run used. On another port, put the address it prints (<code>http://127.0.0.1:&lt;port&gt;/?url={url}</code>) in the Proxy field (in the embedded component, the <code>proxyUrl</code> option); the <code>{url}</code> is replaced with each request's destination.</li>
-          <li><b>Endpoint mock (no network).</b> In <b>Controls › Endpoint mocks</b>, the response comes from the lab itself and the request never goes out, so there is no CORS. Good for screens that depend on a specific response.</li>
-          <li><b>Redirect to a server of your own.</b> In <b>Controls › Redirect hosts</b>, send the API host to a server you control (a mock server, a debugging proxy, a test environment). That server must answer CORS for the lab's origin, including on <code>OPTIONS</code>:
+            On the default port (8787) there is nothing to copy: the page finds the relay by itself and <b>Controls › Network › Proxy</b> says "Relay found at 127.0.0.1:8787 (automatic)"; the page looks again before each app is opened, so a relay started later is used from the next launch, and the execution log names the proxy each run used. On another port, put the address it prints (<code>http://127.0.0.1:&lt;port&gt;/?url={url}</code>) in the Proxy field (in the embedded component, the <code>proxyUrl</code> option); the <code>{url}</code> is replaced with each request's destination.</li>
+          <li><b>Endpoint mock (no network).</b> In <b>Controls › Network › Endpoint mocks</b>, the response comes from the lab itself and the request never goes out, so there is no CORS. Good for screens that depend on a specific response.</li>
+          <li><b>Redirect to a server of your own.</b> In <b>Controls › Network › Redirect hosts</b>, send the API host to a server you control (a mock server, a debugging proxy, a test environment). That server must answer CORS for the lab's origin, including on <code>OPTIONS</code>:
             <div class="code" data-name="CORS headers"><pre><code>Access-Control-Allow-Origin: https://madmax-dev-br.github.io
 Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
 Access-Control-Allow-Headers: Authorization, Content-Type
@@ -293,15 +293,13 @@ Vary: Origin</code></pre></div>
         <p>The <b>Controls</b> panel and the panels below the device are for testing and understanding the app. Every tool that changes the app's behavior is counted, announced in Logcat and listed in the Summary.</p>
         <ul class="tools">
           <li><b>Open</b><span>Deep links and Intents resolved by the manifest's intent filters, like <code>am start</code>.</span></li>
-          <li><b>Appearance</b><span>Dark theme, font scale, language and region, orientation, screen, gesture or button navigation, animation scale, layout bounds.</span></li>
-          <li><b>Device</b><span>24-hour clock, time zone, battery, connectivity, allowed hosts and proxy.</span></li>
-          <li><b>Permissions</b><span>Dangerous permissions from the manifest (ask, grant, deny) and simulated location.</span></li>
-          <li><b>Execution</b><span>VM memory, maximum time per event, tolerant mode, strict failure mode, app data.</span></li>
-          <li><b>Method returns</b><span>Makes a chosen method return a value without running its body.</span></li>
-          <li><b>Ignored activities</b><span>Drops the app's requests to open certain Activities.</span></li>
-          <li><b>Redirect hosts</b><span>Sends the requests of one host to another destination, like <code>/etc/hosts</code>.</span></li>
-          <li><b>Endpoint mocks</b><span>Answers requests that match a pattern, without going to the network; exports and imports JSON.</span></li>
-          <li><b>Plugins</b><span>JavaScript snippets of your own that watch the app, crop the screen, reload the screen, create mocks and open windows with their own layouts. <a href="./plugins.html">How to set up</a>.</span></li>
+          <li><b>Device</b><span>Screen, orientation, navigation, font scale and dark theme; language, region, time zone and 24-hour clock; battery; ARM64 native code and OpenGL ES on the CPU; microG; the device identity.</span></li>
+          <li><b>Network</b><span>Connectivity and allowed hosts, proxy and relay, client certificates (mTLS). <b>Redirect hosts</b> sends the requests of one host to another destination, like <code>/etc/hosts</code>; <b>Endpoint mocks</b> answers requests that match a pattern, without going to the network (exports and imports JSON).</span></li>
+          <li><b>App</b><span>Dangerous permissions from the manifest (ask, grant, deny), simulated location, incoming SMS and what the cameras see.</span></li>
+          <li><b>Files and data</b><span>Files on the device's shared storage and the app's data, kept between reloads, viewed and edited.</span></li>
+          <li><b>Execution</b><span>VM engine and memory, rendering, maximum time per event, tolerant mode, strict failure mode.</span></li>
+          <li><b>Debugging</b><span>Layout bounds and frame rate. <b>Method returns</b> makes a chosen method return a value without running its body; <b>Ignored activities</b> drops the app's requests to open certain Activities.</span></li>
+          <li><b>Extensions</b><span>Plugins: JavaScript snippets of your own that watch the app, crop the screen, reload the screen, create mocks and open windows with their own layouts (<a href="./plugins.html">how to set up</a>). MCP connects an agent.</span></li>
           <li><b>Logcat and Network</b><span>The <code>android.util.Log</code> lines and every request, refusal and mock. Right-click a request: create a mock of it (already filled with method, URL, status, headers and the response body) or redirect the host.</span></li>
           <li><b>Compose</b><span>The screen elements cropped from the frame by the layout bounds, with details and the full tree.</span></li>
           <li><b>Summary and diagnostics</b><span>Memory, who retains it, exceptions, main thread and busiest methods; “Copy diagnostics” takes the whole report.</span></li>
@@ -339,6 +337,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=d6bc8426c03e"></script>
+  <script type="module" src="./site-pages.js?v=efe50e99a19d"></script>
 </body>
 </html>

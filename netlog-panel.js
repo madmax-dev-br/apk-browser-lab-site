@@ -1,9 +1,9 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=d6bc8426c03e';
-import { createReadingHold } from './reading-hold.js?v=d6bc8426c03e';
-import { sanitizeHosts } from './device-settings.js?v=d6bc8426c03e';
+import { MAX_ENTRIES } from './netlog.js?v=efe50e99a19d';
+import { createReadingHold } from './reading-hold.js?v=efe50e99a19d';
+import { sanitizeHosts } from './device-settings.js?v=efe50e99a19d';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -54,8 +54,8 @@ export function statusLabel(entry) {
 export function describeOutcome(entry) {
   const failure = entry.failure?.message ? ` ${entry.failure.message}` : '';
   switch (entry.outcome) {
-    case 'refused-by-allowlist': return `Refused by the allowed hosts list: ${entry.refusedHost || entry.host} is not in "Allowed network hosts" (Controls › Device). The app saw a network failure (UnknownHostException or ConnectException); nothing left the browser.`;
-    case 'offline': return 'Refused because the virtual device is offline (Controls › Device, Network). The app saw the network as unavailable; nothing left the browser.';
+    case 'refused-by-allowlist': return `Refused by the allowed hosts list: ${entry.refusedHost || entry.host} is not in "Allowed network hosts" (Controls › Network). The app saw a network failure (UnknownHostException or ConnectException); nothing left the browser.`;
+    case 'offline': return 'Refused because the virtual device is offline (Controls › Network › Connectivity). The app saw the network as unavailable; nothing left the browser.';
     case 'unknown-host': return `The host name could not be resolved.${failure}`;
     case 'timeout': return `The request hit the app's timeout.${failure}`;
     case 'aborted': return `The request was interrupted before it finished (connection closed by the app or network turned off).${failure}`;
@@ -189,7 +189,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
       box.append(block);
     }
     if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
-    if (entry.proxiedVia) box.append(el('div', 'netlog-note', `Via proxy ${entry.proxiedVia} (Controls › Device › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`));
+    if (entry.proxiedVia) box.append(el('div', 'netlog-note', `Via proxy ${entry.proxiedVia} (Controls › Network › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`));
     if (entry.relayChannel) box.append(el('div', 'netlog-note', channelNote(entry)));
     if (entry.finalUrl) box.append(el('div', 'netlog-note', `The server redirected (3xx) and the transport followed to ${entry.finalUrl}`));
     if (note) box.append(el('div', `netlog-note netlog-note-${categoryOf(entry)}`, note));

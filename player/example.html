@@ -6,8 +6,8 @@
   <title>APK Player · Integration</title>
   <meta name="description" content="Documentation of the APK Player component: embed it, load an APK, configure the device and every lab feature, plugins, events and security, with a live demo.">
   <script>try { document.documentElement.dataset.theme = localStorage.getItem('apkweb-theme') === 'light' ? 'light' : 'dark'; } catch { document.documentElement.dataset.theme = 'dark'; }</script>
-  <link rel="stylesheet" href="../site-pages.css?v=d6bc8426c03e">
-  <link rel="stylesheet" href="../lab-tokens.css?v=d6bc8426c03e">
+  <link rel="stylesheet" href="../site-pages.css?v=efe50e99a19d">
+  <link rel="stylesheet" href="../lab-tokens.css?v=efe50e99a19d">
   <style>
     /* The live demo: the player's slot and its controls. Everything else comes from site-pages.css. */
     .demo{display:grid;grid-template-columns:minmax(280px,400px) minmax(0,1fr);gap:20px;margin-top:16px}
@@ -21,7 +21,7 @@
     .file-pick label.button{display:inline-block}
     .button,.controls button{border:1px solid var(--line-strong);background:var(--surface);border-radius:7px;padding:6px 11px;cursor:pointer;font-size:14px;line-height:1.3}
     .controls button:hover,.button:hover{border-color:var(--accent)}
-    .button.primary{background:#6159e8;border-color:#6159e8;color:#fff}
+    .button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
     .button:disabled,.controls button:disabled{opacity:.5;cursor:not-allowed}
     .controls{display:flex;flex-direction:column;gap:12px}
     .group{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:var(--surface)}
@@ -537,8 +537,8 @@ const { text } = await player.screenState();</code></pre></div>
     <div class="code"><pre><code>node cors-relay.mjs
 # APK Web Lab CORS relay on http://127.0.0.1:8787 (only this machine can reach it)
 # Allowed page origins: https://madmax-dev-br.github.io, http://127.0.0.1:8765, http://localhost:8765
-# Proxy field (Controls &gt; Device): http://127.0.0.1:8787/&lt;token&gt;/?url={url}</code></pre></div>
-    <p>Paste the printed “Proxy” URL into the player's <code>proxyUrl</code> (or into <b>Controls › Device › Proxy</b> on the lab page). <code>{url}</code> is where the lab puts the destination (encoded with <code>encodeURIComponent</code>; without <code>{url}</code>, the destination is appended at the end). The hosts are still decided by <code>allowedHosts</code>.</p>
+# Proxy field (Controls &gt; Network &gt; Proxy and relay): http://127.0.0.1:8787/&lt;token&gt;/?url={url}</code></pre></div>
+    <p>Paste the printed “Proxy” URL into the player's <code>proxyUrl</code> (or into <b>Controls › Network › Proxy</b> on the lab page). <code>{url}</code> is where the lab puts the destination (encoded with <code>encodeURIComponent</code>; without <code>{url}</code>, the destination is appended at the end). The hosts are still decided by <code>allowedHosts</code>.</p>
     <div class="code"><pre><code>&lt;apk-player src="app.apk" allowed-hosts="*" proxy-url="http://127.0.0.1:8787/YOUR-TOKEN/?url={url}"&gt;&lt;/apk-player&gt;
 &lt;!-- or --&gt;
 await player.configure({ network: { allowedHosts: ['*'], proxyUrl: 'http://127.0.0.1:8787/YOUR-TOKEN/?url={url}' } });</code></pre></div>
@@ -816,7 +816,7 @@ await player.plugins.stop('components');</code></pre></div>
     </nav>
   </main>
 </div>
-<script type="module" src="../site-pages.js?v=d6bc8426c03e"></script>
+<script type="module" src="../site-pages.js?v=efe50e99a19d"></script>
 <script type="module">
   import { ApkPlayer } from './apk-player.js';
   const $ = id => document.getElementById(id);

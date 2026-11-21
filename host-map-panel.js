@@ -1,81 +1,119 @@
-// The "Redirecionar hosts" section of the Controles panel (src/host-map.js): N from -> to rows kept in the device settings (network.hostMap) and applied live through the same path as the
-// other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). Each row shows the effective URL shape of its rule and, like the
-// "Mock de endpoints" rows, the live count of the requests it redirected (responses and failures), which come back with every snapshot (snapshot.hostMap).
-import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=d6bc8426c03e';
+// The "Redirect hosts" section of the Controls panel (src/host-map.js): N from -> to rules kept in the device settings (network.hostMap) and applied live through the same path as
+// the other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). One line per rule like the Plugins and Endpoint mocks
+// rows (src/list-rows.js): switch, "source → target", the live count of the requests it redirected (from every snapshot, snapshot.hostMap), and a menu; the two fields and the
+// rule's effective URL shape show when the row is expanded (a new rule opens expanded).
+import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=efe50e99a19d';
+import { listRow } from './list-rows.js?v=efe50e99a19d';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');
   const rows = () => get().map(rule => ({ ...rule }));
-  let current = rows(), timer = null, counts = new Map();
+  let current = rows(), timer = null, counts = new Map(), keys = new WeakMap(), counter = 0;
+  const expanded = new Set();
+  const keyOf = rule => { let key = keys.get(rule); if (!key) { key = `hm-${++counter}`; keys.set(rule, key); } return key; };
 
   function meta(rule) {
     const parsed = parseRule(rule);
     if (parsed.empty) return ['Enter the source (the host the app uses) and the target.', ''];
     if (parsed.error) return [parsed.error, 'error'];
-    return [`${rule.enabled ? '' : 'off · '}${describeRule(parsed)}`, rule.enabled ? 'ok' : ''];
+    return [`${rule.enabled ? '' : 'Off. '}${describeRule(parsed)}`, rule.enabled ? 'ok' : ''];
   }
   function hitsOf(rule) {
-    const parsed = parseRule(rule); if (parsed.empty || parsed.error) return ['', ''];
-    const record = counts.get(ruleKey(rule)) ?? null;
+    const parsed = parseRule(rule); if (parsed.empty || parsed.error) return ['', '', ''];
+    const record = counts.get(ruleKey(rule)) ?? null; if (!record?.hits && !record?.failures) return ['', '', ''];   // nothing redirected yet: no count on the row
     return [hitText(record), record?.failures ? 'warn' : '', record?.lastFailure ? `Last failure: ${record.lastFailure}` : ''];
   }
   const activeRules = () => current.filter(rule => { const parsed = parseRule(rule); return rule.enabled && !parsed.error && !parsed.empty; });
+  const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   function updateMeta() {
     [...list().children].forEach((li, index) => {
       const rule = current[index]; if (!rule) return;
-      const [text, state] = meta(rule), info = li.querySelector('.hm-meta'); info.textContent = text; info.dataset.state = state;
+      const [text, state] = meta(rule), info = li.querySelector('.hm-meta');
+      if (info) { info.textContent = text; info.dataset.state = state; }
+      li.querySelector('.hm-from-text').textContent = rule.from.trim() || 'New rule';
+      li.querySelector('.hm-to-text').textContent = rule.to.trim() || '…';
       const [hits, hitState, title] = hitsOf(rule), counter = li.querySelector('.hm-hits'); counter.textContent = hits; counter.dataset.state = hitState; counter.hidden = !hits; counter.title = title ?? '';
-      li.querySelector('.hm-from').setAttribute('aria-invalid', String(state === 'error' && /^Origem/.test(text)));
-      li.querySelector('.hm-to').setAttribute('aria-invalid', String(state === 'error' && /^Destino|^Falta o destino/.test(text)));
+      const dot = li.querySelector('.hm-dot'); dot.dataset.state = state; dot.textContent = state === 'error' ? '!' : ''; dot.title = state === 'error' ? text : rule.enabled ? 'Active' : 'Off';
+      li.dataset.state = state === 'error' ? 'error' : '';
+      li.querySelector('.hm-from')?.setAttribute('aria-invalid', String(state === 'error' && /source/i.test(text) && !/target/i.test(text)));
+      li.querySelector('.hm-to')?.setAttribute('aria-invalid', String(state === 'error' && /target/i.test(text)));
     });
     const active = activeRules(), responses = active.reduce((sum, rule) => sum + (counts.get(ruleKey(rule))?.responses ?? 0), 0), failures = active.reduce((sum, rule) => sum + (counts.get(ruleKey(rule))?.failures ?? 0), 0);
     $('hm-summary').textContent = `${active.length} active`;
-    $('hm-status').textContent = active.length
-      ? `${active.length} active ${active.length === 1 ? 'rule' : 'rules'}, ${responses} ${responses === 1 ? 'response' : 'responses'}${failures ? `, ${failures} ${failures === 1 ? 'failure' : 'failures'}` : ''}. The app still sees the original URL; the Network panel marks each request REDIRECTED and says where it went.`
-      : current.length ? 'No active rule.' : 'No redirected host.';
+    $('hm-status').textContent = active.length && (responses || failures)
+      ? `${responses} ${responses === 1 ? 'response' : 'responses'}${failures ? `, ${failures} ${failures === 1 ? 'failure' : 'failures'}` : ''} through redirects. The app still sees the original URL.`
+      : active.length ? '' : current.length ? 'No rule is on.' : 'No redirects. A redirect sends the app\'s requests for one host to another server; the app still sees its own URL.';
+    $('hm-status').dataset.empty = String(!current.length);
+    list().hidden = !current.length;
   }
-  const el = (tag, className, text) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   function input(className, value, placeholder, label, describedBy) {
     const field = el('input', className); field.type = 'text'; field.value = value; field.placeholder = placeholder; field.spellcheck = false; field.autocomplete = 'off'; field.autocapitalize = 'off';
     field.setAttribute('aria-label', label); field.setAttribute('aria-describedby', describedBy); field.inputMode = 'url'; return field;
   }
+  function details(rule, index) {
+    const n = index + 1, metaId = `hm-meta-${keyOf(rule)}`, fields = el('div', 'hm-fields');
+    const fromLabel = el('label', 'hm-field'), toLabel = el('label', 'hm-field');
+    const from = input('hm-from', rule.from, 'https://api.example.com', `Source of redirect ${n}: the host the app uses`, metaId);
+    const to = input('hm-to', rule.to, 'localhost:8080 or https://staging.example.com', `Target of redirect ${n}`, metaId);
+    fromLabel.append(el('span', 'hm-field-name', 'Source (app host)'), from); toLabel.append(el('span', 'hm-field-name', 'Target'), to);
+    const arrow = el('span', 'hm-arrow', '→'); arrow.setAttribute('aria-hidden', 'true');
+    fields.append(fromLabel, arrow, toLabel);
+    from.addEventListener('input', () => { rule.from = from.value; changed(); });
+    to.addEventListener('input', () => { rule.to = to.value; changed(); });
+    const info = el('p', 'hm-meta'); info.id = metaId; const [text, state] = meta(rule); info.textContent = text; info.dataset.state = state;
+    return [fields, info];
+  }
   function render() {
     list().replaceChildren(...current.map((rule, index) => {
-      const n = index + 1, metaId = `hm-meta-${n}`, li = el('li', 'hm-row');
-      const head = el('div', 'hm-head'), toggle = el('label', 'hm-toggle'), check = el('input'); check.type = 'checkbox'; check.checked = rule.enabled; check.setAttribute('aria-label', `Turn on redirect ${n}`);
-      toggle.append(check, el('span', null, `Rule ${n}`));
-      const remove = el('button', 'cp-button hm-remove', 'Remove'); remove.type = 'button'; remove.setAttribute('aria-label', `Remove redirect ${n}`);
-      head.append(toggle, remove);
-      const fields = el('div', 'hm-fields');
-      const fromLabel = el('label', 'hm-field'), toLabel = el('label', 'hm-field');
-      const from = input('hm-from', rule.from, 'https://api.example.com', `Source of redirect ${n}: the host the app uses`, metaId);
-      const to = input('hm-to', rule.to, 'localhost:8080 or https://staging.example.com', `Target of redirect ${n}`, metaId);
-      fromLabel.append(el('span', 'hm-field-name', 'Source (app host)'), from); toLabel.append(el('span', 'hm-field-name', 'Target'), to);
-      const arrow = el('span', 'hm-arrow', '→'); arrow.setAttribute('aria-hidden', 'true');
-      fields.append(fromLabel, arrow, toLabel);
-      const info = el('span', 'hm-meta'); info.id = metaId;
-      const hits = el('span', 'hm-hits'); hits.setAttribute('role', 'status'); hits.setAttribute('aria-live', 'polite');
-      check.addEventListener('change', () => { rule.enabled = check.checked; changed(true); });
-      from.addEventListener('input', () => { rule.from = from.value; changed(); });
-      to.addEventListener('input', () => { rule.to = to.value; changed(); });
-      remove.addEventListener('click', () => { current.splice(index, 1); render(); changed(true); (list().querySelectorAll('.hm-remove')[Math.min(index, current.length - 1)] ?? $('hm-add')).focus(); });
-      li.append(head, fields, info, hits); return li;
+      const n = index + 1, key = keyOf(rule);
+      const main = [el('code', 'lr-text hm-from-text', rule.from.trim() || 'New rule'), el('span', 'hm-arrow-inline', '→'), el('code', 'lr-text hm-to-text', rule.to.trim() || '…')];
+      main[1].setAttribute('aria-hidden', 'true');
+      const hits = el('span', 'lr-count hm-hits'); hits.setAttribute('role', 'status'); hits.setAttribute('aria-live', 'polite');
+      const dot = el('span', 'lr-dot hm-dot');
+      const li = listRow({
+        doc: document, key, label: `redirect ${n}`, switchLabel: `Turn on redirect ${n}`, checked: rule.enabled,
+        onToggle: on => { rule.enabled = on; changed(true); },
+        main, trail: [hits, dot], expanded: expanded.has(key),
+        onExpand: open => { if (open) expanded.add(key); else expanded.delete(key); updateMeta(); },
+        details: () => details(rule, current.indexOf(rule)),
+        menu: () => [
+          { label: 'Edit', run: () => openRow(index, '.hm-from') },
+          { label: 'Move up', run: () => move(index, -1), disabled: index === 0 },
+          { label: 'Move down', run: () => move(index, 1), disabled: index === current.length - 1 },
+          { label: 'Remove', danger: true, run: () => removeAt(index) },
+        ],
+      });
+      li.classList.add('hm-row'); return li;
     }));
     updateMeta();
+  }
+  function openRow(index, focus) {
+    const rule = current[index]; if (!rule) return null;
+    expanded.add(keyOf(rule)); render();
+    const target = list().children[index]?.querySelector(focus); target?.scrollIntoView?.({ block: 'center' }); target?.focus?.(); return target;
+  }
+  function move(index, by) {
+    const to = index + by; if (to < 0 || to >= current.length) return;
+    const [item] = current.splice(index, 1); current.splice(to, 0, item); render(); changed(true);
+    list().children[to]?.querySelector('.lr-more')?.focus();
+  }
+  function removeAt(index) {
+    const [gone] = current.splice(index, 1); if (gone) expanded.delete(keyOf(gone)); render(); changed(true);
+    (list().children[Math.min(index, current.length - 1)]?.querySelector('.lr-main') ?? $('hm-add')).focus();
   }
   function changed(now = false) { updateMeta(); clearTimeout(timer); timer = setTimeout(() => set(current.map(rule => ({ ...rule }))), now ? 0 : 400); }
   $('hm-add').addEventListener('click', () => {
     if (current.length >= 50) { $('hm-status').textContent = 'At most 50 redirects.'; return; }
-    current.push({ from: '', to: '', enabled: true }); render(); list().querySelectorAll('.hm-from')[current.length - 1]?.focus();
+    current.push({ from: '', to: '', enabled: true }); openRow(current.length - 1, '.hm-from');
   });
   render();
   return {
-    /** "Redirecionar" from a request of the Rede panel: a new rule with that origin; the destination field gets the focus (nothing applies until it is typed). */
+    /** "Redirect" from a request of the Network panel: a new rule with that origin; the target field gets the focus (nothing applies until it is typed). */
     addRule(from) {
       if (current.length >= 50) { $('hm-status').textContent = 'At most 50 redirects.'; return false; }
       const existing = current.findIndex(rule => rule.from.trim() === String(from).trim());
       const index = existing >= 0 ? existing : current.push({ from: String(from), to: '', enabled: true }) - 1;
-      render(); const target = list().querySelectorAll('.hm-to')[index]; target?.scrollIntoView?.({ block: 'center' }); target?.focus?.(); return true;
+      openRow(index, '.hm-to'); return true;
     },
     /** The device settings changed elsewhere (reset, another tab): show them. */
     refresh() { current = rows(); render(); },

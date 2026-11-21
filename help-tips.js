@@ -6,7 +6,8 @@
 //   - a static paragraph (p.cp-note without role="status", not listed in KEEP): its tab is named after the field that points at it (aria-describedby), the field right
 //     before it, the sub-section it sits in (data-help-title, legend or .cp-subtitle), or "Overview"; a debugging warning (p.cp-note.ov-warning) gets a "!" on its tab and on the icon.
 //   - texts inside [data-help-skip] are left where they are: a block that shows its own notes (the microG settings dialog, src/microg-settings-dialog.js).
-import { createModalHost } from './lab-modal.js?v=d6bc8426c03e';
+// A section made of groups (section.cp-sub with an h4.cp-subtitle: Device › Screen, Network › Proxy and relay…) gets its tabs listed under the group names, in page order.
+import { createModalHost } from './lab-modal.js?v=efe50e99a19d';
 
 const KEEP = new Set(['perms-empty', 'vm-memory-device']);   // state messages without role="status": they say what to do next
 const OVERVIEW = 'Overview';
@@ -56,30 +57,37 @@ function noteTitle(section, note) {
   return OVERVIEW;
 }
 
-/** The section's items in document order, merged by tab name: [{ title, nodes: [Element], warning }]. */
+/** The group (section.cp-sub) a text sits in: its heading's name, or '' outside a group. */
+function groupOf(section, node) {
+  const sub = node.closest?.('.cp-sub');
+  return sub && section.contains(sub) ? labelText(sub.querySelector(':scope > .cp-subtitle')) : '';
+}
+
+/** The section's items in document order, merged by group and tab name: [{ title, group, nodes: [Element], warning }]. */
 function collect(section) {
   const found = [];
   for (const small of section.querySelectorAll('label.cp-field > span > small, label.cp-check > span > small')) {
     if (small.closest('.help-store, [data-help-skip]') || !small.textContent.trim()) continue;
-    found.push({ node: small, title: labelText(small.parentElement) || OVERVIEW, warning: false });
+    found.push({ node: small, title: labelText(small.parentElement) || OVERVIEW, group: groupOf(section, small), warning: false });
   }
   for (const note of section.querySelectorAll('p.cp-note')) {
     if (note.closest('.help-store, [data-help-skip]') || note.getAttribute('role') === 'status' || KEEP.has(note.id) || !note.textContent.trim()) continue;
-    found.push({ node: note, title: noteTitle(section, note), warning: note.classList.contains('ov-warning') });
+    found.push({ node: note, title: noteTitle(section, note), group: groupOf(section, note), warning: note.classList.contains('ov-warning') });
   }
   found.sort((a, b) => (a.node.compareDocumentPosition(b.node) & 4 ? -1 : 1));   // DOCUMENT_POSITION_FOLLOWING: a comes first
   const items = new Map();
-  for (const { node, title, warning } of found) {
-    const item = items.get(title) ?? { title, nodes: [], warning: false };
-    item.nodes.push(node); item.warning ||= warning; items.set(title, item);
+  for (const { node, title, group, warning } of found) {
+    const key = `${group}\u0000${title}`, item = items.get(key) ?? { title, group, nodes: [], warning: false };
+    item.nodes.push(node); item.warning ||= warning; items.set(key, item);
   }
   const list = [...items.values()];
-  const overview = list.findIndex(item => item.title === OVERVIEW);   // the section's introduction comes first
+  const overview = list.findIndex(item => item.title === OVERVIEW && !item.group);   // the section's introduction comes first
   if (overview > 0) list.unshift(...list.splice(overview, 1));
   return list;
 }
 
-/** The dialog's content: the texts alone for one item, a vertical tab list and one panel per item otherwise. The item boxes are moved in and back out by the caller. */
+/** The dialog's content: the texts alone for one item, a vertical tab list and one panel per item otherwise, with the group names between the tabs when the section has
+ *  groups (a tab named as its group, the group's introduction, reads "About"). The item boxes are moved in and back out by the caller. */
 function buildDialog(doc, items, boxes) {
   const root = doc.createElement('div'); root.className = 'help-dialog';
   if (items.length === 1) { root.append(boxes[0]); boxes[0].hidden = false; return { root, focus: null }; }
@@ -91,12 +99,23 @@ function buildDialog(doc, items, boxes) {
     tabs.forEach((tab, i) => { const on = i === index; tab.setAttribute('aria-selected', String(on)); tab.tabIndex = on ? 0 : -1; boxes[i].hidden = !on; });
     if (focus) tabs[index].focus();
   };
+  const grouped = new Set(items.map(item => item.group ?? '')).size > 1;
+  let lastGroup = null, groupId = null;
   items.forEach((item, i) => {
+    const group = item.group ?? '';
+    if (group !== lastGroup) {
+      groupId = null;
+      if (grouped && group) {   // a group name: not a tab (role=presentation); its tabs point at it with aria-describedby
+        const head = doc.createElement('div'); head.className = 'help-group'; head.setAttribute('role', 'presentation'); head.id = groupId = `help-group-${serial}-${i}`; head.textContent = group; tablist.append(head);
+      }
+      lastGroup = group;
+    }
     const tab = doc.createElement('button'), box = boxes[i];
+    if (groupId) tab.setAttribute('aria-describedby', groupId);
     tab.type = 'button'; tab.className = `help-tab${item.warning ? ' warning' : ''}`; tab.setAttribute('role', 'tab');
     tab.id = `help-tab-${serial}-${i}`; box.id = `help-panel-${serial}-${i}`;
     tab.setAttribute('aria-controls', box.id); box.setAttribute('role', 'tabpanel'); box.setAttribute('aria-labelledby', tab.id); box.tabIndex = 0;
-    tab.textContent = item.title;
+    tab.textContent = grouped && item.title === group ? 'About' : item.title;
     if (item.warning) { const mark = doc.createElement('span'); mark.className = 'help-tab-mark'; mark.textContent = '!'; mark.setAttribute('aria-label', 'warning'); tab.prepend(mark); }
     tab.addEventListener('click', () => select(i));
     tab.addEventListener('keydown', event => {
@@ -126,8 +145,8 @@ export function initHelpTips(root, { modalHost = null } = {}) {
     let store = section.querySelector(':scope .help-store');
     if (!store) { store = doc.createElement('div'); store.className = 'help-store'; store.hidden = true; (section.querySelector(':scope > .cp-body') ?? section).append(store); }
     for (const item of items) {
-      let box = [...store.children].find(child => child.dataset.title === item.title);
-      if (!box) { box = doc.createElement('div'); box.className = 'help-item'; box.dataset.title = item.title; store.append(box); }
+      let box = [...store.children].find(child => child.dataset.title === item.title && (child.dataset.group ?? '') === item.group);
+      if (!box) { box = doc.createElement('div'); box.className = 'help-item'; box.dataset.title = item.title; if (item.group) box.dataset.group = item.group; store.append(box); }
       if (item.warning) box.dataset.warning = 'true';
       for (const node of item.nodes) { box.append(node); made++; }
     }
@@ -139,7 +158,7 @@ export function initHelpTips(root, { modalHost = null } = {}) {
     button.setAttribute('aria-label', `Help: ${title}`); button.setAttribute('aria-haspopup', 'dialog'); button.title = `Help: ${title}`;
     button.addEventListener('click', event => {
       event.preventDefault(); event.stopPropagation();   // inside the <summary>: the click must not open or close the section
-      const boxes = [...store.children], list = boxes.map(box => ({ title: box.dataset.title, warning: box.dataset.warning === 'true' }));
+      const boxes = [...store.children], list = boxes.map(box => ({ title: box.dataset.title, group: box.dataset.group ?? '', warning: box.dataset.warning === 'true' }));
       if (!boxes.length) return;
       const ids = boxes.map(box => box.id), { root: content, focus } = buildDialog(doc, list, boxes);
       host().open({

@@ -7,15 +7,17 @@
 //
 // Mock (stored per package, exported as JSON):
 //   { id, enabled, name, method ('ANY' | GET | POST | PUT | PATCH | DELETE | HEAD | OPTIONS), url (pattern), query ('ignore' | 'exact'), bodyContains,
-//     status, reason, headers [{ name, value }], body (text), bodyBase64 (a file's bytes, instead of body) | null, bodyFile (its name), delayMs }
+//     status, reason, headers [{ name, value }], body (text), bodyBase64 (a file's bytes, instead of body) | null, bodyFile (its name), delayMs,
+//     bodyRef (stored list only: the body is in IndexedDB, src/mock-body-store.js) }
 // URL pattern: "http(s)://host[:port]/path[?query]" or a host-less "/path[?query]" (any scheme, host and port). A host label may be "*" (one label: "*.exemplo.com"); a path segment
 // "*" is exactly one segment, "*" inside a segment is any text without "/", and "**" is any number of segments. Without a port the pattern takes any port.
 // Query "exact": the request has exactly the pattern's parameters (any order; a value "*" takes any value); "ignore": the query is not looked at.
-import { inflateRaw } from './inflate.js?v=d6bc8426c03e';
-import { REASONS } from './virtual-http-socket.js?v=d6bc8426c03e';
+import { inflateRaw } from './inflate.js?v=efe50e99a19d';
+import { REASONS } from './virtual-http-socket.js?v=efe50e99a19d';
+import { utf8Length } from './json-tools.js?v=efe50e99a19d';
 
 export const MOCK_METHODS = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
-export const MAX_MOCKS = 50, MAX_BODY_BYTES = 4 * 1024 * 1024, MAX_DELAY_MS = 600000, MAX_HEADERS = 64;
+export const MAX_MOCKS = 50, MAX_BODY_BYTES = 32 * 1024 * 1024, MAX_DELAY_MS = 600000, MAX_HEADERS = 64;
 export const STORAGE_PREFIX = 'apkweb-endpoint-mocks-v1:';
 export const EXPORT_FORMAT = 'apkweb-endpoint-mocks';
 const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
@@ -50,7 +52,7 @@ export function normalizeMock(raw) {
     query: r.query === 'exact' ? 'exact' : r.query === undefined || r.query === 'ignore' ? 'ignore' : text(r.query, 20), bodyContains: text(r.bodyContains, 2000),
     status: r.status ?? 200, reason: text(r.reason, 200), headers: headerRows(r.headers),
     body: text(r.body, MAX_BODY_BYTES + 1), bodyBase64: typeof r.bodyBase64 === 'string' && r.bodyBase64 ? r.bodyBase64.slice(0, Math.ceil(MAX_BODY_BYTES * 4 / 3) + 8) : null, bodyFile: text(r.bodyFile, 200),
-    delayMs: r.delayMs ?? 0,
+    delayMs: r.delayMs ?? 0, bodyRef: r.bodyRef === true,
   };
 }
 
@@ -118,10 +120,11 @@ export function bytesToBase64(bytes) {
 }
 
 /**
- * Checks one mock. Returns { errors: [{ field, message }], warnings: [{ field, message }], compiled } where compiled (null when there are errors) is what the Worker matches with:
+ * Checks one mock. `checkBody` false (the page's list and dialog) skips the work proportional to the body: its JSON is not parsed (the editor checks it in slices) and it is
+ * not encoded (its size is `bodyBytes` when given, else counted); `compiled` is then null. Returns { errors: [{ field, message }], warnings: [{ field, message }], compiled } where compiled (null when there are errors) is what the Worker matches with:
  * { method, pattern, query, bodyContains, response: { status, reason, headers [[name, value]], body Uint8Array, delayMs } }.
  */
-export function validateMock(input) {
+export function validateMock(input, { checkBody = true, bodyBytes = null } = {}) {
   const mock = normalizeMock(input), errors = [], warnings = [], error = (field, message) => errors.push({ field, message }), warn = (field, message) => warnings.push({ field, message });
   if (!MOCK_METHODS.includes(mock.method)) error('method', `Invalid method: use ${MOCK_METHODS.join(', ')}.`);
   const pattern = parsePattern(mock.url); if (pattern.error) error('url', pattern.error);
@@ -141,12 +144,14 @@ export function validateMock(input) {
   if (headers.length > MAX_HEADERS) error('headers', `At most ${MAX_HEADERS} headers.`);
   const header = name => headers.filter(([n]) => n.toLowerCase() === name).map(([, v]) => v);
   let body = new Uint8Array(0);
+  if (mock.bodyRef && !mock.body && !mock.bodyBase64) error('body', 'The body was kept in the browser storage (IndexedDB) and could not be read back: load it again.');
   if (mock.bodyBase64) { try { body = base64Bytes(mock.bodyBase64); } catch { error('body', 'The body file could not be read (invalid base64).'); } }
-  else body = encoder.encode(mock.body);
-  if (body.length > MAX_BODY_BYTES) error('body', `The body is larger than ${MAX_BODY_BYTES / 1048576} MiB.`);
+  else if (checkBody) body = encoder.encode(mock.body);
+  const bodyLength = mock.bodyBase64 || checkBody ? body.length : bodyBytes ?? utf8Length(mock.body);
+  if (bodyLength > MAX_BODY_BYTES) error('body', `The body is larger than ${MAX_BODY_BYTES / 1048576} MiB.`);
   const contentType = header('content-type')[0] ?? '';
-  if (/json/i.test(contentType) && !mock.bodyBase64 && mock.body.trim()) { try { JSON.parse(mock.body); } catch (e) { warn('body', `The body is not valid JSON (Content-Type ${contentType}): ${String(e?.message ?? e).slice(0, 120)}. It will be sent anyway.`); } }
-  if ((status === 204 || status === 304) && body.length) warn('body', `${status} responses have no body: the configured body is not sent.`);
+  if (checkBody && /json/i.test(contentType) && !mock.bodyBase64 && mock.body.trim()) { try { JSON.parse(mock.body); } catch (e) { warn('body', `The body is not valid JSON (Content-Type ${contentType}): ${String(e?.message ?? e).slice(0, 120)}. It will be sent anyway.`); } }
+  if ((status === 204 || status === 304) && bodyLength) warn('body', `${status} responses have no body: the configured body is not sent.`);
   const encodings = header('content-encoding').join(',').split(',').map(v => v.trim().toLowerCase()).filter(v => v && v !== 'identity');
   let delivered = body, decoded = false;
   if (encodings.length) {
@@ -155,15 +160,15 @@ export function validateMock(input) {
   }
   const lengths = header('content-length');
   if (lengths.length > 1) error('headers', 'Content-Length repetido.');
-  else if (lengths.length === 1 && (!/^\d+$/.test(lengths[0]) || Number(lengths[0]) !== body.length)) error('headers', `Content-Length (${lengths[0]}) differs from the body size (${body.length} bytes). Remove the header so the lab computes it.`);
+  else if (lengths.length === 1 && (!/^\d+$/.test(lengths[0]) || Number(lengths[0]) !== bodyLength)) error('headers', `Content-Length (${lengths[0]}) differs from the body size (${bodyLength} bytes). Remove the header so the lab computes it.`);
   const delayText = String(mock.delayMs ?? 0).trim(), delayMs = delayText === '' ? 0 : /^\d+$/.test(delayText) ? Number(delayText) : NaN;
   if (!(delayMs >= 0 && delayMs <= MAX_DELAY_MS)) error('delayMs', `Invalid delay: use 0 to ${MAX_DELAY_MS} ms.`);
-  if (errors.length) return { errors, warnings, compiled: null, mock };
+  if (errors.length || !checkBody) return { errors, warnings, compiled: null, mock, bodyBytes: bodyLength };
   // What the app receives: like the transport (src/network-transport.js), a body the transport decoded loses Content-Encoding and Content-Length; otherwise the lab states the length.
   let out = decoded ? headers.filter(([name]) => !['content-encoding', 'content-length'].includes(name.toLowerCase())) : headers.slice();
   if (!decoded && !lengths.length && status !== 204 && status !== 304) out = [...out, ['Content-Length', String(body.length)]];
   return {
-    errors, warnings, mock,
+    errors, warnings, mock, bodyBytes: bodyLength,
     compiled: { method: mock.method, pattern, query: mock.query, bodyContains: mock.bodyContains, response: { status, reason: mock.reason.trim() || REASONS[status] || '', headers: out, body: status === 204 || status === 304 ? new Uint8Array(0) : delivered, delayMs } },
   };
 }
@@ -265,12 +270,12 @@ export function saveMocks(pkg, mocks, storage = undefined) {
 }
 /** The JSON "Exportar" downloads. */
 export function exportMocks(mocks, packageName = '') {
-  return JSON.stringify({ format: EXPORT_FORMAT, version: 1, packageName, mocks: mocks.map(normalizeMock) }, null, 2);
+  return JSON.stringify({ format: EXPORT_FORMAT, version: 1, packageName, mocks: mocks.map(normalizeMock).map(({ bodyRef, ...mock }) => mock) }, null, 2);
 }
 /** Parses an exported file (or a bare array of mocks). Returns { mocks, error? }; imported mocks get fresh ids so they never collide with the current list. */
 export function importMocks(text) {
   let data; try { data = JSON.parse(String(text)); } catch (e) { return { mocks: [], error: `The file is not valid JSON: ${String(e?.message ?? e).slice(0, 120)}` }; }
   const list = Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray(data.mocks) ? data.mocks : null;
   if (!list) return { mocks: [], error: `The file has no list of mocks (expected {"format":"${EXPORT_FORMAT}","mocks":[...]}).` };
-  return { mocks: list.slice(0, MAX_MOCKS).map(item => ({ ...normalizeMock(item), id: newMockId() })), ...(list.length > MAX_MOCKS ? { error: `Only the first ${MAX_MOCKS} mocks were imported.` } : {}) };
+  return { mocks: list.slice(0, MAX_MOCKS).map(item => ({ ...normalizeMock(item), id: newMockId(), bodyRef: false })), ...(list.length > MAX_MOCKS ? { error: `Only the first ${MAX_MOCKS} mocks were imported.` } : {}) };
 }

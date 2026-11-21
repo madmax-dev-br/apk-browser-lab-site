@@ -1,11 +1,14 @@
-// The "Plugins" section of the Controles panel and the "Plugins" output panel under the device (docs/PLUGINS.md). The section lists the plugins (on/off, name, status, Editar,
-// Remover, order, export / import) and the dialog edits one (name, output options, code; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
+// The "Plugins" section of the Controles panel and the "Plugins" output panel under the device (docs/PLUGINS.md). The section lists the plugins one line each (switch, name,
+// state; details on expand; Edit / Duplicate / Move / Remove in the row's menu; export / import) and the dialog edits one (name, output options, code in a JavaScript editor
+// with colours and a syntax check, src/code-editor.js; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=d6bc8426c03e';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=d6bc8426c03e';
-import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=d6bc8426c03e';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=d6bc8426c03e';
+import { RENDER_MS } from './plugin-host.js?v=efe50e99a19d';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=efe50e99a19d';
+import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=efe50e99a19d';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=efe50e99a19d';
+import { createCodeEditor, editKey } from './code-editor.js?v=efe50e99a19d';
+import { listRow, detailList } from './list-rows.js?v=efe50e99a19d';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };
@@ -16,14 +19,8 @@ function download(name, text, type) {
   const url = URL.createObjectURL(new Blob([text], { type })), link = document.createElement('a');
   link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
-/** A Tab in the code editor inserts two spaces (Shift+Tab removes up to two before the caret); returns whether the key was handled. */
-export function editorKey(textarea, event) {
-  if (event.key !== 'Tab' || event.ctrlKey || event.metaKey || event.altKey) return false;
-  event.preventDefault?.();
-  const start = textarea.selectionStart ?? textarea.value.length, end = textarea.selectionEnd ?? start, value = textarea.value;
-  if (event.shiftKey) { const lineStart = value.lastIndexOf('\n', start - 1) + 1, remove = value.slice(lineStart, lineStart + 2).match(/^ {1,2}/)?.[0].length ?? 0; if (remove) { textarea.value = value.slice(0, lineStart) + value.slice(lineStart + remove); textarea.selectionStart = textarea.selectionEnd = Math.max(lineStart, start - remove); } return true; }
-  textarea.value = value.slice(0, start) + '  ' + value.slice(end); textarea.selectionStart = textarea.selectionEnd = start + 2; return true;
-}
+/** The code editor's keys (src/code-editor.js editKey): Tab inserts two spaces (indents the selected lines), Shift+Tab removes up to two, Enter keeps the indent. */
+export const editorKey = (textarea, event) => editKey(textarea, event);
 
 /** DOM of one output block (text only). */
 export function renderBlock(doc, block) {
@@ -59,7 +56,7 @@ export function powerStatsText(status) {
   return `Plugin power ${name}: ${stats.served} served${stats.batches ? ` (${stats.batches} batches of ${stats.batched} queries)` : ''}, ${round((stats.ms ?? 0) / 1000)} s of VM time, ${stats.deferred} deferred, ${stats.rejected} rejected, longest ${round(stats.maxMs)} ms${stats.queued ? `, ${stats.queued} waiting` : ''}.`;
 }
 export function createPluginsPanel({ $, host, save = download, outputRoot = $('plugins-output'), toolbarRoot = null, setTimer = (fn, ms) => setTimeout(fn, ms), now = () => performance.now(), modals = null, onPower = () => {} }) {
-  const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set() };
+  const S = { plugins: loadPlugins(), editing: null, opener: null, submitted: false, dirty: new Set(), timer: null, lastRender: -Infinity, cards: new Map(), open: new Set(), expanded: new Set() };
   const doc = outputRoot?.ownerDocument ?? globalThis.document;
   const el = (tag, className, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; };
   const button = (text, className, label, onClick) => { const node = el('button', `cp-button ${className}`, text); node.type = 'button'; if (label) node.setAttribute('aria-label', label); node.addEventListener('click', onClick); return node; };
@@ -71,49 +68,84 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   const statusOf = plugin => { const live = host.get(plugin.id); return live ? { status: live.status, reason: live.reason, errors: live.errorCount, badge: live.output?.badge ?? '' } : { status: 'parado', reason: plugin.enabled ? '' : 'off', errors: 0, badge: '' }; };
 
   // ---- the section list -----------------------------------------------------------------------------------------------------------------------------------------------
+  /** The row's short state ("running", "error", "off") and its tone. */
   function meta(plugin) {
     const { status, reason, errors } = statusOf(plugin);
-    const parts = [STATUS_LABEL[status] ?? status]; if (reason && status !== 'rodando') parts.push(reason); if (plugin.packageFilter) parts.push(`package ${plugin.packageFilter}`); if (errors) parts.push(`${errors} ${errors === 1 ? 'error' : 'errors'}`);
-    return [parts.join(' · '), status === 'erro' ? 'error' : status === 'rodando' ? 'ok' : ''];
+    const text = !plugin.enabled && status === 'parado' ? 'off' : errors && status !== 'erro' ? `${STATUS_LABEL[status] ?? status}, ${errors} ${errors === 1 ? 'error' : 'errors'}` : STATUS_LABEL[status] ?? status;
+    return [text, status === 'erro' ? 'error' : status === 'rodando' ? 'ok' : '', reason];
+  }
+  function details(plugin) {
+    const { status, reason, errors } = statusOf(plugin), lines = (plugin.code.match(/\n/g)?.length ?? 0) + 1, fixed = typeof plugin.height === 'number';
+    const nodes = [detailList(doc, [
+      ['State', `${STATUS_LABEL[status] ?? status}${reason && status !== 'rodando' ? `: ${reason}` : ''}${errors ? `, ${errors} ${errors === 1 ? 'error' : 'errors'}` : ''}`],
+      ['Runs for', plugin.packageFilter ? `package ${plugin.packageFilter}` : 'any app'],
+      ['Code', `${lines} ${lines === 1 ? 'line' : 'lines'}`],
+      ['Output', `${plugin.updates === 'manual' ? 'manual updates' : 'automatic updates'}, ${fixed ? `${plugin.height} px blocks` : plugin.height === 'auto' ? 'full-height blocks' : 'blocks up to 320 px'}`],
+    ])];
+    const last = host.get(plugin.id)?.errors?.at?.(-1);
+    if (last) { const note = el('p', 'lr-problem', `${last.phase}: ${String(last.message ?? '').split('\n')[0].slice(0, 300)}`); note.dataset.state = 'error'; nodes.push(note); }
+    const edit = el('button', 'cp-button lr-edit', 'Edit plugin'); edit.type = 'button'; edit.addEventListener('click', event => openDialog(plugin, event.currentTarget)); nodes.push(edit);
+    return nodes;
   }
   function updateMeta() {
     [...$('pl-list').children].forEach((li, index) => {
-      const plugin = S.plugins[index]; if (!plugin) return; const [text, state] = meta(plugin), info = li.querySelector('.em-meta'); if (info) { info.textContent = text; info.dataset.state = state; }
+      const plugin = S.plugins[index]; if (!plugin) return; const [text, state, reason] = meta(plugin), info = li.querySelector('.em-meta');
+      if (info) { info.textContent = text; info.dataset.state = state; info.title = reason || ''; }
+      li.dataset.state = state;
       syncButtons(li.querySelector('.pb-row'), buttonItems(plugin, host.get(plugin.id), 'plugin'), { onClick: clickButton });
     });
     renderToolbar();
     const runningCount = host.runningCount;
-    $('pl-summary').textContent = `${runningCount} running`;
-    $('pl-status').textContent = !S.plugins.length ? 'No plugins. Click + Add.' : `${S.plugins.length} ${S.plugins.length === 1 ? 'plugin' : 'plugins'}, ${runningCount} running.${runningCount ? ' The output appears in the Plugins panel below the device.' : ''}`;
-    $('pl-export').disabled = !S.plugins.length;
+    $('pl-summary').textContent = S.plugins.length ? `${S.plugins.length} · ${runningCount} running` : '0';   // the section summary reads the leading number as the plugin count
+    $('pl-status').textContent = !S.plugins.length ? 'No plugins yet. A plugin is a short script that watches the app and shows what it finds in the Plugins panel below the device.' : runningCount ? 'The output of the running plugins is in the Plugins panel below the device.' : '';
+    $('pl-status').dataset.empty = String(!S.plugins.length);
+    $('pl-list').hidden = !S.plugins.length;
+    $('pl-export').disabled = !S.plugins.length; $('pl-export').hidden = !S.plugins.length;
     if (outputRoot) { outputRoot.hidden = !S.plugins.length; const count = outputRoot.querySelector('.po-count'); if (count) count.textContent = `${runningCount} running`; }
   }
   function renderList() {
     $('pl-list').replaceChildren(...S.plugins.map((plugin, index) => {
-      const li = el('li', 'em-row pl-row'), n = index + 1;
-      const check = el('input'); check.type = 'checkbox'; check.checked = plugin.enabled; check.setAttribute('aria-label', `Turn on plugin ${n}: ${plugin.name}`);
-      check.addEventListener('change', () => { plugin.enabled = check.checked; changed(); });
-      const what = el('span', 'em-what'); what.append(el('b', 'pl-name', plugin.name));
-      const actions = el('span', 'em-row-actions');
-      actions.append(button('↑', 'em-up', `Move plugin ${n} up`, () => move(index, -1)), button('↓', 'em-down', `Move plugin ${n} down`, () => move(index, 1)),
-        button('Edit', 'em-edit', `Edit plugin ${n}: ${plugin.name}`, event => openDialog(plugin, event.currentTarget)),
-        button('Remove', 'em-remove', `Remove plugin ${n}: ${plugin.name}`, () => { if (!globalThis.confirm || globalThis.confirm(`Remove the plugin "${plugin.name}"?`)) { S.plugins.splice(index, 1); changed(); $('pl-add').focus(); } }));
-      actions.children[0].disabled = index === 0; actions.children[1].disabled = index === S.plugins.length - 1;
-      const info = el('span', 'em-meta'); info.setAttribute('role', 'status');
-      li.append(check, what, actions, info, buttonGroup(`Buttons of plugin ${plugin.name}`)); return li;
+      const n = index + 1, label = `plugin ${n}: ${plugin.name}`, info = el('span', 'lr-state em-meta'); info.setAttribute('role', 'status');
+      const li = listRow({
+        doc, key: `pl-${plugin.id}`, label, switchLabel: `Turn on ${label}`, checked: plugin.enabled,
+        onToggle: on => { plugin.enabled = on; changed(); },
+        main: [el('b', 'lr-text pl-name', plugin.name), ...(plugin.packageFilter ? [el('span', 'lr-sub pl-package', `only ${plugin.packageFilter}`)] : [])], trail: [info], expanded: S.expanded.has(plugin.id),
+        onExpand: open => { if (open) S.expanded.add(plugin.id); else S.expanded.delete(plugin.id); },
+        details: () => details(plugin),
+        menu: () => [
+          { label: 'Edit…', run: () => openDialog(plugin, li.querySelector('.lr-more')) },
+          { label: 'Duplicate', run: () => duplicate(index), disabled: S.plugins.length >= MAX_PLUGINS },
+          { label: 'Move up', run: () => move(index, -1), disabled: index === 0 },
+          { label: 'Move down', run: () => move(index, 1), disabled: index === S.plugins.length - 1 },
+          { label: 'Remove', danger: true, run: () => removeAt(index) },
+        ],
+      });
+      li.classList.add('pl-row'); li.append(buttonGroup(`Buttons of plugin ${plugin.name}`)); return li;
     }));
     updateMeta();
+  }
+  function removeAt(index) {
+    const plugin = S.plugins[index]; if (!plugin) return;
+    if (globalThis.confirm && !globalThis.confirm(`Remove the plugin "${plugin.name}"?`)) return;
+    S.plugins.splice(index, 1); S.expanded.delete(plugin.id); changed();
+    ($('pl-list').children[Math.min(index, S.plugins.length - 1)]?.querySelector('.lr-main') ?? $('pl-add')).focus();
   }
   function move(index, by) {
     const to = index + by; if (to < 0 || to >= S.plugins.length) return;
     const [item] = S.plugins.splice(index, 1); S.plugins.splice(to, 0, item); changed();
-    $('pl-list').children[to]?.querySelector(by < 0 ? '.em-up' : '.em-down')?.focus();
+    $('pl-list').children[to]?.querySelector('.lr-more')?.focus();
+  }
+  function duplicate(index) {
+    if (S.plugins.length >= MAX_PLUGINS) return;
+    const source = S.plugins[index], copy = normalizePlugin({ ...source, id: undefined, name: `${source.name} (copy)`, enabled: false });   // a copy starts off: two of the same plugin would both run
+    S.plugins.splice(index + 1, 0, copy); changed(); $('pl-list').children[index + 1]?.querySelector('.lr-main')?.focus();
   }
   function changed() { savePlugins(S.plugins); host.setPlugins(S.plugins); renderList(); renderOutput(true); }
 
   // ---- the dialog -----------------------------------------------------------------------------------------------------------------------------------------------------
+  const codeEditor = createCodeEditor({ $, id: 'pl-code', language: 'js', label: 'code', onChange: () => showErrors() });
   function showErrors() {
-    const { errors } = validatePlugin({ name: $('pl-name').value, code: $('pl-code').value });
+    const { errors } = validatePlugin({ name: $('pl-name').value, code: codeEditor.value });
     for (const field of ['name', 'code']) { const node = $(`pl-err-${field}`), list = S.submitted ? errors.filter(error => error.field === field) : []; node.textContent = list.map(error => error.message).join(' '); node.hidden = !node.textContent; }
     return errors;
   }
@@ -128,12 +160,12 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     S.editing = plugin ? plugin.id : null; S.opener = opener ?? doc.activeElement; S.submitted = false;
     const data = plugin ?? draft ?? blankPlugin();
     $('pl-dialog-title').textContent = plugin ? 'Edit plugin' : 'Add plugin';
-    $('pl-name').value = data.name; showPackage(data.packageFilter ?? ''); $('pl-code').value = data.code; S.draft = data; showErrors();
+    $('pl-name').value = data.name; showPackage(data.packageFilter ?? ''); codeEditor.setValue(data.code, { silent: true }); S.draft = data; showErrors();
     const fixed = typeof data.height === 'number';
     $('pl-updates').value = data.updates === 'manual' ? 'manual' : 'auto'; $('pl-height').value = fixed ? 'fixed' : (data.height ?? 'wrap'); $('pl-height-px').value = String(fixed ? data.height : 240); $('pl-height-px').hidden = !fixed;
     $('pl-dialog').hidden = false; doc.body?.classList?.add('em-modal-open');
     for (const node of doc.querySelectorAll?.('main, header') ?? []) node.inert = true;
-    $('pl-code').focus?.();
+    codeEditor.refresh(); $('pl-code').focus?.();
   }
   function closeDialog() {
     if ($('pl-dialog').hidden) return;
@@ -146,7 +178,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     event?.preventDefault?.(); S.submitted = true;
     if (showErrors().length) { (validatePlugin({ name: $('pl-name').value, code: '' }).errors.some(e => e.field === 'name') ? $('pl-name') : $('pl-code')).focus?.(); return; }
     const at = S.plugins.findIndex(item => item.id === S.editing), base = at >= 0 ? S.plugins[at] : S.draft;
-    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: S.packageFilter, code: $('pl-code').value,
+    const plugin = normalizePlugin({ ...base, name: $('pl-name').value, packageFilter: S.packageFilter, code: codeEditor.value,
       updates: $('pl-updates').value, height: $('pl-height').value === 'fixed' ? Number($('pl-height-px').value) || 240 : $('pl-height').value });   // display options: never restart the plugin
     if (at >= 0) S.plugins[at] = plugin;
     else { if (S.plugins.length >= MAX_PLUGINS) { $('pl-err-code').textContent = `At most ${MAX_PLUGINS} plugins.`; $('pl-err-code').hidden = false; return; } S.plugins.push(plugin); }
@@ -155,8 +187,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   }
   $('pl-dialog').addEventListener('keydown', event => {
     if (event.key === 'Escape') { event.preventDefault(); closeDialog(); return; }
-    if (event.target === $('pl-code') && editorKey($('pl-code'), event)) return;
-    if (event.key !== 'Tab') return;
+    if (event.key !== 'Tab' || event.defaultPrevented) return;   // the code editor handled its own Tab
     const items = [...$('pl-dialog').querySelectorAll(FOCUSABLE)].filter(node => !node.hidden && node.offsetParent !== null);
     if (!items.length) return;
     const first = items[0], last = items[items.length - 1];
@@ -168,7 +199,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   $('pl-height').addEventListener('change', () => { $('pl-height-px').hidden = $('pl-height').value !== 'fixed'; });
   $('pl-cancel').addEventListener('click', closeDialog);
   $('pl-close').addEventListener('click', closeDialog);
-  for (const id of ['pl-name', 'pl-code']) $(id).addEventListener('input', showErrors);
+  $('pl-name').addEventListener('input', showErrors);
 
   // ---- section buttons ------------------------------------------------------------------------------------------------------------------------------------------------
   $('pl-add').addEventListener('click', event => {
@@ -291,7 +322,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     S.dirty.clear();
     if (cards.length !== container.children.length || cards.some((node, index) => container.children[index] !== node)) container.replaceChildren(...cards);
     if (typeof URL?.revokeObjectURL === 'function') releaseImages(new Set((host.list?.() ?? []).flatMap(plugin => plugin.output?.blocks ?? []).filter(block => block.kind === 'image').map(block => block.blob)));
-    if (!cards.length) container.replaceChildren(el('p', 'po-empty', S.plugins.length ? 'No plugin is on. Turn one on in Controls › Plugins.' : 'No plugins.'));
+    if (!cards.length) container.replaceChildren(el('p', 'po-empty', S.plugins.length ? 'No plugin is on. Turn one on in Controls › Extensions › Plugins.' : 'No plugins.'));
   }
   function schedule(id) {
     if (id) S.dirty.add(id);

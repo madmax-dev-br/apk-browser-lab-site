@@ -3,7 +3,7 @@
 // the frame from View.layout) and the View's LayoutParams, and says in Android API terms why the size is 0, walking up the parents: the MeasureSpec a parent passed (EXACTLY 0,
 // AT_MOST 0, UNSPECIFIED), the LayoutParams it came from (width / height, LinearLayout weight, ConstraintLayout's match constraint), a GONE view, a ViewStub not inflated,
 // a window with no size, or a measure pass that never reached the subtree. No app or library names are written here; the class names come from the running app.
-import { isComposeOwner } from './compose-owner.js?v=d6bc8426c03e';
+import { isComposeOwner } from './compose-owner.js?v=efe50e99a19d';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SIZE = 0x00ffffff, MODE = 0xc0000000, EXACTLY = 0x40000000, AT_MOST = 0x80000000;
 const COMPOSE_CONTAINER = 'Landroidx/compose/ui/platform/AbstractComposeView;';

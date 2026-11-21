@@ -5,10 +5,10 @@
 // message per frame (no pixels) and answers with an ack; a new frame is only sent after the previous one was acknowledged. Pixels cross to the Worker only for ImageReader targets:
 // one RGBA buffer per frame at the reader's size (read back from a small 2D canvas, transferred, not copied), and one buffer once for a still capture. A stream that only an encoder
 // consumes (a recording) crosses as a VideoFrame of that canvas: no readback, and the Worker's encoder takes it as it is.
-import { createCameraSource } from './camera-source.js?v=d6bc8426c03e';
-import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=d6bc8426c03e';
-import { probeWebCodecs } from './media-codec-backend.js?v=d6bc8426c03e';
-import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=d6bc8426c03e';
+import { createCameraSource } from './camera-source.js?v=efe50e99a19d';
+import { CAMERAS, cameraById, LENS_FACING_FRONT, inlineThumbnailSize } from './camera-frames.js?v=efe50e99a19d';
+import { probeWebCodecs } from './media-codec-backend.js?v=efe50e99a19d';
+import { createMp4Writer, splitAnnexB } from './media-mp4.js?v=efe50e99a19d';
 
 const FRAME_MS = 1000 / 30, MONITOR_MS = 200, ACK_TIMEOUT_MS = 1500;
 const CAPTURE_SIZE = { width: 960, height: 1280 };   // the upright picture the system camera screen takes (3:4)
@@ -25,7 +25,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
   probeWebCodecs(globalThis).then(codecs => { S.codecs = codecs; if (codecs && S.attached) post({ op: 'capabilities', captureVideo: true }); }, () => {});
 
   // ---- the panel -------------------------------------------------------------------------------------------------------------------------------------------------------------
-  const sectionOpen = () => !!$('cp-sec-camera')?.open;
+  const sectionOpen = () => !!$('cp-sec-app')?.open;
   function statusText() {
     const parts = [];
     if (!S.attached) parts.push('No APK is open: the device gets cameras 0 (rear) and 1 (front) when an APK is opened.');
@@ -59,7 +59,7 @@ export function createCameraLab({ $, vm, documentRef = globalThis.document }) {
       if (kind === 'image' || kind === 'video') { chooseFile(kind); select.value = source.kind; return; }
       select.disabled = true; try { await source.select(kind); } finally { select.disabled = false; renderPanel(); }
     });
-    $('cp-sec-camera')?.addEventListener('toggle', () => { renderPanel(); wake(); });
+    $('cp-sec-app')?.addEventListener('toggle', () => { renderPanel(); wake(); });
     renderPanel();
   }
 

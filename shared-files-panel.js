@@ -1,7 +1,7 @@
 // "Arquivos do dispositivo" in the Controles panel and the system file picker shown over the phone screen. The tester attaches files from the computer (button or drag and drop); they
 // become the virtual device's shared storage (src/shared-storage.js, src/shared-storage-host.js): what the pickers offer and what MediaStore lists. The bytes never leave the browser:
 // the page keeps them (IndexedDB when available, so they survive a reload; this page session otherwise) and hands copies to the VM's Worker.
-import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=d6bc8426c03e';
+import { MAX_FILES, MAX_FILE_BYTES, MAX_TOTAL_BYTES, kindOf, safeName, uniqueName } from './shared-storage.js?v=efe50e99a19d';
 
 const DB_NAME = 'apkweb-shared-storage', STORE = 'files', FIRST_ID = 1001;
 const KIND_LABEL = { image: 'image', video: 'video', audio: 'audio', document: 'document' };
@@ -186,7 +186,7 @@ export function createSharedFilesPanel({ $, vm, store = (() => { try { return op
       item.append(button); list.append(item);
     }
     const empty = document.createElement('p'); empty.className = 'sp-empty'; empty.hidden = request.files.length > 0;
-    empty.textContent = request.total === 0 ? 'The device has no files. Attach files in Controls › Device files and ask again in the app.' : 'No device file matches the type the app asked for.';
+    empty.textContent = request.total === 0 ? 'The device has no files. Attach files in Controls › Files and data › Device files and ask again in the app.' : 'No device file matches the type the app asked for.';
     const others = document.createElement('p'); others.className = 'sp-others'; others.hidden = !(request.others > 0 && request.files.length > 0);
     others.textContent = `${request.others} device file(s) are not shown: the type does not match the app's request.`;
     const actions = document.createElement('div'); actions.className = 'sp-actions';

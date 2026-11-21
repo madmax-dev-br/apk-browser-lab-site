@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=d6bc8426c03e';
+import { blockValue, outputsOf } from './plugin-host.js?v=efe50e99a19d';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -227,7 +227,7 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
       if (!actions?.mock) throw fail('Mocks are not available on this page.');
       const headers = args.headers && typeof args.headers === 'object' ? args.headers : undefined, body = args.body === undefined ? '' : typeof args.body === 'string' ? args.body : JSON.stringify(args.body);
       const result = await actions.mock({ id: args.id, name: args.name ?? `MCP ${args.method ?? 'ANY'} ${args.url ?? ''}`.slice(0, 120), method: args.method ?? 'ANY', url: args.url, status: args.status ?? 200, headers: headers ?? (typeof args.body === 'object' && args.body !== null ? { 'Content-Type': 'application/json' } : undefined), body, delayMs: args.delay_ms ?? 0, query: args.query });
-      return [text({ id: result.id, note: 'Active in Controls › Endpoint mocks: the next request that matches gets this response without going to the network. Use reload so the app fetches again.' })];
+      return [text({ id: result.id, note: 'Active in Controls › Network › Endpoint mocks: the next request that matches gets this response without going to the network. Use reload so the app fetches again.' })];
     },
     async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks are not available on this page.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
     async list_mocks() { if (!actions?.mocks) throw fail('Mocks are not available on this page.'); return [text(await actions.mocks())]; },

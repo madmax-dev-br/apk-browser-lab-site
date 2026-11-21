@@ -1,32 +1,35 @@
 /* APK Browser Lab: the design tokens, the UI typeface and the top bar, shared by the lab page (index.html, with lab-theme.css) and the documentation pages
    (arquitetura.html, plugins.html, player/example.html, over site-pages.css). Linked after the page's own stylesheet.
-   Palette: paper and ink with one accent, blueprint cobalt. Amber is for experimental / warnings only, green for running / validated only, red for errors only.
+   Palette (2026-11-21): neutral black, gray and white, no hue in the chrome; the accent is the ink itself (black on light, white on dark). Amber is for experimental / warnings only, green for running / validated only, red for errors only, all muted. The only colour the page takes is the open app's (src/app-palette.js, "Page in the app's colors"). Every page of the site reads its colours from these tokens.
    Type: Roboto (the Android system typeface, the variable font the device already ships) in one family; monospace only for code. Scale 12 / 14 / 16 / 20 / 28. */
 @font-face{font-family:"Lab Roboto";src:url('./fonts/Roboto.ttf') format('truetype');font-style:normal;font-weight:100 900;font-display:swap}
 :root{
-  --bg:#F3F5F8;--surface:#FFFFFF;--surface-2:#F7F8FB;--ink:#131A2B;--soft:#3D465A;--muted:#5A6479;--line:#D6DCE8;--line-strong:#AEB8CC;
-  --accent:#2447F9;--accent-ink:#2447F9;--accent-soft:#E6EBFF;--accent-hover:#1A38D6;--on-accent:#FFFFFF;
-  --amber:#B86E00;--amber-ink:#8A5200;--amber-soft:#FBF1DF;
-  --run:#0E8A4F;--ok:#0A6E3F;--ok-soft:#E2F4EA;
-  --warn:#B3261E;--warn-soft:#FCEBE9;
-  --code-bg:#EBEEF4;--code-ink:#1D2538;
-  --lane-vm:#2447F9;--lane-vm-soft:#E6EBFF;--syn-keyword:#2447F9;
-  --grid:#D6DCE8;--scrim:rgba(19,26,43,.48);
+  --bg:#F4F4F4;--surface:#FFFFFF;--surface-2:#F8F8F8;--ink:#141414;--soft:#3B3B3B;--muted:#5E5E5E;--line:#DEDEDE;--line-strong:#B0B0B0;
+  --accent:#141414;--accent-ink:#141414;--accent-soft:#EAEAEA;--accent-hover:#3B3B3B;--on-accent:#FFFFFF;
+  --amber:#9A6A1F;--amber-ink:#7A5214;--amber-soft:#F5EFE4;
+  --run:#2F7D55;--ok:#2B6B4A;--ok-soft:#E7F0EA;
+  --warn:#A33A32;--warn-soft:#F7EAE8;
+  --code-bg:#EEEEEE;--code-ink:#1F1F1F;
+  --lane-vm:#141414;--lane-vm-soft:#EAEAEA;--lane-page:#5E5E5E;--lane-page-soft:#F1F1F1;--lane-wasm:#3B3B3B;--lane-wasm-soft:#E4E4E4;
+  --syn-keyword:#141414;--syn-comment:#6E6E6E;--syn-string:#3B3B3B;--syn-number:#3B3B3B;--syn-tag:#3B3B3B;
+  --grid:#E2E2E2;--scrim:rgba(0,0,0,.5);--scrollbar:#C2C2C2;
   --r-control:8px;--r-panel:14px;--r-pill:999px;
   --bar-h:56px;
   --sans:"Lab Roboto",Roboto,system-ui,-apple-system,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Roboto Mono",monospace;
   --ring:0 0 0 2px var(--bg),0 0 0 4px var(--accent);
 }
 :root[data-theme=dark]{
-  --bg:#0F1524;--surface:#161D30;--surface-2:#1B2339;--ink:#E8ECF6;--soft:#C0C8DA;--muted:#99A4BC;--line:#26304A;--line-strong:#43507A;
-  --accent:#7C93FF;--accent-ink:#9DAEFF;--accent-soft:#1C2750;--accent-hover:#93A6FF;--on-accent:#0B1020;
-  --amber:#E0A040;--amber-ink:#F0BC6A;--amber-soft:#2C2311;
-  --run:#3CCB85;--ok:#5BD99A;--ok-soft:#10291D;
-  --warn:#FF9388;--warn-soft:#331A1C;
-  --code-bg:#1B2339;--code-ink:#DCE2F0;
-  --lane-vm:#7C93FF;--lane-vm-soft:#1C2750;--syn-keyword:#9DAEFF;
-  --grid:#26304A;--scrim:rgba(4,7,14,.62);
+  --bg:#000000;--surface:#121212;--surface-2:#1A1A1A;--ink:#F2F2F2;--soft:#C9C9C9;--muted:#A0A0A0;--line:#2A2A2A;--line-strong:#4D4D4D;
+  --accent:#F2F2F2;--accent-ink:#FFFFFF;--accent-soft:#2B2B2B;--accent-hover:#FFFFFF;--on-accent:#000000;
+  --amber:#C9A060;--amber-ink:#D9B87F;--amber-soft:#262017;
+  --run:#6CBF94;--ok:#7FC9A0;--ok-soft:#14221A;
+  --warn:#E8988F;--warn-soft:#2A1817;
+  --code-bg:#1A1A1A;--code-ink:#E2E2E2;
+  --lane-vm:#F2F2F2;--lane-vm-soft:#2B2B2B;--lane-page:#A0A0A0;--lane-page-soft:#1F1F1F;--lane-wasm:#C9C9C9;--lane-wasm-soft:#262626;
+  --syn-keyword:#FFFFFF;--syn-comment:#8C8C8C;--syn-string:#C9C9C9;--syn-number:#C9C9C9;--syn-tag:#C9C9C9;
+  --grid:#1C1C1C;--scrim:rgba(0,0,0,.7);--scrollbar:#4D4D4D;
 }
+html{scrollbar-color:var(--scrollbar) transparent}
 body{font-family:var(--sans);background:var(--bg)}
 ::selection{background:var(--accent);color:var(--on-accent)}
 

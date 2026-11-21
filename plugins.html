@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=d6bc8426c03e">
-  <link rel="stylesheet" href="./lab-tokens.css?v=d6bc8426c03e">
+  <link rel="stylesheet" href="./site-pages.css?v=efe50e99a19d">
+  <link rel="stylesheet" href="./lab-tokens.css?v=efe50e99a19d">
 </head>
 <body>
   <header class="topbar">
@@ -112,7 +112,7 @@
       <section id="onde-ficam" aria-labelledby="h-onde">
         <h2 id="h-onde">Where they live</h2>
         <ul>
-          <li><b>Configuration:</b> the lab's <b>Controls</b> panel, <b>Plugins</b> section (the last one). The title shows how many are running.</li>
+          <li><b>Configuration:</b> the lab's <b>Controls</b> panel, <b>Extensions</b> section, <b>Plugins</b> group. The title shows how many are running.</li>
           <li><b>Output:</b> the <b>Plugins</b> panel below the device, next to Logcat, Network and Compose. It appears when there is at least one plugin in the list and shows one card per plugin: the output blocks, a short badge, the console and the errors.</li>
           <li><b>Storage:</b> the list is kept in this browser's <code>localStorage</code> and applies to any APK (it is not per package). Up to 32 plugins fit, with up to 200,000 characters of code each.</li>
         </ul>
@@ -121,7 +121,7 @@
       <section id="adicionar" aria-labelledby="h-adicionar">
         <h2 id="h-adicionar">Adding a plugin</h2>
         <ol>
-          <li>Open <b>Controls › Plugins</b>.</li>
+          <li>Open <b>Controls › Extensions › Plugins</b>.</li>
           <li>Click <b>+ Add</b>. The dialog opens blank, with a link to the examples: <b>Name</b>, the output options and <b>Code</b>. In the editor, Tab inserts two spaces and Esc closes.</li>
           <li>Write the code, or copy one of the <a href="#exemplos">examples</a> (Current screen, Filtered logs, Observe a ViewModel, Screen components, Compose tree summary, Screenshot when the screen is ready, Plugin buttons, Reload button next to the device, Tip on a component and others).</li>
           <li>Click <b>Save</b>. The new plugin comes enabled, applies to any app and starts running when an APK is open.</li>
@@ -131,7 +131,7 @@
 
       <section id="gerenciar" aria-labelledby="h-gerenciar">
         <h2 id="h-gerenciar">Turning on, stopping and editing</h2>
-        <h3 id="gerenciar-lista">In the list, under Controls › Plugins</h3>
+        <h3 id="gerenciar-lista">In the list, under Controls › Extensions › Plugins</h3>
         <ul>
           <li><b>Checkbox</b> on the plugin's row: turns it on or off. When off, its Worker is terminated.</li>
           <li><b>↑ and ↓</b> change the order of the list (and of the cards).</li>
@@ -579,7 +579,7 @@
           <p>Several read-only queries in one round trip and one VM task. Names: <code>activity</code>, <code>viewModels</code>, <code>fragments</code>, <code>inspect</code>, <code>field</code>, <code>statics</code>, <code>staticField</code>, <code>classes</code>, <code>compositionLocals</code>, <code>methods</code>, with the arguments of the <code>lab</code> call of that name; up to 50 items.</p>
           <dl class="facts">
             <div><dt>Returns</dt><dd><code class="shape">[{ ok: true, value } | { ok: false, error: { code, message } }]</code> in the same order; a failed item does not stop the others.</dd></div>
-            <div><dt>Cost</dt><dd>Cuts the round trips of a plugin that reads many objects. How much time the VM gives plugins is the <b>Plugin power</b> option in Controls &gt; Plugins (Normal, High, Max).</dd></div>
+            <div><dt>Cost</dt><dd>Cuts the round trips of a plugin that reads many objects. How much time the VM gives plugins is the <b>Plugin power</b> option in Controls › Extensions › Plugins › Advanced (Normal, High, Max).</dd></div>
           </dl>
         </div>
 
@@ -618,7 +618,7 @@
 
         <div class="api" id="api-mock">
           <h4 class="api-sig"><code>await lab.mock({ method, url, status, headers, body, delayMs, query, id })</code></h4>
-          <p>Creates or replaces (same <code>id</code>) a mock in <b>Controls › Endpoint mocks</b>, for the open package: the next request that matches gets this response without going to the network. <code>body</code> can be text or an object (it becomes JSON).</p>
+          <p>Creates or replaces (same <code>id</code>) a mock in <b>Controls › Network › Endpoint mocks</b>, for the open package: the next request that matches gets this response without going to the network. <code>body</code> can be text or an object (it becomes JSON).</p>
           <dl class="facts">
             <div><dt>Returns</dt><dd><code class="shape">{ id }</code></dd></div>
             <div><dt>Error</dt><dd>An invalid mock raises an error with the reason.</dd></div>
@@ -767,7 +767,7 @@
         </div>
 
         <h3 id="h-botoes">Plugin buttons</h3>
-        <p>A plugin can have buttons of its own without building HTML: it gives the text, the icon and what to do, and the lab draws real buttons (with keyboard focus, Enter and Space). With <code>placement: 'plugin'</code> (the default) they appear on the plugin's card, in the <b>Plugins</b> panel, and on its row in <b>Controls › Plugins</b>; with <code>placement: 'toolbar'</code>, in the device bar, next to Recreate, Reopen, Back and Full screen, with a dashed border and the plugin's name in the tooltip. While the click code runs, the button shows that it is busy and ignores new clicks. Everything is text, never HTML. The buttons disappear when the plugin stops, is turned off or is removed.</p>
+        <p>A plugin can have buttons of its own without building HTML: it gives the text, the icon and what to do, and the lab draws real buttons (with keyboard focus, Enter and Space). With <code>placement: 'plugin'</code> (the default) they appear on the plugin's card, in the <b>Plugins</b> panel, and on its row in <b>Controls › Extensions › Plugins</b>; with <code>placement: 'toolbar'</code>, in the device bar, next to Recreate, Reopen, Back and Full screen, with a dashed border and the plugin's name in the tooltip. While the click code runs, the button shows that it is busy and ignores new clicks. Everything is text, never HTML. The buttons disappear when the plugin stops, is turned off or is removed.</p>
 
         <div class="api" id="api-button">
           <h4 class="api-sig"><code>const b = await lab.button({ label, icon, title, id, variant, disabled, placement }, onClick)</code><code>lab.button('Text', onClick)</code></h4>
@@ -887,7 +887,7 @@
         </div>
 
         <h3 id="h-hooks">Changing the app's methods</h3>
-        <p>At your request a plugin may change one of the app's methods, in three levels: a fixed outcome, observed calls, or a body you write in smali. It is never silent: every change shows on the page as <b>App modified</b> (a chip in the device's bar that opens the list: method, kind, live call count, who made it and a <b>Remove</b> button), is recorded in the trace when it is installed and removed, is counted in the diagnostics summary and the report, and appears in MCP <code>lab_status</code>. The page's Controls › Method returns rows are the same list. The lab ships no change to any app, and none for an app's protections.</p>
+        <p>At your request a plugin may change one of the app's methods, in three levels: a fixed outcome, observed calls, or a body you write in smali. It is never silent: every change shows on the page as <b>App modified</b> (a chip in the device's bar that opens the list: method, kind, live call count, who made it and a <b>Remove</b> button), is recorded in the trace when it is installed and removed, is counted in the diagnostics summary and the report, and appears in MCP <code>lab_status</code>. The page's Controls › Debugging › Method returns rows are the same list. The lab ships no change to any app, and none for an app's protections.</p>
 
         <div class="api" id="api-hook">
           <h4 class="api-sig"><code>await lab.hook(method, { returns | throws, message | observe: true | smali, persist })</code></h4>
@@ -995,7 +995,7 @@
           <li><b>Queries that run code.</b> No query runs code from the app or from libraries. Values are read from the fields the objects already have, as in a heap dump: a query does not create state (a getter that would create an object is not called; the field is read). The only way to run app code is to ask explicitly, with <a href="#h-metodos"><code>lab.invoke</code></a>: a lab operation, like a click, that runs the app's own method and appears in the execution log.</li>
           <li><b>Touching protected natives.</b> Plugins have no access to native code.</li>
         </ul>
-        <p>To change the app's behavior there are dedicated tools, which leave a trace in the Logcat and in the Summary: Method returns, Ignored activities, Redirect hosts and Endpoint mocks, in Controls, and <a href="#h-hooks"><code>lab.hook</code></a> for plugins.</p>
+        <p>To change the app's behavior there are dedicated tools, which leave a trace in the Logcat and in the Summary: Method returns and Ignored activities (Controls › Debugging), Redirect hosts and Endpoint mocks (Controls › Network), and <a href="#h-hooks"><code>lab.hook</code></a> for plugins.</p>
       </section>
 
       <section id="seguranca" aria-labelledby="h-seguranca">
@@ -1045,7 +1045,7 @@ lab.watch({ static: 'com.example.Session' }, 'current.user', v =&gt; lab.ui.json
         <div class="code" data-name="connection path"><pre><code>MCP client  --HTTP (address) or stdio-->  lab-mcp.mjs (127.0.0.1:8790)  <--  this page (connects by itself)</code></pre></div>
 
         <h3 id="mcp-endereco">Connect by address (the simple way)</h3>
-        <p>The bridge stays running and the agent connects to it by an HTTP address, with an IP and a port. There is no token to copy: the page finds the bridge on its address and connects by itself while it runs. <b>Controls › MCP</b> shows the two ready-made texts:</p>
+        <p>The bridge stays running and the agent connects to it by an HTTP address, with an IP and a port. There is no token to copy: the page finds the bridge on its address and connects by itself while it runs. <b>Controls › Extensions › MCP</b> shows the two ready-made texts:</p>
         <ol>
           <li><b>Run in the terminal and leave it open</b> (Node.js 22 or newer, no dependencies). The command downloads the bridge and starts it; it shows the addresses it serves on.
             <div class="code" data-name="start the bridge"><pre><code>curl -sO https://madmax-dev-br.github.io/apk-browser-lab-site/tools/lab-mcp.mjs &amp;&amp; node lab-mcp.mjs serve</code></pre></div></li>
@@ -1056,8 +1056,8 @@ lab.watch({ static: 'com.example.Session' }, 'current.user', v =&gt; lab.ui.json
 url = "http://127.0.0.1:8790/mcp"</code></pre></div>
             In Cursor, in <code>.cursor/mcp.json</code> (the page also offers a link that adds it with one click):
             <div class="code" data-name="Cursor"><pre><code>{ "mcpServers": { "apk-lab": { "url": "http://127.0.0.1:8790/mcp" } } }</code></pre></div>
-            In <b>Controls › MCP</b>, the <b>Claude</b>, <b>Codex</b> and <b>Cursor</b> buttons each show one of these texts. Other MCP clients accept the same address as an HTTP server (Streamable HTTP).</li>
-          <li><b>Nothing to click:</b> the page connects to the bridge as soon as it answers, and <b>Controls › MCP</b> shows the state (waiting for the bridge, connected, in another tab). While no bridge runs it looks again quietly, with a longer pause each time. On the public site the browser may first ask whether this page may reach your computer (Local Network Access): the page asks only once you open the MCP section. With two lab tabs open, the first keeps the bridge; <b>Connect</b> takes it to the tab you are in.</li>
+            In <b>Controls › Extensions › MCP</b>, the <b>Claude</b>, <b>Codex</b> and <b>Cursor</b> buttons each show one of these texts. Other MCP clients accept the same address as an HTTP server (Streamable HTTP).</li>
+          <li><b>Nothing to click:</b> the page connects to the bridge as soon as it answers, and <b>Controls › Extensions › MCP</b> shows the state (waiting for the bridge, connected, in another tab). While no bridge runs it looks again quietly, with a longer pause each time. On the public site the browser may first ask whether this page may reach your computer (Local Network Access): the page asks only once you open the MCP section. With two lab tabs open, the first keeps the bridge; <b>Connect</b> takes it to the tab you are in.</li>
         </ol>
         <p><b>Agent on another machine on the network:</b> check <b>Accept agents from other machines on the network</b> (off by default; the command gains <code>--host 0.0.0.0</code>) and use in the agent the address with the local IP that the bridge shows, for example <code>http://192.168.0.20:8790/mcp</code>. The page keeps talking to the bridge through <code>127.0.0.1</code>, so the bridge and the browser stay on the same computer. With it on, <b>any machine on the network can drive the lab, without a token or password</b>, and the traffic goes unencrypted; use it only on networks you trust.</p>
 
@@ -1133,7 +1133,7 @@ url = "http://127.0.0.1:8790/mcp"</code></pre></div>
 
         <div class="api" id="mcp-save-plugin">
           <h4 class="api-sig names"><code>get_plugin</code><code>save_plugin</code></h4>
-          <p><code>get_plugin</code> returns one plugin with its code (<code>plugin</code>: id or name). <code>save_plugin</code> creates a plugin (pass <code>name</code> and <code>code</code>) or edits one (pass <code>plugin</code>): it is stored in the browser like a plugin written in Controls › Plugins, starts at once when it is on, and the response has its status, its errors and its buttons.</p>
+          <p><code>get_plugin</code> returns one plugin with its code (<code>plugin</code>: id or name). <code>save_plugin</code> creates a plugin (pass <code>name</code> and <code>code</code>) or edits one (pass <code>plugin</code>): it is stored in the browser like a plugin written in Controls › Extensions › Plugins, starts at once when it is on, and the response has its status, its errors and its buttons.</p>
           <dl class="facts">
             <div><dt>Edit</dt><dd><code>code</code> replaces the whole code. <code>edits</code> changes parts of it: a list of <code>{ old_text, new_text }</code>, each <code>old_text</code> found exactly once in the current code, applied in order. If one does not match, nothing changes.</dd></div>
             <div><dt>Other fields</dt><dd><code>name</code>, <code>enabled</code> (a new plugin starts on), <code>package_filter</code> and <code>wait_ms</code> (how long to wait for the plugin to start, default 2000).</dd></div>
@@ -1171,7 +1171,7 @@ url = "http://127.0.0.1:8790/mcp"</code></pre></div>
 
         <div class="api" id="mcp-set-mock">
           <h4 class="api-sig names"><code>set_mock</code><code>remove_mock</code><code>list_mocks</code></h4>
-          <p>Create or replace (same <code>id</code>) an endpoint mock (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> text or object, <code>headers</code>, <code>delay_ms</code>), remove and list. The mocks live in <b>Controls › Endpoint mocks</b> of the open package, like yours.</p>
+          <p>Create or replace (same <code>id</code>) an endpoint mock (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> text or object, <code>headers</code>, <code>delay_ms</code>), remove and list. The mocks live in <b>Controls › Network › Endpoint mocks</b> of the open package, like yours.</p>
         </div>
 
         <div class="api" id="mcp-reload">
@@ -1246,7 +1246,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
 
       <section id="exemplos" aria-labelledby="h-exemplos">
         <h2 id="h-exemplos">Examples</h2>
-        <p>Copy an example, click <b>+ Add</b> in Controls › Plugins (the editor opens blank) and paste it into the Code field.</p>
+        <p>Copy an example, click <b>+ Add</b> in Controls › Extensions › Plugins (the editor opens blank) and paste it into the Code field.</p>
         <ul class="ex-index">
           <li><a href="#ex-tela-atual">Current screen</a></li>
           <li><a href="#ex-print">Screenshot when the screen is ready</a></li>
@@ -1502,7 +1502,7 @@ tab.onToggle((isOpen, by) =&gt; lab.ui.text(`tab ${isOpen ? 'open' : 'collapsed'
         <figure class="ex-shot"><img src="./plugin-examples/ex-aba.webp" width="1440" height="1200" loading="lazy" decoding="async" alt="The Side tab example running in the lab, in the approvals example app"><figcaption>The side tab open on the right, with the scroll buttons.</figcaption></figure>
 
         <h3 id="ex-botoes">Plugin buttons</h3>
-        <p>Three buttons with no HTML at all: two on the plugin's card (and on its row in Controls › Plugins), one that scrolls the list to the end and another that takes a screenshot and reports its size, and one in the device bar that changes its own text on every click.</p>
+        <p>Three buttons with no HTML at all: two on the plugin's card (and on its row in Controls › Extensions › Plugins), one that scrolls the list to the end and another that takes a screenshot and reports its size, and one in the device bar that changes its own text on every click.</p>
         <div class="code" data-name="Plugin buttons"><pre><code>await lab.button({ id: 'end', label: 'Go to the end', icon: '⤓', title: 'Scrolls the largest list on the screen to the end' }, async () =&gt; {
   const where = await lab.scrollToPercent(100);
   lab.ui.kv({ list: where.element, percent: `${where.percentY} %`, reached: where.reached }, { id: 'scroll' });
@@ -1673,7 +1673,7 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       
         <h3 id="ex-di">Dependency injection inspector</h3>
         <p>Finds which dependency injection libraries the app ships (Koin, Dagger / Hilt, Kodein, Toothpick, kotlin-inject, Metro, Guice) and lists what their containers hold right now: each binding, its kind (single, factory, scoped), whether the instance was already created, and its class and handle. <b>DI window</b> opens the full table in a window with a filter and an "only created" switch; <b>Rescan DI</b> reads again. Read-only: it never calls a container, so nothing is created by looking. Also in the repository as <code>docs/plugins/di-inspector.js</code>.</p>
-        <div class="code" data-name="Dependency injection inspector"><pre><code>// Dependency injection inspector (a plugin for Controls › Plugins: paste this file as the plugin's code).
+        <div class="code" data-name="Dependency injection inspector"><pre><code>// Dependency injection inspector (a plugin for Controls › Extensions › Plugins: paste this file as the plugin's code).
 // Finds which DI libraries the open app ships and lists what their containers hold right now: Koin (definitions, singletons created, scoped values), Dagger / Hilt
 // (DoubleCheck and SingleCheck providers, created or not, and the generated components), Kodein (singletons and multitons), Toothpick (scopes and bindings) and
 // kotlin-inject / Metro / Guice (components found). Read-only: it reads the fields the objects already have (lab.instances, lab.inspect, lab.field); it never calls
@@ -1852,6 +1852,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=d6bc8426c03e"></script>
+  <script type="module" src="./site-pages.js?v=efe50e99a19d"></script>
 </body>
 </html>
