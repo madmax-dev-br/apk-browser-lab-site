@@ -1,9 +1,12 @@
-import {APKError} from './apk-runtime.js?v=ea49b2bd6e79';
-import {PathApproxProvider} from './path-approx-provider.js?v=ea49b2bd6e79';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=ea49b2bd6e79';
-import {createFontFallback} from './font-fallback.js?v=ea49b2bd6e79';
-import {createSystemFontStore} from './system-fonts.js?v=ea49b2bd6e79';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=ea49b2bd6e79';
+import {APKError} from './apk-runtime.js?v=6954cacca256';
+import {PathApproxProvider} from './path-approx-provider.js?v=6954cacca256';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=6954cacca256';
+import {createFontFallback} from './font-fallback.js?v=6954cacca256';
+import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=6954cacca256';
+import {loadMinikin} from './minikin-provider.js?v=6954cacca256';
+import {createMinikinText} from './minikin-text.js?v=6954cacca256';
+import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=6954cacca256';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=6954cacca256';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -88,6 +91,17 @@ export class SkiaProvider{
   const systemFonts=createSystemFontStore({CK,fallback,fontBoxes});   // the named families of Android's fonts.xml; a font file is read when a family is first asked for
   const pathApprox=await(this.pathApproxProvider??new PathApproxProvider({fetchImpl:this.fetch})).load();
   const result={pathApprox,codecs:null,codecsError:null,prepareCodecs:null,CanvasKit:CK,typeface,fontManager,selectTypeface,fallback,systemFonts,fontBoxes,metadata:{...metadata,enabled:true,backend:'official-Skia-Wasm/CPU-MakeSurface',integrity:'verified-SHA-256',wasmTransport:node?'verified-local-file':'verified-Blob-URL',heapBytes:CK.HEAPU8.buffer.byteLength,font:'Roboto Regular',fontMatching:'original-Skia-FontMgr/nearest-installed-style',domRequired:false,webGLRequired:false,pathApproximation:pathApprox.metadata,textShaping:'Roboto simple glyph runs; other text is itemized through the Android 13 fallback chain (vendor/android-fonts) and shaped by SkParagraph/HarfBuzz; code points no chain font has fail explicitly'},createHost:runtime=>createSkiaCanvasHost(runtime,result),measureText:(text,state={})=>measureSkiaText(result,text,state),rasterizeCanvas:(runtime,graphics,receiver,width,height,options)=>rasterizeSkiaCanvas(runtime,result,graphics,receiver,width,height,options)};
+  // AOSP Minikin (src/minikin-provider.js, src/minikin-text.js): read and instantiated synchronously the first time a text native asks for it, over the same font files
+  // the backend draws with; one module and one set of font copies per policy for the life of the backend.
+  const backendFaces=fonts.map(f=>({weight:f.weight,italic:!!f.italic,bytes:assets[f.file]})),minikinTexts=new Map();let minikinModule=null;
+  result.minikinText=(policy='drawing')=>{
+   if(!minikinTexts.has(policy)){
+    const icuBaseURL=new URL('../../icu/70.1/',this.baseURL);
+    minikinModule??=loadMinikin({readSync,baseURL:new URL('../../minikin/android-13.0.0_r1/',this.baseURL),icuBaseURL,sharedIcuData:sharedAssetBytesIfLoaded(new URL('icudt70l.dat',icuBaseURL))});
+    minikinTexts.set(policy,createMinikinText(minikinModule,{backendFaces,systemBytes:file=>fallback.readSystemFont(file,systemFontFile(file)),manifest:()=>fallback.manifest(),fallbackBytes:stem=>fallback.readFallbackFont(stem)},{policy}));
+   }
+   return minikinTexts.get(policy);
+  };
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) are not part of Skia's own load: apk-loader prepares them when the APK can decode or encode images. The load is bounded; a failure is recorded in codecsError
   // (the hosts that need a codec then fail with that message) instead of blocking the run.
   result.prepareCodecs=()=>this.codecsPending??=loadLabCodecs({baseURL:this.codecBaseURL(),readBytes:this.codecReadBytes??((url,limit)=>this.readCodecBytes(url,limit)),timeoutMs:this.codecTimeoutMs}).then(codecs=>{result.codecs=codecs;return codecs;},error=>{result.codecsError=error;return null;});

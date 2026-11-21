@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=ea49b2bd6e79';
-import {DIGESTS} from './crypto-host.js?v=ea49b2bd6e79';
+import {APKError} from './apk-runtime.js?v=6954cacca256';
+import {DIGESTS} from './crypto-host.js?v=6954cacca256';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -167,6 +167,13 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
       const bytes = readSync(new URL('system/' + file, baseURL), MAX_FONT);
       if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + file);
       stats.loadedFiles.push('system/' + file); stats.loadedBytes += bytes.length;
+      return bytes;
+    },
+    /** The bytes of fallback file `stem`, read and checked against the manifest (Minikin's collections, src/minikin-text.js, keep their own copy in its memory). */
+    readFallbackFont(stem) {
+      load(); const entry = lookup.get(stem); if (!entry) fail('Unknown fallback font ' + stem);
+      const bytes = readSync(new URL(entry.file, baseURL), MAX_FONT);
+      if (bytes.length !== entry.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== entry.sha256) fail('Fallback font integrity mismatch: ' + entry.file);
       return bytes;
     },
     /** Registers app font bytes with the paragraph font provider under `name` (a content-derived family name), so a text style can list it ahead of Roboto. */

@@ -1,13 +1,14 @@
 // AArch64 (A64) user-mode interpreter for the app's own arm64-v8a native libraries (src/arm64/, docs/ARM64-NATIVE.md).
 //
-// It executes the library's machine code instruction by instruction over a flat little-endian memory (src/arm64/memory.js); it never translates, patches or skips
-// code. General registers are BigInt (X0..X30, SP), the 32 vector registers are 16 bytes each, NZCV are booleans. An address at or above HOST_BASE is a host
+// It executes the library's machine code instruction by instruction over a flat little-endian memory (src/arm64/memory.js); it never patches or skips code. Hot code
+// is also compiled to WebAssembly by the translation tier (src/arm64/translate.js), which does exactly what this interpreter does and hands back to it what it does not
+// translate. General registers are BigInt (X0..X30, SP), the 32 vector registers are 16 bytes each, NZCV are booleans. An address at or above HOST_BASE is a host
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
-import { executeNeon } from './neon.js?v=ea49b2bd6e79';
-import { DecodeCache } from './decode-cache.js?v=ea49b2bd6e79';
+import { APKError } from '../apk-error.js?v=6954cacca256';
+import { executeNeon } from './neon.js?v=6954cacca256';
+import { DecodeCache } from './decode-cache.js?v=6954cacca256';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -43,12 +44,15 @@ function decodeBitMasks(n, imms, immr, immediate, width) {
 
 export { decodeBitMasks, ror, ones };   // also src/arm64/decode-cache.js
 export class Arm64Cpu {
-  constructor(memory, { host = () => { throw new Error('no host'); }, maxSteps = 2e9 } = {}) {
+  constructor(memory, { host = () => { throw new Error('no host'); }, maxSteps = 2e9, translate = true } = {}) {
     this.mem = memory; this.host = host; this.maxSteps = maxSteps;
     this.x = new Array(32).fill(0n);   // x[31] is SP
     this.vbuf = new Uint8Array(32 * 16); this.vview = new DataView(this.vbuf.buffer);
     this.n = false; this.z = false; this.c = false; this.v = false;
     this.pc = 0; this.tpidr = 0n; this.fpcr = 0n; this.fpsr = 0n; this.steps = 0; this.exclusive = null;
+    // the translation tier (src/arm64/translate.js): hot code runs as WebAssembly over this memory; the vector registers then live in the tier's register-file slot
+    const tier = translate ? memory?.translationTier?.() : null;
+    if (tier) { const slot = tier.attach(this); if (slot >= 0) { this.tier = tier; this.tierSlot = slot; } }
   }
   // ---- registers
   r(n) { return n === 31 ? 0n : this.x[n]; }                  // Xn / XZR
@@ -107,10 +111,16 @@ export class Arm64Cpu {
     return result;
   }
   /** Runs until `stopAt` ('done'), or `budget` instructions ('yield'), or a host function that must wait for another thread ('blocked': pc stays on that call to retry it). */
+  // With the translation tier, a branch target (and a return from a lab function) is where translated code is entered: tier.enter runs it while it can and returns how
+  // many instructions it executed, never more than the budget allows and never past the instruction where the next heartbeat falls (src/arm64/translate.js).
   run(stopAt, budget = Infinity) {
-    const mem = this.mem, cache = mem.decodeCache ??= new DecodeCache(mem); let left = budget;
+    const mem = this.mem, cache = mem.decodeCache ??= new DecodeCache(mem), tier = this.tier; let left = budget;
     while (this.pc !== stopAt) {
-      if (this.pc >= HOST_BASE) { const returnTo = Number(this.x[30]); if (this.host(this, (this.pc - HOST_BASE) / 16) === BLOCKED) return 'blocked'; if (this.exited) return 'exited'; if (this.jumpTo !== undefined) { this.pc = this.jumpTo; this.jumpTo = undefined; } else this.pc = returnTo; continue; }   // jumpTo: longjmp's target
+      if (this.pc >= HOST_BASE) {
+        const returnTo = Number(this.x[30]); if (this.host(this, (this.pc - HOST_BASE) / 16) === BLOCKED) return 'blocked'; if (this.exited) return 'exited'; if (this.jumpTo !== undefined) { this.pc = this.jumpTo; this.jumpTo = undefined; } else this.pc = returnTo;   // jumpTo: longjmp's target
+        if (tier !== undefined && this.pc < HOST_BASE && this.pc !== stopAt) left -= tier.enter(this, stopAt, left);
+        continue;
+      }
       if (--left < 0) return 'yield';
       if ((++this.steps & 0xfffff) === 0) {   // every 2^20 instructions: the budget, and the progress report (the Worker's heartbeat names the native code while it runs)
         if (this.steps > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps}) exceeded at pc 0x${this.pc.toString(16)}`, { kind: 'arm64-budget' });
@@ -120,6 +130,7 @@ export class Arm64Cpu {
       this.pc += 4;
       step(this);
       if (this.svcBlocked) { this.svcBlocked = false; return 'blocked'; }
+      if (tier !== undefined && this.pc !== at + 4 && this.pc < HOST_BASE && this.pc !== stopAt) left -= tier.enter(this, stopAt, left);
     }
     return 'done';
   }
@@ -230,7 +241,7 @@ export class Arm64Cpu {
   system(word, at) {
     const l = bit(word, 21), op0 = field(word, 19, 2), op1 = field(word, 16, 3), crn = field(word, 12, 4), crm = field(word, 8, 4), op2 = field(word, 5, 3), rt = word & 31;
     if (op0 === 0 && crn === 2 && l === 0 && rt === 31) return;   // hints: NOP, YIELD, WFE, WFI, SEV, PACIASP/AUTIASP (no PAC keys: the pointer is unchanged and the check is the identity), BTI, ...
-    if (op0 === 0 && crn === 3 && l === 0) return;               // barriers: CLREX, DSB, DMB, ISB, SB (one thread of memory at a time)
+    if (op0 === 0 && crn === 3 && l === 0) { if (op2 === 2) this.exclusive = null; return; }   // barriers: DSB, DMB, ISB, SB (one thread of memory at a time); CLREX clears the exclusive monitor
     if (op0 === 0 && crn === 4 && l === 0) return this.unsupported(word, at, 'an MSR (immediate) to PSTATE');
     if (op0 >= 2) {   // MRS / MSR (register)
       const key = `${op0}.${op1}.${crn}.${crm}.${op2}`;

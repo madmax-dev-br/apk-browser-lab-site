@@ -4,9 +4,9 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=ea49b2bd6e79';
-import { ART_BLOCKED } from './signals.js?v=ea49b2bd6e79';
+import { APKError } from '../apk-error.js?v=6954cacca256';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=6954cacca256';
+import { ART_BLOCKED } from './signals.js?v=6954cacca256';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 // bionic's pthread_internal_t (android-13.0.0_r1 bionic/libc/bionic/pthread_internal.h, arm64): pthread_t is the address of this record, and TLS_SLOT_THREAD_ID (tp + 8) holds it.

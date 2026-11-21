@@ -3,20 +3,21 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=ea49b2bd6e79';
-import { Arm64Memory } from './memory.js?v=ea49b2bd6e79';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=ea49b2bd6e79';
-import { NativeThreads } from './threads.js?v=ea49b2bd6e79';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=ea49b2bd6e79';
+import { APKError } from '../apk-error.js?v=6954cacca256';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=6954cacca256';
+import { Arm64Memory } from './memory.js?v=6954cacca256';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=6954cacca256';
+import { NativeThreads } from './threads.js?v=6954cacca256';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=6954cacca256';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);   // the process's lowest address (its first page stays unmapped, as NULL's)
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
 export class Arm64Process {
-  constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null, progress = undefined } = {}) {
-    this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE });
+  // `translate`: the translation tier (src/arm64/translate.js) for hot code; false runs every instruction in the interpreter
+  constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null, progress = undefined, translate = true } = {}) {
+    this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE, translate });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
     this.cpu.progress = progress;   // (cpu) every 2^20 instructions of any thread (src/arm64/glue.js: the operation monitor's heartbeat)
     this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };

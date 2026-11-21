@@ -1,22 +1,22 @@
-import { createArm64Native } from './arm64/glue.js?v=ea49b2bd6e79';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=ea49b2bd6e79';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=ea49b2bd6e79';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=ea49b2bd6e79';
-import { inspectELF } from './native-inspector.js?v=ea49b2bd6e79';
-import { elfBuildId } from './elf-build-id.js?v=ea49b2bd6e79';
-import { crc32 } from './zip-entry.js?v=ea49b2bd6e79';
-import { resolveDevice } from './device-profile.js?v=ea49b2bd6e79';
-import { resourceProfileFor } from './device-configuration.js?v=ea49b2bd6e79';
-import { JniBridge } from './jni-host.js?v=ea49b2bd6e79';
-import { providerForApk } from './native-provider-variants.js?v=ea49b2bd6e79';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=ea49b2bd6e79';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=ea49b2bd6e79';
-import { AndroidResources } from './android-resources.js?v=ea49b2bd6e79';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=ea49b2bd6e79';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=ea49b2bd6e79';
-import { FrameworkProvider } from './framework-provider.js?v=ea49b2bd6e79';
-import { APKArchive } from './apk-archive.js?v=ea49b2bd6e79';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=ea49b2bd6e79';
+import { createArm64Native } from './arm64/glue.js?v=6954cacca256';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6954cacca256';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=6954cacca256';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=6954cacca256';
+import { inspectELF } from './native-inspector.js?v=6954cacca256';
+import { elfBuildId } from './elf-build-id.js?v=6954cacca256';
+import { crc32 } from './zip-entry.js?v=6954cacca256';
+import { resolveDevice } from './device-profile.js?v=6954cacca256';
+import { resourceProfileFor } from './device-configuration.js?v=6954cacca256';
+import { JniBridge } from './jni-host.js?v=6954cacca256';
+import { providerForApk } from './native-provider-variants.js?v=6954cacca256';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=6954cacca256';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=6954cacca256';
+import { AndroidResources } from './android-resources.js?v=6954cacca256';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=6954cacca256';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=6954cacca256';
+import { FrameworkProvider } from './framework-provider.js?v=6954cacca256';
+import { APKArchive } from './apk-archive.js?v=6954cacca256';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=6954cacca256';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -877,7 +877,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     runtime.reactNativeVersion = detectReactNativeVersion(runtime); runtime.hermesBytecodeVersion = await detectHermesBytecodeVersion(archive);
   }
   runtime.nativeVersionMismatch = options.nativeVersionMismatch === true;   // opt-in: serve the lab's React Native libraries to an app of another release (jni-host.js #requireVersions), reported
-  if (options.arm64Native) runtime.arm64 = createArm64Native(runtime);   // the app's arm64-v8a libraries run in the ARM64 interpreter (docs/ARM64-NATIVE.md); off unless asked
+  if (options.arm64Native) runtime.arm64 = createArm64Native(runtime, { translate: options.arm64Translate !== false });   // arm64Translate: the translation tier for hot code (src/arm64/translate.js), on unless false   // the app's arm64-v8a libraries run in the ARM64 interpreter (docs/ARM64-NATIVE.md); off unless asked
   if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256, formatVersion(runtime.reactNativeVersion)), runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));

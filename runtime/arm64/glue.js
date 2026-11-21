@@ -1,17 +1,18 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=ea49b2bd6e79';
-import { Arm64Process } from './process.js?v=ea49b2bd6e79';
-import { createLibc } from './libc.js?v=ea49b2bd6e79';
-import { attachArm64Jni } from './jni.js?v=ea49b2bd6e79';
-import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=ea49b2bd6e79';
-import { BUCKET, inBucket } from '../time-breakdown.js?v=ea49b2bd6e79';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=6954cacca256';
+import { Arm64Process } from './process.js?v=6954cacca256';
+import { tierSupported } from './translate.js?v=6954cacca256';
+import { createLibc } from './libc.js?v=6954cacca256';
+import { attachArm64Jni } from './jni.js?v=6954cacca256';
+import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=6954cacca256';
+import { BUCKET, inBucket } from '../time-breakdown.js?v=6954cacca256';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
 
-export function createArm64Native(runtime) {
+export function createArm64Native(runtime, { translate = true } = {}) {
   let process = null, lib = null;
   const entries = runtime.apkEntries ?? new Set();
   const written = new Map();   // libraries System.load'ed from a file the app wrote (an unpacked or downloaded .so), by soname
@@ -31,10 +32,16 @@ export function createArm64Native(runtime) {
       host: createLibc({ runtime, properties, fs: () => runtime.platform?.javaIo?.fs?.() ?? null, clock: () => runtime.platform?.clock?.now?.() ?? Date.now(),
         assets: { read: name => entries.has('assets/' + name) ? runtime.apkReader('assets/' + name) : null, list: dir => [...new Set([...entries].filter(e => e.startsWith(`assets/${dir ? dir + '/' : ''}`) && !e.slice(`assets/${dir ? dir + '/' : ''}`.length).includes('/')).map(e => e.slice(e.lastIndexOf('/') + 1)))] } }),
       log: line => runtime.record(line),
-      pid: runtime.platform?.virtualProcess?.pid ?? 4321,
+      pid: runtime.platform?.virtualProcess?.pid ?? 4321, translate,
       progress: cpu => runtime.monitor?.nativeProgress?.(() => `ARM64 native code at ${cpu.where(cpu.pc)}`),   // a long native run keeps the page's heartbeat alive, naming where it is
       queueTask: runtime.platform?.queueTask ? (fn, delay) => runtime.platform.queueTask(() => inBucket(runtime.tb, BUCKET.NATIVE, fn), delay, []) : null,   // the native threads' slices: the breakdown's native bucket
     });
+    // A fault at a value Java handed out as Executable.artMethod (src/hidden-members.js): on ART that value is the address of the method's ArtMethod, so native code may read the
+    // structure there. The lab's jmethodIDs are indices, not addresses of ArtMethod records, and the fault says so instead of naming only the address.
+    process.memory.explainAddress = address => {
+      for (const [id, method] of runtime.artMethodValues ?? []) if (address >= id && address < id + 32) return `0x${address.toString(16)} is ${address - id} bytes into the ArtMethod at Executable.artMethod ${id} of ${method} as the lab answers it (that method's jmethodID): on ART the value is the address of the method's ArtMethod structure (art/runtime/art_method.h); if this code took the address from artMethod or a jmethodID, it reads that structure, which the lab does not lay out in native memory`;
+      return null;
+    };
     process.threads.javaThreadName = () => runtime.thread?.name ?? 'main';
     process.threads.javaMain = () => runtime.scheduler?.main ?? null;
     runtime.nativeOwnsFd = fd => !!process.hostLibrary.__ownsFd?.(fd);   // a descriptor native code created and handed to Java (a pipe, socket or file of the ARM64 process)   // names the Java thread in native wait reports (every Java thread calls native code as the process's main thread)
@@ -44,7 +51,7 @@ export function createArm64Native(runtime) {
     return process;
   };
   let mounted = false;
-  runtime.record?.('DEVICE ARM64 native code: on (the app\'s arm64-v8a libraries run in the lab\'s interpreter, src/arm64/)');
+  runtime.record?.(`DEVICE ARM64 native code: on (the app's arm64-v8a libraries run in the lab's interpreter, src/arm64/; translation of hot code to WebAssembly ${translate ? (tierSupported() ? 'on' : 'unavailable in this engine') : 'off'}, src/arm64/translate.js)`);
   return {
     abi: 'arm64-v8a',
     has,

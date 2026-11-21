@@ -1,0 +1,12 @@
+minikin.wasm: AOSP Minikin with HarfBuzz and ICU, compiled to wasm32 by scripts/wasm/build-minikin.sh (Emscripten 3.1.74).
+
+Sources (AOSP tag android-13.0.0_r1; commits and the SHA-256 of every file in scripts/wasm/minikin-sources.json, summarized in provenance.json):
+- platform/frameworks/minikin (libminikin): Apache License 2.0, The Android Open Source Project. licenses/Apache-2.0.txt
+- platform/external/harfbuzz_ng (HarfBuzz 3.1.1): "Old MIT" license, HarfBuzz authors (Google, Red Hat, Mozilla and others). licenses/HarfBuzz-COPYING.txt
+- platform/system/core libutils/libcutils headers, platform/system/logging liblog headers, platform/system/libbase headers: Apache License 2.0. licenses/Apache-2.0.txt
+- platform/external/googletest googletest/include/gtest/gtest_prod.h (the FRIEND_TEST macro, a header only): BSD 3-Clause, Google Inc. licenses/googletest-LICENSE.txt
+- ICU 70.1 (the static libraries of scripts/build-icu-break.sh; icudt70l-minikin.dat holds four unchanged items of the original icudt70l.dat): Unicode/ICU license. licenses/ICU-LICENSE.txt
+- The Emscripten runtime and libc++/musl notices are those of framework-aosp/native-config/licenses.
+
+The lab's own adaptor (lab/minikin-wrapper.cpp, lab/lab-liblog.cpp, lab/include/sys/cdefs.h) is part of APK Web Lab (MIT).
+No algorithm of Minikin, HarfBuzz or ICU is changed; the adaptations are listed in provenance.json ("adaptations").

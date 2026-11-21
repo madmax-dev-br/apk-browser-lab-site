@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "artifact": "minikin.wasm",
+  "bytes": 1326251,
+  "sha256": "93720a460a49ad2dfcfe94e0993994f2261b0a296b82f62e7c3c424fb2ccb53e",
+  "compiler": "emcc (Emscripten gcc/clang-like replacement + linker emulating GNU ld) 3.1.74 (1092ec30a3fb1d46b1782ff1b4db5094d3d06ae5)",
+  "sourceTag": "android-13.0.0_r1",
+  "projects": [
+    {
+      "name": "platform/frameworks/minikin",
+      "commit": "1f7ae7b706552274ff52597efd79fe6a0c799e08",
+      "paths": [
+        "include/",
+        "libs/minikin/",
+        "tools/mk_hyb_file.py"
+      ]
+    },
+    {
+      "name": "platform/external/harfbuzz_ng",
+      "commit": "94c39a7f519c5746c1b6e39b8c4c28e09259782d",
+      "paths": [
+        "src/",
+        "COPYING",
+        "NOTICE",
+        "Android.bp"
+      ]
+    },
+    {
+      "name": "platform/system/core",
+      "commit": "83366e7e7a1556ab6cff117673bb9f17b973de99",
+      "paths": [
+        "libutils/include/",
+        "libcutils/include/",
+        "MODULE_LICENSE_APACHE2"
+      ]
+    },
+    {
+      "name": "platform/system/logging",
+      "commit": "6bfb380b168c7127d79977a0e931d6e5e469d887",
+      "paths": [
+        "liblog/include/",
+        "liblog/NOTICE"
+      ]
+    },
+    {
+      "name": "platform/system/libbase",
+      "commit": "c914dc8c167ac2212c470ad5d684d96ab7c20a0e",
+      "paths": [
+        "include/",
+        "NOTICE"
+      ]
+    },
+    {
+      "name": "platform/external/googletest",
+      "commit": "b83b185cf15f817bd5404209a5e06de204d3af81",
+      "paths": [
+        "googletest/include/gtest/gtest_prod.h",
+        "LICENSE"
+      ]
+    }
+  ],
+  "pinnedFiles": 524,
+  "pinnedFilesDigest": "07698110acba7db2e26381b78530e280545351062e1c7efdfea4744fbeb9817c",
+  "flags": {
+    "harfbuzz": "-std=c++11 -O2 -fno-exceptions -fno-rtti -DUCONFIG_NO_FILE_IO=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_SERVICE=1 -ffile-prefix-map=<source tree>/= -ffile-prefix-map=<source tree>/=vendor/minikin/android-13.0.0_r1/ -ffile-prefix-map=<source tree>/=icu/source/ -DHB_NO_MT -DHB_NO_PRAGMA_GCC_DIAGNOSTIC -DHAVE_OT -DHAVE_ICU -DHAVE_ICU_BUILTIN -Wno-unused-parameter -Wno-missing-field-initializers",
+    "minikin": "-std=c++17 -O2 -fno-exceptions -fno-rtti -DUCONFIG_NO_FILE_IO=1 -DUCONFIG_NO_COLLATION=1 -DUCONFIG_NO_FORMATTING=1 -DUCONFIG_NO_TRANSLITERATION=1 -DUCONFIG_NO_SERVICE=1 -ffile-prefix-map=<source tree>/= -ffile-prefix-map=<source tree>/=vendor/minikin/android-13.0.0_r1/ -ffile-prefix-map=<source tree>/=icu/source/ -D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION -Wall -Wextra -Wno-unused-parameter",
+    "link": "-O2 --no-entry -sSTANDALONE_WASM=1 -sFILESYSTEM=0 -sINITIAL_MEMORY=33554432 -sALLOW_MEMORY_GROWTH=1 -sMAXIMUM_MEMORY=536870912 -sSTACK_SIZE=1048576 -sMALLOC=emmalloc -sEXPORTED_FUNCTIONS=_mk_initialize,_mk_last_error,_mk_fatal_message,_mk_locale_list,_mk_data_new,_mk_data_free,_mk_font_new,_mk_font_free,_mk_family_new,_mk_family_free,_mk_collection_new,_mk_collection_free,_mk_collection_has_variation_selector,_mk_mt_builder_new,_mk_mt_builder_free,_mk_mt_add_style_run,_mk_mt_add_replacement_run,_mk_mt_build,_mk_mt_free,_mk_mt_widths,_mk_mt_width,_mk_mt_extent,_mk_mt_bounds,_mk_mt_memory,_mk_lb_new,_mk_lb_free,_mk_lb_compute,_mk_result_free,_mk_result_count,_mk_result_offsets,_mk_result_widths,_mk_result_ascents,_mk_result_descents,_mk_result_flags,_mk_measure_text,_mk_text_bounds,_mk_font_extent,_mk_malloc,_mk_free"
+  },
+  "adaptor": {
+    "minikin-wrapper.cpp": "01b3d236f6df7fcf32a8012ec204ab071b98f540315a7e435d1d7a6309c7fff4",
+    "lab-liblog.cpp": "b2f776f4e335deb0ba028903336fc9546180600b0b3c6b988d4b9bd7bdff326a",
+    "include/sys/cdefs.h": "a96c4031ec584f32ed43c67834d688dd9307136987b90d66df5e535507202c22"
+  },
+  "icuData": {
+    "shared": {
+      "file": "../../icu/70.1/icudt70l.dat",
+      "bytes": 3450768,
+      "sha256": "a261e18e579c7a5e0697f44d628c5713fbec8e2ec9ea43956cb98ee5af094937"
+    },
+    "extra": {
+      "file": "icudt70l-minikin.dat",
+      "bytes": 111056,
+      "sha256": "fb3aaba391b0a68bf6004fff93afba7004300bb4ddd42fad02a3c408f30fb244",
+      "items": [
+        "likelySubtags.res",
+        "uemoji.icu",
+        "keyTypeData.res",
+        "metadata.res"
+      ],
+      "source": "original ICU 70.1 icudt70l.dat (icupkg -x, unchanged items)"
+    }
+  },
+  "algorithmPatches": [],
+  "adaptations": [
+    "No source file of Minikin, HarfBuzz, ICU or the AOSP headers is modified.",
+    "lab/minikin-wrapper.cpp: the MinikinFont of the virtual device (in the place of hwui MinikinFontSkia): FreeType linear advances, 26.6 control boxes and Skia font extents computed from the font tables with HarfBuzz; FreeType hinting is not modelled",
+    "lab/minikin-wrapper.cpp: hwui MinikinUtils::prepareMinikinPaint and the MeasuredText / LineBreaker / Paint JNI functions of hwui as C exports over handles",
+    "lab/lab-liblog.cpp: liblog entry points (logs dropped; a fatal assertion keeps its message and traps)",
+    "lab/include/sys/cdefs.h: the bionic declaration macros the liblog headers use, for the musl sysroot",
+    "HarfBuzz built without HAVE_PTHREAD (HB_NO_MT, single-threaded module); its subsetter sources are not compiled (Minikin does not use them)",
+    "-D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION: keeps std::unary_function for libutils LruCache.h, as Android's libc++ does",
+    "Minikin built as a user build (no ENABLE_ASSERTION); no hyphenation pattern files are loaded (none are vendored)"
+  ]
+}

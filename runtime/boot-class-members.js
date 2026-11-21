@@ -15,8 +15,9 @@ const CLASS = names(`forName newInstance isInstance isAssignableFrom isInterface
 const OBJECT = names('getClass hashCode equals clone toString notify notifyAll wait finalize');
 const CLOSED = new Map([['Ljava/lang/Class;', CLASS], ['Ljava/lang/Object;', OBJECT]]);
 /** true when `owner` has a complete name inventory and `name` is not one of its members; constructors are never public for these classes. */
-// java.lang.reflect.Field / Method / Constructor / Executable / AccessibleObject declare no SDK fields: accessFlags, artField, artMethod, declaringClass, ... are hidden-API
-// "blocked" members, so Class.getDeclaredField on them throws NoSuchFieldException on a device (the old `Field.class.getDeclaredField("accessFlags")` final-removal hack fails there).
+// java.lang.reflect.Field / Method / Constructor / Executable / AccessibleObject declare no SDK fields. Their libcore fields are hidden API: the "unsupported" ones an app can see
+// (Executable.artMethod, Field.accessFlags, AccessibleObject.override) are found first in src/hidden-members.js (REFLECT_FIELDS); every other one (declaringClass, dexMethodIndex,
+// artFieldIndex, ...) is "blocked", so Class.getDeclaredField of it throws NoSuchFieldException on a device.
 const NO_SDK_FIELDS = new Set(['Ljava/lang/reflect/Field;', 'Ljava/lang/reflect/Method;', 'Ljava/lang/reflect/Constructor;', 'Ljava/lang/reflect/Executable;', 'Ljava/lang/reflect/AccessibleObject;']);
 export const bootClassLacksMember = (owner, kind, name) => {
   if (kind === 'field' && NO_SDK_FIELDS.has(owner)) return true;

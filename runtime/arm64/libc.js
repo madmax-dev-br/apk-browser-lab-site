@@ -3,11 +3,11 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
-import { BLOCKED } from './cpu.js?v=ea49b2bd6e79';
-import { extendLibc } from './libc-extra.js?v=ea49b2bd6e79';
-import { addGles } from './gles.js?v=ea49b2bd6e79';
-import { utf8 } from './text.js?v=ea49b2bd6e79';
+import { APKError } from '../apk-error.js?v=6954cacca256';
+import { BLOCKED } from './cpu.js?v=6954cacca256';
+import { extendLibc } from './libc-extra.js?v=6954cacca256';
+import { addGles } from './gles.js?v=6954cacca256';
+import { utf8 } from './text.js?v=6954cacca256';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -165,6 +165,12 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.getpid = () => runtime?.platform?.virtualProcess?.pid ?? 4321;
   lib.getuid = lib.geteuid = lib.getgid = lib.getegid = () => runtime?.platform?.virtualProcess?.uid ?? 10123;
   lib.getppid = () => 1;
+  // Process group and session (POSIX): an app process is forked by zygote, which ZygoteInit.main puts in its own process group (Os.setpgid(0, 0)) under the session init
+  // started it in; the app inherits both, so its pgid and sid are its parent's pid (getppid: 1 here). getpgid/getsid of another pid the VM has (only the parent) answer the
+  // same; any other pid is ESRCH. setpgid/setsid are not provided (they fail by name).
+  const ESRCH = 3, parentGroup = pid => (pid === 0 || pid === lib.getpid() || pid === lib.getppid() ? lib.getppid() : null);
+  lib.getpgid = lib.getsid = (p, c) => parentGroup(Number(BigInt.asIntN(32, c.x[0]))) ?? setErrno(p, ESRCH);
+  lib.getpgrp = () => lib.getppid();
   lib.isatty = () => 0;
   lib.prctl = () => 0;
   lib.getenv = (p, c) => { const name = str(p, x(c, 0)), value = { ANDROID_ROOT: '/system', ANDROID_DATA: '/data', EXTERNAL_STORAGE: '/sdcard', BOOTCLASSPATH: '' }[name]; return value === undefined ? 0 : p.allocString(value); };
@@ -280,8 +286,9 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   // mmap: anonymous regions come from the address space; a file mapping copies the file (MAP_PRIVATE semantics; writes are not reflected back)
   lib.mmap = lib.mmap64 = (p, c) => { const length = n(c, 1), flags = n(c, 3), fd = s32(c, 4), offset = n(c, 5); if (length >= 64 * 1048576) runtime?.record?.(`ARM64 mmap of ${Math.round(length / 1048576)} MiB (prot ${n(c, 2)}, flags 0x${flags.toString(16)}) from ${c.where?.(Number(c.x[30])) ?? 'native code'}: reserved in the process address space (pages are backed only when touched)`); const at = p.mapRegion(length, 0x1000); if (!(flags & 0x20) && fd >= 0) { const f = fds.get(fd); if (!f) return setErrno(p, EBADF); const data = fileBytes(f.path).subarray(offset, offset + length); p.memory.copyIn(at, data); if (flags & 1) p.sharedMappings = [...(p.sharedMappings ?? []), { at, length, path: f.path, offset, writable: !!(n(c, 2) & 2) }]; } return at; };
   lib.msync = (p, c) => { writeBack(p, n(c, 0), n(c, 1)); return 0; };
-  lib.munmap = (p, c) => { const at = n(c, 0), length = n(c, 1); writeBack(p, at, length); p.sharedMappings = (p.sharedMappings ?? []).filter(m => !(m.at >= at && m.at < at + length)); return 0; };
-  lib.mprotect = lib.madvise = () => 0;
+  lib.munmap = (p, c) => { const at = n(c, 0), length = n(c, 1); writeBack(p, at, length); p.sharedMappings = (p.sharedMappings ?? []).filter(m => !(m.at >= at && m.at < at + length)); p.memory.invalidateCode?.(at, length); return 0; };
+  lib.mprotect = (p, c) => { p.memory.invalidateCode?.(n(c, 0), n(c, 1)); return 0; };   // no page protections; code in the range is decoded (and translated) again before it runs
+  lib.madvise = () => 0;
   // ---- C++ ABI helpers that bionic exports
   lib.__cxa_thread_atexit_impl = () => 0;
   lib.android_set_abort_message = (p, c) => { runtime?.record?.(`LOG F libc: abort message: ${str(p, x(c, 0))}`); };

@@ -1,20 +1,20 @@
-import {APKError} from './apk-runtime.js?v=ea49b2bd6e79';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=ea49b2bd6e79';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=ea49b2bd6e79';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=ea49b2bd6e79';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=ea49b2bd6e79';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=ea49b2bd6e79';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=ea49b2bd6e79';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=ea49b2bd6e79';
-import {createBitmapHost} from './bitmap-host.js?v=ea49b2bd6e79';
-import { gcRoot } from './heap-gc.js?v=ea49b2bd6e79';
-import {sha256Hex} from './sha256-sync.js?v=ea49b2bd6e79';
-import {colorLongToArgb} from './color-long.js?v=ea49b2bd6e79';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=ea49b2bd6e79';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=ea49b2bd6e79';
-import {renderNodeByHandle} from './rendernode-native.js?v=ea49b2bd6e79';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=ea49b2bd6e79';
-import {BUCKET} from './time-breakdown.js?v=ea49b2bd6e79';
+import {APKError} from './apk-runtime.js?v=6954cacca256';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=6954cacca256';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=6954cacca256';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=6954cacca256';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=6954cacca256';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=6954cacca256';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=6954cacca256';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=6954cacca256';
+import {createBitmapHost} from './bitmap-host.js?v=6954cacca256';
+import { gcRoot } from './heap-gc.js?v=6954cacca256';
+import {sha256Hex} from './sha256-sync.js?v=6954cacca256';
+import {colorLongToArgb} from './color-long.js?v=6954cacca256';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=6954cacca256';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=6954cacca256';
+import {renderNodeByHandle} from './rendernode-native.js?v=6954cacca256';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=6954cacca256';
+import {BUCKET} from './time-breakdown.js?v=6954cacca256';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -649,7 +649,7 @@ export function createSkiaCanvasHost(runtime,backend){
   if(faceCache.has(key))return faceCache.get(key);
   const picked=backend.systemFonts?backend.systemFonts.select(family,weight,italic,variation):{backend:true},value=runtime.makeObject(TYPEFACE);
   const info=picked.backend?{face:backend.selectTypeface(weight,italic),...(variation?.length?{fontVariations:variation.map(axis=>({axis:axis.tag,value:axis.value}))}:{})}
-   :{custom:true,system:true,face:picked.file.ck,families:[picked.file.name],fontVariations:picked.fontVariations.length?picked.fontVariations:undefined,fakeBold:weight>=600&&weight-picked.font.weight>=200,fakeItalic:italic&&!picked.font.italic};
+   :{custom:true,system:true,systemFont:picked.font,face:picked.file.ck,families:[picked.file.name],fontVariations:picked.fontVariations.length?picked.fontVariations:undefined,fakeBold:weight>=600&&weight-picked.font.weight>=200,fakeItalic:italic&&!picked.font.italic};
   Object.assign(info,{family,style:api,weight,baseWeight:base,italic,reference:value,variation:variation?.length?variation:null});
   typefaces.set(value.ref,info);faceCache.set(key,value);return value;
  };
@@ -670,7 +670,7 @@ export function createSkiaCanvasHost(runtime,backend){
   const ck=CK.Typeface.MakeFreeTypeFaceFromData(data.buffer.slice(data.byteOffset,data.byteOffset+data.byteLength));if(!ck)return null;
   const name='apk-font-'+hash.slice(0,32).replace(':','-');if(!registeredNames.has(name)){if(registeredNames.size>=1024)fail('Registered custom font limit (1024) exceeded');backend.fallback.registerCustom(name,data);registeredNames.add(name);}
   backend.fontBoxes?.set(ck,sfntBounds(data,0));
-  const entry={ck,name,axes:sfntAxes(data,0),size:data.length};fontFiles.set(hash,entry);return entry;
+  const entry={ck,name,axes:sfntAxes(data,0),size:data.length,bytes:data};fontFiles.set(hash,entry);return entry;   // bytes: the font file Minikin's collections open (src/minikin-text.js)
  };
  // Minikin FontFamily::getClosestMatch (score = weight grades apart + 2 for a slant mismatch) and computeFakery (fake bold when the wanted weight is >= 600 and 200+ above the font's; fake italic for an italic request on an upright font)
  const closest=(fonts,weight,italic)=>{let best=null,score=Infinity;for(const f of fonts){const s=Math.abs(Math.trunc(weight/100)-Math.trunc(f.weight/100))+(italic===f.italic?0:2);if(s<score){best=f;score=s;}}return best;};

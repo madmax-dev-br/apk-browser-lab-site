@@ -1,13 +1,13 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=ea49b2bd6e79';
-import { formatC, variadic, vaList } from './libc.js?v=ea49b2bd6e79';
-import { addSockets } from './sockets.js?v=ea49b2bd6e79';
-import { addMoreLibc } from './libc-more.js?v=ea49b2bd6e79';
-import { addSyscalls } from './syscalls.js?v=ea49b2bd6e79';
-import { addSignals } from './signals.js?v=ea49b2bd6e79';
-import { utf8 } from './text.js?v=ea49b2bd6e79';
+import { APKError } from '../apk-error.js?v=6954cacca256';
+import { formatC, variadic, vaList } from './libc.js?v=6954cacca256';
+import { addSockets } from './sockets.js?v=6954cacca256';
+import { addMoreLibc } from './libc-more.js?v=6954cacca256';
+import { addSyscalls } from './syscalls.js?v=6954cacca256';
+import { addSignals } from './signals.js?v=6954cacca256';
+import { utf8 } from './text.js?v=6954cacca256';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
 const decoder = utf8, encoder = new TextEncoder();

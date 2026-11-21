@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=ea49b2bd6e79';
+import { APKError } from './apk-error.js?v=6954cacca256';
 
 // The VM's raw-memory model and the natives that expose it to the original libcore classes:
 //   sun.misc.Unsafe / jdk.internal.misc.Unsafe     (get/put/compareAndSwap on (Object, offset) and on native addresses)
@@ -292,13 +292,15 @@ export function createUnsafeNativeBindings() {
     const count = Number(byteCount), s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst);
     checkRange(runtime, s, s.base + srcOffset, count); checkRange(runtime, d, d.base + dstOffset, count); writeArray(d, d.base + dstOffset, readArray(s, s.base + srcOffset, count));
   });
+  // libcore_io_Memory.cpp: the byte[] side's offset is in bytes, the other array's offset is an ELEMENT index (scaled by sizeofElements); byteCount is bytes on both sides.
+  // (HeapByteBuffer.getUnchecked(pos, char[] dst, dstOffset, length) passes dstOffset in chars: a CharBuffer view's get(char[], off, len) with off > 0 lands at dst[off].)
   add(MEMORY, 'unsafeBulkGet(Ljava/lang/Object;II[BIIZ)V', (runtime, [dst, dstOffset, byteCount, src, srcOffset, sizeofElements, swap]) => {
-    const s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst); checkRange(runtime, s, s.base + srcOffset, byteCount); checkRange(runtime, d, d.base + dstOffset, byteCount);
-    const bytes = readArray(s, s.base + srcOffset, byteCount); if (swap) swapElements(bytes, sizeofElements); writeArray(d, d.base + dstOffset, bytes);
+    const s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst), at = d.base + dstOffset * sizeofElements; checkRange(runtime, s, s.base + srcOffset, byteCount); checkRange(runtime, d, at, byteCount);
+    const bytes = readArray(s, s.base + srcOffset, byteCount); if (swap) swapElements(bytes, sizeofElements); writeArray(d, at, bytes);
   });
   add(MEMORY, 'unsafeBulkPut([BIILjava/lang/Object;IIZ)V', (runtime, [dst, dstOffset, byteCount, src, srcOffset, sizeofElements, swap]) => {
-    const s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst); checkRange(runtime, s, s.base + srcOffset, byteCount); checkRange(runtime, d, d.base + dstOffset, byteCount);
-    const bytes = readArray(s, s.base + srcOffset, byteCount); if (swap) swapElements(bytes, sizeofElements); writeArray(d, d.base + dstOffset, bytes);
+    const s = arrayInfo(runtime, src), d = arrayInfo(runtime, dst), from = s.base + srcOffset * sizeofElements; checkRange(runtime, s, from, byteCount); checkRange(runtime, d, d.base + dstOffset, byteCount);
+    const bytes = readArray(s, from, byteCount); if (swap) swapElements(bytes, sizeofElements); writeArray(d, d.base + dstOffset, bytes);
   });
 
   // ---- java.nio.Bits bulk copies: (array object, byte offset from the array object, native address, byte length)

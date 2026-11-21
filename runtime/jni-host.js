@@ -1,20 +1,21 @@
-import { APKError } from './apk-error.js?v=ea49b2bd6e79';
-import { constantField, nonConstantField } from './framework-constants.js?v=ea49b2bd6e79';
-import { JavaException } from './apk-runtime.js?v=ea49b2bd6e79';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=ea49b2bd6e79';
-import { buildElfDescriptor } from './native-descriptor.js?v=ea49b2bd6e79';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=ea49b2bd6e79';
-import { NativeLinker, LinkError } from './native-linker.js?v=ea49b2bd6e79';
-import { hostFunction } from './wasm-host-function.js?v=ea49b2bd6e79';
-import { parseWasm } from './wasm-dylink.js?v=ea49b2bd6e79';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=ea49b2bd6e79';
-import { BUCKET, inBucket } from './time-breakdown.js?v=ea49b2bd6e79';
-import { Blocked } from './scheduler.js?v=ea49b2bd6e79';
-import { registerWasmMemory } from './unsafe-native.js?v=ea49b2bd6e79';
-import { writeSkPath } from './skia-path-layout.js?v=ea49b2bd6e79';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=ea49b2bd6e79';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=ea49b2bd6e79';
-import { withVariants } from './native-provider-variants.js?v=ea49b2bd6e79';
+import { APKError } from './apk-error.js?v=6954cacca256';
+import { ACCESSORS as HIDDEN_ACCESSORS, hiddenReflection } from './hidden-members.js?v=6954cacca256';
+import { constantField, nonConstantField } from './framework-constants.js?v=6954cacca256';
+import { JavaException } from './apk-runtime.js?v=6954cacca256';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=6954cacca256';
+import { buildElfDescriptor } from './native-descriptor.js?v=6954cacca256';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=6954cacca256';
+import { NativeLinker, LinkError } from './native-linker.js?v=6954cacca256';
+import { hostFunction } from './wasm-host-function.js?v=6954cacca256';
+import { parseWasm } from './wasm-dylink.js?v=6954cacca256';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=6954cacca256';
+import { BUCKET, inBucket } from './time-breakdown.js?v=6954cacca256';
+import { Blocked } from './scheduler.js?v=6954cacca256';
+import { registerWasmMemory } from './unsafe-native.js?v=6954cacca256';
+import { writeSkPath } from './skia-path-layout.js?v=6954cacca256';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=6954cacca256';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=6954cacca256';
+import { withVariants } from './native-provider-variants.js?v=6954cacca256';
 
 // JNI -> WebAssembly bridge.
 //
@@ -421,6 +422,8 @@ export class JniBridge {
     }
     return null;
   }
+  /** The jmethodID of a reflected Method / Constructor member, the value FromReflectedMethod answers for it (and ART's Executable.artMethod: the same ArtMethod*). */
+  methodIdOf(member) { return this.#methodId({ ...member.method, static: !!(member.flags & 8) }); }
   #methodId(info) { let id = this.methodIdByKey.get(info.key); if (!id) { id = this.methodIds.length; this.methodIds.push(info); this.methodIdByKey.set(info.key, id); } return id; }
   #fieldId(info) { const key = info.key + (info.static ? '#s' : ''); let id = this.fieldIdByKey.get(key); if (!id) { id = this.fieldIds.length; this.fieldIds.push(info); this.fieldIdByKey.set(key, id); } return id; }
   /**
@@ -456,6 +459,13 @@ export class JniBridge {
         if (declared.name === name && declared.type === signature && statics === isStatic) return { owner: declared.owner, name, type: signature, key: declared.key, static: statics };
       }
       queue.push(cls.superclass, ...cls.interfaces);
+    }
+    // a field of a host-modelled framework class from its member table (src/hidden-members.js: ActivityThread.mH, Executable.artMethod, Field.accessFlags ...), searched up the
+    // superclass chain as ART's FindFieldID does
+    for (let owner = type, depth = 0; owner && depth < 32; owner = r.classes.get(owner)?.superclass ?? r.parent?.(owner), depth++) {
+      if (r.classes.get(owner)) continue;
+      const found = hiddenReflection(owner, 'field', name, null, false);
+      if (found && found.field.type === signature && !!(found.flags & 8) === isStatic) return { owner, name, type: signature, key: found.field.key, static: isStatic };
     }
     // a compile-time constant of an SDK class the VM has no body for (Context.*_SERVICE, Build.VERSION_CODES.*, ...): the value the platform's class carries, as reflection reads it
     if (isStatic) { for (const owner of [type, ...seen]) { const constant = constantField(owner, name); if (constant && constant.type === signature) return { owner, name, type: signature, key: `${owner}->${name}:${signature}`, static: true, constant: constant.value }; } }
@@ -615,8 +625,9 @@ export class JniBridge {
     // A null jfieldID is what a failed GetFieldID/FromReflectedField answered: ART aborts on it in every build; the abort names that failed lookup, the cause to look at.
     const fieldRef = (id, fn) => { if (!id) jniAbort(fn, 'fid', self.lastFieldIdFailure); const f = self.fieldIds[id]; if (!f) throw new APKError(`Invalid jfieldID ${typeof id === 'number' ? '0x' + id.toString(16) : String(id)} (the bridge has handed out ${self.fieldIds.length - 1})`, { kind: 'jni-invalid-reference', id: Number(id) }); return f; };
     for (const [name, code] of callTypes.slice(0, 9)) {
-      h[`Get${name}Field`] = (_env, obj, id) => { if (!obj) jniAbort(`Get${name}Field`, 'obj'); const f = fieldRef(id, `Get${name}Field`); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
-      h[`Set${name}Field`] = (_env, obj, id, value) => { if (!obj) jniAbort(`Set${name}Field`, 'obj'); const f = fieldRef(id, `Set${name}Field`); r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
+      // A field the VM models with live state (src/hidden-members.js ACCESSORS: Executable.artMethod, Field.accessFlags, ActivityThread.mH ...) reads and writes that state, as Field.get / set do
+      h[`Get${name}Field`] = (_env, obj, id) => { if (!obj) jniAbort(`Get${name}Field`, 'obj'); const f = fieldRef(id, `Get${name}Field`); if (f.nativePath) return toJNI(code, BigInt(self.#nativePathAddress(self.#value(obj)))); const accessor = HIDDEN_ACCESSORS.get(f.key); if (accessor) return toJNI(code, accessor.get(r, self.#value(obj))); const o = r.object(self.#value(obj)), stored = o.fields.get(f.key); return toJNI(code, stored === undefined ? defaultFor(f.type) : stored); };
+      h[`Set${name}Field`] = (_env, obj, id, value) => { if (!obj) jniAbort(`Set${name}Field`, 'obj'); const f = fieldRef(id, `Set${name}Field`), accessor = HIDDEN_ACCESSORS.get(f.key); if (accessor) { if (!accessor.set) throw new APKError(`JNI Set${name}Field of ${f.key}: the lab models this field read-only`, { kind: 'jni-unsupported', function: `Set${name}Field`, field: f.key }); accessor.set(r, self.#value(obj), toVM(code, value)); return; } r.storeField(r.object(self.#value(obj)).fields, f.key, toVM(code, value)); };
       h[`GetStatic${name}Field`] = (_env, _cls, id) => { const f = fieldRef(id, `GetStatic${name}Field`); if ('constant' in f) return toJNI(code, f.constant); return toJNI(code, r.readStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key })); };
       h[`SetStatic${name}Field`] = (_env, _cls, id, value) => { const f = fieldRef(id, `SetStatic${name}Field`); r.writeStatic({ owner: f.owner, name: f.name, type: f.type, key: f.key }, toVM(code, value)); };
     }

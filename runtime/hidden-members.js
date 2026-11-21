@@ -1,5 +1,6 @@
-import TABLES from './hidden-member-tables.js?v=ea49b2bd6e79';
-import { constantField } from './framework-constants.js?v=ea49b2bd6e79';
+import TABLES from './hidden-member-tables.js?v=6954cacca256';
+import { APKError } from './apk-error.js?v=6954cacca256';
+import { constantField } from './framework-constants.js?v=6954cacca256';
 
 /**
  * Reflection over the members of host-modelled framework classes (Handler, Looper, Message, ActivityThread, Activity, View ...) that apps and libraries reach with
@@ -21,8 +22,24 @@ const entry = owner => {
 export const isTabled = owner => entry(owner) !== null;
 const key = (owner, name, type) => `${owner}->${name}:${type}`;
 
+/**
+ * The instance fields of libcore's java.lang.reflect classes that an app can discover on Android 13. libcore declares more (Executable: accessFlags, artMethod, declaringClass,
+ * declaringClassOfOverriddenMethod, dexMethodIndex, hasRealParameterData, parameters; Field: accessFlags, declaringClass, artFieldIndex, offset, type; AccessibleObject: override;
+ * Constructor: serializationClass, serializationCtor), and ART's hidden-API check filters them by their flag for a caller in the app's domain (Class.getDeclaredFields, getDeclaredField,
+ * JNI GetFieldID): only the members annotated @UnsupportedAppUsage in libcore's ojluni/annotations/hiddenapi stubs ("unsupported", no maxTargetSdk) are visible; the rest are "blocked",
+ * absent from getDeclaredFields and a NoSuchFieldException for getDeclaredField (src/boot-class-members.js). Rows: [name, type, access flags]. Fields only: the methods of these classes
+ * stay the bridge's (they are not a complete member table, so isTabled is false for them).
+ */
+const REFLECT_FIELDS = new Map([
+  ['Ljava/lang/reflect/Executable;', [['artMethod', 'J', 0x2]]],
+  ['Ljava/lang/reflect/Field;', [['accessFlags', 'I', 0x2]]],
+  ['Ljava/lang/reflect/AccessibleObject;', [['override', 'Z', 0]]],
+]);
+const reflectField = (owner, row) => ({ field: { owner, name: row[0], type: row[1], key: key(owner, row[0], row[1]) }, flags: row[2] });
+
 /** A reflection member for runtime.reflectionLookup, or null. kind: 'field' | 'method' | 'constructor'. */
 export function hiddenReflection(owner, kind, name, parameters, publicOnly) {
+  if (kind === 'field' && REFLECT_FIELDS.has(owner)) { const row = REFLECT_FIELDS.get(owner).find(item => item[0] === name); return row && !publicOnly ? reflectField(owner, row) : null; }
   const table = entry(owner); if (!table) return null;
   if (kind === 'field') {
     const row = table.fields.get(name); if (!row || (publicOnly && !(row[2] & 1))) return null;
@@ -33,7 +50,7 @@ export function hiddenReflection(owner, kind, name, parameters, publicOnly) {
   const signature = `(${wanted})${row[2]}`;
   return { method: { owner, name: methodName, parameters: [...row[1]], result: row[2], signature, key: `${owner}->${methodName}${signature}` }, flags: row[3] };
 }
-export const hiddenFields = owner => entry(owner) ? [...entry(owner).fields.values()].map(row => ({ field: { owner, name: row[0], type: row[1], key: key(owner, row[0], row[1]) }, flags: row[2] })) : [];
+export const hiddenFields = owner => REFLECT_FIELDS.has(owner) ? REFLECT_FIELDS.get(owner).map(row => reflectField(owner, row)) : entry(owner) ? [...entry(owner).fields.values()].map(row => ({ field: { owner, name: row[0], type: row[1], key: key(owner, row[0], row[1]) }, flags: row[2] })) : [];
 export const hiddenMethods = (owner, wantConstructors) => (entry(owner)?.methods ?? []).filter(row => (row[0] === '<init>') === wantConstructors && row[0] !== '<clinit>').map(row => {
   const signature = `(${row[1].join('')})${row[2]}`;
   return { method: { owner, name: row[0], parameters: [...row[1]], result: row[2], signature, key: `${owner}->${row[0]}${signature}` }, flags: row[3] };
@@ -64,6 +81,13 @@ export const ACCESSORS = new Map([
   [key(THREAD, 'mInstrumentation', 'Landroid/app/Instrumentation;'), { get: rt => rt.instrumentation ??= (rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;')), set: (rt, _o, v) => { rt.defaultInstrumentation ??= rt.allocate('Landroid/app/Instrumentation;'); rt.instrumentation = isNull(v) ? null : v; } }],
   [key('Landroid/app/Activity;', 'mDecor', 'Landroid/view/View;'), { get: (rt, o) => { const window = call(rt, o, 'Landroid/app/Activity;', 'getWindow', 'Landroid/view/Window;'); return isNull(window) ? null : call(rt, window, 'Landroid/view/Window;', 'peekDecorView', 'Landroid/view/View;'); } }],
   [key('Landroid/view/View;', 'mContext', 'Landroid/content/Context;'), { get: (rt, o) => call(rt, o, 'Landroid/view/View;', 'getContext', 'Landroid/content/Context;') }],
+  // Executable.artMethod: on ART the ArtMethod* of the method, which is also its jmethodID (FromReflectedMethod answers the same value): here the JNI bridge's jmethodID of the member.
+  // Read-only: on ART writing it would make the Executable dispatch to another method, which the lab does not model (an explicit IllegalAccessException, never a silent store).
+  [key('Ljava/lang/reflect/Executable;', 'artMethod', 'J'), { get: (rt, o) => { const member = rt.object(o).member; if (!member?.method) throw new APKError('Executable.artMethod read on an object without a reflected method', { kind: 'internal' }); if (!rt.jni) throw new APKError('Executable.artMethod is the method\'s jmethodID, and this VM has no JNI bridge', { kind: 'jni-required' }); const id = rt.jni.methodIdOf(member); const seen = rt.artMethodValues ??= new Map(); if (!seen.has(id) && seen.size < 4096) seen.set(id, `${String(member.method.owner).replace(/^L|;$/g, '').replaceAll('/', '.')}.${member.method.name}`); return BigInt(id); } }],
+  // Field.accessFlags: the access flags of this Field object (getModifiers is their low 16 bits; Field.set refuses a final field from them). A write changes this Field object only, as on ART.
+  [key('Ljava/lang/reflect/Field;', 'accessFlags', 'I'), { get: (rt, o) => rt.object(o).member?.flags ?? 0, set: (rt, o, v) => { const obj = rt.object(o); obj.member = { ...obj.member, flags: Number(v) | 0 }; } }],
+  // AccessibleObject.override: the flag setAccessible(true) sets and the access checks of invoke / get / set skip on.
+  [key('Ljava/lang/reflect/AccessibleObject;', 'override', 'Z'), { get: (rt, o) => rt.object(o).accessible ? 1 : 0, set: (rt, o, v) => { rt.object(o).accessible = !!Number(v); } }],
 ]);
 
 /** Static fields: accessors by key, then the compile-time constants of the table; the rest is shadow storage in the runtime's static table (read: default of the type). */
