@@ -29,11 +29,11 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=6954cacca256';
+import { Blocked } from '../../runtime/scheduler.js?v=7233e918dcc9';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=6954cacca256';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=6954cacca256';
-import { CLASS } from './linker.js?v=6954cacca256';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7233e918dcc9';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=7233e918dcc9';
+import { CLASS } from './linker.js?v=7233e918dcc9';
 const CLASS_INIT_STATE = CLASS.initState;
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
@@ -47,6 +47,7 @@ const T = { status: 12, detail: 16, steps: 32, result: 48, calls: 56, stackTop: 
 // deadline, as a preemptive scheduler would end it, and a thread in plain Java yields at most every few hundred microseconds. Nothing the thread runs changes, only where it is
 // preempted. The main thread and runs outside a slice keep the core's own quantum (0).
 const QUANTUM_TARGET_MS = 1, QUANTUM_MIN = 256, QUANTUM_MAX = 20000;
+const LONG_WAIT_MS = 1000;   // host time the main thread's suspendable event may wait nested in the pump before it is suspended (waitFor)
 export const THREADS_STATE_BYTES = 96 + 4 * 1024, MONITOR_BYTES = 48, MONITORS = 4096;
 const FLAG_NO_BLOCK = 1, FLAG_GREEN = 2, WAIT_LISTED = 1, WAIT_REACQUIRE = 2;
 const PARKED = -1, YIELD = -2, DONE = -3;   // advance(): the thread is parked, yielded, or its work is done
@@ -349,8 +350,16 @@ export class CoreThreads {
   }
   /** The run loop with an owner, while the owner cannot go on (interpreter.js runLoop's thread switch). */
   waitFor(owner) {
-    const sched = this.sched, rt = this.rt;
+    const sched = this.sched, rt = this.rt, engine = this.engine, mark = engine.pins.length, since = performance.now();
     for (;;) {
+      // Each turn of this loop is finished work (events served, a slice of another thread, a clock skip): the handles it made were pinned until the host call this wait is
+      // nested in returns, which a long wait never does -- a main thread parked for minutes while the pump served millions of host tasks grew the pins past what a JavaScript
+      // array can hold ("RangeError: Invalid array length"). What a turn keeps is in a rooted table, a record or a thread's steps, as at a bridge call's return.
+      if (engine.pins.length > mark) engine.pins.length = mark;
+      // The main thread's event that may suspend (WasmEngine.suspendable) and has waited LONG_WAIT_MS of host time here: the wait is suspended as a network wait is, so the
+      // event pump returns to the browser's event loop (the page, its watchdog and a driver's wall clock see the wait) and resumes the event once the wait is over. Waits
+      // that end in less (most: a skip of the VM clock, another thread's short work) keep the nested path.
+      if (owner.state === 'blocked' && performance.now() - since >= LONG_WAIT_MS && engine.maySuspend(owner)) { engine.noteSuspend(owner, null, Math.round(performance.now() - since)); throw MAIN_SUSPEND; }
       if (owner.state === 'blocked' || sched.starved) sched.serviceEvents();
       const choice = sched.pick(this.last ?? owner, owner);
       if (choice.thread === owner) { if (this.last !== owner) sched.switching(rt, this.last, owner); this.last = owner; rt.thread = owner; return; }

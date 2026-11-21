@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=6954cacca256") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=6954cacca256">
-  <link rel="stylesheet" href="./lab-theme.css?v=6954cacca256">
-  <meta name="apk-browser-build" content="6954cacca256">
+  <style>@import url("./styles.css?v=7233e918dcc9") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=7233e918dcc9">
+  <link rel="stylesheet" href="./lab-theme.css?v=7233e918dcc9">
+  <meta name="apk-browser-build" content="7233e918dcc9">
 </head>
 <body>
   <header class="topbar">
@@ -82,6 +82,7 @@
                 <label for="dev-microg">With microG <em id="dev-microg-hint" class="vm-memory-hint" role="status" hidden>reopen the APK to apply</em></label><input id="dev-microg" type="checkbox" aria-describedby="dev-microg-note">
                 <div class="cp-microg-open"><button id="dev-microg-settings" class="cp-button" type="button" aria-haspopup="dialog" aria-expanded="false" aria-describedby="dev-microg-settings-summary">microG settings…</button><span id="dev-microg-settings-summary" class="cp-microg-settings-summary" role="status">services: all off</span></div>
               </div>
+              <p id="dev-identity" class="cp-note" role="status">Identity (fixed, the same for every app): Android 13 (API 33), user build, release-keys.</p>
               <p id="dev-proxy-note" class="cp-note" role="status"></p>
               <p id="dev-relay-channel-note" class="cp-note" role="status"></p>
               <p id="dev-client-cert-status" class="cp-note" role="status"></p>
@@ -323,7 +324,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=6954cacca256"></script>
+  <script type="module" src="./app.js?v=7233e918dcc9"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

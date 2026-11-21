@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=6954cacca256">
-  <link rel="stylesheet" href="./lab-tokens.css?v=6954cacca256">
+  <link rel="stylesheet" href="./site-pages.css?v=7233e918dcc9">
+  <link rel="stylesheet" href="./lab-tokens.css?v=7233e918dcc9">
 </head>
 <body>
   <header class="topbar">
@@ -1228,7 +1228,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
             <div><dt>Screen and log</dt><dd><code>screencap -p</code> returns the image; <code>uiautomator dump</code> returns the hierarchy (Views and Compose semantic nodes, with window bounds; 1 px = 1 dp); <code>logcat</code> accepts <code>-d</code>, <code>-c</code>, <code>-t</code>, <code>-s</code>, <code>-v</code>, <code>--pid</code>, <code>-e</code> and <code>TAG:P</code> filters; <code>dumpsys activity</code>, <code>window</code>, <code>package</code> and <code>battery</code> bring what the page knows, in Android's format.</dd></div>
             <div><dt>Settings</dt><dd><code>settings get|put</code> for the animation scales, <code>font_scale</code>, <code>time_12_24</code>, <code>user_rotation</code> and <code>ui_night_mode</code>; <code>wm size</code>, <code>svc wifi|data</code>, <code>cmd uimode night</code>, <code>dumpsys battery set …</code>. These are the settings in <b>Controls › Device</b>.</dd></div>
             <div><dt>Files</dt><dd><code>push</code> writes to shared storage, in the folder for the file's type (<code>/sdcard/Pictures</code>, <code>Movies</code>, <code>Music</code> or <code>Download</code>). <code>pull</code>, <code>cat</code>, <code>ls</code> and <code>rm</code> reach what <code>push</code>, <code>screencap</code> and <code>uiautomator dump</code> wrote; files created by the app do not reach the page. Local paths are on the machine where the bridge runs, relative to the folder it was started in.</dd></div>
-            <div><dt>What fails</dt><dd>What the page cannot reach fails with the command's name and status 127, and never runs as something else: <code>am broadcast</code>, <code>am startservice</code>, keys that are neither text nor cursor (volume, <code>TAB</code>, function keys), <code>run-as</code> and the app's private files (use <code>app_data</code>), <code>getprop ro.product.*</code> / <code>ro.build.*</code>, <code>forward</code> / <code>reverse</code> (use <code>host_redirects</code>), <code>screenrecord</code> (use <code>record_screen</code>), <code>install-multiple</code>, interactive shell.</dd></div>
+            <div><dt>What fails</dt><dd>What the page cannot reach fails with the command's name and status 127, and never runs as something else: <code>am broadcast</code>, <code>am startservice</code>, keys that are neither text nor cursor (volume, <code>TAB</code>, function keys), <code>run-as</code> and the app's private files (use <code>app_data</code>), <code>forward</code> / <code>reverse</code> (use <code>host_redirects</code>), <code>screenrecord</code> (use <code>record_screen</code>), <code>install-multiple</code>, interactive shell.</dd></div>
             <div><dt>Response</dt><dd>The command's output as adb writes it, the <code>screencap</code> image and, when there is one, <code>exit</code> and <code>lab</code>: notes on how the page served the command (for example, which path a touch took) or where it differs from a device.</dd></div>
           </dl>
         </div>
@@ -1678,6 +1678,6 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=6954cacca256"></script>
+  <script type="module" src="./site-pages.js?v=7233e918dcc9"></script>
 </body>
 </html>

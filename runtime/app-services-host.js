@@ -1,11 +1,11 @@
-import { resolveIntentFields } from './intent-resolver.js?v=6954cacca256';
-import { APKError } from './apk-error.js?v=6954cacca256';
-import { registerPackageValueFields } from './package-value-fields.js?v=6954cacca256';
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=6954cacca256';
-import { nativeHeap } from './vm-debug-host.js?v=6954cacca256';
-import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=6954cacca256';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6954cacca256';
-import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=6954cacca256';
+import { resolveIntentFields } from './intent-resolver.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=7233e918dcc9';
+import { registerPackageValueFields } from './package-value-fields.js?v=7233e918dcc9';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=7233e918dcc9';
+import { nativeHeap } from './vm-debug-host.js?v=7233e918dcc9';
+import { createHostRegistry, bitsFloat, floatBits } from './host-contract.js?v=7233e918dcc9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7233e918dcc9';
+import { PLATFORM_CERTIFICATE_BASE64 } from './platform-certificate-data.js?v=7233e918dcc9';
 
 // Application-process services between ActivityThread and the app: Context file/preference APIs, SharedPreferences (SharedPreferencesImpl
 // semantics, XML files on the virtual filesystem), ContentProvider base class + ProviderInfo + installContentProviders, and the PackageManager
@@ -383,11 +383,19 @@ export function createAppServicesHost(platform) {
   defContext('getCodeCacheDir', `()${FILE}`, r => ensure(r, `${dataDir()}/code_cache`));
   defContext('getNoBackupFilesDir', `()${FILE}`, r => ensure(r, `${dataDir()}/no_backup`));
   defContext('getDir', `(${STRING}I)${FILE}`, (r, _m, [, name]) => ensure(r, `${dataDir()}/app_${text(r, name)}`));
-  defContext('getDatabasePath', `(${STRING})${FILE}`, (r, _m, [, name]) => { const n = text(r, name); return file(r, n.startsWith('/') ? n : (ensure(r, `${dataDir()}/databases`), `${dataDir()}/databases/${n}`)); });
+  // ContextImpl.getDatabasePath: an absolute name is the file itself, and its directory is made when it is missing (File.mkdir: one level, so a missing parent of it leaves
+  // the open to fail); a relative name is a file of the databases directory and may not contain a separator (makeFilename: IllegalArgumentException). openOrCreateDatabase,
+  // deleteDatabase and SQLiteOpenHelper (through getDatabasePath) see the same path.
+  const databasePath = (r, name) => {
+    const n = text(r, name);
+    if (n.startsWith('/')) { const dir = n.slice(0, n.lastIndexOf('/')); if (dir && fs().stat(dir)?.type !== 'dir') fs().mkdir(dir); return n; }
+    if (n.includes('/')) r.throwJava('Ljava/lang/IllegalArgumentException;', `File ${n} contains a path separator`);
+    ensure(r, `${dataDir()}/databases`); return `${dataDir()}/databases/${n}`;
+  };
+  defContext('getDatabasePath', `(${STRING})${FILE}`, (r, _m, [, name]) => file(r, databasePath(r, name)));
   // ContextImpl.openOrCreateDatabase/deleteDatabase/databaseList over the original android.database.sqlite classes (src/sqlite-native.js natives).
   const SQLITE_DB = 'Landroid/database/sqlite/SQLiteDatabase;', CURSOR_FACTORY = 'Landroid/database/sqlite/SQLiteDatabase$CursorFactory;', ERROR_HANDLER = 'Landroid/database/DatabaseErrorHandler;';
   const MODE_ENABLE_WRITE_AHEAD_LOGGING = 0x8, MODE_NO_LOCALIZED_COLLATORS = 0x10, CREATE_IF_NECESSARY = 0x10000000, ENABLE_WRITE_AHEAD_LOGGING = 0x20000000, NO_LOCALIZED_COLLATORS = 0x10;
-  const databasePath = (r, name) => { const n = text(r, name); if (n.startsWith('/')) return n; if (n.includes('/')) r.throwJava('Ljava/lang/IllegalArgumentException;', `File ${n} contains a path separator`); ensure(r, `${dataDir()}/databases`); return `${dataDir()}/databases/${n}`; };
   const openDatabase = (r, name, mode, factory, handler) => {
     const path = databasePath(r, name); let flags = CREATE_IF_NECESSARY;
     if (mode & MODE_ENABLE_WRITE_AHEAD_LOGGING) flags |= ENABLE_WRITE_AHEAD_LOGGING;
@@ -1199,8 +1207,9 @@ export function createAppServicesHost(platform) {
   def(APP_INFO_FLAGS, 'getValue', '()J', (r, _m, [self]) => r.object(self).flagsValue ?? 0n);
   // ---- the packages of the virtual device ------------------------------------------------------------------------------------------------------------
   // A stock Android 13 image without Google services: this app plus a small, generic set of system packages (framework resources, System UI, the AOSP launcher). Nothing else is installed (no store,
-  // no root or hooking framework). System packages carry what the image would: FLAG_SYSTEM, a /system* code path, the platform version, no installer, and the signer of a test-keys build (the
-  // device's Build.FINGERPRINT says test-keys): the AOSP test platform certificate (framework-aosp/security, src/platform-certificate-data.js). Their components and permission lists are
+  // no root or hooking framework). System packages carry what the image would: FLAG_SYSTEM, a /system* code path, the platform version, no installer, and the signer of a release-keys build: the
+  // platform certificate of the image's maker, here the lab's own platform key (src/device-identity.js; framework-aosp/device-identity/lab-platform.x509.pem, src/platform-certificate-data.js:
+  // only the certificate exists, nothing can be signed as this platform), never AOSP's public test key or another maker's. Their components and permission lists are
   // not modeled (activities / services / requestedPermissions stay null). Package visibility (API 30+) applies: an app targeting 30 or later without QUERY_ALL_PACKAGES sees itself and the
   // always-visible "android" package; <queries> declarations are not parsed, so packages they would add are not listed.
   const SYSTEM_PACKAGES = [

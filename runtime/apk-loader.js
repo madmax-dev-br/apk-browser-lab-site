@@ -1,22 +1,23 @@
-import { createArm64Native } from './arm64/glue.js?v=6954cacca256';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=6954cacca256';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=6954cacca256';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=6954cacca256';
-import { inspectELF } from './native-inspector.js?v=6954cacca256';
-import { elfBuildId } from './elf-build-id.js?v=6954cacca256';
-import { crc32 } from './zip-entry.js?v=6954cacca256';
-import { resolveDevice } from './device-profile.js?v=6954cacca256';
-import { resourceProfileFor } from './device-configuration.js?v=6954cacca256';
-import { JniBridge } from './jni-host.js?v=6954cacca256';
-import { providerForApk } from './native-provider-variants.js?v=6954cacca256';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=6954cacca256';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=6954cacca256';
-import { AndroidResources } from './android-resources.js?v=6954cacca256';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=6954cacca256';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=6954cacca256';
-import { FrameworkProvider } from './framework-provider.js?v=6954cacca256';
-import { APKArchive } from './apk-archive.js?v=6954cacca256';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=6954cacca256';
+import { createArm64Native } from './arm64/glue.js?v=7233e918dcc9';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7233e918dcc9';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=7233e918dcc9';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=7233e918dcc9';
+import { inspectELF } from './native-inspector.js?v=7233e918dcc9';
+import { elfBuildId } from './elf-build-id.js?v=7233e918dcc9';
+import { crc32 } from './zip-entry.js?v=7233e918dcc9';
+import { resolveDevice } from './device-profile.js?v=7233e918dcc9';
+import { resourceProfileFor } from './device-configuration.js?v=7233e918dcc9';
+import { JniBridge } from './jni-host.js?v=7233e918dcc9';
+import { providerForApk } from './native-provider-variants.js?v=7233e918dcc9';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=7233e918dcc9';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7233e918dcc9';
+import { AndroidResources } from './android-resources.js?v=7233e918dcc9';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=7233e918dcc9';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=7233e918dcc9';
+import { FrameworkProvider } from './framework-provider.js?v=7233e918dcc9';
+import { APKArchive } from './apk-archive.js?v=7233e918dcc9';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=7233e918dcc9';
+import { identityTraceLine } from './device-identity.js?v=7233e918dcc9';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -725,7 +726,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
       verifiedBaseFrameworkHash ??= await frameworkBytesHash(baseFrameworkFiles);
       if (requiredBaseHash.toLowerCase() !== verifiedBaseFrameworkHash) fail(`Source ${selection.name} profile requires base framework SHA-256 ${requiredBaseHash}; actual DEX bytes are ${verifiedBaseFrameworkHash}`);
     }
-    const bindings=new Map(framework.nativeBindings);for(const [key,binding]of profile.nativeBindings)if(!bindings.has(key))bindings.set(key,binding);
+    const bindings=new Map(framework.nativeBindings);for(const [key,binding]of profile.nativeBindings)if(!bindings.has(key))bindings.set(key,binding);bindings.systemProperties=framework.nativeBindings.systemProperties;   /* the device's property table travels with the bindings (src/arm64/glue.js reads it) */
     framework={...framework,files:[...framework.files,...profile.files],nativeBindings:bindings,metadata:{...framework.metadata,
       baseClasses:framework.metadata.baseClasses??framework.metadata.classes,baseBytes:framework.metadata.baseBytes??framework.metadata.bytes,baseSha256:framework.metadata.baseSha256??framework.metadata.sha256,nativeBoundaries:[...bindings.keys()],
       methods:(framework.metadata.methods??0)+(profile.metadata?.methods??0),profiles:[...(framework.metadata.profiles??[]),{...profile.metadata,name:selection.name,reason:selection.explicit===true?'explicitly-requested':selection.reason,tracePaths:profile.files.map(file=>file.filename)}]}};
@@ -878,6 +879,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   }
   runtime.nativeVersionMismatch = options.nativeVersionMismatch === true;   // opt-in: serve the lab's React Native libraries to an app of another release (jni-host.js #requireVersions), reported
   if (options.arm64Native) runtime.arm64 = createArm64Native(runtime, { translate: options.arm64Translate !== false });   // arm64Translate: the translation tier for hot code (src/arm64/translate.js), on unless false   // the app's arm64-v8a libraries run in the ARM64 interpreter (docs/ARM64-NATIVE.md); off unless asked
+  runtime.record(identityTraceLine(runtime));   // the device identity, fixed for every app (src/device-identity.js); its ABIs follow the ARM64 option just set
   if (nativeLibraryProvider) runtime.jni = new JniBridge(runtime, providerForApk(nativeLibraryProvider, runtime.apkSha256, formatVersion(runtime.reactNativeVersion)), runtime.platform);
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));

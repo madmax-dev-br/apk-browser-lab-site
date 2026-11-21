@@ -1,5 +1,5 @@
-import { createHostRegistry, floatBits } from './host-contract.js?v=6954cacca256';
-import { DIGESTS } from './crypto-host.js?v=6954cacca256';
+import { createHostRegistry, floatBits } from './host-contract.js?v=7233e918dcc9';
+import { DIGESTS } from './crypto-host.js?v=7233e918dcc9';
 
 // android.provider.Settings.Secure / Global / System as an app (not a system app) sees them: reads of the keys a stock Android 13 device exposes, taken from the virtual device
 // (font scale, animation scale, 24-hour clock, airplane mode follow the Dispositivo panel), ANDROID_ID derived per (package, device) like Android 8+'s per-app-signing-key value,
@@ -31,6 +31,8 @@ export function createSettingsHost(platform) {
     [SECURE]: r => ({ android_id: androidId(r), accessibility_enabled: '0', touch_exploration_enabled: '0', speak_password: '0', high_text_contrast_enabled: '0', long_press_timeout: '400', multi_press_timeout: '300',
       default_input_method: 'com.android.inputmethod.latin/.LatinIME', location_mode: platform.locationSimulation?.enabled ? '3' : '0', location_providers_allowed: platform.locationSimulation?.enabled ? 'gps,network' : '', skip_first_use_hints: '0', screensaver_enabled: '1', tts_default_rate: '100',
       show_ime_with_hard_keyboard: '0', user_setup_complete: '1', install_non_market_apps: '0', accessibility_display_magnification_enabled: '0', enabled_accessibility_services: null }),
+    // adb_enabled / development_settings_enabled: 0, as a user image ships them (ro.debuggable=0, ro.adb.secure=1: adbd is off by default, core/main.mk; Developer options start off
+    // unless the build is eng). The lab's page-side adb (src/adb-commands.js) is the page's tool, not the device's adbd.
     [GLOBAL]: r => ({ airplane_mode_on: '0', adb_enabled: '0', development_settings_enabled: '0', device_name: 'Browser Lab', device_provisioned: '1', auto_time: '1', auto_time_zone: '1',
       animator_duration_scale: String(device().animatorScale ?? 1), transition_animation_scale: String(device().animatorScale ?? 1), window_animation_scale: String(device().animatorScale ?? 1), always_finish_activities: '0',
       stay_on_while_plugged_in: '0', wifi_on: device().connectivity === 'offline' ? '0' : '1', bluetooth_on: '0', mobile_data: '1', data_roaming: '0', boot_count: '1', wait_for_debugger: '0', usb_mass_storage_enabled: '0',

@@ -2,11 +2,11 @@
 // number in X8 and the arguments in X0-X5, or bionic's syscall(3)) instead of calling libc. Both reach the same lab implementations as the libc functions: the
 // arm64 (asm-generic) numbers below map to the libc function whose arguments the call has in the same order. A raw call returns -errno, as the kernel does;
 // syscall(3) returns -1 and sets errno, as bionic does. A number the lab does not provide fails naming it, never a silent 0.
-import { APKError } from '../apk-error.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
 
 // number -> libc function taking the same arguments in the same registers
 const SAME = {
-  17: 'getcwd', 23: 'dup', 24: 'dup3', 25: 'fcntl', 29: 'ioctl', 34: 'mkdirat', 35: 'unlinkat', 48: 'faccessat', 56: 'openat', 57: 'close', 62: 'lseek',
+  17: 'getcwd', 23: 'dup', 45: 'truncate', 46: 'ftruncate', 47: 'fallocate', 24: 'dup3', 25: 'fcntl', 29: 'ioctl', 34: 'mkdirat', 35: 'unlinkat', 48: 'faccessat', 56: 'openat', 57: 'close', 62: 'lseek',
   63: 'read', 64: 'write', 65: 'readv', 66: 'writev', 67: 'pread64', 68: 'pwrite64', 79: 'fstatat', 80: 'fstat', 82: 'fsync', 83: 'fdatasync', 101: 'nanosleep',
   113: 'clock_gettime', 114: 'clock_getres', 124: 'sched_yield', 129: 'kill', 130: 'tkill', 131: 'tgkill', 132: 'sigaltstack', 160: 'uname', 167: 'prctl', 169: 'gettimeofday',
   155: 'getpgid', 156: 'getsid', 172: 'getpid', 173: 'getppid', 174: 'getuid', 175: 'geteuid', 176: 'getgid', 177: 'getegid', 179: 'sysinfo', 215: 'munmap', 216: 'mremap', 222: 'mmap',

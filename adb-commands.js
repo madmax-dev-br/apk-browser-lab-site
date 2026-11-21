@@ -7,10 +7,9 @@
 // createAdb(device).run({ command | args }, io) -> { stdout, stderr, code, images: [{ blob, type }], notes: [] }
 //   io.localFile(path) -> File of the machine that runs the bridge (adb install / push); io.writeLocal(path, blob, { append }) writes one there (adb pull, `> file`).
 // The command-line syntax (quotes, | grep, &&, >) is src/adb-shell.js. No process.*.
-import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=6954cacca256';
-import { formatThreadtime } from './logcat.js?v=6954cacca256';
-import { kindOf, directoryOf } from './shared-storage.js?v=6954cacca256';
-import { BUILD_PROPS } from './build-properties.js?v=6954cacca256';
+import { AdbError, unsupported, usage, parseLine, runList, FILTERS } from './adb-shell.js?v=7233e918dcc9';
+import { formatThreadtime } from './logcat.js?v=7233e918dcc9';
+import { kindOf, directoryOf } from './shared-storage.js?v=7233e918dcc9';
 
 export const SERIAL = 'apkweb-lab';
 const SHARED_ROOT = '/storage/emulated/0', SHARED_ALIASES = ['/sdcard', '/mnt/sdcard', '/storage/self/primary'];
@@ -162,13 +161,13 @@ export const ADB_HELP = `adb commands interpreted by APK Web Lab (the device is 
     wm size [WxH|reset] | wm density | svc wifi|data enable|disable | cmd uimode night [yes|no] | cmd connectivity airplane-mode [enable|disable] | cmd package … | cmd activity … | cmd battery …
     ls [-l] [path] | cat <file> | rm [-f] <file> (in /sdcard) | echo | sleep
 Not implemented (fails with the command's name, status 127): am broadcast / startservice / instrument, keys that are not text or cursor keys in a focused field (except BACK, HOME, APP_SWITCH), run-as and the
-app's private files (use the app_data tool), pm path, getprop ro.product.* / ro.build.* (android.os.Build stays in the VM), forward / reverse (use host_redirects), reboot, root,
+app's private files (use the app_data tool), pm path, forward / reverse (use host_redirects), reboot, root,
 screenrecord, install-multiple, interactive shell.
 1 px = 1 dp in the lab (160 dpi): the coordinates of input and uiautomator are the window's.`;
 
 const SETTINGS_KEYS = 'global animator_duration_scale | transition_animation_scale | window_animation_scale; system font_scale | time_12_24 | user_rotation | accelerometer_rotation; secure ui_night_mode';
 const SCALE_KEYS = ['animator_duration_scale', 'transition_animation_scale', 'window_animation_scale'];
-// BUILD_PROPS: src/build-properties.js
+// getprop: the device identity's properties (device.buildProps(), src/device-identity.js: the build.prop of the lab's Android 13 user image), the display density, locale and time zone
 
 /**
  * The interpreter over a device facade (src/app.js adbDevice; tests pass a fake). Every method of the facade does what the page's own control does:
@@ -178,7 +177,7 @@ const SCALE_KEYS = ['animator_duration_scale', 'transition_animation_scale', 'wi
  *   permissions() -> [{ name, state, granted }]; setPermission(name, state)
  *   tap(x, y) -> via; swipe(x1, y1, x2, y2, ms) -> via; text(text) -> via; key(code) -> via; keyCode(name) -> number | null; nav('back' | 'home' | 'recents')
  *   screenshot() -> { blob }; snapshot() -> page snapshot; resourceNames(ids) -> Map; logcat() -> entries; clearLogcat()
- *   settings() -> device settings; setSettings(patch); defaultScreen() -> the screen setting to go back to; buildProps() -> { MODEL, 'VERSION.SDK_INT', ... } | null
+ *   settings() -> device settings; setSettings(patch); defaultScreen() -> the screen setting to go back to; buildProps() -> { 'ro.product.model': ..., 'ro.build.version.sdk': ..., ... } (the device identity's properties) | null
  *   sharedFiles() -> [{ id, name, mime, size, modified }]; pushShared(file) -> { name }; removeShared(id); sharedBlob(id) -> Blob
  */
 export function createAdb(device, { sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() } = {}) {
@@ -410,12 +409,12 @@ export function createAdb(device, { sleep = ms => new Promise(resolve => setTime
 
     async getprop(argv, env) {
       const settings = await device.settings(), build = await device.buildProps(), props = new Map();
-      if (build) for (const [key, field] of BUILD_PROPS) if (build[field] !== undefined && build[field] !== null) props.set(key, String(build[field]));
+      if (build) for (const [key, value] of Object.entries(build)) if (value !== undefined && value !== null) props.set(key, String(value));
       props.set('ro.sf.lcd_density', String((await current()).densityDpi)); props.set('persist.sys.locale', settings.locale ?? ''); if (settings.timeZone) props.set('persist.sys.timezone', settings.timeZone);
-      if (!argv.length) { if (!build) env.notes.push('Only the properties the page knows: those of android.os.Build (ro.product.*, ro.build.*) stay in the VM and the page does not read them yet.'); return ok([...props].sort(([a], [b]) => a < b ? -1 : 1).map(([key, value]) => `[${key}]: [${value}]\n`).join('')); }
+      if (!argv.length) { if (!build) env.notes.push('Only the properties the page knows: the device identity (ro.product.*, ro.build.*) is not available to the page.'); return ok([...props].sort(([a], [b]) => a < b ? -1 : 1).map(([key, value]) => `[${key}]: [${value}]\n`).join('')); }
       if (argv.length > 2) throw usage('getprop [key [default]]');
       if (props.has(argv[0])) return ok(`${props.get(argv[0])}\n`);
-      if (BUILD_PROPS.some(([key]) => key === argv[0])) throw unsupported(`getprop ${argv[0]}`, 'the value is that of android.os.Build inside the VM, which the page does not read yet');
+      if (!build && /^ro\.(?:product|build)\./.test(argv[0])) throw unsupported(`getprop ${argv[0]}`, 'the device identity is not available to the page');
       env.notes.push(`The page does not know the property ${argv[0]}; the answer is that of a property with no value.`);
       return ok(`${argv[1] ?? ''}\n`);
     },
@@ -512,7 +511,7 @@ export function createAdb(device, { sleep = ms => new Promise(resolve => setTime
       case undefined: case 'help': case '--help': case '-h': return ok(`${ADB_HELP}\n`);
       case 'version': case '--version': return ok('APK Web Lab: adb command interpreter (not the Android Debug Bridge)\n');
       case 'devices': {
-        const build = rest.includes('-l') ? await device.buildProps() : null, detail = build ? ` product:${String(build.PRODUCT).replace(/\s+/g, '_')} model:${String(build.MODEL).replace(/\s+/g, '_')} device:${String(build.DEVICE).replace(/\s+/g, '_')} transport_id:1` : rest.includes('-l') ? ' transport_id:1' : '';
+        const build = rest.includes('-l') ? await device.buildProps() : null, detail = build ? ` product:${String(build['ro.product.name']).replace(/\s+/g, '_')} model:${String(build['ro.product.model']).replace(/\s+/g, '_')} device:${String(build['ro.product.device']).replace(/\s+/g, '_')} transport_id:1` : rest.includes('-l') ? ' transport_id:1' : '';
         return ok(rest.includes('-l') ? `List of devices attached\n${SERIAL.padEnd(22)} device${detail}\n\n` : `List of devices attached\n${SERIAL}\tdevice\n\n`);
       }
       case 'get-state': return ok('device\n');

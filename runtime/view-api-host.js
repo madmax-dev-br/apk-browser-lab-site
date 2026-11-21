@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=6954cacca256';
-import { APKError } from './apk-error.js?v=6954cacca256';
+import { createHostRegistry } from './host-contract.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=7233e918dcc9';
 
 // Public android.view.View API (API 33) that the platform View model did not carry, with the semantics of android-13.0.0_r1 View.java. Grouped by topic below; state lives on the
 // View's host object (`r.object(view)`), the same place the other view hosts keep theirs.
@@ -93,7 +93,7 @@ export function createViewApiHost(platform) {
   def(VIEW, 'dispatchStartTemporaryDetach', '()V', (r, _m, [self]) => { viewCall(r, self, 'onStartTemporaryDetach'); r.object(self).temporarilyDetached = true; });
   def(VIEW, 'dispatchFinishTemporaryDetach', '()V', (r, _m, [self]) => { r.object(self).temporarilyDetached = false; viewCall(r, self, 'onFinishTemporaryDetach'); });
   def(VIEW, 'onStartTemporaryDetach', '()V', () => {}); def(VIEW, 'onFinishTemporaryDetach', '()V', () => {});
-  def(VIEW, 'isInLayout', '()Z', (r, _m, [self]) => r.object(self).inLayout ? 1 : 0);
+  def(VIEW, 'isInLayout', '()Z', (r, _m, [self]) => platform.viewLayoutHost?.isInLayout?.(r, self) ? 1 : 0);   // ViewRootImpl.isInLayout of the view's window
 
   // ================================================================================== geometry
   def(VIEW, 'getDrawingRect', `(${RECT})V`, (r, _m, [self, outRect]) => {

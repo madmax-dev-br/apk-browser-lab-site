@@ -3,12 +3,12 @@
 // It executes the library's machine code instruction by instruction over a flat little-endian memory (src/arm64/memory.js); it never patches or skips code. Hot code
 // is also compiled to WebAssembly by the translation tier (src/arm64/translate.js), which does exactly what this interpreter does and hands back to it what it does not
 // translate. General registers are BigInt (X0..X30, SP), the 32 vector registers are 16 bytes each, NZCV are booleans. An address at or above HOST_BASE is a host
-// entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js): branching there calls the JavaScript body with the AAPCS64 argument
+// entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js; code reaches it through the 16-byte stub src/arm64/process.js gives each one): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { executeNeon } from './neon.js?v=6954cacca256';
-import { DecodeCache } from './decode-cache.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { executeNeon } from './neon.js?v=7233e918dcc9';
+import { DecodeCache } from './decode-cache.js?v=7233e918dcc9';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -50,6 +50,7 @@ export class Arm64Cpu {
     this.vbuf = new Uint8Array(32 * 16); this.vview = new DataView(this.vbuf.buffer);
     this.n = false; this.z = false; this.c = false; this.v = false;
     this.pc = 0; this.tpidr = 0n; this.fpcr = 0n; this.fpsr = 0n; this.steps = 0; this.exclusive = null;
+    this.budgetFrom = 0;   // cpu.steps when the budget's count began: the outermost call from JavaScript (a JNI call), or the thread's start
     // the translation tier (src/arm64/translate.js): hot code runs as WebAssembly over this memory; the vector registers then live in the tier's register-file slot
     const tier = translate ? memory?.translationTier?.() : null;
     if (tier) { const slot = tier.attach(this); if (slot >= 0) { this.tier = tier; this.tierSlot = slot; } }
@@ -97,6 +98,7 @@ export class Arm64Cpu {
   }
   /** The first half of call(): the arguments in place, pc at the function and X30 at the sentinel; run(RETURN_SENTINEL) executes it (a thread that can park continues it later), endCall ends it. */
   beginCall(address, args = [], { floats = [] } = {}) {
+    if (!((this.nested ?? 0) > 0)) this.budgetFrom = this.steps;   // each outermost native call has the whole budget (a long-lived thread's earlier calls do not use it up)
     const saved = { lr: this.x[30], pc: this.pc, sp: this.sp };   // sp too: stack-passed arguments lower it, and the interrupted caller's frame must be where it left it
     for (let i = 0; i < 8; i++) if (i < args.length) this.x[i] = BigInt.asUintN(64, BigInt(args[i]));
     floats.forEach((value, i) => { if (value.kind === 'float') this.setS(i, value.value); else this.setD(i, value.value ?? value); });
@@ -123,7 +125,7 @@ export class Arm64Cpu {
       }
       if (--left < 0) return 'yield';
       if ((++this.steps & 0xfffff) === 0) {   // every 2^20 instructions: the budget, and the progress report (the Worker's heartbeat names the native code while it runs)
-        if (this.steps > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps}) exceeded at pc 0x${this.pc.toString(16)}`, { kind: 'arm64-budget' });
+        if (this.steps - this.budgetFrom > this.maxSteps) throw new APKError(`ARM64 interpreter: instruction budget (${this.maxSteps} instructions in one native call or thread) exceeded at pc 0x${this.pc.toString(16)} (${this.where(this.pc)})`, { kind: 'arm64-budget', pc: this.pc, steps: this.steps - this.budgetFrom });
         if (this.progress !== undefined) this.progress(this);
       }
       const at = this.pc, step = cache.get(this, at);   // decoded once per address (src/arm64/decode-cache.js)

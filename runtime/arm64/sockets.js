@@ -6,10 +6,10 @@
 // name nobody bound refuses the connection, as on a device). UDP has no path (the relay
 // tunnels TCP only): a UDP socket opens, every send fails with ENETUNREACH (recorded) and nothing arrives, as on a network that blocks UDP; QUIC stacks then fall back to TCP. A blocking call waits as a native thread wait (src/arm64/threads.js);
 // on the thread that runs Java the network cannot be waited for synchronously, so that call fails by name.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { BLOCKED } from './cpu.js?v=6954cacca256';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=6954cacca256';
-import { utf8 } from './text.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { BLOCKED } from './cpu.js?v=7233e918dcc9';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=7233e918dcc9';
+import { utf8 } from './text.js?v=7233e918dcc9';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
@@ -23,7 +23,7 @@ export function addSockets(lib, { runtime } = {}) {
   const unsupported = what => { throw new APKError(`ARM64 native code: ${what} is not provided by the lab`, { kind: 'arm64-network' }); };
   const T = p => p.threads;
   // ---- readiness, shared by read/recv, poll, select and epoll
-  const expirations = o => { const now = performance.now(); if (now < o.next) return 0; return o.interval ? 1 + Math.floor((now - o.next) / o.interval) : 1; };
+  const expirations = o => { const now = o.now ? o.now() : performance.now(); if (now < o.next) return 0; return o.interval ? 1 + Math.floor((now - o.next) / o.interval) : 1; };   // o.now: the native threads' clock (timerfd_create)
   const readable = o => o.kind === 'unix' ? (o.listening ? o.backlog.length > 0 : !!o.rx && (o.rx.bytes.length > 0 || o.rx.closed)) : o.kind === 'tcp' ? (o.session && (o.session.queue.length > 0 || o.session.closed || !!o.session.error)) : o.kind === 'pipe-read' ? (o.pipe.bytes.length > 0 || o.pipe.closed) : o.kind === 'eventfd' ? o.count > 0n : o.kind === 'timerfd' ? expirations(o) > 0 : o.kind === 'file' ? true : false;
   const writable = o => o.kind === 'udp' ? true : o.kind === 'unix' ? !!o.tx && !o.tx.closed : o.kind === 'tcp' ? !!o.session?.connected && !o.session.closed : o.kind === 'pipe-write' ? true : o.kind === 'eventfd' ? true : o.kind === 'file' ? true : false;
   const events = o => (readable(o) ? POLLIN : 0) | (writable(o) ? POLLOUT : 0) | (o.kind === 'tcp' && o.session?.error ? POLLERR : 0) | (o.kind === 'tcp' && o.session?.closed ? POLLHUP : 0);
@@ -187,7 +187,7 @@ export function addSockets(lib, { runtime } = {}) {
     const r = waitFor(p, c, () => collect(false) > 0, 'epoll_wait()', deadline, [...e.watched.keys()].some(fd => objects.get(fd)?.kind === 'tcp'), () => timerWake(e.watched.keys())); if (r === BLOCKED) return BLOCKED; return collect(true);
   };
   // ---- timerfd: a descriptor that becomes readable when its (monotonic or realtime) timer expires; read gives the expirations since the last read
-  lib.timerfd_create = (p, c) => { const fd = nextFd++; objects.set(fd, { kind: 'timerfd', clock: s32(c, 0), next: Infinity, interval: 0, nonblocking: !!(n(c, 1) & O_NONBLOCK) }); return fd; };
+  lib.timerfd_create = (p, c) => { const fd = nextFd++; objects.set(fd, { kind: 'timerfd', clock: s32(c, 0), now: () => T(p).now(), next: Infinity, interval: 0, nonblocking: !!(n(c, 1) & O_NONBLOCK) }); return fd; };
   const spec = (p, at) => Number(p.memory.read64(at)) * 1000 + Number(p.memory.read64(at + 8)) / 1e6;
   const writeSpec = (p, at, ms) => { p.memory.write64(at, BigInt(Math.floor(ms / 1000))); p.memory.write64(at + 8, BigInt(Math.floor((ms % 1000) * 1e6))); };
   const timerOf = (p, c) => { const o = objects.get(s32(c, 0)); return o?.kind === 'timerfd' ? o : null; };
@@ -197,7 +197,7 @@ export function addSockets(lib, { runtime } = {}) {
     const flags = n(c, 1), value = n(c, 2), old = n(c, 3);
     if (old) { writeSpec(p, old, o.interval); writeSpec(p, old + 16, o.next === Infinity ? 0 : Math.max(0, o.next - T(p).now())); }
     const interval = spec(p, value), first = spec(p, value + 16), now = T(p).now();
-    const absoluteBase = o.clock === 0 ? Date.now() : now;   // TFD_TIMER_ABSTIME: the value is a time on the timer's clock (CLOCK_REALTIME or CLOCK_MONOTONIC / BOOTTIME)
+    const absoluteBase = o.clock === 0 ? (runtime?.platform?.clock?.wall?.() ?? Date.now()) : now;   // TFD_TIMER_ABSTIME: the value is a time on the timer's clock (CLOCK_REALTIME or CLOCK_MONOTONIC / BOOTTIME)
     o.interval = interval; o.next = first === 0 ? Infinity : flags & 1 ? now + (first - absoluteBase) : now + first;
     T(p).schedulePump(); pumpMain(p); return 0;
   };

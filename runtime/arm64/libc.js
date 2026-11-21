@@ -3,11 +3,12 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { BLOCKED } from './cpu.js?v=6954cacca256';
-import { extendLibc } from './libc-extra.js?v=6954cacca256';
-import { addGles } from './gles.js?v=6954cacca256';
-import { utf8 } from './text.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { BLOCKED } from './cpu.js?v=7233e918dcc9';
+import { extendLibc } from './libc-extra.js?v=7233e918dcc9';
+import { addGles } from './gles.js?v=7233e918dcc9';
+import { utf8 } from './text.js?v=7233e918dcc9';
+import { release } from '../libcore-io-native.js?v=7233e918dcc9';
 
 const EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -189,7 +190,9 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   // ---- time
   lib.time = (p, c) => { const t = Math.floor(clock() / 1000); if (n(c, 0)) p.memory.write64(n(c, 0), BigInt(t)); return t; };
   lib.gettimeofday = (p, c) => { const ms = clock(); if (n(c, 0)) { p.memory.write64(n(c, 0), BigInt(Math.floor(ms / 1000))); p.memory.write64(n(c, 0) + 8, BigInt(Math.floor((ms % 1000) * 1000))); } return 0; };
-  lib.clock_gettime = (p, c) => { const id = n(c, 0), ms = id === 0 ? clock() : performance.now(), ptr = n(c, 1); p.memory.write64(ptr, BigInt(Math.floor(ms / 1000))); p.memory.write64(ptr + 8, BigInt(Math.floor((ms % 1000) * 1e6))); return 0; };
+  // CLOCK_REALTIME(_COARSE) is the wall clock; CLOCK_MONOTONIC, _RAW, _COARSE and BOOTTIME the native threads' clock (the VM clock, whose deadlines every native wait uses);
+  // the CPU-time clocks (PROCESS/THREAD_CPUTIME_ID) the host's time
+  lib.clock_gettime = (p, c) => { const id = n(c, 0), ms = id === 0 || id === 5 ? clock() : id === 2 || id === 3 ? performance.now() : (p.threads?.now() ?? performance.now()), ptr = n(c, 1); p.memory.write64(ptr, BigInt(Math.floor(ms / 1000))); p.memory.write64(ptr + 8, BigInt(Math.floor((ms % 1000) * 1e6))); return 0; };
   lib.clock = () => BigInt(Math.floor(performance.now() * 1000));
   // ---- threads (src/arm64/threads.js): pthread_create runs the start routine as a native thread; locks, conditions, joins and futexes wait for real
   const T = p => p.threads, BLOCK = r => r; let nextKey = 1;
@@ -217,7 +220,9 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.pthread_cond_wait = (p, c) => BLOCK(T(p).condWait(c, n(c, 0), n(c, 1)));
   const absDeadline = (p, ptr) => T(p).now() + (Number(p.memory.read64(ptr)) * 1000 + Number(p.memory.read64(ptr + 8)) / 1e6 - clock());
   lib.pthread_cond_timedwait = (p, c) => BLOCK(T(p).condWait(c, n(c, 0), n(c, 1), absDeadline(p, n(c, 2))));
-  lib.pthread_cond_timedwait_monotonic_np = lib.pthread_cond_timedwait_relative_np = (p, c) => BLOCK(T(p).condWait(c, n(c, 0), n(c, 1), T(p).now() + Number(p.memory.read64(n(c, 2))) * 1000 + Number(p.memory.read64(n(c, 2) + 8)) / 1e6));
+  const spanMs = (p, ptr) => Number(p.memory.read64(ptr)) * 1000 + Number(p.memory.read64(ptr + 8)) / 1e6;
+  lib.pthread_cond_timedwait_monotonic_np = (p, c) => BLOCK(T(p).condWait(c, n(c, 0), n(c, 1), spanMs(p, n(c, 2))));   // an absolute CLOCK_MONOTONIC time: the native threads' clock
+  lib.pthread_cond_timedwait_relative_np = (p, c) => BLOCK(T(p).condWait(c, n(c, 0), n(c, 1), T(p).now() + spanMs(p, n(c, 2))));   // relative: from the first call (condWait keeps the deadline while the call is retried)
   lib.pthread_cond_signal = lib.pthread_cond_broadcast = (p, c) => T(p).condSignal(n(c, 0));
   lib.pthread_rwlock_rdlock = lib.pthread_rwlock_wrlock = (p, c) => BLOCK(T(p).mutexLock(c, n(c, 0)));
   lib.pthread_rwlock_tryrdlock = lib.pthread_rwlock_trywrlock = (p, c) => T(p).mutexTrylock(n(c, 0));
@@ -238,11 +243,36 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.pthread_getattr_np = (p, c) => { const t = T(p).byPthread(n(c, 0)); if (!t) return 3; const self = T(p).selfOf(t); p.memory.copyIn(n(c, 1), p.memory.bytes(self + 0x18, 56).slice()); return 0; };   // ESRCH
   lib.pthread_attr_getstack = (p, c) => { const attr = n(c, 0), size = p.memory.read64(attr + 16); if (size === 0n) { p.memory.writePtr(n(c, 1), Number(c.sp) - 0x70000); p.memory.write64(n(c, 2), 0x80000n); return 0; } p.memory.writePtr(n(c, 1), p.memory.readPtr(attr + 8)); p.memory.write64(n(c, 2), size); return 0; };
   // ---- dlfcn
-  lib.dlopen = (p, c) => { const name = n(c, 0) ? str(p, x(c, 0)) : null; if (!name) return 0x7e0000000001; try { const soname = name.slice(name.lastIndexOf('/') + 1); const handle = p.load(soname); return p.order.indexOf(handle) + 0x7e0000000100; } catch (error) { p.dlerror = error.message; return 0; } };
+  // dlopen of a path loads that file (a library the app unpacked or downloaded into its own directories), of a bare name the library of that soname; a library already
+  // loaded under the same soname is that one, as the linker's soname match does
+  const isElf = b => b && b.length > 64 && b[0] === 0x7f && b[1] === 0x45 && b[2] === 0x4c && b[3] === 0x46;
+  const fileImage = path => { if (!path.includes('/')) return null; try { const b = fs()?.bytes?.(path); return isElf(b) ? b : null; } catch { return null; } };
+  const openLibrary = (p, name, bytes = null) => { try { const soname = name.slice(name.lastIndexOf('/') + 1); const handle = p.load(soname, { bytes: bytes ?? fileImage(name) }); return p.order.indexOf(handle) + 0x7e0000000100; } catch (error) { p.dlerror = error.message; return 0; } };
+  lib.dlopen = (p, c) => { const name = n(c, 0) ? str(p, x(c, 0)) : null; if (!name) return 0x7e0000000001; return openLibrary(p, name); };
+  // android_dlopen_ext(filename, flags, const android_dlextinfo*): { u64 flags; void* reserved_addr; size_t reserved_size; int relro_fd; int library_fd; off64_t library_fd_offset;
+  // android_namespace_t* library_namespace }. Loading from a descriptor (USE_LIBRARY_FD, with USE_LIBRARY_FD_OFFSET) reads the image from that file; a reserved-address hint and
+  // a namespace (the lab has one) do not change where or how it loads; a required reserved address and RELRO sharing fail naming the flag.
+  lib.android_dlopen_ext = (p, c) => {
+    const name = n(c, 0) ? str(p, x(c, 0)) : null, info = n(c, 2), flags = info ? Number(p.memory.read64(info) & 0xffffffffn) : 0;
+    if (!info || !flags) return name ? openLibrary(p, name) : 0x7e0000000001;
+    const unsupported = [[0x1, 'ANDROID_DLEXT_RESERVED_ADDRESS'], [0x4, 'ANDROID_DLEXT_WRITE_RELRO'], [0x8, 'ANDROID_DLEXT_USE_RELRO']].find(([bit]) => flags & bit);
+    if (unsupported) { p.dlerror = `android_dlopen_ext: ${unsupported[1]} is not supported by the lab's loader`; return 0; }
+    if (flags & 0x10) {   // ANDROID_DLEXT_USE_LIBRARY_FD
+      const f = fds.get(p.memory.int32(info + 28)), offset = flags & 0x20 ? Number(p.memory.read64(info + 32)) : 0, image = f?.path ? fileBytes(f.path).subarray(offset) : null;
+      if (!isElf(image)) { p.dlerror = `android_dlopen_ext: descriptor ${p.memory.int32(info + 28)} does not hold an ELF image`; return 0; }
+      return openLibrary(p, name ?? f.path, image);
+    }
+    return name ? openLibrary(p, name) : 0x7e0000000001;
+  };
+  // the dynamic linker's own entry points (ld-android.so, reached through libdl.so's dependencies: dlsym on libdl finds them); the caller address picks a namespace, and the
+  // lab has one
+  lib.__loader_dlopen = (p, c) => lib.dlopen(p, c);
+  lib.__loader_android_dlopen_ext = (p, c) => lib.android_dlopen_ext(p, c);
   lib.dlsym = (p, c) => { const handle = n(c, 0), name = str(p, x(c, 1)), lib0 = handle >= 0x7e0000000100 ? p.order[handle - 0x7e0000000100] : null; const address = lib0 ? lib0.exports.get(name) : p.resolve(name, null); if (address === undefined || address === null) { p.dlerror = `undefined symbol: ${name}`; return 0; } return address; };
-  lib.dlclose = () => 0;
+  lib.dlclose = lib.__loader_dlclose = () => 0;
   lib.dlerror = p => { const message = p.dlerror; p.dlerror = null; return message ? p.allocString(message) : 0; };
   lib.dladdr = (p, c) => { const lib0 = p.libraryAt(n(c, 0)); if (!lib0) return 0; const info = n(c, 1); p.memory.writePtr(info, p.allocString(lib0.name)); p.memory.writePtr(info + 8, lib0.base); p.memory.writePtr(info + 16, 0); p.memory.writePtr(info + 24, 0); return 1; };
+  lib.__loader_dlsym = (p, c) => lib.dlsym(p, c); lib.__loader_dlerror = p => lib.dlerror(p); lib.__loader_dladdr = (p, c) => lib.dladdr(p, c);   // (the caller-address argument names a namespace)
   lib.dl_iterate_phdr = (p, c) => {   // dl_phdr_info: addr, name, phdr, phnum (the C++ unwinder finds .eh_frame_hdr this way)
     const callback = n(c, 0), data = n(c, 1);
     for (const lib0 of p.order) {
@@ -274,6 +304,27 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.write = (p, c) => { const fd = n(c, 0), bytes = p.memory.bytes(n(c, 1), n(c, 2)).slice(); if (fd === 1 || fd === 2) { log(fd === 1 ? 4 : 6, fd === 1 ? 'stdout' : 'stderr', text(bytes).replace(/\n$/, '')); return bytes.length; } const f = fds.get(fd); if (!f) return setErrno(p, EBADF); if (f.device) return bytes.length; const data = fileBytes(f.path), at = f.append ? data.length : f.offset, next = new Uint8Array(Math.max(data.length, at + bytes.length)); next.set(data); next.set(bytes, at); store(p, f.path, next); f.offset = at + bytes.length; return bytes.length; };
   lib.pwrite = lib.pwrite64 = (p, c) => { const f = fds.get(n(c, 0)); if (!f) return setErrno(p, EBADF); const bytes = p.memory.bytes(n(c, 1), n(c, 2)).slice(), at = n(c, 3), data = fileBytes(f.path), next = new Uint8Array(Math.max(data.length, at + bytes.length)); next.set(data); next.set(bytes, at); store(p, f.path, next); return bytes.length; };
   lib.lseek = lib.lseek64 = (p, c) => { const f = fds.get(n(c, 0)); if (!f) return setErrno(p, EBADF); const whence = n(c, 2), off = Number(BigInt.asIntN(64, x(c, 1))); f.offset = whence === 0 ? off : whence === 1 ? f.offset + off : fileBytes(f.path).length + off; return f.offset; };
+  // fallocate(fd, mode, offset, len) / posix_fallocate(fd, offset, len), as on a filesystem with the common modes (ext4, f2fs): mode 0 makes the file at least offset + len
+  // bytes long (zeros); FALLOC_FL_KEEP_SIZE (1) alone reserves space without changing the size; PUNCH_HOLE (2, with KEEP_SIZE) and ZERO_RANGE (0x10) zero the range (ZERO_RANGE
+  // without KEEP_SIZE also extends the file); collapse, insert and unshare fail with EOPNOTSUPP. A pipe or socket is ESPIPE, a device ENODEV. Returns 0 or the error number.
+  const allocate = (p, fd, mode, offset, len) => {
+    const f = fds.get(fd); if (!f) return lib.__ownsFd?.(fd) ? 29 : EBADF;
+    if (f.device) return 19;
+    if (offset < 0 || len <= 0) return EINVAL;
+    const KEEP = 1, PUNCH = 2, ZERO = 0x10;
+    if (mode & ~(KEEP | PUNCH | ZERO) || ((mode & PUNCH) && (mode & ZERO))) return 95;
+    if ((mode & PUNCH) && !(mode & KEEP)) return 95;
+    const data = fileBytes(f.path), end = offset + len, size = data.length;
+    if (mode === KEEP) return 0;
+    if (mode & (PUNCH | ZERO)) {
+      const grow = !(mode & KEEP) && end > size, next = new Uint8Array(grow ? end : size); next.set(data); next.fill(0, Math.min(offset, next.length), Math.min(end, next.length)); store(p, f.path, next); return 0;
+    }
+    if (end > size) { const next = new Uint8Array(end); next.set(data); store(p, f.path, next); }
+    return 0;
+  };
+  const off = (c, i) => Number(BigInt.asIntN(64, c.x[i]));
+  lib.fallocate = lib.fallocate64 = (p, c) => { const error = allocate(p, n(c, 0), s32(c, 1), off(c, 2), off(c, 3)); return error ? setErrno(p, error) : 0; };
+  lib.posix_fallocate = lib.posix_fallocate64 = (p, c) => allocate(p, n(c, 0), 0, off(c, 1), off(c, 2));   // POSIX: the error number is the result, errno is untouched
   lib.ftruncate = lib.ftruncate64 = (p, c) => { const f = fds.get(n(c, 0)); if (!f) return setErrno(p, EBADF); const size = n(c, 1), data = fileBytes(f.path), next = new Uint8Array(size); next.set(data.subarray(0, size)); store(p, f.path, next); return 0; };
   const statInto = (p, path, out) => { if (deviceOf(path)) { p.memory.fill(out, 0, 128); p.memory.writeU32(out + 16, 0o20666); return 0; } const st = vfs().stat(path); if (!st) return setErrno(p, ENOENT); p.memory.fill(out, 0, 128); p.memory.writeU32(out + 16, st.type === 'dir' ? 0o40755 : 0o100644); p.memory.write64(out + 48, BigInt(st.type === 'file' ? fileBytes(path).length : 4096)); return 0; };
   lib.stat = lib.stat64 = lib.lstat = (p, c) => statInto(p, str(p, x(c, 0)), n(c, 1));
@@ -321,6 +372,11 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
     const bytes = p.memory.bytes(src, length).slice(), data = fileBytes(s.path), at = s.append ? data.length : s.offset, next = new Uint8Array(Math.max(data.length, at + length)); next.set(data); next.set(bytes, at); store(p, s.path, next); s.offset = at + length; return length;
   };
   lib.fread = (p, c) => { const size = n(c, 1), count = n(c, 2); if (!size || !count) return 0; return Math.floor(streamRead(p, stream(p, x(c, 3)), n(c, 0), size * count) / size); };
+  lib.__fread_chk = (p, c) => {   // _FORTIFY_SOURCE's fread(buf, bufSize, size, count, stream): bionic aborts the process when the read could overflow the buffer
+    const bufSize = n(c, 1), size = n(c, 2), count = n(c, 3);
+    if (size * count > bufSize) throw new APKError(`FORTIFY: fread: prevented ${size * count}-byte write into ${bufSize}-byte buffer (bionic aborts the process here)`, { kind: 'arm64-abort' });
+    return lib.fread(p, { x: [c.x[0], c.x[2], c.x[3], c.x[4]] });
+  };
   lib.fwrite = (p, c) => { const size = n(c, 1), count = n(c, 2); if (!size || !count) return 0; return Math.floor(streamWrite(p, stream(p, x(c, 3)), n(c, 0), size * count) / size); };
   lib.fgets = (p, c) => { const dst = n(c, 0), max = s32(c, 1), s = stream(p, x(c, 2)); let i = 0; while (i < max - 1) { const tmp = p.malloc(1), got = streamRead(p, s, tmp, 1), ch = p.memory.byte(tmp); p.free(tmp); if (!got) break; p.memory.setByte(dst + i++, ch); if (ch === 10) break; } if (!i) return 0; p.memory.setByte(dst + i, 0); return dst; };
   lib.fgetc = lib.getc = (p, c) => { const tmp = p.malloc(1), got = streamRead(p, stream(p, x(c, 0)), tmp, 1), ch = p.memory.byte(tmp); p.free(tmp); return got ? ch : 0xffffffffffffffffn; };
@@ -349,7 +405,83 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
     environ: p => { const ptr = p.malloc(16); p.memory.write64(ptr, 0n); const holder = p.malloc(8); p.memory.writePtr(holder, ptr); return holder; },
     __progname: p => { const holder = p.malloc(8); p.memory.writePtr(holder, p.allocString('app_process64')); return holder; },
   };
+  addJavaDescriptors(lib, { runtime, fds, setErrno, n });   // descriptors Java opened, used by native code (below)
   lib.__errno_location = lib.__errno;
   void ENOMEM; void EAGAIN; void ERANGE;
   return addGles(extendLibc(lib, { runtime, fs, clock, assets }), { runtime });   // libEGL, libGLESv2 / v3 and ANativeWindow: src/arm64/gles.js
+}
+
+/**
+ * The descriptors of the process that Java opened (libcore's table, src/libcore-io-native.js). On a device Java and native code share one kernel descriptor table, so
+ * a descriptor Java hands to native code (FileDescriptor.getInt$, ParcelFileDescriptor.getFd, a RandomAccessFile's fd) reads, writes, seeks, truncates, stats, maps and
+ * closes the very file Java opened, with the same file offset. The ARM64 process's own descriptors (`fds`: open() in native code) keep their numbers; a number in neither
+ * table is EBADF, as before; the standard streams (0 to 2) stay the process's own. Shared mappings of the file (Java's or a lab-built library's, runtime.fileMappings) reach the file before it is read and are refreshed after
+ * it changes, as the libcore natives do. A Java descriptor that is not a regular file or a directory (a pipe, a socket, a standard stream) fails by name.
+ */
+function addJavaDescriptors(lib, { runtime, fds, setErrno, n }) {
+  const EBADF = 9, EINVAL = 22, EISDIR = 21, ESPIPE = 29, ENODEV = 19, ACC = 3, RDONLY = 0, WRONLY = 1;
+  const files = () => runtime.platform.javaIo.fs();
+  const entryOf = fd => fd <= 2 || fds.has(fd) ? null : runtime?.libcoreIo?.table.get(fd) ?? null;   // 0 to 2 (stdin, stdout, stderr) stay with the process's own functions (the log)
+  const flush = node => runtime.fileMappings?.flushNode(node), refresh = node => runtime.fileMappings?.refreshNode(node);
+  /** The open file behind Java descriptor `fd` for `op`: { desc } or { errno } (`need`: 'read' or 'write' access, or null). */
+  const usable = (fd, entry, op, need) => {
+    const desc = entry.desc;
+    if (desc.kind === 'closed') return { errno: EBADF };
+    if (desc.kind !== 'file' && desc.kind !== 'dir') throw new APKError(`ARM64 native code called ${op} on descriptor ${fd}, which Java opened as a ${desc.kind === 'std' ? 'standard stream' : desc.kind}: native I/O on such a descriptor is not provided by the lab`, { kind: 'arm64-files' });
+    const acc = desc.acc & ACC;
+    if (desc.kind === 'dir' && need !== null) return { errno: need === 'read' ? EISDIR : EBADF };
+    if ((need === 'read' && acc === WRONLY) || (need === 'write' && acc === RDONLY)) return { errno: EBADF };
+    return { desc };
+  };
+  const readAt = (p, desc, target, count, at) => {
+    const node = desc.node; flush(node);
+    if (at >= node.size || count <= 0) return 0;
+    const length = Math.min(count, node.size - at), chunk = new Uint8Array(length); files().readAt(node, at, chunk, 0, length); p.memory.copyIn(target, chunk); return length;
+  };
+  const writeAt = (p, desc, source, count, at) => { const node = desc.node; flush(node); files().writeAt(node, at, p.memory.bytes(source, count).slice(), 0, count); refresh(node); return count; };
+  // each function takes the descriptor in x0; a number the ARM64 process owns, or one Java does not have, goes to the process's own function
+  const wrap = (names, op) => { const own = lib[names[0]]; const fn = (p, c) => { const fd = n(c, 0), entry = entryOf(fd); return entry ? op(p, c, fd, entry) : own(p, c); }; for (const name of names) lib[name] = fn; };
+  wrap(['read'], (p, c, fd, entry) => { const u = usable(fd, entry, 'read', 'read'); if (u.errno) return setErrno(p, u.errno); const got = readAt(p, u.desc, n(c, 1), n(c, 2), u.desc.offset); u.desc.offset += got; return got; });
+  wrap(['pread', 'pread64'], (p, c, fd, entry) => { const u = usable(fd, entry, 'pread', 'read'); if (u.errno) return setErrno(p, u.errno); return readAt(p, u.desc, n(c, 1), n(c, 2), n(c, 3)); });
+  wrap(['write'], (p, c, fd, entry) => { const u = usable(fd, entry, 'write', 'write'); if (u.errno) return setErrno(p, u.errno); const at = u.desc.append ? u.desc.node.size : u.desc.offset, wrote = writeAt(p, u.desc, n(c, 1), n(c, 2), at); u.desc.offset = at + wrote; return wrote; });
+  wrap(['pwrite', 'pwrite64'], (p, c, fd, entry) => { const u = usable(fd, entry, 'pwrite', 'write'); if (u.errno) return setErrno(p, u.errno); return writeAt(p, u.desc, n(c, 1), n(c, 2), n(c, 3)); });
+  wrap(['lseek', 'lseek64'], (p, c, fd, entry) => {
+    const u = usable(fd, entry, 'lseek', null); if (u.errno) return setErrno(p, u.errno);
+    if (u.desc.kind !== 'file') return setErrno(p, ESPIPE);
+    const whence = n(c, 2), offset = Number(BigInt.asIntN(64, c.x[1])), origin = whence === 0 ? 0 : whence === 1 ? u.desc.offset : whence === 2 ? u.desc.node.size : -1;
+    if (origin < 0 || origin + offset < 0) return setErrno(p, EINVAL);
+    u.desc.offset = origin + offset; return u.desc.offset;
+  });
+  wrap(['ftruncate', 'ftruncate64'], (p, c, fd, entry) => {   // as libcore's ftruncate of the same file: EINVAL for a descriptor not open for writing or a negative length
+    const u = usable(fd, entry, 'ftruncate', null); if (u.errno) return setErrno(p, u.errno);
+    const length = Number(BigInt.asIntN(64, c.x[1])), node = u.desc.node;
+    if (u.desc.kind !== 'file' || (u.desc.acc & ACC) === RDONLY || length < 0) return setErrno(p, EINVAL);
+    flush(node);
+    if (length < node.size) { node.size = length; node.mtime = files().now(); } else if (length > node.size) files().writeAt(node, length, new Uint8Array(0), 0, 0);
+    refresh(node); return 0;
+  });
+  wrap(['fstat', 'fstat64'], (p, c, fd, entry) => {   // bionic's arm64 struct stat: st_dev @0, st_mode @16, st_nlink @20, st_uid @24, st_gid @28, st_size @48, st_blksize @56, st_blocks @64, st_atim/st_mtim/st_ctim @72/88/104
+    const u = usable(fd, entry, 'fstat', null); if (u.errno) return setErrno(p, u.errno);
+    const node = u.desc.node, out = n(c, 1), uid = runtime.platform?.virtualProcess?.uid ?? 10000; flush(node);
+    const size = node.type === 'file' ? node.size : 4096, mtime = node.mtime ?? 0;
+    p.memory.fill(out, 0, 128); p.memory.write64(out, 0xfd00n); p.memory.writeU32(out + 16, (node.type === 'dir' ? 0o40000 : 0o100000) | ((node.mode ?? 0o600) & 0o7777)); p.memory.writeU32(out + 20, node.type === 'dir' ? 2 : 1);
+    p.memory.writeU32(out + 24, uid); p.memory.writeU32(out + 28, uid); p.memory.write64(out + 48, BigInt(size)); p.memory.writeU32(out + 56, 4096); p.memory.write64(out + 64, BigInt(Math.ceil(size / 512)));
+    for (const at of [72, 88, 104]) { p.memory.write64(out + at, BigInt(Math.floor(mtime / 1000))); p.memory.write64(out + at + 8, BigInt(Math.floor(mtime % 1000) * 1000000)); }
+    return 0;
+  });
+  wrap(['fsync', 'fdatasync'], (p, c, fd, entry) => { const u = usable(fd, entry, 'fsync', null); if (u.errno) return setErrno(p, u.errno); flush(u.desc.node); return 0; });   // the file system is memory: stable once the mappings reached it
+  wrap(['close'], (p, c, fd, entry) => { if (entry.desc.kind === 'closed') return setErrno(p, EBADF); release(runtime, fd); return 0; });   // the process's descriptor: closed for Java too, as on a device
+  { // mmap(addr, length, prot, flags, fd, offset): the descriptor is x4; a MAP_ANONYMOUS mapping ignores it
+    const own = lib.mmap;
+    lib.mmap = lib.mmap64 = (p, c) => {
+      const flags = n(c, 3), fd = Number(BigInt.asIntN(32, c.x[4])), entry = !(flags & 0x20) && fd >= 0 ? entryOf(fd) : null;
+      if (!entry) return own(p, c);
+      const u = usable(fd, entry, 'mmap', null); if (u.errno) return setErrno(p, u.errno);
+      if (u.desc.kind !== 'file') return setErrno(p, ENODEV);
+      const length = n(c, 1), offset = n(c, 5), node = u.desc.node, at = p.mapRegion(length, 0x1000); flush(node);
+      const chunk = new Uint8Array(Math.max(0, Math.min(length, node.size - offset))); if (chunk.length) files().readAt(node, offset, chunk, 0, chunk.length); p.memory.copyIn(at, chunk);
+      if (flags & 1) p.sharedMappings = [...(p.sharedMappings ?? []), { at, length, path: u.desc.path, offset, writable: !!(n(c, 2) & 2) && (u.desc.acc & ACC) !== RDONLY }];   // MAP_SHARED: msync / munmap write it back
+      return at;
+    };
+  }
 }

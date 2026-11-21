@@ -4,11 +4,12 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=6954cacca256';
-import { ART_BLOCKED } from './signals.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=7233e918dcc9';
+import { ART_BLOCKED } from './signals.js?v=7233e918dcc9';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
+const PUMP_MS = 4;   // the delay of the next background pump while native threads can run
 // bionic's pthread_internal_t (android-13.0.0_r1 bionic/libc/bionic/pthread_internal.h, arm64): pthread_t is the address of this record, and TLS_SLOT_THREAD_ID (tp + 8) holds it.
 // The fields the lab fills: tid, the cached pid, pthread_attr_t (flags, stack_base, stack_size, guard_size, sched_policy, sched_priority), start_routine and its argument, and
 // alternate_signal_stack (the mapping bionic gives every thread for its signal handlers: SIGNAL_STACK_SIZE with a guard page at its bottom, installed with sigaltstack).
@@ -98,7 +99,7 @@ export class NativeThreads {
     this.schedulePump();
     return self;
   }
-  finish(thread, value) { thread.state = 'done'; thread.result = value; this.log(`ARM64 native thread ${thread.tid} ended`); }
+  finish(thread, value) { thread.state = 'done'; thread.result = value; this.log(`ARM64 native thread ${thread.tid} ended`); this.wake(); }
   /** Can the thread that is running now be suspended at this call (true), or must its wait be driven synchronously (false)? */
   canSuspend(cpu) { const t = this.current; return !t.main && (!t.java || t.parkable === true) && t.cpu === cpu && (cpu.nested ?? 0) === 0; }
   /** The waiting primitive for host functions: returns BLOCKED (the call is retried when the thread runs again) or, for a synchronous caller, runs the other threads until `ready()`. */
@@ -145,17 +146,40 @@ export class NativeThreads {
       throw error;   // a fault in any thread ends the process, as SIGSEGV / abort do on a device
     } finally { this.current = previous; p.activeCpu = previous.cpu; }
   }
-  /** Background progress: while native threads can run, the VM's event loop gives them slices between its own events. */
-  schedulePump() {
-    if (this.pumpQueued || !this.queueTask) return;
-    this.pumpQueued = true;
+  /**
+   * Background progress: while native threads can run, the VM's event loop gives them slices between its own events (a host task every PUMP_MS). While every thread waits,
+   * the next pump is due when the earliest of their deadlines and timers is (a thread waiting with neither runs again when a waker asks: wake()), so a native thread that
+   * sleeps or waits with a timeout is not polled every PUMP_MS until then. Polling while the main thread was parked made the Java scheduler skip the VM clock PUMP_MS at a
+   * time and run the poll again, millions of times in one wait.
+   * `delay` is the delay of the pump asked for: a sooner request replaces a later queued one.
+   */
+  schedulePump(delay = PUMP_MS) {
+    if (!this.queueTask) return;
+    if (this.pumpQueued && (this.pumpShort || (delay > PUMP_MS && this.now() + delay >= this.pumpAt))) return;
+    this.pumpQueued = true; this.pumpShort = delay <= PUMP_MS; this.pumpAt = this.now() + delay;
+    const token = this.pumpToken = (this.pumpToken ?? 0) + 1;
     this.queueTask(() => {
+      if (token !== this.pumpToken) return;   // replaced by a sooner pump
       this.pumpQueued = false;
       const caller = this.current; let active = false;
       for (let round = 0; round < 8; round++) { if (!this.runOthers(caller)) break; active = true; }
-      if ([...this.threads.values()].some(t => !t.main && t.state !== 'done' && (t.state === 'runnable' || t.deadline !== Infinity || (t.wakeAt?.() ?? Infinity) !== Infinity || active))) this.schedulePump();
-    }, 4);
+      const next = this.pumpDelay(active);
+      if (next !== null) this.schedulePump(next);
+    }, delay);
   }
+  /** The delay of the next pump: PUMP_MS while a thread can run (or ran in this pump), the time to the earliest deadline or timer while all wait, null when none of them has one. */
+  pumpDelay(active) {
+    let earliest = Infinity, waiting = false;
+    for (const t of this.threads.values()) {
+      if (t.main || t.state === 'done') continue;
+      if (active || t.state !== 'waiting') return PUMP_MS;
+      waiting = true; earliest = Math.min(earliest, t.deadline ?? Infinity, t.wakeAt?.() ?? Infinity);
+    }
+    if (!waiting || earliest === Infinity) return null;
+    return Math.max(PUMP_MS, Math.ceil(earliest - this.now()));
+  }
+  /** A thread may have been made ready by what the running code did (a signal, an unlock, a futex wake, a thread that ended): its next turn comes within PUMP_MS. */
+  wake() { if (this.threads.size > 1) this.schedulePump(); }
   // ---- primitives used by libc
   mutexLock(cpu, m) {
     const mem = this.process.memory, type = (mem.readU32(m) >> 14) & 3, me = this.current.tid, owner = () => mem.readU32(m + 4);
@@ -166,10 +190,11 @@ export class NativeThreads {
     mem.writeU32(m + 4, me); mem.writeU32(m + 8, 1); (this.lockSites ??= new Map()).set(m, { where: cpu.where(Number(cpu.x[30])), java: javaThread }); return 0;
   }
   mutexTrylock(m) { const mem = this.process.memory, me = this.current.tid, owner = mem.readU32(m + 4); if (owner === 0) { mem.writeU32(m + 4, me); mem.writeU32(m + 8, 1); return 0; } if (owner === me && ((mem.readU32(m) >> 14) & 3) === 1) { mem.writeU32(m + 8, mem.readU32(m + 8) + 1); return 0; } return 16; }   // EBUSY
-  mutexUnlock(m) { const mem = this.process.memory; if (mem.readU32(m + 4) !== this.current.tid) return 1; const count = mem.readU32(m + 8) - 1; if (count > 0) { mem.writeU32(m + 8, count); return 0; } mem.writeU32(m + 4, 0); mem.writeU32(m + 8, 0); return 0; }   // EPERM when not the owner
+  mutexUnlock(m) { const mem = this.process.memory; if (mem.readU32(m + 4) !== this.current.tid) return 1; const count = mem.readU32(m + 8) - 1; if (count > 0) { mem.writeU32(m + 8, count); return 0; } mem.writeU32(m + 4, 0); mem.writeU32(m + 8, 0); this.wake(); return 0; }   // EPERM when not the owner
   condWait(cpu, cond, m, deadline = Infinity) {
     const mem = this.process.memory, t = this.current;
-    if (t.condWait?.cond !== cond) { t.condWait = { cond, seq: mem.readU32(cond), mutex: m }; this.mutexUnlock(m); }   // first entry: remember the sequence and release the mutex
+    if (t.condWait?.cond !== cond) { t.condWait = { cond, seq: mem.readU32(cond), mutex: m, deadline }; this.mutexUnlock(m); }   // first entry: remember the sequence and the deadline, release the mutex
+    deadline = t.condWait.deadline ?? Infinity;   // a retried call (the thread was suspended in it) keeps the deadline of its first entry: a relative timeout does not start again
     const signalled = () => mem.readU32(cond) !== t.condWait.seq;
     const got = this.wait(cpu, () => signalled() || this.now() >= deadline, { what: `a condition variable at 0x${cond.toString(16)}`, deadline });
     if (got === BLOCKED) return BLOCKED;
@@ -177,7 +202,7 @@ export class NativeThreads {
     const relock = this.mutexLock(cpu, m); if (relock === BLOCKED) { t.condWait = { cond, seq: -1, mutex: m, relocking: true }; return BLOCKED; }
     return timedOut ? 110 : 0;   // ETIMEDOUT
   }
-  condSignal(cond) { const mem = this.process.memory; mem.writeU32(cond, (mem.readU32(cond) + 1) >>> 0); return 0; }
+  condSignal(cond) { const mem = this.process.memory; mem.writeU32(cond, (mem.readU32(cond) + 1) >>> 0); this.wake(); return 0; }
   join(cpu, pthread, out) {
     const thread = this.byPthread(pthread); if (!thread || thread.main) return 3;   // ESRCH
     const tid = thread.tid;
@@ -200,6 +225,7 @@ export class NativeThreads {
     }
     if (cmd === 1 || cmd === 10) {   // FUTEX_WAKE / FUTEX_WAKE_BITSET
       let woken = 0; for (const t of this.futexWaiters ?? []) if (woken < value && t.futex?.address === address && !t.futex.woken) { t.futex.woken = true; woken++; }
+      if (woken) this.wake();
       return woken;
     }
     throw new APKError(`ARM64 native code: futex operation ${cmd} is not supported`, { kind: 'arm64-syscall' });

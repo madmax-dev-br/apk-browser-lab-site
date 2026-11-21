@@ -1,8 +1,8 @@
-import { APKError } from './apk-runtime.js?v=6954cacca256';
-import { breakParagraphs } from './text-layout-native.js?v=6954cacca256';
-import { measureSkiaParagraph } from './skia-paragraph.js?v=6954cacca256';
-import { gcRoot, ephemeronMap } from './heap-gc.js?v=6954cacca256';
-import { getVectorGraphics } from './vector-native.js?v=6954cacca256';
+import { APKError } from './apk-runtime.js?v=7233e918dcc9';
+import { breakParagraphs } from './text-layout-native.js?v=7233e918dcc9';
+import { measureSkiaParagraph } from './skia-paragraph.js?v=7233e918dcc9';
+import { gcRoot, ephemeronMap } from './heap-gc.js?v=7233e918dcc9';
+import { getVectorGraphics } from './vector-native.js?v=7233e918dcc9';
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', SPEC = 'Landroid/view/View$MeasureSpec;', ALGORITHMS = 'Landroid/view/ViewMeasureAlgorithms;', CHILD = 'Landroid/view/ViewGroupMeasureAlgorithms;';
 const SIZE = 0x00ffffff, STATE = 0xff000000;
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -41,19 +41,64 @@ export function createViewLayoutHost(platform) {
     }
     return null;
   };
+  // ViewRootImpl.performLayout state of the roots whose layout pass is running: mInLayout, mHandlingLayoutInLayoutRequest and mLayoutRequesters (views that called requestLayout
+  // while the pass ran). `requesting` is AttachInfo.mViewRequestingLayout: the view whose requestLayout started the current chain up the parents (only that one is a requester).
+  const layouts = new Map(); let requesting = null;
   const request = (runtime, receiver) => {
-    let ref = receiver; const seen = new Set();
-    while (ref) {
-      if (seen.has(ref.ref) || seen.size >= 4096) fail('Cyclic/excessive layout hierarchy'); seen.add(ref.ref); const object = runtime.object(ref);
-      // View.requestLayout (android-13.0.0_r1): "if (mParent != null && !mParent.isLayoutRequested()) mParent.requestLayout()" is a virtual call. An ancestor whose class overrides
-      // requestLayout() (TableLayout forces its rows, RelativeLayout marks its dependency graph dirty, GridLayout drops its cached axes, an app's own container) runs its override, whose
-      // super.requestLayout() continues from there.
-      if (ref !== receiver && object.layoutRequested === false && object.type && runtime.objectOverride(object.type, 'requestLayout()V')) { runtime.dispatch({ owner: object.type, name: 'requestLayout', signature: '()V', parameters: [], result: 'V' }, [ref], 'virtual'); return; }
-      object.layoutRequested = true; object.measureCache?.clear(); ref = object.parent;
+    const outer = requesting === null;
+    if (outer && layouts.size && runtime.object(receiver).attached) {
+      const root = rootFor(runtime, receiver), state = root ? layouts.get(root.ref) : null;
+      // View.requestLayout: "if (viewRoot != null && viewRoot.isInLayout()) { if (!viewRoot.requestLayoutDuringLayout(this)) return; }"; during the second pass the request only
+      // clears the view's measure cache and is answered after that pass (performLayout posts it).
+      if (state?.inLayout) { if (!state.requesters.some(view => view.ref === receiver.ref)) state.requesters.push(receiver); if (state.handling) { runtime.object(receiver).measureCache?.clear(); return; } }
     }
-    const root = rootFor(runtime, receiver); if (!root) return;
-    if (!runtime.object(root).attached) { ephemeronMap(runtime, detachedRoots); detachedRoots.set(root.ref, root); return; }
-    pendingRoots.set(root.ref,root); pending = true; schedule(runtime,root);
+    if (outer) requesting = receiver;
+    try {
+      let ref = receiver; const seen = new Set();
+      while (ref) {
+        if (seen.has(ref.ref) || seen.size >= 4096) fail('Cyclic/excessive layout hierarchy'); seen.add(ref.ref); const object = runtime.object(ref);
+        // View.requestLayout (android-13.0.0_r1): "if (mParent != null && !mParent.isLayoutRequested()) mParent.requestLayout()" is a virtual call. An ancestor whose class overrides
+        // requestLayout() (TableLayout forces its rows, RelativeLayout marks its dependency graph dirty, GridLayout drops its cached axes, an app's own container) runs its override, whose
+        // super.requestLayout() continues from there.
+        if (ref !== receiver && object.layoutRequested === false && object.type && runtime.objectOverride(object.type, 'requestLayout()V')) { runtime.dispatch({ owner: object.type, name: 'requestLayout', signature: '()V', parameters: [], result: 'V' }, [ref], 'virtual'); return; }
+        object.layoutRequested = true; object.measureCache?.clear(); ref = object.parent;
+      }
+      const root = rootFor(runtime, receiver); if (!root) return;
+      if (!runtime.object(root).attached) { ephemeronMap(runtime, detachedRoots); detachedRoots.set(root.ref, root); return; }
+      // a request while the root's layout pass runs: the pass itself answers it (its second measure and layout); ViewRootImpl.requestLayout does not schedule another traversal
+      // while it handles the requests made during layout (mHandlingLayoutInLayoutRequest)
+      const state = layouts.get(root.ref); if (state && (state.inLayout || state.handling)) return;
+      pendingRoots.set(root.ref,root); pending = true; schedule(runtime,root);
+    } finally { if (outer) requesting = null; }
+  };
+  /** ViewRootImpl.getValidLayoutRequesters: the requesters still attached, in a hierarchy with no GONE view, and (first pass) still asking for a layout; on the first pass the
+   * layout flags of every requester and its flagged parents are cleared. The list is emptied. */
+  const validRequesters = (runtime, state, secondPass) => {
+    const valid = [];
+    for (const ref of state.requesters) {
+      const view = runtime.object(ref); if (!view.attached || !view.parent || !(secondPass || view.layoutRequested !== false)) continue;
+      let gone = false; for (let at = ref, seen = 0; at && seen < 4096; at = runtime.object(at).parent, seen++) if ((runtime.object(at).visibility ?? 0) === 8) { gone = true; break; }
+      if (!gone) valid.push(ref);
+    }
+    if (!secondPass) for (const ref of state.requesters) for (let at = ref, seen = 0; at && seen < 4096 && runtime.object(at).layoutRequested !== false; at = runtime.object(at).parent, seen++) runtime.object(at).layoutRequested = false;
+    state.requesters = []; return valid;
+  };
+  const describe = (runtime, ref) => { const view = runtime.object(ref); return `${String(view.type).slice(1, -1).replaceAll('/', '.')}{${(view.id >>> 0).toString(16)}${view.androidId ? ` #${(view.androidId >>> 0).toString(16)}` : ''}}`; };
+  /** ViewRootImpl.performLayout: the root's layout, then, for the views that asked for a layout during it, a second measure and layout in the same traversal; what they ask
+   * for during that second pass is asked again after it (posted), as on Android. */
+  const performLayout = (runtime, root, measureHierarchy) => {
+    const state = { inLayout: true, handling: false, requesters: [] }; layouts.set(root.ref, state);
+    try {
+      let view = runtime.object(root); call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); state.inLayout = false;
+      if (!state.requesters.length) return;
+      const valid = validRequesters(runtime, state, false); if (!valid.length) return;
+      state.handling = true;
+      for (const ref of valid) { runtime.record(`LOG W View: requestLayout() improperly called by ${describe(runtime, ref)} during layout: running second layout pass`); call(runtime, ref, VIEW, 'requestLayout', '()V'); }
+      view = measureHierarchy(); state.inLayout = true;
+      call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); state.handling = false; state.inLayout = false;
+      const again = validRequesters(runtime, state, true);
+      if (again.length) platform.queueTask(() => { for (const ref of again) { runtime.record(`LOG W View: requestLayout() improperly called by ${describe(runtime, ref)} during second layout pass: posting in next frame`); if (runtime.object(ref).attached) call(runtime, ref, VIEW, 'requestLayout', '()V'); } }, 1000 / 60, again, { ui: true });
+    } finally { layouts.delete(root.ref); }
   };
   const schedule = (runtime, root) => {
     if (queuedRoots.has(root.ref)) return; queuedRoots.add(root.ref); queued = true;
@@ -62,13 +107,28 @@ export function createViewLayoutHost(platform) {
       if (pendingRoots.has(root.ref) && !runtime.object(root).attached) { pendingRoots.delete(root.ref); pending = pendingRoots.size > 0; ephemeronMap(runtime, detachedRoots); detachedRoots.set(root.ref, root); return; }   // detached since the request (a layout asked for while the window was being removed): it waits for an attach without being held
       if (!pendingRoots.has(root.ref) || platform.taskClosed) return;
       pendingRoots.delete(root.ref); pending = pendingRoots.size > 0;
-      const rootView = runtime.object(root), frameRect = platform.systemBarsHost?.contentFrame(runtime, root), geometry = platform.dialogWindowHost?.geometry(runtime,root) ?? (frameRect ? { width: frameRect.right - frameRect.left, height: frameRect.bottom - frameRect.top } : null), device = platform.device ?? { widthDp: 411, heightDp: 840 }, parentW = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.width??device.widthDp, 0x40000000]), parentH = algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [geometry?.height??device.heightDp, 0x40000000]);
-      const width = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentW, 0, geometry?.layoutWidth??rootView.layoutWidth??-1]), height = algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [parentH, 0, geometry?.layoutHeight??rootView.layoutHeight??-1]);
-      call(runtime,root,VIEW,'measure','(II)V',[width,height]); const view=runtime.object(root);
-      // DecorView.onMeasure: a floating window under its theme's windowMinWidth is measured again at exactly that width
-      const minWidth = platform.dialogWindowHost?.minWidth(runtime, root) ?? 0;
-      if (minWidth > 0 && algorithm(runtime, SPEC, 'getMode', '(I)I', [width]) === (0x80000000 | 0) && (view.measuredWidth & SIZE) < minWidth) call(runtime,root,VIEW,'measure','(II)V',[algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [minWidth, 0x40000000]), height]);
-      call(runtime,root,VIEW,'layout','(IIII)V',[0,0,view.measuredWidth&SIZE,view.measuredHeight&SIZE]); platform.requestDraw(runtime,root);
+      const rootView = runtime.object(root), frameRect = platform.systemBarsHost?.contentFrame(runtime, root), geometry = platform.dialogWindowHost?.geometry(runtime,root) ?? (frameRect ? { width: frameRect.right - frameRect.left, height: frameRect.bottom - frameRect.top } : null), device = platform.device ?? { widthDp: 411, heightDp: 840 };
+      const desiredWidth = geometry?.width ?? device.widthDp, desiredHeight = geometry?.height ?? device.heightDp, layoutWidth = geometry?.layoutWidth ?? rootView.layoutWidth ?? -1, layoutHeight = geometry?.layoutHeight ?? rootView.layoutHeight ?? -1;
+      // ViewRootImpl.getRootMeasureSpec: MATCH_PARENT is EXACTLY the window size, WRAP_CONTENT AT_MOST it, a fixed size EXACTLY that size
+      const rootSpec = (size, dimension) => algorithm(runtime, CHILD, 'getChildMeasureSpec', '(III)I', [algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [size, 0x40000000]), 0, dimension]);
+      const performMeasure = (width, height) => {
+        call(runtime,root,VIEW,'measure','(II)V',[width,height]); const view=runtime.object(root);
+        // DecorView.onMeasure: a floating window under its theme's windowMinWidth is measured again at exactly that width
+        const minWidth = platform.dialogWindowHost?.minWidth(runtime, root) ?? 0;
+        if (minWidth > 0 && algorithm(runtime, SPEC, 'getMode', '(I)I', [width]) === (0x80000000 | 0) && (view.measuredWidth & SIZE) < minWidth) call(runtime,root,VIEW,'measure','(II)V',[algorithm(runtime, SPEC, 'makeMeasureSpec', '(II)I', [minWidth, 0x40000000]), height]);
+        return view;
+      };
+      // ViewRootImpl.measureHierarchy: a WRAP_CONTENT-wide window (a Dialog) is first measured at most config_prefDialogWidth wide, then halfway to the window width if the content
+      // said MEASURED_STATE_TOO_SMALL, and only then against the whole width; every other window is measured once against its size.
+      const measureHierarchy = () => {
+        let goodMeasure = false, baseSize = geometry?.prefDialogWidth ?? 0; const heightSpec = rootSpec(desiredHeight, layoutHeight);
+        if (layoutWidth === -2 && baseSize > 0 && desiredWidth > baseSize) {
+          if (!(performMeasure(rootSpec(baseSize, layoutWidth), heightSpec).measuredWidth & 0x01000000)) goodMeasure = true;
+          else { baseSize = ((baseSize + desiredWidth) / 2) | 0; if (!(performMeasure(rootSpec(baseSize, layoutWidth), heightSpec).measuredWidth & 0x01000000)) goodMeasure = true; }
+        }
+        return goodMeasure ? runtime.object(root) : performMeasure(rootSpec(desiredWidth, layoutWidth), heightSpec);
+      };
+      measureHierarchy(); performLayout(runtime, root, measureHierarchy); platform.requestDraw(runtime,root);
     }, 0, [root], { ui: true });
   };
   /** View.resolveRtlPropertiesIfNeeded (android-13.0.0_r1), the first thing a measure pass does. */
@@ -354,6 +414,8 @@ export function createViewLayoutHost(platform) {
     /** Which roots still wait for a measure/layout pass, whether the pass is queued as a task (the performTraversals of this VM) and whether the root is attached to a window. */
     /** Whether a layout pass of this window root is queued: ViewRootImpl.performTraversals measures and lays out before it dispatches the pre-draw listeners and draws. */
     layoutQueued: root => queuedRoots.has(root.ref) && pendingRoots.has(root.ref),
+    /** View.isInLayout: whether the layout pass of the view's window root is running (ViewRootImpl.isInLayout). */
+    isInLayout(runtime, receiver) { if (!layouts.size || !runtime.object(receiver).attached) return false; const root = rootFor(runtime, receiver); return !!(root && layouts.get(root.ref)?.inLayout); },
     detail: runtime => ({ pending, queued, roots: [...pendingRoots.values(), ...detachedRoots.values()].map(root => ({ ref: root.ref, type: runtime.object(root).type, attached: !!runtime.object(root).attached, queued: queuedRoots.has(root.ref) })) }),
     relayoutRoot(runtime, root) { request(runtime, root); },
     invoke(runtime, method, args) {

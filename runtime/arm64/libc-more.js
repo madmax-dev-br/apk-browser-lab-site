@@ -1,11 +1,11 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { BLOCKED } from './cpu.js?v=6954cacca256';
-import { formatC, variadic } from './libc.js?v=6954cacca256';
-import { lookup } from '../libcore-io-native.js?v=6954cacca256';
-import { utf8 } from './text.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { BLOCKED } from './cpu.js?v=7233e918dcc9';
+import { formatC, variadic } from './libc.js?v=7233e918dcc9';
+import { lookup } from '../libcore-io-native.js?v=7233e918dcc9';
+import { utf8 } from './text.js?v=7233e918dcc9';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -15,7 +15,9 @@ export function addMoreLibc(lib, { runtime } = {}) {
   // stdin / stdout / stderr: FILE* variables bionic exports since API 23, pointing into __sF
   const sf = p => { p.hostData ??= new Map(); if (!p.hostData.has('__sF')) p.hostData.set('__sF', lib.__data.__sF(p)); return p.hostData.get('__sF'); };
   for (const [name, index] of [['stdin', 0], ['stdout', 1], ['stderr', 2]]) lib.__data[name] = p => { const holder = p.malloc(8); p.memory.writePtr(holder, sf(p) + 152 * index); return holder; };
-  lib.__data._ctype_ = p => { const table = p.malloc(257); for (let i = 0; i < 256; i++) { const ch = String.fromCharCode(i); p.memory.setByte(table + 1 + i, (/[A-Z]/.test(ch) ? 1 : 0) | (/[a-z]/.test(ch) ? 2 : 0) | (/[0-9]/.test(ch) ? 4 : 0) | (/[ \t\n\v\f\r]/.test(ch) ? 8 : 0) | (/[!-\/:-@\[-`{-~]/.test(ch) ? 16 : 0) | (i < 32 || i === 127 ? 32 : 0) | (/[0-9A-Fa-f]/.test(ch) ? 64 : 0) | (ch === ' ' ? 128 : 0)); } return table; };
+  // _ctype_: bionic's `const char* _ctype_` (OpenBSD ctype_.c: a pointer variable to _C_ctype_), so the symbol is a pointer to the 1 + 256 entry table; isalnum and friends
+  // read (_ctype_ + 1)[c] through it
+  lib.__data._ctype_ = p => { const table = p.malloc(257); for (let i = 0; i < 256; i++) { const ch = String.fromCharCode(i); p.memory.setByte(table + 1 + i, (/[A-Z]/.test(ch) ? 1 : 0) | (/[a-z]/.test(ch) ? 2 : 0) | (/[0-9]/.test(ch) ? 4 : 0) | (/[ \t\n\v\f\r]/.test(ch) ? 8 : 0) | (/[!-\/:-@\[-`{-~]/.test(ch) ? 16 : 0) | (i < 32 || i === 127 ? 32 : 0) | (/[0-9A-Fa-f]/.test(ch) ? 64 : 0) | (ch === ' ' ? 128 : 0)); } const holder = p.malloc(8); p.memory.writePtr(holder, table); return holder; };
   lib.__data.tzname = p => { const a = p.malloc(16); p.memory.writePtr(a, p.allocString('GMT')); p.memory.writePtr(a + 8, p.allocString('GMT')); return a; };
   lib.__data.timezone = p => { const a = p.malloc(8); p.memory.write64(a, 0n); return a; };
   // ---- POSIX semaphores (sem_t: the count in the first word) waiting as native threads do
@@ -68,7 +70,7 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.sched_getcpu = () => 0; lib.pthread_gettid_np = (p, c) => p.threads.byPthread(n(c, 0))?.tid ?? -1; lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
   lib.__libc_current_sigrtmin = () => 34; lib.__libc_current_sigrtmax = () => 64;
   lib.sigwait = () => 0;   // the sigset_t functions, sigaction64 and sigprocmask64: src/arm64/signals.js
-  lib.posix_fadvise = lib.posix_fallocate = lib.mlock = lib.munlock = lib.mincore = () => 0;
+  lib.posix_fadvise = lib.mlock = lib.munlock = lib.mincore = () => 0;
   lib.mremap = (p, c) => { const old = n(c, 0), oldSize = n(c, 1), size = n(c, 2), at = p.mapRegion(size, 0x1000); p.memory.copyIn(at, p.memory.bytes(old, Math.min(oldSize, size)).slice()); return at; };
   lib.memfd_create = (p, c) => { const path = `/memfd/${str(p, x(c, 0))}-${Date.now()}`; c.x[0] = BigInt(p.allocString(path)); c.x[1] = 0o102n; return lib.open(p, c); };
   lib.truncate = (p, c) => { c.x[0] = BigInt(lib.open(p, { x: [x(c, 0), 2n] })); return lib.ftruncate(p, c); };

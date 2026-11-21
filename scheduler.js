@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=6954cacca256';
+import { APKError } from './apk-error.js?v=7233e918dcc9';
 
 // Green-thread scheduler for the VM.
 //
@@ -315,7 +315,9 @@ export class Scheduler {
       let timedOut = false;
       try {
         let idleRounds = 0;
+        const pins = this.rt.wasm?.pins, mark = pins?.length ?? 0;
         for (;;) {
+          if (pins && pins.length > mark) pins.length = mark;   // a finished turn's handles (CoreThreads.waitFor: the pins of a host call that waits do not grow with every turn)
           const earliest = this.wake();
           if (thread.state === 'runnable') { timedOut = thread.timedOut; break; }
           const { thread: next } = this.pick(thread, null);

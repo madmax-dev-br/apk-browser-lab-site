@@ -1,13 +1,13 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=6954cacca256';
-import { Arm64Process } from './process.js?v=6954cacca256';
-import { tierSupported } from './translate.js?v=6954cacca256';
-import { createLibc } from './libc.js?v=6954cacca256';
-import { attachArm64Jni } from './jni.js?v=6954cacca256';
-import { BUILD_PROPS, buildProperty } from '../build-properties.js?v=6954cacca256';
-import { BUCKET, inBucket } from '../time-breakdown.js?v=6954cacca256';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=7233e918dcc9';
+import { Arm64Process } from './process.js?v=7233e918dcc9';
+import { tierSupported } from './translate.js?v=7233e918dcc9';
+import { createLibc } from './libc.js?v=7233e918dcc9';
+import { attachArm64Jni } from './jni.js?v=7233e918dcc9';
+import { deviceProperty, devicePropertyNames } from '../device-identity.js?v=7233e918dcc9';
+import { BUCKET, inBucket } from '../time-breakdown.js?v=7233e918dcc9';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';
@@ -20,20 +20,22 @@ export function createArm64Native(runtime, { translate = true } = {}) {
   const fileElf = path => { try { const fs = runtime.platform?.javaIo?.fs?.(), bytes = fs?.bytes?.(path); return bytes && bytes.length > 64 && bytes[0] === 0x7f && bytes[1] === 0x45 && bytes[2] === 0x4c && bytes[3] === 0x46 && bytes[18] === 183 ? bytes : null; } catch { return null; } };
   const ensure = () => {
     if (process) return process;
-    // the device's system properties: the table Java's SystemProperties reads (src/framework-provider.js), so native and Java code see the same device
-    const table = () => runtime.nativeBindings?.systemProperties ?? null;
+    // the device's system properties: the table Java's SystemProperties reads (src/framework-provider.js, with the device identity of src/device-identity.js), so native and
+    // Java code see the same device
     const properties = Object.assign(name => {
-      const t = table(); if (t?.has(name)) { const value = String(t.get(name)); runtime.record(`PROPERTY ${name}=${value} [native]`); return value; }
-      try { const value = buildProperty(runtime, name); if (value !== null) { runtime.record(`PROPERTY ${name}=${value} [native, from Build]`); return value; } } catch { /* Build not readable yet */ }
-      try { return runtime.platform?.systemProperty?.(name) ?? null; } catch { return null; }
-    }, { names: () => [...new Set([...(table()?.keys() ?? []), ...BUILD_PROPS.map(([name]) => name)])] });
+      const value = deviceProperty(runtime, name); if (value !== null) runtime.record(`PROPERTY ${name}=${value} [native]`); return value;
+    }, { names: () => devicePropertyNames(runtime) });
     process = new Arm64Process({
       readLibrary: soname => written.get(soname) ?? (entries.has(ARM64_LIB_DIR + soname) ? runtime.apkReader(ARM64_LIB_DIR + soname) : null),
-      host: createLibc({ runtime, properties, fs: () => runtime.platform?.javaIo?.fs?.() ?? null, clock: () => runtime.platform?.clock?.now?.() ?? Date.now(),
+      // CLOCK_REALTIME (time, gettimeofday): the VM clock's wall time (milliseconds since the epoch); CLOCK_MONOTONIC and every native wait: the VM clock (`now` below)
+      host: createLibc({ runtime, properties, fs: () => runtime.platform?.javaIo?.fs?.() ?? null, clock: () => runtime.platform?.clock?.wall?.() ?? Date.now(),
         assets: { read: name => entries.has('assets/' + name) ? runtime.apkReader('assets/' + name) : null, list: dir => [...new Set([...entries].filter(e => e.startsWith(`assets/${dir ? dir + '/' : ''}`) && !e.slice(`assets/${dir ? dir + '/' : ''}`.length).includes('/')).map(e => e.slice(e.lastIndexOf('/') + 1)))] } }),
       log: line => runtime.record(line),
       pid: runtime.platform?.virtualProcess?.pid ?? 4321, translate,
       progress: cpu => runtime.monitor?.nativeProgress?.(() => `ARM64 native code at ${cpu.where(cpu.pc)}`),   // a long native run keeps the page's heartbeat alive, naming where it is
+      // the native threads' deadlines and timers read the VM clock, as Java's waits do: when the scheduler skips the clock to the next deadline (every thread waits), native
+      // timeouts and sleeps move with it (on performance.now() they waited in real time while Java's time ran ahead, and the pump polled them all along)
+      ...(runtime.platform?.clock ? { now: () => runtime.platform.clock.now() } : {}),
       queueTask: runtime.platform?.queueTask ? (fn, delay) => runtime.platform.queueTask(() => inBucket(runtime.tb, BUCKET.NATIVE, fn), delay, []) : null,   // the native threads' slices: the breakdown's native bucket
     });
     // A fault at a value Java handed out as Executable.artMethod (src/hidden-members.js): on ART that value is the address of the method's ArtMethod, so native code may read the

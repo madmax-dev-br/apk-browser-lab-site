@@ -1,7 +1,7 @@
-import { gcRoot } from './heap-gc.js?v=6954cacca256';
-import { Invoke } from './interpreter.js?v=6954cacca256';
-import { APKError } from './apk-error.js?v=6954cacca256';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=6954cacca256';
+import { gcRoot } from './heap-gc.js?v=7233e918dcc9';
+import { Invoke } from './interpreter.js?v=7233e918dcc9';
+import { APKError } from './apk-error.js?v=7233e918dcc9';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=7233e918dcc9';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -21,18 +21,7 @@ export function createSystemServicesHost(platform) {
     return doubleBits(quartSec / (3600 * 4));
   }, { static: true });
 
-  // ---- android.os.Build (browser VM device identity; framework resources/classes are Android 13-based but SDK_INT stays the VM's declared api level (28; moving it to 33 changes AppCompat/Material code paths and breaks 20+ UI tests, see the task 21 report), whatever the app's targetSdkVersion) ----
-  const BUILD = 'Landroid/os/Build;', stringArray = values => runtime => { const array = runtime.newArray('[Ljava/lang/String;', values.length); runtime.array(array).elements = values.slice(); return array; };
-  // The ABIs whose code this device runs: wasm32 (the lab's own WebAssembly libraries) and, with the ARM64 interpreter option on (src/arm64/), arm64-v8a first, as on a 64-bit phone
-  const abis = runtime => runtime.arm64 ? ['arm64-v8a', 'wasm32'] : ['wasm32'];
-  registry.staticField(BUILD, 'SUPPORTED_ABIS', '[Ljava/lang/String;', runtime => stringArray(abis(runtime))(runtime));
-  registry.staticField(BUILD, 'SUPPORTED_32_BIT_ABIS', '[Ljava/lang/String;', stringArray(['wasm32']));
-  registry.staticField(BUILD, 'SUPPORTED_64_BIT_ABIS', '[Ljava/lang/String;', runtime => stringArray(runtime.arm64 ? ['arm64-v8a'] : [])(runtime));
-  for (const [name, value] of Object.entries({ BOARD: 'apkweb', BOOTLOADER: 'unknown', HOST: 'apkweb-host', USER: 'apkweb', RADIO: 'unknown', SERIAL: 'unknown' })) registry.staticField(BUILD, name, 'Ljava/lang/String;', () => value);
-  registry.staticField(BUILD, 'TIME', 'J', () => 0n); registry.staticField(BUILD, 'IS_DEBUGGABLE', 'Z', () => 0);
-  const BUILD_VERSION = 'Landroid/os/Build$VERSION;';
-  for (const [name, value] of Object.entries({ RELEASE: '9', INCREMENTAL: 'apkweb', CODENAME: 'REL', SECURITY_PATCH: '', BASE_OS: '', RELEASE_OR_CODENAME: '9', RELEASE_OR_PREVIEW_DISPLAY: '9' })) registry.staticField(BUILD_VERSION, name, 'Ljava/lang/String;', () => value);
-  registry.staticField(BUILD_VERSION, 'PREVIEW_SDK_INT', 'I', () => 0);
+  // android.os.Build / Build.VERSION: src/build-host.js, from the device identity's system properties (src/device-identity.js).
 
   // ---- Byte/Short/Long string parsing (java.lang.Long.parseLong semantics: optional sign, digits of the radix, range check; Integer.parseInt is a VM bridge) ----
   const parseWhole = (r, value, radix, min, max, withRadix) => {

@@ -1,45 +1,51 @@
-import { APKError, DexFile } from './apk-runtime.js?v=6954cacca256';
-import { createVectorNativeBindings } from './vector-native.js?v=6954cacca256';
-import { createMatrixNativeBindings } from './matrix-native.js?v=6954cacca256';
-import { createCharsetNativeBindings } from './charset-native.js?v=6954cacca256';
-import { createSqliteNativeBindings } from './sqlite-native.js?v=6954cacca256';
-import { createJavaTimeNativeBindings } from './java-time-native.js?v=6954cacca256';
-import { createMathNativeBindings } from './math-native.js?v=6954cacca256';
-import { createUnsafeNativeBindings } from './unsafe-native.js?v=6954cacca256';
-import { createZipNativeBindings } from './zip-native.js?v=6954cacca256';
-import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=6954cacca256';
-import { createNetworkNativeBindings } from './network-native.js?v=6954cacca256';
-import { createServicesNativeBindings } from './services-native.js?v=6954cacca256';
-import { createParcelNativeBindings } from './parcel-native.js?v=6954cacca256';
-import { createInputNativeBindings } from './input-native.js?v=6954cacca256';
-import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=6954cacca256';
-import { createAudioNativeBindings } from './audio-native.js?v=6954cacca256';
-import { createFileObserverNativeBindings } from './file-observer-native.js?v=6954cacca256';
-import { createRegionNativeBindings } from './region-native.js?v=6954cacca256';
-import { createGlesNativeBindings } from './gles-native.js?v=6954cacca256';
-import { createRenderThreadAnimators } from './rt-animators.js?v=6954cacca256';
-import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=6954cacca256';
-import { createCoreApiNativeBindings } from './core-api-natives.js?v=6954cacca256';
-import { createMessageQueueNativeBindings } from './message-queue-native.js?v=6954cacca256';
-import { createProcessNativeBindings } from './process-native.js?v=6954cacca256';
-import { createTextLayoutNativeBindings } from './text-layout-native.js?v=6954cacca256';
-import { createColorFilterNativeBindings } from './color-filter-native.js?v=6954cacca256';
-import { createRenderNodeNativeBindings } from './rendernode-native.js?v=6954cacca256';
-import { createHardwareBufferNativeBindings } from './hardware-buffer-native.js?v=6954cacca256';
-import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=6954cacca256';
-import { createRegexNativeBindings } from './regex-native.js?v=6954cacca256';
-import { createMemoryFileNativeBindings } from './memory-file-native.js?v=6954cacca256';
+import { APKError, DexFile } from './apk-runtime.js?v=7233e918dcc9';
+import { createVectorNativeBindings } from './vector-native.js?v=7233e918dcc9';
+import { createMatrixNativeBindings } from './matrix-native.js?v=7233e918dcc9';
+import { createCharsetNativeBindings } from './charset-native.js?v=7233e918dcc9';
+import { createSqliteNativeBindings } from './sqlite-native.js?v=7233e918dcc9';
+import { createJavaTimeNativeBindings } from './java-time-native.js?v=7233e918dcc9';
+import { createMathNativeBindings } from './math-native.js?v=7233e918dcc9';
+import { createUnsafeNativeBindings } from './unsafe-native.js?v=7233e918dcc9';
+import { createZipNativeBindings } from './zip-native.js?v=7233e918dcc9';
+import { createLibcoreIoNativeBindings } from './libcore-io-native.js?v=7233e918dcc9';
+import { createNetworkNativeBindings } from './network-native.js?v=7233e918dcc9';
+import { createServicesNativeBindings } from './services-native.js?v=7233e918dcc9';
+import { createParcelNativeBindings } from './parcel-native.js?v=7233e918dcc9';
+import { createInputNativeBindings } from './input-native.js?v=7233e918dcc9';
+import { createViewHiddenNativeBindings } from './view-hidden-native.js?v=7233e918dcc9';
+import { createAudioNativeBindings } from './audio-native.js?v=7233e918dcc9';
+import { createFileObserverNativeBindings } from './file-observer-native.js?v=7233e918dcc9';
+import { createRegionNativeBindings } from './region-native.js?v=7233e918dcc9';
+import { createGlesNativeBindings } from './gles-native.js?v=7233e918dcc9';
+import { createRenderThreadAnimators } from './rt-animators.js?v=7233e918dcc9';
+import { createIcuConverterNativeBindings } from './icu-converter-native.js?v=7233e918dcc9';
+import { createCoreApiNativeBindings } from './core-api-natives.js?v=7233e918dcc9';
+import { createMessageQueueNativeBindings } from './message-queue-native.js?v=7233e918dcc9';
+import { createProcessNativeBindings } from './process-native.js?v=7233e918dcc9';
+import { createTextLayoutNativeBindings } from './text-layout-native.js?v=7233e918dcc9';
+import { createColorFilterNativeBindings } from './color-filter-native.js?v=7233e918dcc9';
+import { createRenderNodeNativeBindings } from './rendernode-native.js?v=7233e918dcc9';
+import { createHardwareBufferNativeBindings } from './hardware-buffer-native.js?v=7233e918dcc9';
+import { createAnimatedVectorNativeBindings } from './animated-vector-native.js?v=7233e918dcc9';
+import { createRegexNativeBindings } from './regex-native.js?v=7233e918dcc9';
+import { createMemoryFileNativeBindings } from './memory-file-native.js?v=7233e918dcc9';
+import { IDENTITY_PROPERTIES, deviceProperty } from './device-identity.js?v=7233e918dcc9';
 
 const MAX_FRAMEWORK_BYTES = 64 * 1024 * 1024;
 const NATIVE_GET_INT = 'Landroid/os/SystemProperties;->native_get_int(Ljava/lang/String;I)I';
 
-/** Explicit VM system properties. These describe the web device model, never host telemetry. */
+/**
+ * Explicit VM system properties. These describe the web device model, never host telemetry: the device identity (src/device-identity.js, the build.prop of the lab's Android 13
+ * user image), the display density and SDK extension levels of an android-13 device, and whatever `properties` a test sets over them. The identity's ABI properties follow the
+ * runtime's ABI configuration (deviceProperty).
+ */
 export function createFrameworkNativeBindings({ properties = {}, onBoundary = null } = {}) {
-  const state = properties instanceof Map ? new Map(properties) : new Map(Object.entries({ 'ro.sf.lcd_density': '160', 'build.version.extensions.r': '3', 'build.version.extensions.s': '3', 'build.version.extensions.t': '3', ...properties }))   /* SDK extension levels of an android-13 device */;
+  const state = new Map([...IDENTITY_PROPERTIES, ...(properties instanceof Map ? properties : Object.entries({ 'ro.sf.lcd_density': '160', 'build.version.extensions.r': '3', 'build.version.extensions.s': '3', 'build.version.extensions.t': '3', ...properties }))]);
+  const lookup = (runtime, key) => deviceProperty(runtime, key, state);
   const bindings = new Map([[NATIVE_GET_INT, (runtime, args, method) => {
     const [key, fallback] = args;
     if (typeof key !== 'string' || !Number.isInteger(fallback)) throw new APKError('Invalid SystemProperties native_get_int arguments');
-    const text = state.has(key) ? String(state.get(key)).trim() : null;
+    const text = lookup(runtime, key)?.trim() ?? null;
     let value = fallback | 0;
     if (text !== null && /^[+-]?(?:0[xX][0-9a-fA-F]+|[0-9]+)$/.test(text)) {
       const negative = text.startsWith('-'), unsigned = text.replace(/^[+-]/, '');
@@ -52,7 +58,7 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
   }]]);
   bindings.set('Landroid/os/SystemProperties;->native_get_boolean(Ljava/lang/String;Z)Z',(runtime,[key,fallback],method)=>{
     if(typeof key!=='string'||![0,1].includes(fallback))throw new APKError('Invalid SystemProperties native_get_boolean arguments');
-    const value=state.has(key)?String(state.get(key)):null;
+    const value=lookup(runtime,key);
     // Android13 system/libbase/parsebool.cpp: exact, case-sensitive spellings.
     const result=['1','y','yes','on','true'].includes(value)?1:['0','n','no','off','false'].includes(value)?0:fallback;
     onBoundary?.({key:method.key,property:key,value:result,source:'explicit-web-device-properties'});
@@ -61,7 +67,7 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
   // SystemProperties.getLong -> property_get_int64 (android::base::ParseInt<int64_t>): decimal or 0x hex with an optional sign, within the int64 range, else the default.
   bindings.set('Landroid/os/SystemProperties;->native_get_long(Ljava/lang/String;J)J',(runtime,[key,fallback],method)=>{
     if(typeof key!=='string'||typeof fallback!=='bigint')throw new APKError('Invalid SystemProperties native_get_long arguments');
-    const text=state.has(key)?String(state.get(key)).trim():null;let value=fallback;
+    const text=lookup(runtime,key)?.trim()??null;let value=fallback;
     if(text!==null&&/^[+-]?(?:0[xX][0-9a-fA-F]+|[0-9]+)$/.test(text)){const negative=text.startsWith('-'),digits=text.replace(/^[+-]/,''),parsed=BigInt(digits)*(negative?-1n:1n);if(parsed>=-(2n**63n)&&parsed<2n**63n)value=parsed;}
     onBoundary?.({key:method.key,property:key,value:String(value),source:'explicit-web-device-properties'});runtime.record(`PROPERTY ${key}=${value} [web-device-model]`);return value;
   });
@@ -74,7 +80,7 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
   const handleKeys = [], SP = 'Landroid/os/SystemProperties;->';
   bindings.set(`${SP}native_find(Ljava/lang/String;)J`, (runtime, [key]) => {
     if (typeof key !== 'string') throw new APKError('Invalid SystemProperties native_find arguments');
-    if (!state.has(key)) return 0n;
+    if (lookup(runtime, key) === null) return 0n;
     let at = handleKeys.indexOf(key); if (at < 0) at = handleKeys.push(key) - 1;
     return BigInt(at + 1);
   });
@@ -84,10 +90,11 @@ export function createFrameworkNativeBindings({ properties = {}, onBoundary = nu
       return bindings.get(`${SP}${keyed}`)(runtime, [key, ...rest], { ...method, key: `${SP}${keyed}` });
     });
   }
-  // SystemProperties.get(key[, default]) -> property_get: the stored value, else the default ("" without one).
+  // SystemProperties.get(key[, default]) -> android::base::GetProperty (android_os_SystemProperties.cpp): the stored value, else the default ("" without one); an empty value
+  // reads as the default too ("the default if the property is empty or doesn't exist", libbase properties.h).
   for (const [signature, hasDefault] of [['native_get(Ljava/lang/String;)Ljava/lang/String;', false], ['native_get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;', true]]) bindings.set(`Landroid/os/SystemProperties;->${signature}`, (runtime, args, method) => {
     const key = args[0]; if (typeof key !== 'string') throw new APKError('Invalid SystemProperties native_get arguments');
-    const found = state.has(key), value = found ? String(state.get(key)) : hasDefault ? args[1] : '';
+    const stored = lookup(runtime, key), found = stored !== null && stored !== '', value = found ? stored : hasDefault ? args[1] : '';
     onBoundary?.({ key: method.key, property: key, value, source: 'explicit-web-device-properties' }); runtime.record(`PROPERTY ${key}=${found ? value : '<unset>'} [web-device-model]`); return value;
   });
   for (const name of ['newUnpaddedArray', 'newNonMovableArray']) bindings.set(

@@ -3,24 +3,28 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=6954cacca256';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=6954cacca256';
-import { Arm64Memory } from './memory.js?v=6954cacca256';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=6954cacca256';
-import { NativeThreads } from './threads.js?v=6954cacca256';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=6954cacca256';
+import { APKError } from '../apk-error.js?v=7233e918dcc9';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=7233e918dcc9';
+import { Arm64Memory } from './memory.js?v=7233e918dcc9';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=7233e918dcc9';
+import { NativeThreads } from './threads.js?v=7233e918dcc9';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=7233e918dcc9';
 
-export const ARM64_BASE = Number(ARM64_WINDOW);   // the process's lowest address (its first page stays unmapped, as NULL's)
+export const ARM64_BASE = Number(ARM64_WINDOW);
+const HOST_STUBS = 65536;   // lab functions with a code stub (1 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)
 
 const SYSTEM_LIBRARIES = new Set(['libc.so', 'libm.so', 'libdl.so', 'liblog.so', 'libandroid.so', 'libz.so', 'libjnigraphics.so', 'libEGL.so', 'libGLESv1_CM.so', 'libGLESv2.so', 'libGLESv3.so', 'libOpenSLES.so', 'libmediandk.so', 'libvulkan.so', 'libnativewindow.so', 'libstdc++.so', 'libsync.so', 'libaaudio.so', 'libcamera2ndk.so', 'libbinder_ndk.so', 'libneuralnetworks.so', 'libicu.so', 'libamidi.so']);
 
 export class Arm64Process {
   // `translate`: the translation tier (src/arm64/translate.js) for hot code; false runs every instruction in the interpreter
-  constructor({ readLibrary, host = {}, maxSteps = 4e9, log = () => {}, pid = 4321, queueTask = null, progress = undefined, translate = true } = {}) {
+  // `maxSteps`: the instructions one native call from Java (or one native thread) may run before the run ends as a runaway (the instruction budget). 5e10: libraries that
+  // unpack or decompress their own code at startup run several billion per thread (one measured startup: 22e9 over four decompression threads, 5.5e9 each);
+  // the wall-clock limits of the operation monitor still end a run that takes too long.
+  constructor({ readLibrary, host = {}, maxSteps = 5e10, log = () => {}, pid = 4321, queueTask = null, progress = undefined, translate = true, now = undefined } = {}) {
     this.memory = new Arm64Memory(64 * 1024 * 1024, { base: ARM64_BASE, translate });
     this.cpu = new Arm64Cpu(this.memory, { host: (cpu, index) => this.dispatchHost(cpu, index), maxSteps });
     this.cpu.progress = progress;   // (cpu) every 2^20 instructions of any thread (src/arm64/glue.js: the operation monitor's heartbeat)
-    this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
+    this.cpu.describe = address => { if (address >= HOST_BASE) { const name = this.hostNames[Math.floor((address - HOST_BASE) / 16)]; return name ? `the lab's ${name}` : null; } const stub = this.stubIndex(address); if (stub >= 0) return `the lab's ${this.hostNames[stub]} (its stub +0x${((address - this.stubs.base) % 16).toString(16)})`; const lib = this.libraryAt(address); return lib ? `${lib.name}+0x${(address - lib.base).toString(16)}` : null; };
     this.memory.cpu = this.cpu; this.memory.activeCpu = () => this.activeCpu; this.memory.recentCalls = () => { const out = []; for (let i = 1; i <= 8; i++) { const index = this.recentHost[(this.recentAt - i) & 7]; if (index !== null && index !== undefined) out.push(index === 'svc' ? 'svc' : this.hostNames[index]); } return out.reverse(); };   // a fault names the instruction of the thread that is running
     this.readLibrary = readLibrary;   // soname -> Uint8Array of the app's library, or null
     this.log = log;
@@ -37,7 +41,7 @@ export class Arm64Process {
     this.cpu.tpidr = BigInt(this.tp);
     this.errnoAddressMain = this.tlsBase + 0x10; this.pid = pid; this.activeCpu = this.cpu;
     this.hostLibrary = host;   // name -> (process, cpu) => result
-    this.threads = new NativeThreads(this, { queueTask, log });
+    this.threads = new NativeThreads(this, { queueTask, log, ...(now ? { now } : {}) });   // `now`: the monotonic clock of every native wait (the VM clock, src/vm-clock.js)
   }
   /** errno of the native thread that is running */
   get errnoAddress() { return this.threads?.current.errno ?? this.errnoAddressMain; }
@@ -60,11 +64,23 @@ export class Arm64Process {
   usableSize(ptr) { return this.heap.sizes.get(Number(ptr)) ?? 0; }
   allocString(text) { const bytes = new TextEncoder().encode(text), ptr = this.malloc(bytes.length + 1); this.memory.copyIn(ptr, bytes); this.memory.setByte(ptr + bytes.length, 0); return ptr; }
   // ---- host entries
+  // A lab function's address is a 16-byte stub of real code in the process memory, LDR X16, #8; BR X16; .quad HOST_BASE + 16 * index (a veneer: X16 is the intra-procedure
+  // scratch register AAPCS64 gives the linker), as a libc function is code on a device: a library that reads a function's first instructions (a hooking or unwinding
+  // library relocating them into a trampoline) reads instructions, and one that patches them redirects the calls. Branching to the stub reaches the host entry.
   hostEntry(name, fn) {
-    if (this.hostIndex.has(name)) return HOST_BASE + 16 * this.hostIndex.get(name);
+    if (this.hostIndex.has(name)) return this.hostStub(this.hostIndex.get(name));
     const index = this.hostFns.length; this.hostFns.push(fn); this.hostIndex.set(name, index); this.hostNames.push(name);
-    return HOST_BASE + 16 * index;
+    return this.hostStub(index);
   }
+  hostStub(index) {
+    if (index >= HOST_STUBS) return HOST_BASE + 16 * index;
+    this.stubs ??= { base: this.mapRegion(16 * HOST_STUBS, 0x1000), written: new Set() };
+    const at = this.stubs.base + 16 * index;
+    if (!this.stubs.written.has(index)) { this.stubs.written.add(index); this.memory.writeU32(at, 0x58000050); this.memory.writeU32(at + 4, 0xd61f0200); this.memory.write64(at + 8, BigInt(HOST_BASE + 16 * index)); }
+    return at;
+  }
+  /** The lab function whose stub holds `address`, or -1. */
+  stubIndex(address) { const s = this.stubs; if (!s || address < s.base || address >= s.base + 16 * HOST_STUBS) return -1; const index = Math.floor((address - s.base) / 16); return s.written.has(index) ? index : -1; }
   dispatchHost(cpu, index) {
     this.recentHost[this.recentAt++ & 7] = index;   // the last lab functions native code called, for fault reports
     const fn = index === 'svc' ? this.hostLibrary.__svc : this.hostFns[index]; if (!fn) throw new APKError(`ARM64 native code branched to an unknown host entry ${index}`, { kind: 'arm64-host' });
@@ -108,10 +124,11 @@ export class Arm64Process {
   }
   // ---- libraries
   /** dlopen: the library and its DT_NEEDED closure (app libraries from the APK, system ones from the host), relocated and initialized once. */
-  load(soname, { via = 'dlopen' } = {}) {
+  // `bytes`: the ELF image when the caller has it (dlopen of a path, android_dlopen_ext from a descriptor); otherwise readLibrary finds it by soname
+  load(soname, { via = 'dlopen', bytes: given = null } = {}) {
     if (this.libraries.has(soname)) return this.libraries.get(soname);
     if (SYSTEM_LIBRARIES.has(soname)) { const lib = { name: soname, soname, system: true, exports: new Map(), base: 0, end: 0 }; this.libraries.set(soname, lib); return lib; }
-    const bytes = this.readLibrary(soname);
+    const bytes = given ?? this.readLibrary(soname);
     if (!bytes) throw new APKError(`dlopen failed: library "${soname}" not found`, { kind: 'arm64-dlopen', soname });
     const lib = mapLibrary(this, parseElf(bytes), soname); lib.via = via;
     this.libraries.set(soname, lib); this.order.push(lib);

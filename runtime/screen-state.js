@@ -1,34 +1,37 @@
 // "Screen state": a plain-text picture of what the VM shows and why it may be blank, for "Copy diagnostics" and for a button that works without any error. Read-only on the VM.
 // Pure data: no app or library names are written here; class names come from the running app and only reach the user's clipboard.
-import { reportSummary, collapseThreads } from './report-summary.js?v=6954cacca256';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=6954cacca256';
+import { reportSummary, collapseThreads } from './report-summary.js?v=7233e918dcc9';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=7233e918dcc9';
+import { composeHostKind, zeroSizeLine, zeroSizeReason, viewLabel, idName } from './view-size-diagnosis.js?v=7233e918dcc9';
 const MiB = 1024 * 1024, BYTES_PER_OBJECT = 1600;
 const STAGES = { 0: 'destroyed', 1: 'created', 2: 'stopped', 3: 'started/paused', 4: 'resumed (foreground)' };
 const dotted = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '').replaceAll('/', '.');
-const isCompose = type => /(^|\.)(AndroidComposeView|ComposeView|AbstractComposeView)$/.test(dotted(type));
 const sizeOf = view => ({ width: Math.max(0, (view.bounds?.right ?? 0) - (view.bounds?.left ?? 0)), height: Math.max(0, (view.bounds?.bottom ?? 0) - (view.bounds?.top ?? 0)) });
 const colorOf = background => background === null || background === undefined ? 'none' : typeof background === 'number' ? '#' + (background >>> 0).toString(16).padStart(8, '0') : typeof background === 'object' ? (background.color !== undefined ? '#' + (background.color >>> 0).toString(16).padStart(8, '0') : background.kind ?? background.type ?? 'drawable') : String(background);
 
 /** The View tree of one root: lines (depth <= maxDepth, at most maxLines) plus aggregate facts used by the blank-screen verdict. */
 function walkTree(runtime, root, { maxDepth = 6, maxLines = 80 } = {}) {
-  const lines = [], facts = { views: 0, visibleDrawn: 0, zero: 0, invisible: 0, composeHosts: [], truncated: false };
+  const lines = [], facts = { views: 0, visibleDrawn: 0, zero: 0, invisible: 0, composeHosts: [], zeroViews: [], truncated: false };
   const seen = new Set();
-  const visit = (ref, depth, ancestorsVisible) => {
+  const visit = (ref, depth, ancestorsVisible, underZero = false) => {
     const view = runtime.object(ref); if (seen.has(view.id) || seen.size > 4096) return; seen.add(view.id); facts.views++;
-    const { width, height } = sizeOf(view), visibility = view.visibility ?? 0, alpha = view.alpha ?? 1, visible = ancestorsVisible && visibility === 0 && alpha > 0;
-    if (width === 0 || height === 0) facts.zero++;
+    const { width, height } = sizeOf(view), visibility = view.visibility ?? 0, alpha = view.alpha ?? 1, visible = ancestorsVisible && visibility === 0 && alpha > 0, zero = width === 0 || height === 0;
+    if (zero) facts.zero++;
     if (!visible) facts.invisible++;
     if (visible && width > 0 && height > 0) facts.visibleDrawn++;
-    if (isCompose(view.type)) facts.composeHosts.push({ ref, view, width, height, visible });
+    const kind = composeHostKind(runtime, view.type);
+    if (kind) facts.composeHosts.push({ ref, view, width, height, visible, kind });
+    // the topmost Views at 0x0 that are not GONE (a GONE view is 0x0 by definition): each says why, walking up its parents (src/view-size-diagnosis.js)
+    if (zero && !underZero && visibility !== 8 && facts.zeroViews.length < 8) facts.zeroViews.push(ref);
     if (depth <= maxDepth) {
       if (lines.length < maxLines) {
         const flags = [];
         if (visibility !== 0) flags.push(visibility === 4 ? 'INVISIBLE' : 'GONE'); if (alpha === 0) flags.push('alpha=0'); if (width === 0 || height === 0) flags.push('0x0');
         if (view.willNotDraw) flags.push('willNotDraw'); if (view.layoutRequested || view.layoutRequired) flags.push('layout pending'); if (view.displayListDirty) flags.push('redraw pending'); if (view.laidOut === false) flags.push('no layout'); if (view.attached === false) flags.push('detached');
-        lines.push(`${'  '.repeat(depth)}${dotted(view.type)}${view.androidId ? ` #${view.androidId}` : ''} [${view.bounds ? `${view.bounds.left},${view.bounds.top},${view.bounds.right},${view.bounds.bottom}` : 'no bounds'}] children=${(view.children ?? []).length} background=${colorOf(view.background)}${alpha !== 1 ? ` alpha=${alpha}` : ''}${flags.length ? ' ⚠ ' + flags.join(', ') : ''}`);
+        lines.push(`${'  '.repeat(depth)}${dotted(view.type)}${view.androidId ? ` #${idName(runtime, view.androidId)}` : ''} [${view.bounds ? `${view.bounds.left},${view.bounds.top},${view.bounds.right},${view.bounds.bottom}` : 'no bounds'}] children=${(view.children ?? []).length} background=${colorOf(view.background)}${alpha !== 1 ? ` alpha=${alpha}` : ''}${flags.length ? ' ⚠ ' + flags.join(', ') : ''}`);
       } else facts.truncated = true;
     }
-    for (const child of view.children ?? []) visit(child, depth + 1, visible);
+    for (const child of view.children ?? []) visit(child, depth + 1, visible, underZero || zero || visibility === 8);
   };
   visit(root, 0, true);
   if (facts.truncated) lines.push('  … (tree truncated)');
@@ -73,6 +76,7 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
     const { lines, facts } = walkTree(runtime, entry.root);
     out.push(...lines.map(line => '  ' + line));
     out.push(`  summary: ${facts.views} views, ${facts.visibleDrawn} visible with area, ${facts.zero} with 0x0, ${facts.invisible} invisible/alpha 0`);
+    if (facts.zeroViews.length) { out.push('  Views at 0x0 (topmost, not GONE) and why, walking up the parents:'); for (const ref of facts.zeroViews) { let line = null; try { line = zeroSizeLine(runtime, ref); } catch { /* a View the diagnosis cannot read */ } if (line) out.push(`    ${line}`); } }
     if (index === roots.length - 1) {
       if (width === 0 || height === 0) reasons.push(`the top window measures ${width}x${height}`);
       else if (facts.views > 0 && facts.visibleDrawn === 0) reasons.push('everything invisible/0x0: no view has visible area');
@@ -81,17 +85,29 @@ export function buildScreenState(runtime, { semantics = null, heartbeat = null }
   });
   // ---- compose
   out.push('Compose:');
-  if (!hosts.length) out.push('  no ComposeView/AndroidComposeView in the top window');
+  if (!hosts.length) out.push('  no ComposeView/AndroidComposeView in the top window (recognized by name or, in a minified app, by the framework methods they override)');
   const frameState = platform.viewWindowHost?.frameState?.() ?? null;
   for (const host of hosts) {
     const facts = composeFacts(runtime, host, semantics);
-    out.push(`  ${dotted(host.view.type)}: ${facts.size}, ${facts.attached ? 'attached' : 'DETACHED'}, ${facts.visible ? 'visible' : 'INVISIBLE'}; composition fields filled: ${facts.fieldsWithValue.join(', ') || 'none'}`);
+    const role = host.kind === 'owner' ? 'Compose owner (AndroidComposeView)' : 'Compose container (AbstractComposeView)', renamed = !/(AndroidComposeView|AbstractComposeView|ComposeView);$/.test(host.view.type ?? '');
+    out.push(`  ${dotted(host.view.type)} [${role}${renamed ? ', recognized by structure' : ''}]: ${facts.size}, ${facts.attached ? 'attached' : 'DETACHED'}, ${facts.visible ? 'visible' : 'INVISIBLE'}; composition fields filled: ${facts.fieldsWithValue.join(', ') || 'none'}`);
     if (facts.owner) out.push(`    semantics: ${facts.owner.nodes} nodes (${facts.owner.placed} placed, ${facts.owner.withText} with text, ${facts.owner.invisible} invisible, ${facts.owner.outside} outside the bounds ${facts.owner.width}x${facts.owner.height})`);
-    else out.push('    semantics: no semantics owner on this view' + (/AndroidComposeView$/.test(dotted(host.view.type)) ? ' (the composition created no nodes)' : ' (it is the container; the nodes live in the AndroidComposeView)'));
-    const wrapper = !/AndroidComposeView$/.test(dotted(host.view.type));
-    if (host.width === 0 || host.height === 0) reasons.push('the ComposeView measures 0x0 (clipped to 0)');
+    // a renamed owner (minified app): Compose's SemanticsOwner API has another name too, so the semantics cannot be read by name; what the owner drew through its RenderNode says it
+    // (and a report built without a semantics snapshot cannot tell either)
+    const unreadable = host.kind === 'owner' && !facts.owner && (renamed || !semantics);
+    if (unreadable) out.push(`    semantics: ${renamed ? 'not readable (minified app: the SemanticsOwner API is renamed)' : 'not read in this report'}; drawn through its RenderNode: ${host.view.canvasChildrenCaptured ? 'yes' : 'no'}`);
+    else if (!facts.owner) out.push('    semantics: no semantics owner on this view' + (host.kind === 'owner' ? ' (the composition created no nodes)' : ' (it is the container; the nodes live in the AndroidComposeView)'));
+    const wrapper = host.kind !== 'owner';
+    let zeroWhy = null; if (host.width === 0 || host.height === 0) { try { zeroWhy = zeroSizeReason(runtime, host.ref); } catch { zeroWhy = null; } if (zeroWhy) out.push(`    0x0 because ${zeroWhy}`); }
+    // an owner inside a container already explained at 0x0 is the same cause, said once
+    const insideZero = host.kind === 'owner' && host.view.parent && hosts.some(other => other !== host && other.ref.ref === host.view.parent.ref && (other.width === 0 || other.height === 0));
+    // a ComposeView that is GONE (or under a GONE parent) is hidden on purpose: it is described above, not a reason for a blank frame
+    let gone = false; for (let at = host.ref, depth = 0; at && depth < 4096 && !gone; at = runtime.object(at).parent, depth++) gone = (runtime.object(at).visibility ?? 0) === 8;
+    if (host.width === 0 || host.height === 0) { if (!insideZero && !gone) reasons.push(`the ComposeView ${viewLabel(runtime, host.ref)} measures ${host.width}x${host.height}${zeroWhy ? ': ' + zeroWhy : ''}`); }
     else if (host.view.attached === false) reasons.push('the ComposeView is not attached to the window');
-    else if (wrapper) { if (!facts.fieldsWithValue.includes('composition')) reasons.push('composition not created: the ComposeView has no composition'); }
+    // AbstractComposeView.createComposition adds the owner View as its only child: a container with that child has its composition (by structure; the field names are renamed in a minified app)
+    else if (wrapper) { if (!facts.fieldsWithValue.includes('composition') && !(host.view.children ?? []).some(child => composeHostKind(runtime, runtime.object(child).type) === 'owner')) reasons.push('composition not created: the ComposeView has no composition (no owner View child)'); }
+    else if (unreadable) { if (!host.view.canvasChildrenCaptured) reasons.push('the Compose owner drew nothing through its RenderNode'); }
     else if (!facts.owner || facts.owner.nodes === 0) reasons.push('composition not created: the AndroidComposeView produced no semantics node');
     else if (facts.owner.placed === 0) reasons.push('the composition exists but no node was placed (layout did not run)');
     else if (facts.owner.outside === facts.owner.placed) reasons.push('all the content is beyond the window bounds');

@@ -19,7 +19,7 @@
 // Availability: the first exchange opens the channel and waits for the hello. No hello (an older relay, a relay that is not running, a proxy that is not the relay) means the
 // per-request path, for that exchange and for the next ones until `retryMs` later; the app's request never fails because the channel is missing. Exchanges in flight when an open
 // channel drops fail as a dropped connection does (ECONNRESET: java.net.SocketException "Connection reset"); the next exchange opens a new channel.
-import { tunnelEndpoint } from './tcp-tunnel.js?v=6954cacca256';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=7233e918dcc9';
 
 export const MUX_VERSION = 1, MUX_WINDOW = 256 * 1024, MUX_FRAME = 64 * 1024;
 const KIND_REQUEST_BODY = 1, KIND_RESPONSE_BODY = 2;

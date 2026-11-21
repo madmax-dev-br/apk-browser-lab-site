@@ -1,6 +1,6 @@
-import { APKError } from './apk-runtime.js?v=6954cacca256';
-import { getVectorGraphics } from './vector-native.js?v=6954cacca256';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=6954cacca256';
+import { APKError } from './apk-runtime.js?v=7233e918dcc9';
+import { getVectorGraphics } from './vector-native.js?v=7233e918dcc9';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=7233e918dcc9';
 const VIEW='Landroid/view/View;',KEYEVENT='Landroid/view/KeyEvent;',GROUP='Landroid/view/ViewGroup;',FRAME='Landroid/widget/FrameLayout;',WINDOW='Landroid/view/Window;',PHONE='Lcom/android/internal/policy/PhoneWindow;',WM='Landroid/view/WindowManager;',WMI='Landroid/view/WindowManagerImpl;',LP='Landroid/view/WindowManager$LayoutParams;',VLP='Landroid/view/ViewGroup$LayoutParams;',CTX='Landroid/content/Context;',CTXW='Landroid/view/ContextThemeWrapper;',THEME='Landroid/content/res/Resources$Theme;',RECT='Landroid/graphics/Rect;',TOKEN='Lapkweb/bridge/WindowToken;',ACTIVITY='Landroid/app/Activity;',DIALOG='Landroid/app/Dialog;',TYPED='Landroid/util/TypedValue;';
 const floatBuffer=new DataView(new ArrayBuffer(4)),bits=value=>{floatBuffer.setFloat32(0,value,true);return floatBuffer.getInt32(0,true);},number=value=>{floatBuffer.setInt32(0,value,true);return floatBuffer.getFloat32(0,true);};
 const keys=new Set(),add=(owner,methods)=>methods.forEach(method=>keys.add(owner+'->'+method));
@@ -38,6 +38,10 @@ export function createDialogWindowHost(platform){
   if(dim?dim.data:floating?.data){set(r,w.attributes,LP,'flags','I',field(r,w.attributes,'flags')|2);set(r,w.attributes,LP,'dimAmount','F',amount?.type===4?amount.data:bits(0.5));}
   const background=w.explicitBackground?null:themeValue(r,c,0x01010054);if(background){if(background.type>=0x1c&&background.type<=0x1f)call(r,w.decor,VIEW,'setBackgroundColor','(I)V',[background.data]);else if(background.resourceId)call(r,w.decor,VIEW,'setBackgroundResource','(I)V',[background.resourceId]);}};
  const ensureDecor=(r,ref)=>{const w=windowData(r,ref);if(!w.decor){w.decor=frameView(r,w.windowContext);w.content=frameView(r,w.windowContext);r.object(w.content).androidId=0x01020002;call(r,w.decor,GROUP,'addView','(Landroid/view/View;)V',[w.content]);r.object(w.decor).surfaceWindow=ref;applyThemePolicy(r,w);}return w.decor;};
+ // ViewRootImpl.measureHierarchy: a WRAP_CONTENT-wide window is first measured at most com.android.internal.R.dimen.config_prefDialogWidth wide, read from the root View's Resources
+ // (Resources.getValue, then (int) TypedValue.getDimension(DisplayMetrics) when it is a dimension); 0 when the framework table does not have it.
+ const prefDialogWidth=(r,root)=>{const id=platform.resources?.frameworkTable?.findId('dimen/config_prefDialogWidth');if(!id)return 0;const RES='Landroid/content/res/Resources;',resources=call(r,call(r,root,VIEW,'getContext',`()${CTX}`),CTX,'getResources',`()${RES}`),value=r.allocate(TYPED);call(r,value,TYPED,'<init>','()V',[],'direct');
+  call(r,resources,RES,'getValue',`(I${TYPED}Z)V`,[id,value,1]);if((r.object(value).fields.get(`${TYPED}->type:I`)??0)!==5)return 0;const metrics=call(r,resources,RES,'getDisplayMetrics','()Landroid/util/DisplayMetrics;');return Math.trunc(number(call(r,value,TYPED,'getDimension','(Landroid/util/DisplayMetrics;)F',[metrics])));};
  const visible=(r,record)=>record.attached&&(r.object(record.root).visibility??0)===0;
  const focusedRoot=r=>[...records.values()].reverse().find(record=>visible(r,record)&&!(field(r,record.params,'flags')&8))?.root??r.root;
  const focusTree=(r,root,focused)=>call(r,root,VIEW,'dispatchWindowFocusChanged','(Z)V',[focused?1:0]);
@@ -83,7 +87,11 @@ export function createDialogWindowHost(platform){
    if(value.type===5){const metrics=call(r,call(r,w.windowContext,CTX,'getResources','()Landroid/content/res/Resources;',[]),'Landroid/content/res/Resources;','getDisplayMetrics','()Landroid/util/DisplayMetrics;',[]);return Math.trunc(number(call(r,null,TV,'complexToDimension','(ILandroid/util/DisplayMetrics;)F',[value.data,metrics],'static')));}   // TYPE_DIMENSION
    return 0;
   },
-  geometry(r,root){const record=records.get(root.ref);return record?{width:platform.device.widthDp,height:platform.device.heightDp,layoutWidth:field(r,record.params,'width',-1),layoutHeight:field(r,record.params,'height',-1)}:null;},
+  // The size the first traversal measures a WindowManager root against (ViewRootImpl.performTraversals' desiredWindowWidth / Height). A WRAP_CONTENT window (a floating Dialog's)
+  // uses getWindowBoundsInsetSystemBars: the display less the visible status and navigation bars; any other window its frame, which the lab places on the display.
+  geometry(r,root){const record=records.get(root.ref);if(!record)return null;const layoutWidth=field(r,record.params,'width',-1),layoutHeight=field(r,record.params,'height',-1);let width=platform.device.widthDp,height=platform.device.heightDp;
+   if(layoutWidth===-2||layoutHeight===-2){const frame=platform.allFrames().find(frame=>same(frame.activity,record.ownerActivity)),inset=frame?platform.systemBarsHost?.barInsets?.(r,frame):null;if(inset){width=Math.max(0,width-inset.left-inset.right);height=Math.max(0,height-inset.top-inset.bottom);}}
+   return{width,height,layoutWidth,layoutHeight,prefDialogWidth:layoutWidth===-2?prefDialogWidth(r,root):0};},
   recordFor,
   /** Screen position of an attached WindowManager root (null for the Activity window). */
   surfaceOffset(r,root){const record=records.get(root.ref);if(!record?.attached)return null;const {x,y}=dimensions(r,record);return{x,y};},

@@ -1,13 +1,14 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=6954cacca256';
-import { staticRetentionLines } from './heap-gc.js?v=6954cacca256';
-import { overrideSummaryLines } from './method-overrides.js?v=6954cacca256';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=6954cacca256';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=6954cacca256';
-import { hostMapSummaryLines } from './host-map.js?v=6954cacca256';
-import { attributeGap } from './worker-task-log.js?v=6954cacca256';
-import { loadImageText } from './load-image.js?v=6954cacca256';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=7233e918dcc9';
+import { staticRetentionLines } from './heap-gc.js?v=7233e918dcc9';
+import { overrideSummaryLines } from './method-overrides.js?v=7233e918dcc9';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=7233e918dcc9';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=7233e918dcc9';
+import { hostMapSummaryLines } from './host-map.js?v=7233e918dcc9';
+import { attributeGap } from './worker-task-log.js?v=7233e918dcc9';
+import { loadImageText } from './load-image.js?v=7233e918dcc9';
+import { identityText } from './device-identity.js?v=7233e918dcc9';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -254,7 +255,9 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     const busiest = heartbeat?.busiest?.length ? heartbeat.busiest : runtime.profile?.top?.(5);
     if (busiest?.length) out.push(`busiest methods: ${busiest.slice(0, 5).join(', ')}`);
   });
-  return out.length > 1 ? [...out, '== end of summary =='] : [];
+  if (out.length <= 1) return [];
+  part(() => out.push(`Device identity (fixed, the same for every app): ${identityText(runtime)}`));   // src/device-identity.js; last, the summary leads with what went wrong
+  return [...out, '== end of summary =='];
 }
 
 const IDLE_WAIT = /LockSupport\.park|Unsafe\.park|Object\.wait|ThreadPoolExecutor\.getTask|ConditionObject\.await|CountDownLatch\.await|Semaphore\.acquire|SynchronousQueue|LinkedBlockingQueue\.take|DelayedWorkQueue|AbstractQueuedSynchronizer|Thread\.sleep|CoroutineScheduler\$Worker\.park|parkNanos|\.awaitNanos|Looper\.loop/;

@@ -62,23 +62,23 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=6954cacca256';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=6954cacca256';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=6954cacca256';
-import { HandleTable } from './handles.js?v=6954cacca256';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=6954cacca256';
-import { coreImports } from './boundary-imports.js?v=6954cacca256';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=6954cacca256';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=6954cacca256';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=6954cacca256';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=6954cacca256';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=6954cacca256';
-import { timedExports, timedBridge } from './core-timing.js?v=6954cacca256';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=6954cacca256';
-import { Blocked } from '../../runtime/scheduler.js?v=6954cacca256';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=6954cacca256';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=6954cacca256';
-import { PaintRecords } from './paint-record.js?v=6954cacca256';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=7233e918dcc9';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=7233e918dcc9';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=7233e918dcc9';
+import { HandleTable } from './handles.js?v=7233e918dcc9';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=7233e918dcc9';
+import { coreImports } from './boundary-imports.js?v=7233e918dcc9';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=7233e918dcc9';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=7233e918dcc9';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=7233e918dcc9';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=7233e918dcc9';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=7233e918dcc9';
+import { timedExports, timedBridge } from './core-timing.js?v=7233e918dcc9';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=7233e918dcc9';
+import { Blocked } from '../../runtime/scheduler.js?v=7233e918dcc9';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=7233e918dcc9';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=7233e918dcc9';
+import { PaintRecords } from './paint-record.js?v=7233e918dcc9';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -656,11 +656,15 @@ export class WasmEngine {
     return run !== null && run.owner === owner && owner === sched.main && this.suspended === null && rt.nestedRuns === 1 && owner.nestedDepth === 1 && sched.waitingNested.size === 0 && owner.core.steps[run.base] === OWN_STEP;
   }
   /** CoreThreads.waitFor suspends the run (it throws MAIN_SUSPEND next): recorded in the trace, never silent. */
-  noteSuspend(owner, error) {
+  // `waitedMs`: the wait is suspended because it lasted that long nested in the pump (CoreThreads.waitFor LONG_WAIT_MS), not because only the event loop can end it
+  noteSuspend(owner, error, waitedMs = null) {
     const run = this.suspendableRun, rt = this.runtime, sched = rt.scheduler, blocked = owner.blocked;
     this.suspended = run; sched.suspendedMain = run; run.since = performance.now(); run.suspensions++; this.stats.suspensions = (this.stats.suspensions ?? 0) + 1;
+    if (waitedMs !== null) this.stats.longWaitSuspensions = (this.stats.longWaitSuspensions ?? 0) + 1;
     const what = blocked?.blocker ? `, ${String(rt.typeOf(blocked.blocker)).replace(/^L|;$/g, '').replaceAll('/', '.')}` : '';
-    rt.record(`SCHEDULER main thread suspended in its event: it waits (${blocked?.reason ?? 'unknown'}${what}) and only the browser's event loop can end that wait (${rt.network?.pending ?? 0} network exchange(s) or host job(s) in flight); its frames stay parked, the event pump returns and resumes the event when the wait ends, as a blocked main thread on a device`);
+    const why = waitedMs !== null ? `it has waited ${waitedMs} ms of host time (${blocked?.reason ?? 'unknown'}${what}) while the lab ran other threads and host tasks on top of it`
+      : `it waits (${blocked?.reason ?? 'unknown'}${what}) and only the browser's event loop can end that wait (${rt.network?.pending ?? 0} network exchange(s) or host job(s) in flight)`;
+    rt.record(`SCHEDULER main thread suspended in its event: ${why}; its frames stay parked, the event pump returns and resumes the event when the wait ends, as a blocked main thread on a device`);
   }
   /** The main thread's event is suspended (its record parked in its wait). */
   get mainSuspended() { return this.suspended !== null; }

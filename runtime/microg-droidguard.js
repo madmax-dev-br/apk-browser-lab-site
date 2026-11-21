@@ -1,4 +1,4 @@
-import { setMethodInterceptor } from './method-overrides.js?v=6954cacca256';
+import { setMethodInterceptor } from './method-overrides.js?v=7233e918dcc9';
 
 // DroidGuard, SafetyNet and Play Integrity on the "com microG" device (CLAUDE.md, docs/MICROG.md section 6).
 //
@@ -14,7 +14,7 @@ import { setMethodInterceptor } from './method-overrides.js?v=6954cacca256';
 // so a token from it would attest another device than this one. microG's RemoteHandleImpl is refused explicitly whatever the settings say.
 
 const GMS = 'com.google.android.gms';
-/** The device's ABI (Build.SUPPORTED_ABIS, src/system-services-host.js): the only machine code the lab runs is wasm32 libraries rebuilt from source. */
+/** The device's ABI (Build.SUPPORTED_ABIS = ro.product.cpu.abilist, src/device-identity.js): the only machine code the lab runs is wasm32 libraries rebuilt from source. */
 const DEVICE_ABI = 'wasm32';
 /** Where microG keeps the VM it downloads (HandleProxyFactory: Context.getDir("cache_dg") = <dataDir>/app_cache_dg) and loads it with a DexClassLoader. */
 const VM_CACHE = /\/app_cache_dg\//;

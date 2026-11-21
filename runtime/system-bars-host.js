@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=6954cacca256';
-import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=6954cacca256';
+import { APKError } from './apk-error.js?v=7233e918dcc9';
+import { GESTURE_NAVIGATION_INSET_DP } from './device-profile.js?v=7233e918dcc9';
 // SystemUI of the virtual device: status bar, navigation bar (gesture handle or 3 buttons) and the window policy PhoneWindow/DecorView apply to the app:
 // edge-to-edge (targetSdk >= 35 unless windowOptOutEdgeToEdgeEnforcement, Window.setDecorFitsSystemWindows(false), SYSTEM_UI_FLAG_LAYOUT_*),
 // bar colors/appearance (theme + Window setters + WindowInsetsController + SYSTEM_UI_FLAG_LIGHT_*), hiding (FLAG_FULLSCREEN, SYSTEM_UI_FLAG_FULLSCREEN/HIDE_NAVIGATION,
@@ -171,6 +171,8 @@ export function createSystemBarsHost(platform) {
     /** Window removed: the decor has no ViewRoot any more, calls go back to being pending. */
     windowDetached(r, owner) { const holder = r.object(owner).insetsHolder; if (holder?.attached) { holder.attached = false; holder.shadow = cloneWindowBars(holder.bars); } },
     contentFrame(r, root) { const frame = this.frameForRoot(r, root); return frame ? compute(r, frame).contentFrame : null; },
+    /** The insets of the visible system bars of an Activity frame's window (ViewRootImpl.getWindowBoundsInsetSystemBars takes them off the window bounds). */
+    barInsets(r, frame) { return frame ? compute(r, frame).insets : null; },
     notifyChanged(r) { for (const frame of platform.allFrames()) changed(r, frame); },
     invoke(r, method, args) {
       const name = method.name, owner = method.owner, receiver = args[0];
