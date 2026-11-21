@@ -13,12 +13,12 @@
 // eglGetProcAddress answers the EGL and GL entry points listed here, NULL for any other name (as Android does for an unknown name). Not provided, failing by name: GLES 1.x,
 // pixmap surfaces and client-buffer pbuffers, a SurfaceTexture / ImageReader Surface as a native window, ANativeWindow_lock (CPU rendering), EGL extension functions
 // (EGLImage, sync objects, presentation time, damage regions). No process.*.
-import { APKError } from '../apk-error.js?v=8afe13eb0890';
-import { BLOCKED } from './cpu.js?v=8afe13eb0890';
-import { Blocked } from '../scheduler.js?v=8afe13eb0890';
-import { floatBits } from '../host-contract.js?v=8afe13eb0890';
-import { createGlesNativeBindings, createEglCore, EGL_CONSTANTS as EGL, glAccess, NativeRegion, configAttribute, EGL_CONFIGS, windowSize } from '../gles-native.js?v=8afe13eb0890';
-import { utf8 } from './text.js?v=8afe13eb0890';
+import { APKError } from '../apk-error.js?v=d826b7643adc';
+import { BLOCKED } from './cpu.js?v=d826b7643adc';
+import { Blocked } from '../scheduler.js?v=d826b7643adc';
+import { floatBits } from '../host-contract.js?v=d826b7643adc';
+import { createGlesNativeBindings, createEglCore, EGL_CONSTANTS as EGL, glAccess, NativeRegion, configAttribute, EGL_CONFIGS, windowSize } from '../gles-native.js?v=d826b7643adc';
+import { utf8 } from './text.js?v=d826b7643adc';
 
 const GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', STRING = 'Ljava/lang/String;', BUFFER = 'Ljava/nio/Buffer;', INT_BUFFER = 'Ljava/nio/IntBuffer;';
 const GL = { INVALID_ENUM: 0x500, INVALID_VALUE: 0x501, INVALID_OPERATION: 0x502, ARRAY_BUFFER_BINDING: 0x8894, ELEMENT_ARRAY_BUFFER_BINDING: 0x8895, PIXEL_PACK_BUFFER_BINDING: 0x88ED,

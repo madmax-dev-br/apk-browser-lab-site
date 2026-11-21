@@ -1,14 +1,14 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=8afe13eb0890';
-import { staticRetentionLines } from './heap-gc.js?v=8afe13eb0890';
-import { overrideSummaryLines } from './method-overrides.js?v=8afe13eb0890';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=8afe13eb0890';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=8afe13eb0890';
-import { hostMapSummaryLines } from './host-map.js?v=8afe13eb0890';
-import { attributeGap } from './worker-task-log.js?v=8afe13eb0890';
-import { loadImageText } from './load-image.js?v=8afe13eb0890';
-import { identityText } from './device-identity.js?v=8afe13eb0890';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=d826b7643adc';
+import { staticRetentionLines } from './heap-gc.js?v=d826b7643adc';
+import { overrideSummaryLines } from './method-overrides.js?v=d826b7643adc';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=d826b7643adc';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=d826b7643adc';
+import { hostMapSummaryLines } from './host-map.js?v=d826b7643adc';
+import { attributeGap } from './worker-task-log.js?v=d826b7643adc';
+import { loadImageText } from './load-image.js?v=d826b7643adc';
+import { identityText } from './device-identity.js?v=d826b7643adc';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 

@@ -2,8 +2,8 @@
 // programs built from AOSP's own sources (scripts/build-system-programs.sh, vendor/system-programs): toybox (external/toybox), mksh as /system/bin/sh (external/mksh) and
 // toolbox (system/core/toolbox: getprop, setprop, start, stop). As on a production device there is no su, no busybox, nothing in /system/xbin and no /bin.
 // Also here: the mount table an app's mount namespace sees, the kernel's uname, and the file labels the programs report. Everything is fixed for every app.
-import { identityProperties } from './device-identity.js?v=8afe13eb0890';
-import { CA_CERTIFICATES } from './ca-certificates-data.js?v=8afe13eb0890';
+import { identityProperties } from './device-identity.js?v=d826b7643adc';
+import { CA_CERTIFICATES } from './ca-certificates-data.js?v=d826b7643adc';
 
 /** The programs and what /system/bin holds for each: toybox's symlinks are Android.bp's `toybox_symlinks` (device variant), toolbox's its `symlinks`. */
 export const TOYBOX_SYMLINKS = Object.freeze(['[', 'acpi', 'base64', 'basename', 'blockdev', 'cal', 'cat', 'chattr', 'chcon', 'chgrp', 'chmod', 'chown', 'chroot', 'chrt', 'cksum', 'clear', 'comm', 'cmp', 'cp', 'cpio', 'cut',
