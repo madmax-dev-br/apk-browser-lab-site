@@ -1,13 +1,13 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { deviceMemory, bootUptimeMs } from '../process-memory.js?v=bf542493e850';
-import { APKError } from '../apk-error.js?v=bf542493e850';
-import { BLOCKED } from './cpu.js?v=bf542493e850';
-import { formatC, variadic } from './libc.js?v=bf542493e850';
-import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=bf542493e850';
-import { restrictedNetlink } from './netlink.js?v=bf542493e850';
-import { utf8 } from './text.js?v=bf542493e850';
+import { deviceMemory, bootUptimeMs } from '../process-memory.js?v=8afe13eb0890';
+import { APKError } from '../apk-error.js?v=8afe13eb0890';
+import { BLOCKED } from './cpu.js?v=8afe13eb0890';
+import { formatC, variadic } from './libc.js?v=8afe13eb0890';
+import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=8afe13eb0890';
+import { restrictedNetlink } from './netlink.js?v=8afe13eb0890';
+import { utf8 } from './text.js?v=8afe13eb0890';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));

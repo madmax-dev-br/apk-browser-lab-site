@@ -3,7 +3,7 @@
 // The rows come from the Worker snapshot (deviceOptions.microg.entryPoints); the mock values are sent with vm.setMicrogMocks([{ id, value }]). The lab ships no mock; this only lets a
 // user supply one. Richer values than a constant (a Bundle, a byte[], a built object) are the Node API's platform.microg.mock(id, handler) only.
 
-import { MICROG_APIS, MICROG_API_STATE_LABELS } from './microg-apis.js?v=bf542493e850';
+import { MICROG_APIS, MICROG_API_STATE_LABELS } from './microg-apis.js?v=8afe13eb0890';
 
 /** The static list of what microG answers on this device (src/microg-apis.js), in the "With microG" box. */
 export function renderMicrogApis(list) {
