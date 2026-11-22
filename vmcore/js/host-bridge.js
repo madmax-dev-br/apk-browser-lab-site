@@ -62,23 +62,24 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=d826b7643adc';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=d826b7643adc';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=d826b7643adc';
-import { HandleTable } from './handles.js?v=d826b7643adc';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=d826b7643adc';
-import { coreImports } from './boundary-imports.js?v=d826b7643adc';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=d826b7643adc';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=d826b7643adc';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=d826b7643adc';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=d826b7643adc';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=d826b7643adc';
-import { timedExports, timedBridge } from './core-timing.js?v=d826b7643adc';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d826b7643adc';
-import { Blocked } from '../../runtime/scheduler.js?v=d826b7643adc';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=d826b7643adc';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=d826b7643adc';
-import { PaintRecords } from './paint-record.js?v=d826b7643adc';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=97135b36a679';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=97135b36a679';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=97135b36a679';
+import { HandleTable } from './handles.js?v=97135b36a679';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=97135b36a679';
+import { coreImports } from './boundary-imports.js?v=97135b36a679';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=97135b36a679';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=97135b36a679';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=97135b36a679';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=97135b36a679';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=97135b36a679';
+import { timedExports, timedBridge } from './core-timing.js?v=97135b36a679';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=97135b36a679';
+import { Blocked } from '../../runtime/scheduler.js?v=97135b36a679';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=97135b36a679';
+import { CoreDebugAdapter } from './core-debug.js?v=97135b36a679';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=97135b36a679';
+import { PaintRecords } from './paint-record.js?v=97135b36a679';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -195,6 +196,8 @@ export class WasmEngine {
     mi.routed = false; this.routedRecords.delete(mi.key);
     Atomics.store(this.u32, (mi.address + METHOD.kind) >>> 2, mi.routedKind === 0 ? 0 : METHOD_KIND_UNLINKED);   // linked before: its code is still in place; otherwise it links on its next call
   }
+  /** The debugger's view of the core (src/debugger.js): breakpoints in the linked code, the debugger's statuses, the frames in memory. */
+  debugAdapter(dbg) { return new CoreDebugAdapter(this, dbg); }
   /** The record whose body runs for `method`: its own, or the twin of a routed one (same DEX code, its own copy linked on first call; not in its class's method table). */
   bodyInfo(method) {
     const hookBody = method.dex?.hookBody;   // a smali body a plugin wrote (src/method-hooks.js): a record of its own over the hook's DEX
@@ -274,6 +277,8 @@ export class WasmEngine {
   /** A record whose thread ended goes back to its empty state (registered, its tid kept). */
   resetRecord(t) {
     for (const field of ['frame', 'pc', 'depth', 'throwing', 'status', 'detail']) this.w32(t + THREAD[field], 0);
+    for (let at = 2208; at < 2224; at += 4) this.w32(t + at, 0);   // abi.h debugFlags, debugPc, debugWord, debugThrown
+    this.view.setBigUint64(t + THREAD.maxSteps, 1n << 60n, true);
     this.w32(t + THREAD.stackTop, 0); this.view.setBigUint64(t + THREAD.result, 0n, true);
     this.view.setBigUint64(t + THREAD.steps, 0n, true); this.view.setBigUint64(t + THREAD.calls, 0n, true);
   }
@@ -660,12 +665,12 @@ export class WasmEngine {
   }
   /** CoreThreads.waitFor suspends the run (it throws MAIN_SUSPEND next): recorded in the trace, never silent. */
   // `waitedMs`: the wait is suspended because it lasted that long nested in the pump (CoreThreads.waitFor LONG_WAIT_MS), not because only the event loop can end it
-  noteSuspend(owner, error, waitedMs = null) {
+  noteSuspend(owner, error, waitedMs = null, because = null) {
     const run = this.suspendableRun, rt = this.runtime, sched = rt.scheduler, blocked = owner.blocked;
     this.suspended = run; sched.suspendedMain = run; run.since = performance.now(); run.suspensions++; this.stats.suspensions = (this.stats.suspensions ?? 0) + 1;
     if (waitedMs !== null) this.stats.longWaitSuspensions = (this.stats.longWaitSuspensions ?? 0) + 1;
     const what = blocked?.blocker ? `, ${String(rt.typeOf(blocked.blocker)).replace(/^L|;$/g, '').replaceAll('/', '.')}` : '';
-    const why = waitedMs !== null ? `it has waited ${waitedMs} ms of host time (${blocked?.reason ?? 'unknown'}${what}) while the lab ran other threads and host tasks on top of it`
+    const why = because !== null ? because : waitedMs !== null ? `it has waited ${waitedMs} ms of host time (${blocked?.reason ?? 'unknown'}${what}) while the lab ran other threads and host tasks on top of it`
       : `it waits (${blocked?.reason ?? 'unknown'}${what}) and only the browser's event loop can end that wait (${rt.network?.pending ?? 0} network exchange(s) or host job(s) in flight)`;
     rt.record(`SCHEDULER main thread suspended in its event: ${why}; its frames stay parked, the event pump returns and resumes the event when the wait ends, as a blocked main thread on a device`);
   }
@@ -715,13 +720,14 @@ export class WasmEngine {
     this.stats.nested++;
     let status, detail, value, thrown = 0;
     const steps = owner.core.steps, base = steps.length; steps.push(parked === null ? OWN_STEP : { kind: 'own', parked });   // the base of this run among the thread's host steps (CoreThreads.pump)
+    const outer = this.runtime.debugger !== null ? (owner.debugOuter ??= []) : null; if (outer !== null) outer.push(sFrame, sPc, sDepth);   // the frames this run is nested above (src/debugger.js shows them)
     try {
       status = this.threads.finish(owner, this.threads.runEntry(owner, id, words, initClass, sStackTop, sDepth));   // collections, waits and other threads until the run is over
       detail = this.r32(t + THREAD.detail);
       if (status === Status.OK) value = result === 'V' ? undefined : this.valueAt(result, t + THREAD.result);
       else if (status === Status.UNCAUGHT) thrown = this.r32(t + THREAD.result);
     } finally {
-      steps.length = base;
+      steps.length = base; if (outer !== null) outer.length = Math.max(0, outer.length - 3);
       const w = this.u32;
       w[at + (THREAD.frame >> 2)] = sFrame; w[at + (THREAD.pc >> 2)] = sPc; w[at + (THREAD.depth >> 2)] = sDepth; w[at + (THREAD.stackTop >> 2)] = sStackTop;
       w[at + (THREAD.throwing >> 2)] = sThrowing; w[at + (THREAD.status >> 2)] = sStatus; w[at + (THREAD.detail >> 2)] = sDetail;

@@ -13,10 +13,10 @@
 // abstract methods, static initializers, framework methods the lab implements in JavaScript (no DEX: nothing to hook), and a smali body for a framework method (levels 1
 // and 2 only, where the lab runs the AOSP original from DEX).
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { APKRuntime, DexFile, SHIMS, JavaException } from './apk-runtime.js?v=d826b7643adc';
-import { assembleSmali, SmaliError } from './smali-assembler.js?v=d826b7643adc';
-import { parseMethodSpec, parseReturnValue, smaliTypeToJava, hookRegistry, updateHooks, hookOn, hookDetail, HOOK_KINDS } from './method-overrides.js?v=d826b7643adc';
-import { createHeapReader, classDescriptor, dotted, typeName } from './plugin-queries.js?v=d826b7643adc';
+import { APKRuntime, DexFile, SHIMS, JavaException } from './apk-runtime.js?v=97135b36a679';
+import { assembleSmali, SmaliError } from './smali-assembler.js?v=97135b36a679';
+import { parseMethodSpec, parseReturnValue, smaliTypeToJava, hookRegistry, updateHooks, hookOn, hookDetail, HOOK_KINDS } from './method-overrides.js?v=97135b36a679';
+import { createHeapReader, classDescriptor, dotted, typeName } from './plugin-queries.js?v=97135b36a679';
 
 export const HOOK_LIMITS = Object.freeze({ hooks: 200, smaliChars: 200_000, message: 2000, maxPending: 2000, maxString: 2000, maxItems: 50, depth: 2 });
 const ACC_STATIC = 0x8, ACC_NATIVE = 0x100, ACC_ABSTRACT = 0x400, ACC_INTERFACE = 0x200;
@@ -147,6 +147,15 @@ export function smaliBody(rt, target, text, id) {
   const body = { method, code, units: out.units.length, registers: out.registers, instructions: out.instructions, dex, def: { method, flags: definition.flags & ~(ACC_NATIVE | ACC_ABSTRACT), code } };
   dex.hookBody = body;   // the WebAssembly core runs it from a record of its own (vmcore/js/host-bridge.js hookBodyInfo)
   return body;
+}
+
+/** Checks a smali body for the method `spec` names as lab.hook(method, { smali }) would (the method resolves, accepts a smali body, and the body assembles and verifies),
+ *  without installing anything: { key, registers, units, instructions }, or throws the HookError the install would (code 'verify' with `errors` for the body). */
+export function checkSmaliBody(rt, spec) {
+  if (!rt) throw fail('no-apk', 'No APK is running.');
+  const target = resolveHookTarget(rt, spec), why = refusal(rt, target, 'smali'); if (why) throw fail('unsupported', why);
+  const body = smaliBody(rt, target, spec?.smali, 'check');
+  return { key: target.key, registers: body.registers, units: body.units, instructions: body.instructions };
 }
 
 // ---- the fixed exception ----------------------------------------------------------------------------------------------------------------------------------------------

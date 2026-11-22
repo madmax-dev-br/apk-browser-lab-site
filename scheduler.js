@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=d826b7643adc';
+import { APKError } from './apk-error.js?v=97135b36a679';
 
 // Green-thread scheduler for the VM.
 //
@@ -46,7 +46,7 @@ const EVENT_GRACE_MS = 50;   // host time a due host event may wait for a run th
 const QUIET_IDLE_LIMIT = 50000;
 const MAIN_NESTED_SKIP_LIMIT_MS = 10 * 60 * 1000;   // virtual time a deadline-less nested wait of the main thread may skip (checkEndlessMainWait)  // consecutive clock skips with no host event in between
 export class Scheduler {
-  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; this.suspendedMain = null; }   // suspendedMain: the main thread's event suspended in its wait (vmcore/js/host-bridge.js suspendable)
+  constructor(rt) { this.rt = rt; this.threads = []; this.main = null; this.cursor = 0; this.parkedServing = 0; this.waitingNested = new Set(); this.stats = { idles: 0, skippedMs: 0, events: 0, wakeups: 0, rounds: 0, boosts: 0 }; this.quietIdles = 0; this.fairTick = 0; this.eventTotal = 0; this.lastSteps = 0; this.starved = false; this.dueSince = 0; this.ioBoostMs = 0; this.boosted = []; this.boostTurn = 0; this.suspendedMain = null; this.held = null; }   // held: the threads the debugger suspends (src/debugger.js), null when none   // suspendedMain: the main thread's event suspended in its wait (vmcore/js/host-bridge.js suspendable)
   get clock() { return this.rt.platform.clock; }
 
   /** The thread that runs host events (Looper/main). */
@@ -158,11 +158,12 @@ export class Scheduler {
     const from = current !== null && current !== undefined ? this.threads.indexOf(current) : this.cursor;
     if (this.boosted.length && this.pumpSlice(owner)) {   // a thread that just got its network answer goes first (ioBoostMs), but for one slice in IO_BOOST_SHARE
       const boosted = this.boostHead(owner);
-      if (boosted !== null && ++this.boostTurn % IO_BOOST_SHARE !== 0) { this.lastPicked = boosted; return { thread: boosted, earliest }; }
+      if (boosted !== null && (this.held === null || !this.held.has(boosted)) && ++this.boostTurn % IO_BOOST_SHARE !== 0) { this.lastPicked = boosted; return { thread: boosted, earliest }; }
     }
     for (let i = 1; i <= n; i++) {
       const at = (from + i + n) % n, thread = this.threads[at];
       if (!thread || thread.state !== 'runnable') continue;
+      if (this.held !== null && this.held.has(thread)) continue;   // suspended by the debugger (src/debugger.js)
       if (thread !== owner && thread.nestedDepth > 0) continue;   // suspended under the JavaScript stack of an outer run: only that run can resume it
       if (thread !== owner && this.waitingNested.has(thread)) continue;   // parked in a nested host wait (resolveNested) on the JavaScript stack: its own wait loop resumes it when wake() made it runnable, never a slice as a guest (that ran its frames twice and ended in a false deadlock)
       if (thread === this.main && thread !== owner && thread.frames.length === 0) continue;   // the main thread between events has no frames and no driver: it is the host event loop, not a guest to resume (running it ends it)
@@ -172,14 +173,14 @@ export class Scheduler {
     return { thread: null, earliest };
   }
   /** True when some free thread can run now (after waking those whose wait is over). */
-  hasRunnable() { this.wake(); return this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && thread !== this.rt.thread && !this.idleMain(thread)); }
+  hasRunnable() { this.wake(); return this.threads.some(thread => thread.state === 'runnable' && (this.held === null || !this.held.has(thread)) && thread.nestedDepth === 0 && thread !== this.rt.thread && !this.idleMain(thread)); }
   /** The main thread while the host event loop runs: runnable on paper, but with no frames and no driver there is nothing to resume. */
   idleMain(thread) { return thread === this.main && thread.frames.length === 0 && thread.driver === null; }
   /** Milliseconds until a thread needs the processor again: 0 if one is runnable, the earliest timed wait otherwise, null if none. */
   threadDelay() {
     if (!this.rt.multiThreaded) return null;
     const earliest = this.wake();
-    if (this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && thread !== this.main)) return 0;
+    if (this.threads.some(thread => thread.state === 'runnable' && (this.held === null || !this.held.has(thread)) && thread.nestedDepth === 0 && thread !== this.main)) return 0;
     return earliest === Infinity ? null : Math.max(0, earliest - this.clock.now());
   }
   hasOtherRunnable(current, owner) {
@@ -194,7 +195,7 @@ export class Scheduler {
     if (owner === null && this.waitingNested.size && this.innermostNestedReady()) return true;
     if (this.hostEventsStarved(owner)) return true;
     if (this.boosted.length && this.pumpSlice(owner)) { const head = this.boostHead(owner); if (head !== null) return head !== current; }   // boosted threads first, the smallest answer (then the earliest woken) until its boost is over
-    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (thread === owner || thread.nestedDepth === 0)) return true;
+    for (const thread of this.threads) if (thread !== current && thread.state === 'runnable' && (this.held === null || !this.held.has(thread)) && (thread === owner || thread.nestedDepth === 0)) return true;
     return false;
   }
   /**
@@ -279,7 +280,7 @@ export class Scheduler {
     // in the checks below, and a network read whose response ended during this wake() (its ready() refreshes the exchange) left network.pending at 0 -- concluding "deadlock"
     // then was a race the response's timing decided (seen with the synchronous bridge under load).
     let woken = this.stats.wakeups;
-    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
+    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && (this.held === null || !this.held.has(thread)) && !this.idleMain(thread) && (thread.nestedDepth === 0 || this.waitingNested.has(thread)))) return;
     const serve = this.mayServeEvents();
     const processed = serve ? this.serveEvents(platform) : 0;
     if (processed) { this.stats.events += processed; this.quietIdles = 0; return; }
@@ -291,7 +292,7 @@ export class Scheduler {
       throw new APKError(`Network wait in a frame that cannot suspend: ${why}. ${network.pending} exchange(s) are in flight and the VM is inside a nested host call, so it cannot yield to the browser event loop (threads: ${this.describe()})`, { kind: 'network-would-block' });
     }
     woken = this.stats.wakeups;
-    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
+    this.wake(); if (this.stats.wakeups !== woken || this.threads.some(thread => thread.state === 'runnable' && (this.held === null || !this.held.has(thread)) && thread.nestedDepth === 0 && !this.idleMain(thread))) return;   // same race, after the platform events ran
     const delay = serve ? (this.servableEventDelay() ?? null) : null, now = this.clock.now();   // queued messages that may not run now (see mayServeEvents) are no wake-up for this wait
     const next = Math.min(earliest === Infinity ? Infinity : Math.max(0, earliest - now), delay === null ? Infinity : delay);
     if (next === Infinity) throw new APKError(`Deadlock: ${why}; no thread is runnable and no timer or event is pending${serve ? '' : ' (main-Looper messages are queued, but the main thread is blocked inside a message that ran during its own wait: they run only when main is back in its Looper)'} (threads: ${this.describe()})`, { kind: 'cooperative-deadlock' });

@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=d826b7643adc") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=d826b7643adc">
-  <link rel="stylesheet" href="./lab-theme.css?v=d826b7643adc">
-  <meta name="apk-browser-build" content="d826b7643adc">
+  <style>@import url("./styles.css?v=97135b36a679") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=97135b36a679">
+  <link rel="stylesheet" href="./lab-theme.css?v=97135b36a679">
+  <meta name="apk-browser-build" content="97135b36a679">
 </head>
 <body>
   <header class="topbar">
@@ -321,8 +321,8 @@
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
-        <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Method changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code> and Controls › Debugging › Method returns). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="debug-paused" class="ready-chip debug-paused-chip" type="button" hidden title="Paused in the debugger: open the Code tool">Paused in the debugger</button><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code>, Controls › Debugging › Method returns, and the methods and APK files edited in the Code tool). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
@@ -335,6 +335,7 @@
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
               <canvas id="frame-graph-canvas" class="frame-graph-canvas" aria-hidden="true" hidden></canvas>
               <div id="lab-highlight-layer" class="lab-highlight-layer" aria-hidden="true"></div>
+              <div id="debug-paused-overlay" class="debug-paused-overlay" role="status" aria-live="polite" hidden><div class="dpo-plate"><p class="dpo-title">Paused in the debugger</p><p class="dpo-where"></p><p class="dpo-note">The app's threads are suspended: taps and keys wait until it resumes.</p><button class="dpo-resume" type="button">Resume <kbd>F8</kbd></button></div></div>
               <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Only this time</button><button id="perm-deny" type="button" class="perm-button">Don't allow</button></div></div></div>
               <div id="system-picker" class="sp-scrim" hidden></div>
               <div class="system-bars" aria-hidden="true">
@@ -362,6 +363,8 @@
         <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Layout</span><span class="ci-count">closed</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspects the screen now: its layout tree (XML Views and Compose, detected), and an image of the element you choose">Capture</button><label class="logcat-auto" title="Captures again when the screen navigates (another Activity or destination)"><input class="ci-follow" type="checkbox" checked> Update on navigation</label><label class="logcat-auto" title="Shows every LayoutNode of the Compose tree; off, shows the boxes of &quot;Show layout bounds&quot;"><input class="ci-tree" type="checkbox"> Full tree</label><input class="ci-filter" type="search" placeholder="Filter by name, id, text, tag or modifier" aria-label="Filter elements by name, text, testTag or modifier"><button class="ci-copy" type="button" title="Copies the inspection data (without images) as JSON">Copy JSON</button></div>
           <div class="ci-body" aria-live="polite"></div></details>
+        <details id="code-browser" class="trace logcat code-browser"><summary><span>Code</span><span class="cb-count">no app</span><span class="trace-chevron">⌄</span></summary>
+          <div class="cb-body"></div></details>
         <details id="plugins-output" class="trace logcat plugins-output" hidden><summary><span>Plugins</span><span class="po-count">0 running</span><span class="trace-chevron">⌄</span></summary>
           <div class="po-cards" aria-live="off"></div></details>
       </section>
@@ -383,7 +386,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=d826b7643adc"></script>
+  <script type="module" src="./app.js?v=97135b36a679"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

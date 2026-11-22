@@ -8,24 +8,26 @@
 // The counts come back with every snapshot (snapshot.methodHooks) and with every reply. No timer, no VM message while nothing is changed. DOM only through `$` and document.
 
 const KIND_TEXT = { returns: 'fixed return', throws: 'throws', observe: 'observed', smali: 'smali body' };
-export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow = null, getPackage = () => null, documentRef = globalThis.document } = {}) {
-  const S = { hooks: [], persisted: new Map(), failures: new Map(), seq: 0, open: false };
+/** The owner of the changes made in the Code browser (src/code-browser.js): its method edits are smali hooks of this owner, its file edits the `files` rows. */
+export const CODE_BROWSER = Object.freeze({ id: 'code-browser', name: 'Code browser' });
+export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow = null, getPackage = () => null, removeFile = null, documentRef = globalThis.document } = {}) {
+  const S = { hooks: [], files: [], persisted: new Map(), failures: new Map(), seq: 0, open: false };
   const chip = () => $('app-modified'), panel = () => $('app-modified-panel'), list = () => $('app-modified-list');
-  const ownerLabel = hook => hook.owner === 'page' ? 'Method returns (page)' : `plugin ${hook.plugin?.name ?? '?'}`;
+  const ownerLabel = hook => hook.owner === 'page' ? 'Method returns (page)' : hook.plugin?.id === CODE_BROWSER.id ? CODE_BROWSER.name : hook.plugin?.id === 'mcp' ? 'MCP' : `plugin ${hook.plugin?.name ?? '?'}`;
   const pluginOf = hook => hook.owner === 'plugin' ? hook.plugin?.id ?? null : null;
   const hitsText = hook => `${hook.hits} ${hook.hits === 1 ? 'call' : 'calls'}${hook.dropped ? ` (${hook.dropped} not delivered)` : ''}`;
 
   function render() {
     const c = chip(), p = panel(), l = list(); if (!c || !p || !l) return;
-    const count = S.hooks.length, failed = [...S.failures.values()];
+    const count = S.hooks.length + S.files.length, failed = [...S.failures.values()];
     c.hidden = !count && !failed.length;
-    c.textContent = `App modified · ${count}`; c.title = count ? `${count} method change${count === 1 ? '' : 's'} chosen by the user are active: click for the list` : 'A persistent method change could not be applied again: click for the reason';
+    c.textContent = `App modified · ${count}`; c.title = count ? `${count} change${count === 1 ? '' : 's'} chosen by the user ${count === 1 ? 'is' : 'are'} active (methods and APK files): click for the list` : 'A persistent method change could not be applied again: click for the reason';
     c.setAttribute('aria-expanded', String(S.open && !c.hidden));
     p.hidden = !S.open || c.hidden;
     if (p.hidden) { S.rowsKey = null; return; }
     // the same changes as the rows on screen (a snapshot with new counts): only the counts are written, so a Remove button under the pointer is never replaced mid-click
-    const key = JSON.stringify([S.hooks.map(hook => [hook.id, hook.kind, hook.method, hook.value ?? null]), failed.map(failure => [failure.id, failure.error])]);
-    if (key === S.rowsKey && l.children.length === S.hooks.length + failed.length) { S.hooks.forEach((hook, index) => { const hits = l.children[index]?.children?.[2]; if (hits) hits.textContent = hitsText(hook); }); return; }
+    const key = JSON.stringify([S.hooks.map(hook => [hook.id, hook.kind, hook.method, hook.value ?? null]), failed.map(failure => [failure.id, failure.error]), S.files.map(file => [file.path, file.bytes])]);
+    if (key === S.rowsKey && l.children.length === S.hooks.length + failed.length + S.files.length) { S.hooks.forEach((hook, index) => { const hits = l.children[index]?.children?.[2]; if (hits) hits.textContent = hitsText(hook); }); return; }
     S.rowsKey = key;
     const rows = S.hooks.map(hook => {
       const li = documentRef.createElement('li'); li.className = 'am-row'; li.dataset.kind = hook.kind;
@@ -45,6 +47,16 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
       const remove = documentRef.createElement('button'); remove.type = 'button'; remove.className = 'cp-button am-remove'; remove.textContent = 'Forget';
       remove.addEventListener('click', () => { S.persisted.delete(failure.id); S.failures.delete(failure.id); render(); });
       li.append(method, why, owner, remove); rows.push(li);
+    }
+    for (const file of S.files) {
+      const li = documentRef.createElement('li'); li.className = 'am-row am-file'; li.dataset.kind = 'file';
+      const path = documentRef.createElement('code'); path.className = 'am-method'; path.textContent = file.path;
+      const kind = documentRef.createElement('span'); kind.className = 'am-kind'; kind.textContent = 'edited file';
+      const size = documentRef.createElement('span'); size.className = 'am-hits'; size.textContent = `${file.bytes} bytes (APK: ${file.originalBytes})`;
+      const owner = documentRef.createElement('span'); owner.className = 'am-owner'; owner.textContent = file.by ?? CODE_BROWSER.name;
+      const remove = documentRef.createElement('button'); remove.type = 'button'; remove.className = 'cp-button am-remove'; remove.textContent = 'Remove'; remove.setAttribute('aria-label', `Restore the APK's ${file.path}`);
+      remove.addEventListener('click', () => { Promise.resolve(removeFile?.(file.path)).catch(error => trace(`App modified: could not restore ${file.path}: ${error?.message ?? error}`)); });
+      li.append(path, kind, size, owner, remove); rows.push(li);
     }
     l.replaceChildren(...rows);
   }
@@ -72,7 +84,7 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
       const reply = await vm.methodHooks('add', { spec: clean, owner: { id: String(owner?.id ?? ''), name: String(owner?.name ?? 'plugin') }, id });
       if (clean.persist === true) S.persisted.set(id, { id, owner: { id: String(owner.id), name: String(owner.name) }, spec: clean, packageName, method: reply.hook.method });
       setHooks(reply.hooks);
-      trace(`Plugin ${owner?.name}: app modified, ${KIND_TEXT[reply.hook.kind] ?? reply.hook.kind} of ${reply.hook.method}${reply.hook.kind === 'returns' ? ` = ${reply.hook.value}` : ''} (${id}${clean.persist ? ', persists' : ''})`);
+      trace(`${owner?.id === CODE_BROWSER.id ? CODE_BROWSER.name : `Plugin ${owner?.name}`}: app modified, ${KIND_TEXT[reply.hook.kind] ?? reply.hook.kind} of ${reply.hook.method}${reply.hook.kind === 'returns' ? ` = ${reply.hook.value}` : ''} (${id}${clean.persist ? ', persists' : ''})`);
       return reply.hook;
     },
     /** lab.unhook (owner: the plugin that asks; null from the page). */
@@ -95,8 +107,12 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
     },
     /** The live list of a snapshot (snapshot.methodHooks: absent when nothing is changed). */
     update(hooks) { const next = Array.isArray(hooks) ? hooks : []; if (!next.length && !S.hooks.length) return; setHooks(next); },
+    /** Drops a change from the ones re-applied after a reload (it was replaced by a newer change of the same method, which has its own entry). */
+    forget(id) { S.persisted.delete(String(id)); S.failures.delete(String(id)); },
+    /** The APK files the user edited (src/code-service.js fileEdits): [{ path, bytes, originalBytes, by }], listed with the method changes. */
+    setFiles(files) { S.files = Array.isArray(files) ? files : []; render(); },
     /** The VM ended (another APK, a new run): its changes ended with it; persistent ones wait for attach(). */
-    vmEnded() { S.hooks = []; S.failures.clear(); render(); },
+    vmEnded() { S.hooks = []; S.files = []; S.failures.clear(); render(); },
     /** A new VM of `inventory.packageName` is loaded, before the app's code runs: the persistent changes made for that package are installed again, with their ids. */
     async attach(inventory) {
       const pkg = inventory?.packageName ?? null; let applied = 0;
@@ -110,7 +126,7 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
       return applied;
     },
     /** For lab_status (MCP) and the diagnostics: { count, calls, changes }. */
-    summary() { return { count: S.hooks.length, calls: S.hooks.reduce((sum, hook) => sum + (hook.hits ?? 0), 0), changes: S.hooks.map(hook => ({ id: hook.id, method: hook.method, kind: hook.kind, detail: hook.detail, hits: hook.hits, by: ownerLabel(hook), ...(hook.dropped ? { dropped: hook.dropped } : {}) })), ...(S.failures.size ? { failed: [...S.failures.values()].map(f => ({ id: f.id, method: f.method, error: f.error })) } : {}) }; },
+    summary() { return { count: S.hooks.length + S.files.length, ...(S.files.length ? { files: S.files.map(file => ({ path: file.path, bytes: file.bytes, originalBytes: file.originalBytes, by: file.by ?? CODE_BROWSER.name })) } : {}), calls: S.hooks.reduce((sum, hook) => sum + (hook.hits ?? 0), 0), changes: S.hooks.map(hook => ({ id: hook.id, method: hook.method, kind: hook.kind, detail: hook.detail, hits: hook.hits, by: ownerLabel(hook), ...(hook.dropped ? { dropped: hook.dropped } : {}) })), ...(S.failures.size ? { failed: [...S.failures.values()].map(f => ({ id: f.id, method: f.method, error: f.error })) } : {}) }; },
     /** How many changes the plugins made (the report header; the page's rows are counted by the Method returns section). */
     pluginCount() { return S.hooks.filter(hook => hook.owner === 'plugin').length; },
     get state() { return S; },

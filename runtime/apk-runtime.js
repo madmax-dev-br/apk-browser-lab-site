@@ -1,41 +1,41 @@
-import { procFdFile } from './libcore-io-native.js?v=d826b7643adc';
-import STATIC_SHIMS from './shim-static-methods.js?v=d826b7643adc';
-import { VMClock } from './vm-clock.js?v=d826b7643adc';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=d826b7643adc';
-import { OperationMonitor } from './operation-monitor.js?v=d826b7643adc';
-import { ExecutionProfile } from './execution-profile.js?v=d826b7643adc';
-import { SamplingProfiler } from './sampling-profiler.js?v=d826b7643adc';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=d826b7643adc';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=d826b7643adc';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=d826b7643adc';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=d826b7643adc';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=d826b7643adc';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=d826b7643adc';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=d826b7643adc';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=d826b7643adc';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=d826b7643adc';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=d826b7643adc';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=d826b7643adc';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=d826b7643adc';
-import { APKError } from './apk-error.js?v=d826b7643adc';
-import { invokePolymorphic } from './method-handles.js?v=d826b7643adc';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=d826b7643adc';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=d826b7643adc';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=d826b7643adc';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=d826b7643adc';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=d826b7643adc';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=d826b7643adc';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=d826b7643adc';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=d826b7643adc';
+import { procFdFile } from './libcore-io-native.js?v=97135b36a679';
+import STATIC_SHIMS from './shim-static-methods.js?v=97135b36a679';
+import { VMClock } from './vm-clock.js?v=97135b36a679';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=97135b36a679';
+import { OperationMonitor } from './operation-monitor.js?v=97135b36a679';
+import { ExecutionProfile } from './execution-profile.js?v=97135b36a679';
+import { SamplingProfiler } from './sampling-profiler.js?v=97135b36a679';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=97135b36a679';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=97135b36a679';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=97135b36a679';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=97135b36a679';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=97135b36a679';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=97135b36a679';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=97135b36a679';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=97135b36a679';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=97135b36a679';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=97135b36a679';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=97135b36a679';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=97135b36a679';
+import { APKError } from './apk-error.js?v=97135b36a679';
+import { invokePolymorphic } from './method-handles.js?v=97135b36a679';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=97135b36a679';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=97135b36a679';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=97135b36a679';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=97135b36a679';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=97135b36a679';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=97135b36a679';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=97135b36a679';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=97135b36a679';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=d826b7643adc';
-import { ProcessStartPending } from './package-registry.js?v=d826b7643adc';
-import { bootClassLacksMember } from './boot-class-members.js?v=d826b7643adc';
-export { APKError } from './apk-error.js?v=d826b7643adc';
-import { BinaryReader } from './binary-reader.js?v=d826b7643adc';
-import { recordCollection } from './runtime-stats.js?v=d826b7643adc';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=d826b7643adc';
-import { scrollsItself } from './scrolling-view.js?v=d826b7643adc';
+import { Scheduler, Blocked } from './scheduler.js?v=97135b36a679';
+import { ProcessStartPending } from './package-registry.js?v=97135b36a679';
+import { bootClassLacksMember } from './boot-class-members.js?v=97135b36a679';
+export { APKError } from './apk-error.js?v=97135b36a679';
+import { BinaryReader } from './binary-reader.js?v=97135b36a679';
+import { recordCollection } from './runtime-stats.js?v=97135b36a679';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=97135b36a679';
+import { scrollsItself } from './scrolling-view.js?v=97135b36a679';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -937,7 +937,7 @@ const hostReturn = (method, value) => {
 const equal = (a, b) => (isNull(a) && isNull(b)) || (a && b && typeof a === 'object' && typeof b === 'object' ? a.ref === b.ref : a === b);
 const signed16 = n => (n << 16) >> 16;
 const signed8 = n => (n << 24) >> 24;
-const WIDE_HIGH = Symbol('wide-high');
+export const WIDE_HIGH = Symbol('wide-high');
 const defaultValue = type => type === 'J' || type === 'D' ? 0n : type.startsWith('L') || type.startsWith('[') ? null : 0;
 const wordCount = parameters => parameters.reduce((n, type) => n + (type === 'J' || type === 'D' ? 2 : 1), 0);
 const LIFECYCLE_CALLBACKS = 'Landroid/app/Application$ActivityLifecycleCallbacks;';
@@ -1160,6 +1160,7 @@ export class APKRuntime {
     // boolean/byte/short/char/int/long/float/double methods with 0/false; 'all' also answers object methods with null. Every stubbed call is counted and traced (STUB-VOID / STUB-RETURN), so the run
     // doubles as the to-do list of missing bridges; a run that stubbed anything is never treated as validated. The default stays strict.
     if (!['off', 'void', 'primitives', 'all'].includes(tolerateMissing)) fail('VM tolerateMissing must be off, void, primitives or all');
+    this.debugger = null; this.debugRearm = null;   // the Java debugger (src/debugger.js) while one is attached; a breakpoint being stepped over (interpreter.js, opcode 0x73)
     this.methodOverrides = null; this.methodInterceptors = null; this.tolerateMissing = tolerateMissing; this.missingVoid = new Map(); this.missingReturns = new Map(); this.missingClasses = new Map(); this.missingLibraries = new Map(); this.refusedProtectedLibrary = null;
     this.maxCallDepth = maxCallDepth; this.peakCallDepth = 0;
     if (!Number.isInteger(maxInstructionsPerEvent) || maxInstructionsPerEvent < 1000 || maxInstructionsPerEvent > 200000000) fail('VM maxInstructionsPerEvent must be an integer from 1000 to 200000000');

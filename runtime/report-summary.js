@@ -1,14 +1,14 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=d826b7643adc';
-import { staticRetentionLines } from './heap-gc.js?v=d826b7643adc';
-import { overrideSummaryLines } from './method-overrides.js?v=d826b7643adc';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=d826b7643adc';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=d826b7643adc';
-import { hostMapSummaryLines } from './host-map.js?v=d826b7643adc';
-import { attributeGap } from './worker-task-log.js?v=d826b7643adc';
-import { loadImageText } from './load-image.js?v=d826b7643adc';
-import { identityText } from './device-identity.js?v=d826b7643adc';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=97135b36a679';
+import { staticRetentionLines } from './heap-gc.js?v=97135b36a679';
+import { overrideSummaryLines } from './method-overrides.js?v=97135b36a679';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=97135b36a679';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=97135b36a679';
+import { hostMapSummaryLines } from './host-map.js?v=97135b36a679';
+import { attributeGap } from './worker-task-log.js?v=97135b36a679';
+import { loadImageText } from './load-image.js?v=97135b36a679';
+import { identityText } from './device-identity.js?v=97135b36a679';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -73,6 +73,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     out.push(s.active === 'gpu' ? `Rendering: GPU (experimental, ${s.api ?? 'WebGL'}${s.gpuRenderer ? `, ${s.gpuRenderer}` : ''}): ${s.frames} frames, ${s.gpuMs} ms, max ${s.maxMs} ms${s.recoveries ? `; ${s.recoveries} lost WebGL context(s) replaced, the last: ${s.lastLoss}` : ''}` : s.requested === 'gpu' || s.reason ? `Rendering: CPU — GPU unavailable: ${s.reason ?? 'unknown'}` : 'Rendering: CPU (default)');
   });
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
+  part(() => { const lines = entryEditLines(runtime); if (lines) out.push(...lines); });   // APK files edited by the user in the Code browser (src/code-service.js): never silent
   part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)
   part(() => { const lines = endpointMockSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/endpoint-mocks.js)
   part(() => { const lines = hostMapSummaryLines(runtime.network?.policy?.hostMap ?? runtime.platform?.device?.network?.hostMap, runtime.network?.redirectTable); if (lines) out.push(...lines); });   // "Redirect hosts" in use: never silent (src/host-map.js)
@@ -272,4 +273,12 @@ export function collapseThreads(runtime, threads, mainThread) {
     groups.set(key, (groups.get(key) ?? 0) + 1);
   }
   return { groups: [...groups].sort((a, b) => b[1] - a[1]).map(([key, n]) => `${n}× ${key}`), shown };
+}
+/** The APK entries the user edited (src/code-service.js editFile, listed on the page as "App modified"): null when none is. */
+export function entryEditLines(runtime) {
+  const edits = [...(runtime?.entryEdits?.values() ?? [])]; if (!edits.length) return null;
+  const lines = [`App modified, APK files: ${edits.length} entr${edits.length === 1 ? 'y' : 'ies'} edited by the user (the app reads the edited bytes; listed on the page as "App modified")`];
+  for (const edit of edits.slice(0, 8)) lines.push(`  ${edit.path}: ${edit.bytes.length} bytes (the APK has ${edit.original.length}) · ${edit.by}`);
+  if (edits.length > 8) lines.push(`  … and ${edits.length - 8} more`);
+  return lines;
 }

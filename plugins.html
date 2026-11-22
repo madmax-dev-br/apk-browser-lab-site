@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=d826b7643adc">
-  <link rel="stylesheet" href="./lab-tokens.css?v=d826b7643adc">
+  <link rel="stylesheet" href="./site-pages.css?v=97135b36a679">
+  <link rel="stylesheet" href="./lab-tokens.css?v=97135b36a679">
 </head>
 <body>
   <header class="topbar">
@@ -313,6 +313,17 @@
               <li><a href="#api-hook-smali"><code>smali</code></a></li>
               <li><a href="#api-hooks"><code>hooks</code></a></li>
               <li><a href="#api-unhook"><code>unhook</code></a></li>
+            </ul>
+          </div>
+          <div>
+            <a class="api-index-group" href="#h-codigo">Code and the debugger</a>
+            <ul>
+              <li><a href="#api-code-read"><code>code.search</code>, <code>code.disassemble</code>…</a></li>
+              <li><a href="#api-code-edit"><code>code.editFile</code>, <code>code.editMethod</code></a></li>
+              <li><a href="#api-debug-breakpoints"><code>debug.setBreakpoint</code>…</a></li>
+              <li><a href="#api-debug-control"><code>debug.resume</code>, <code>debug.step</code>…</a></li>
+              <li><a href="#api-debug-inspect"><code>debug.locals</code>, <code>debug.evaluate</code>…</a></li>
+              <li><a href="#api-on-debug"><code>on('debug')</code></a></li>
             </ul>
           </div>
           <div>
@@ -943,6 +954,46 @@
           <p>Removes one of the plugin's changes: the original method runs again from the next call. <code class="shape">{ removed }</code></p>
         </div>
 
+        <h3 id="h-codigo">Code and the debugger</h3>
+        <p>The running APK's code as the <b>Code</b> tool shows it, and the Java debugger of that tool (docs/DEBUGGER.md). Reads change nothing. An edit is a change chosen by you, as with <code>lab.hook</code>: it shows in <b>App modified</b> with the plugin as its owner, is recorded in the trace and goes when the plugin stops. The debugger session is the page's own: the plugin's breakpoints appear in the Code tool's list with its name, and they go when it stops. The app never sees the debugger (<code>Debug.isDebuggerConnected()</code> stays false).</p>
+
+        <div class="api" id="api-code-read">
+          <h4 class="api-sig"><code>await lab.code.search(query, { kinds, limit, framework })</code>, <code>disassemble(descriptor, method?)</code>, <code>classInfo(descriptor)</code>, <code>readFile(path)</code></h4>
+          <p>Search classes, methods, fields, string constants and APK files; a class as exact smali (lines numbered from 1, with each method's <code>pcToLine</code>), or one method's smali; a class's superclass, interfaces, fields and methods; an APK entry as text (compiled XML decoded).</p>
+          <dl class="facts">
+            <div><dt>Returns</dt><dd><code class="shape">{ results: [{ kind, descriptor, name, signature, key, value, path }], more, cursor }</code>; <code class="shape">{ descriptor, text, methods: [{ key, startLine, endLine, hasCode, pcToLine }], method?: { key, text } }</code>; <code class="shape">{ path, kind, text, editable, refusal, edited }</code></dd></div>
+            <div><dt>Cost</dt><dd>One call at a time per plugin, the <b>Plugin power</b> pause between two; a search is at most 500 results per call (<code>more</code> and <code>cursor</code> continue).</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-code-edit">
+          <h4 class="api-sig"><code>await lab.code.editFile(path, text | bytes)</code>, <code>revertFile(path)</code>, <code>editMethod(descriptor, method, smali, { persist })</code></h4>
+          <p>Replaces an editable APK entry (assets, <code>res/raw</code> and other non-compiled files) for the app's next read, or one method's body (the same as <code>lab.hook(method, { smali })</code>). Compiled XML, the resource table, DEX, native libraries and signatures are refused with <code>unsupported</code>; a file another owner edited, with <code>conflict</code>.</p>
+        </div>
+
+        <div class="api" id="api-debug-breakpoints">
+          <h4 class="api-sig"><code>await lab.debug.setBreakpoint(spec)</code>, <code>removeBreakpoint(id)</code>, <code>enableBreakpoint(id, on)</code>, <code>breakpoints({ all })</code>, <code>attach()</code>, <code>detach()</code></h4>
+          <p><code>spec</code>: <code>{ className, line }</code> (a source line), <code>{ type: 'location', method, pc }</code>, <code>{ type: 'entry' | 'exit', method }</code>, <code>{ type: 'exception', exceptionClass, caught, uncaught }</code> or <code>{ type: 'field', className, field, access }</code>; for any of them <code>condition</code>, <code>hitCondition</code> and <code>logMessage</code> (a logpoint: it never stops). The first breakpoint attaches the debugger.</p>
+          <dl class="facts">
+            <div><dt>Owner</dt><dd>A plugin removes or changes only its own breakpoints (<code>not-owner</code> otherwise); <code>breakpoints({ all: true })</code> lists everyone's. <code>detach()</code> removes the plugin's breakpoints and detaches only when no one else has one.</dd></div>
+          </dl>
+        </div>
+
+        <div class="api" id="api-debug-control">
+          <h4 class="api-sig"><code>await lab.debug.pause()</code>, <code>resume({ thread })</code>, <code>step({ kind, unit, thread })</code>, <code>runTo({ method, pc } | { className, line })</code>, <code>wait({ timeoutMs })</code></h4>
+          <p>Execution control of the stopped thread: <code>kind</code> <code>'over'</code>, <code>'into'</code> or <code>'out'</code>, <code>unit</code> <code>'line'</code> or <code>'instruction'</code>. <code>wait</code> resolves the current or next stop (or <code>null</code>).</p>
+        </div>
+
+        <div class="api" id="api-debug-inspect">
+          <h4 class="api-sig"><code>await lab.debug.threads()</code>, <code>frames({ thread })</code>, <code>locals({ thread, frame })</code>, <code>evaluate(expression, { thread, frame })</code>, <code>setLocal(name, value, { thread, frame })</code>, <code>inspect(handle)</code></h4>
+          <p>The threads, the stack, the locals named by the debug info (with types), a read-only Java-like expression, a new value for a local, and an object's fields (values in the format of <a href="#valores">Values</a>).</p>
+        </div>
+
+        <div class="api" id="api-on-debug">
+          <h4 class="api-sig"><code>lab.on('debug', fn)</code></h4>
+          <p>The debugger's events, one per <code>fn</code>: <code>paused</code> (thread, reason, location, mode, exception), <code>resumed</code>, <code>breakpoint-resolved</code>, <code>log</code> (a logpoint's message), <code>exception</code>, <code>detached</code>. At most 500 per 250 ms; <code>dropped</code> counts the rest.</p>
+        </div>
+
         <h3 id="api-saida">Output and utilities</h3>
         <p>Each <code>lab.ui</code> call adds a block. A block with the same <code>id</code> is replaced in place, which lets you update a value without stacking output. Text is always shown as text, never as HTML.</p>
         <div class="table-scroll"><table class="ref">
@@ -1081,6 +1132,16 @@ url = "http://127.0.0.1:8790/mcp"</code></pre></div>
 
         <h3 id="mcp-ferramentas">Tools</h3>
         <p>What the MCP client sees. The reads are the same as the plugins'; the actions use the lab's controls.</p>
+
+        <div class="api" id="mcp-code">
+          <h4 class="api-sig names"><code>code_search</code><code>code_disassemble</code><code>code_class_info</code><code>code_read_file</code><code>code_edit_file</code><code>code_revert_file</code><code>code_edit_method</code></h4>
+          <p>The Code tool's reads and edits: search, a class as smali (or one method with each instruction's dex pc, the unit of breakpoints and steps), class information, an APK entry as text; an edit of an APK file or of a method body is listed in <b>App modified</b> with MCP as owner.</p>
+        </div>
+
+        <div class="api" id="mcp-debug">
+          <h4 class="api-sig names"><code>debug_set_breakpoint</code><code>debug_wait</code><code>debug_step</code><code>debug_continue</code><code>debug_locals</code><code>debug_evaluate</code><code>debug_set_local</code><code>debug_stack</code><code>debug_threads</code><code>debug_run_to</code><code>debug_pause</code><code>debug_breakpoints</code><code>debug_remove_breakpoint</code><code>debug_attach</code><code>debug_detach</code></h4>
+          <p>The Java debugger, the same session as the Code tool's. The loop: <code>debug_set_breakpoint</code> (class and source line, or method and pc, a condition, a hit count, a log message, an exception type), trigger the code (<code>tap</code>, <code>invoke_method</code>, <code>adb</code> <code>am start</code>), <code>debug_wait</code> (it returns where the thread stopped, why, the stack and the locals), inspect (<code>debug_evaluate</code>, <code>debug_locals</code>), then <code>debug_step</code> or <code>debug_continue</code> and <code>debug_wait</code> again. Errors start with their code: <code>[not-attached]</code>, <code>[not-paused]</code>, <code>[bad-args]</code>, <code>[bad-expression]</code>.</p>
+        </div>
 
         <div class="api" id="mcp-lab-status">
           <h4 class="api-sig names"><code>lab_status</code><code>wait_ready</code></h4>
@@ -1259,6 +1320,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
           <li><a href="#ex-janela">Panel in a window</a></li>
           <li><a href="#ex-mock">Mock from the plugin</a></li>
           <li><a href="#ex-hook">Watch and change a method</a></li>
+          <li><a href="#ex-debug">Breakpoint with a report</a></li>
           <li><a href="#ex-rolar">Scroll to the middle or to a position</a></li>
           <li><a href="#ex-aba">Side tab</a></li>
           <li><a href="#ex-botoes">Plugin buttons</a></li>
@@ -1472,6 +1534,21 @@ await lab.button({ label: 'Smali body' }, async () =&gt; {
 await lab.button({ label: 'Original' }, async () =&gt; {
   for (const change of await lab.hooks()) await lab.unhook(change.id);
   lab.ui.text('Original method', { id: 'state' });
+});</code></pre></div>
+
+        <h3 id="ex-debug">Breakpoint with a report</h3>
+        <p>Stops at a source line of the app's code, writes the stopped method, the stack and the locals on the card, then lets the app go on. Change <code>CLASS</code> and <code>LINE</code> (the <code>.line</code> numbers in the Code tool's smali). The breakpoint shows in the Code tool's list with the plugin's name and goes when the plugin stops.</p>
+        <div class="code" data-name="Breakpoint with a report"><pre><code>const CLASS = 'com.example.app.MainActivity', LINE = 42;
+const bp = await lab.debug.setBreakpoint({ className: CLASS, line: LINE });
+lab.ui.text(`Waiting at ${bp.where}${bp.resolved ? '' : ' (pending until the class runs)'}`, { id: 'state' });
+lab.on('debug', async event =&gt; {
+  if (event.type !== 'paused' || !event.reasons?.some(reason =&gt; reason.id === bp.id)) return;
+  const frames = await lab.debug.frames({ thread: event.thread });
+  const locals = await lab.debug.locals({ thread: event.thread });
+  lab.ui.text(`${event.location.methodName} line ${event.location.line} (${event.mode})`, { id: 'state' });
+  lab.ui.table(frames.frames.map(f =&gt; ({ method: f.host ? 'host code' : `${f.className}.${f.methodName}`, line: f.line ?? '' })), { id: 'stack' });
+  lab.ui.table(locals.locals.map(l =&gt; ({ name: l.name, type: l.type, value: JSON.stringify(l.value) })), { id: 'locals' });
+  if (event.held) await lab.debug.resume();
 });</code></pre></div>
 
         <h3 id="ex-rolar">Scroll to the middle or to a position</h3>
@@ -1852,6 +1929,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=d826b7643adc"></script>
+  <script type="module" src="./site-pages.js?v=97135b36a679"></script>
 </body>
 </html>

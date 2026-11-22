@@ -9,8 +9,9 @@
 //     it in memory, shows its first PREVIEW_CHARS read-only and says so; Paste replaces it, Format / Minify / Clear / Download work on the whole text in slices.
 // Markup (index.html), for an editor with id X: textarea#X.ce-input inside .ce-main next to pre.ce-hl > code#X-hl, a gutter #X-gutter, and optional #X-status (role=status),
 // #X-pos (caret line and column) and #X-large (the banner of a large text, with #X-large-text).
-import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=d826b7643adc';
-import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=d826b7643adc';
+import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=97135b36a679';
+import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=97135b36a679';
+import { tokenizeSmaliLine } from './smali-tools.js?v=97135b36a679';
 
 export const LARGE_CHARS = 512 * 1024, PREVIEW_CHARS = 64 * 1024, LONG_LINE = 2000, CHECK_DELAY_MS = 300, SLICE_CHARS = 131072;
 const INDENT = '  ', OPENERS = '{[(', CLOSERS = '}])';
@@ -112,10 +113,11 @@ export function createCodeEditor({ $, id, language = 'json', onChange = () => {}
       if (S.statesVersion !== S.version) { S.states = lineStates(area.value); S.statesVersion = S.version; }
       return tokenizeJsLine(line, S.states[n]).tokens;
     }
+    if (S.language === 'smali') return tokenizeSmaliLine(line);
     return [];
   }
   function bracketMarks() {
-    if (S.language === 'text' || area.selectionStart !== area.selectionEnd || doc.activeElement !== area) return [];
+    if (S.language === 'text' || S.language === 'smali' || area.selectionStart !== area.selectionEnd || doc.activeElement !== area) return [];
     const value = area.value, caret = area.selectionStart ?? 0;
     const pairOf = offset => {
       if (S.language === 'json') return matchBracketJson(value, offset);
@@ -205,6 +207,7 @@ export function createCodeEditor({ $, id, language = 'json', onChange = () => {}
       status = { state: result.error ? 'error' : 'ok', bytes: result.bytes, lines: result.lines, error: result.error };
     }
     if (cancelled()) return null;
+    if (S.language === 'smali' && S.external?.version === version) status = { ...status, state: S.external.error ? 'error' : 'ok', error: S.external.error };   // the Worker's verdict on this text (setError)
     S.status = status; S.checkedVersion = version; showStatus(); schedule(); onStatus(status); settle();
     return status;
   }
@@ -275,6 +278,19 @@ export function createCodeEditor({ $, id, language = 'json', onChange = () => {}
     },
     clear() { setValue(''); area.focus?.(); },
     focus() { area.focus?.(); },
+    /** The version of the text (it grows with every edit): setError applies to the version it was computed for. */
+    get version() { return S.version; },
+    /** An error found outside the editor (the smali verifier of the Worker): { line, col, message } or null for "no error", for the text of `version`; the status and the
+     *  line mark show it until the text changes. */
+    setError(error, version = S.version) {
+      if (version !== S.version) return false;
+      const mark = error ? { line: error.line || 0, col: error.col || 1, message: String(error.message ?? ''), offset: error.line ? offsetOf(error.line, error.col || 1) : undefined } : null;
+      S.external = { version, error: mark };
+      if (S.checkedVersion === version) { S.status = { ...S.status, state: mark ? 'error' : 'ok', error: mark }; showStatus(); schedule(); }
+      return true;
+    },
+    /** Puts the caret at line:col (1-based) and scrolls it into view. */
+    reveal(line, col = 1) { const at = offsetOf(line, col); area.focus?.(); area.setSelectionRange?.(at, at); const { lh } = metrics(); area.scrollTop = Math.max(0, (line - 3) * lh); schedule(); },
     /** Repaints (the dialog opened: sizes are known now). */
     refresh() { S.metrics = null; schedule(); },
     get state() { return S; },

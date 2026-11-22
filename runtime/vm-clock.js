@@ -33,6 +33,28 @@ export class VMClock {
   nanos() { if (this.base !== undefined) this.nanoReads++; return BigInt(Math.floor(this.now() * 1000)) * 1000n; }
   /** Wall-clock nanoseconds since the epoch as a BigInt. */
   wallNanos() { return BigInt(Math.round((performance.timeOrigin + this.now()) * 1000)) * 1000n; }
+  /**
+   * The debugger suspended every thread (src/debugger.js): the host time until debugResume is taken out of the clock, as a device's clocks do not see the time a JDWP
+   * debugger holds the VM... in the sense that matters to the app -- nothing it scheduled comes due, and no interval it measures includes the pause. The pause is subtracted
+   * from the skew when it ends (a frame's frozen start moves with it), so reading the clock costs nothing extra. A deterministic clock does not follow host time: nothing to do.
+   */
+  debugPause() {
+    if (this.debugPausedAt !== undefined && this.debugPausedAt !== null) return;
+    this.debugPausedAt = performance.now();
+    this.debugFroze = this.base === undefined && this.frozenAt === null;   // while paused the clock reads as a frozen frame does (one microsecond per read): monotonic, never past the pause
+    if (this.debugFroze) { this.frozenAt = this.debugPausedAt; this.reads = 0; }
+  }
+  debugResume() {
+    const at = this.debugPausedAt; if (at === undefined || at === null) return 0;
+    this.debugPausedAt = null;
+    if (this.base !== undefined) return 0;
+    const pause = Math.max(0, performance.now() - at);
+    if (this.debugFroze) { const ticks = this.reads * 0.001; this.frozenAt = null; this.reads = 0; this.skew -= Math.max(0, pause - ticks); }
+    else { this.skew -= pause; if (this.frozenAt !== null) this.frozenAt += pause; }
+    this.debugFroze = false;
+    this.debugPausedMs = (this.debugPausedMs ?? 0) + pause;
+    return pause;
+  }
   /** Advances the clock by `ms` (no real waiting). */
   skip(ms) { if (ms > 0) this.skew += ms; }
 }

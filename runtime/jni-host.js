@@ -1,22 +1,22 @@
-import { APKError } from './apk-error.js?v=d826b7643adc';
-import { ACCESSORS as HIDDEN_ACCESSORS, hiddenReflection } from './hidden-members.js?v=d826b7643adc';
-import { constantField, nonConstantField } from './framework-constants.js?v=d826b7643adc';
-import { JavaException } from './apk-runtime.js?v=d826b7643adc';
-import { JNI_FUNCTIONS } from './jni-function-table.js?v=d826b7643adc';
-import { buildElfDescriptor } from './native-descriptor.js?v=d826b7643adc';
-import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=d826b7643adc';
-import { NativeLinker, LinkError } from './native-linker.js?v=d826b7643adc';
-import { hostFunction } from './wasm-host-function.js?v=d826b7643adc';
-import { parseWasm } from './wasm-dylink.js?v=d826b7643adc';
-import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=d826b7643adc';
-import { BUCKET, inBucket } from './time-breakdown.js?v=d826b7643adc';
-import { Blocked } from './scheduler.js?v=d826b7643adc';
-import { registerWasmMemory, registerNativeHeap } from './unsafe-native.js?v=d826b7643adc';
-import { installDirectBuffers } from './direct-buffers.js?v=d826b7643adc';
-import { writeSkPath } from './skia-path-layout.js?v=d826b7643adc';
-import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=d826b7643adc';
-import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=d826b7643adc';
-import { withVariants } from './native-provider-variants.js?v=d826b7643adc';
+import { APKError } from './apk-error.js?v=97135b36a679';
+import { ACCESSORS as HIDDEN_ACCESSORS, hiddenReflection } from './hidden-members.js?v=97135b36a679';
+import { constantField, nonConstantField } from './framework-constants.js?v=97135b36a679';
+import { JavaException } from './apk-runtime.js?v=97135b36a679';
+import { JNI_FUNCTIONS } from './jni-function-table.js?v=97135b36a679';
+import { buildElfDescriptor } from './native-descriptor.js?v=97135b36a679';
+import { parseSignature, bitsDouble, bitsFloat, doubleBits, floatBits } from './host-contract.js?v=97135b36a679';
+import { NativeLinker, LinkError } from './native-linker.js?v=97135b36a679';
+import { hostFunction } from './wasm-host-function.js?v=97135b36a679';
+import { parseWasm } from './wasm-dylink.js?v=97135b36a679';
+import { formatVersion, isUnreleased, nightlyCommit } from './rn-version.js?v=97135b36a679';
+import { BUCKET, inBucket } from './time-breakdown.js?v=97135b36a679';
+import { Blocked } from './scheduler.js?v=97135b36a679';
+import { registerWasmMemory, registerNativeHeap } from './unsafe-native.js?v=97135b36a679';
+import { installDirectBuffers } from './direct-buffers.js?v=97135b36a679';
+import { writeSkPath } from './skia-path-layout.js?v=97135b36a679';
+import { createFileSyscalls, SYSCALLS } from './native-file-syscalls.js?v=97135b36a679';
+import { createPosixFileSyscalls, POSIX_SYSCALLS } from './native-posix-files.js?v=97135b36a679';
+import { withVariants } from './native-provider-variants.js?v=97135b36a679';
 
 // JNI -> WebAssembly bridge.
 //

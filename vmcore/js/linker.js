@@ -31,9 +31,9 @@
 // Threads (vmcore/threads.h, vmcore/js/threads.js): the linker lives in one thread, its owner; Workers send their env.resolve requests to it through a slot in ThreadsState.
 // Whatever a reader tests to see a record as published (a constant's `a`, Method.kind, the class and string counts) is written last, with Atomics.store.
 
-import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=d826b7643adc';
-import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=d826b7643adc';
-import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=d826b7643adc';
+import { CORE_NATIVES, HOST_VIRTUALS, HOST_INTERFACE_METHODS, STRING_CONSTRUCTORS } from './natives.js?v=97135b36a679';
+import { CLASS_STRING, STRING_LAYOUT, literalBytes, writeLiteral } from './strings.js?v=97135b36a679';
+import { WELL_KNOWN, RESOLVE_WELL_KNOWN } from './exceptions.js?v=97135b36a679';
 
 export const CLASS = { super: 0, instanceSize: 4, refMap: 8, flags: 12, depth: 16, display: 20, vtable: 24, vtableLength: 28, itable: 32, itableLength: 36, statics: 40, staticRefMap: 44,
   initState: 48, initThread: 52, initList: 56, clinit: 60, component: 64, accessFlags: 68, id: 72, SIZE: 76 };
@@ -107,7 +107,7 @@ export class Linker {
   constructor(runtime, { memory, metaStart, metaEnd, natives = DEFAULT_NATIVES, maxMethods = 1 << 16, maxClasses = 1 << 16, maxStrings = 1 << 16 }) {
     this.r = runtime; this.memory = memory; this.unsharedMemory = !(typeof SharedArrayBuffer === 'function' && memory.buffer instanceof SharedArrayBuffer); this.top = metaStart; this.end = metaEnd; this.natives = natives;
     this.maxMethods = maxMethods; this.maxClasses = maxClasses; this.maxStrings = maxStrings;
-    this.classes = new Map(); this.classList = []; this.methodList = []; this.methodsAt = new Map(); this.strings = new Map(); this.error = null;
+    this.onLinked = null; this.classes = new Map(); this.classList = []; this.methodList = []; this.methodsAt = new Map(); this.strings = new Map(); this.error = null;
     this.core = null; this.thread = 0; this.defaultThread = 0;   // bindCore: the exports that make interned String records for static initial values, and a thread to allocate as
     this.staticRoots = [];   // addresses of every reference static slot laid out so far (collector roots: static storage is metaspace, never heap)
     this.extraRoots = [];    // [address, words] ranges of metaspace that hold heap references for others (the host state's box caches, vmcore/js/host-linking.js)
@@ -483,6 +483,7 @@ export class Linker {
     mi.pool = pool; mi.poolAddress = poolAt;
     this.w32(mi.address + METHOD.code, codeAt); this.w32(mi.address + METHOD.pool, poolAt); this.w32(mi.address + METHOD.tries, tries);
     Atomics.store(this.u32, (mi.address + METHOD.kind) >>> 2, 0);
+    if (this.onLinked !== null) this.onLinked(mi);   // the debugger arms its pending breakpoints in the new code (vmcore/js/core-debug.js)
   }
 
   /**

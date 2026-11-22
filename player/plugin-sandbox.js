@@ -2,7 +2,7 @@
 // from the embedding page, which is another site, so it must not get the runtime origin (its IndexedDB app data of other embedders, caches, same-origin requests).
 // One hidden sandboxed iframe (sandbox="allow-scripts", no allow-same-origin: an opaque origin) creates each Worker from a Blob URL of its own origin and relays the
 // messages; src/plugin-host.js sees an ordinary { postMessage, onmessage, onerror, terminate } Worker. Nothing is created until the first plugin starts.
-import { pluginWorkerSource } from '../plugin-runtime.js?v=d826b7643adc';
+import { pluginWorkerSource } from '../plugin-runtime.js?v=97135b36a679';
 
 export const RELAY_SOURCE = `<!doctype html><meta charset="utf-8"><title>plugins</title><script>
 "use strict";

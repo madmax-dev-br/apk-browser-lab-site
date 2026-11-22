@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=d826b7643adc';
-import { BUCKET } from './time-breakdown.js?v=d826b7643adc';
-import { Blocked, QUANTUM } from './scheduler.js?v=d826b7643adc';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=d826b7643adc';
+import { APKError } from './apk-error.js?v=97135b36a679';
+import { BUCKET } from './time-breakdown.js?v=97135b36a679';
+import { Blocked, QUANTUM } from './scheduler.js?v=97135b36a679';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=97135b36a679';
 
 // Frame-based DEX interpreter.
 //
@@ -83,8 +83,10 @@ function prepareCore(rt, method, code) {
   // Code units are little-endian 16-bit words; a view avoids copying when the code item is 2-byte aligned (always, in a well-formed DEX, unless the input buffer is offset oddly).
   const units = (byteStart & 1) === 0 && LITTLE_ENDIAN ? new Uint16Array(reader.bytes.buffer, byteStart, code.units) : Uint16Array.from({ length: code.units }, (_, i) => reader.view.getUint16(code.offset + i * 2, true));
   const origin = rt.methodOrigin(method);
-  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, d: null, ghost: null, deopts: 0, noDirect: false, dc: 0, dn: 0, info: undefined, method, code, getter: detectGetter(code, units), shape: detectShape(code, units) };
-  progs.set(rt, prog); (rt.allProgs ??= []).push(prog); return prog;   // allProgs: applyMethodOverrides resets the call-site caches of every decoded method (src/method-overrides.js)
+  const prog = { dex, units, refs: new Array(code.units), tries: null, stats: rt.executionByOrigin[origin], key: method.key, filename: dex.filename ?? 'DEX', calls: 0, loops: 0, fn: null, d: null, ghost: null, deopts: 0, noDirect: false, dc: 0, dn: 0, info: undefined, method, code, getter: detectGetter(code, units), shape: detectShape(code, units), debug: false };
+  progs.set(rt, prog); (rt.allProgs ??= []).push(prog);
+  if (rt.debugger !== null) rt.debugger.prepared(prog);   // a pending breakpoint in this method is armed now that its code is decoded (src/debugger.js)
+  return prog;   // allProgs: applyMethodOverrides resets the call-site caches of every decoded method (src/method-overrides.js)
 }
 
 /**
@@ -204,7 +206,7 @@ function calleeInfo(calleeMethod, prog) {
 /** Compiles the method of `frame` now (a loop in it has run long enough in the interpreter). Always returns false. */
 function compileHot(rt, prog, frame = null) {
   const code = prog.code, method = prog.method;
-  if (prog.fn === null && rt.jit && rt.instructionProbe === undefined && code.units <= MAX_COMPILED_UNITS) {
+  if (prog.fn === null && rt.jit && rt.instructionProbe === undefined && !prog.debug && code.units <= MAX_COMPILED_UNITS) {   // prog.debug: a method with breakpoints stays interpreted (src/debugger.js)
     const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
     const tb = rt.tb, previous = tb.enter(BUCKET.COMPILE); try { prog.fn = compileMethod(rt, method, code, prog, tries, jitSupport(rt)); } finally { tb.leave(previous); }
     if (prog.fn !== null) rt.jitCompiled++;
@@ -215,7 +217,7 @@ function compileHot(rt, prog, frame = null) {
 /** Gives the method its direct form (see "Direct form"). A method the compiler does not take, or one that lost its direct form (noDirect), keeps none. */
 function compileDirect(rt, prog) {
   const code = prog.code, method = prog.method;
-  if (prog.d !== null || prog.noDirect || !rt.jit || !rt.tier2 || rt.instructionProbe !== undefined || code.units > MAX_COMPILED_UNITS || code.registers > 240) return;
+  if (prog.d !== null || prog.noDirect || prog.debug || !rt.jit || !rt.tier2 || rt.instructionProbe !== undefined || code.units > MAX_COMPILED_UNITS || code.registers > 240) return;
   const tries = prog.tries ??= decodeTries(rt, code, prog.dex);
   if (prog.ghost === null) { prog.ghost = new Frame(method, code, NO_REGS, prog); prog.ghost.busy = true; }
   const tb = rt.tb, previous = tb.enter(BUCKET.COMPILE); try { prog.d = compileMethod(rt, method, code, prog, tries, jitSupport(rt), true); } finally { tb.leave(previous); }
@@ -618,6 +620,22 @@ export function missingResultCall(dex, u, pc) {
   return '';
 }
 
+/**
+ * The debugger (src/debugger.js) stops `thread` at `pc` of its top frame `f`: a breakpoint, the end of a step, or an exception about to be unwound (`thrown`). It either holds the
+ * thread in place (the page talks to it meanwhile through a synchronous channel) or decides there and then that the thread goes on (a condition that is false, a logpoint) --
+ * false: the instruction runs now -- or parks it (true): only a thread this loop runs as a pure scheduling slice of the event pump, with no host code of its own on the
+ * JavaScript stack (owner null, not a direct form's single invoke, the outermost run), can be parked; the debugger's Blocked keeps it until it is resumed.
+ */
+function debugStop(rt, thread, f, pc, owner, single, kind, thrown) {
+  f.pc = pc;
+  const parkable = owner === null && single === null && rt.nestedRuns === 1;
+  const parked = rt.debugger.stop(thread, f, pc, parkable, kind, thrown);
+  if (parked) { thread.blocked = rt.debugger.parkBlocked(thread, kind, thrown); thread.blockKind = 'site'; thread.state = 'blocked'; }
+  return parked;
+}
+/** For the debugger: the handler pc of `frame` for exception `value` thrown at `pc` (null: none), as the unwinding finds it. */
+export function debugCatchTarget(rt, frame, pc, value) { return catchTarget(rt, frame, pc, value); }
+
 /** The thread the interpreter is currently running (the scheduler switches it at safepoints). */
 export function currentThread(rt) { return rt.thread ?? rt.scheduler.mainThread(); }
 
@@ -651,6 +669,7 @@ export function runNested(rt, method, code, args) {
   if (rt.nestedRuns === 1) rt.scheduler.beginEvent(rt);
   thread.frames.push(makeFrame(rt, method, code, args));
   thread.nestedDepth++;
+  if (rt.debugger !== null) (thread.debugBases ??= []).push(base);   // where this run's frames start (an exception leaving them goes to host code: src/debugger.js)
   // The thread may be parked (a Java wait below on its stack, served by this run: the scheduler runs due main-Looper messages on the main thread while it waits -- serviceEvents, idle).
   // The run has its own blocking inside (a message that sleeps or waits parks and resumes the thread through `blocked`); the outer wait's bookkeeping is kept aside and put back when the
   // run ends, or the outer wait was lost: the thread went on after its wait() as if it had returned, without reacquiring the monitor, and its synchronized handler looped on
@@ -666,6 +685,7 @@ export function runNested(rt, method, code, args) {
   finally {
     rt.t2Site = directSite; rt.dstart = dstart; rt.dlimit = dlimit; if (rt.nestedRuns === 1) foldDirectCalls(rt);
     thread.frames.length = base; thread.nestedDepth--; rt.nestedRuns--; rt.thread = thread;
+    if (thread.debugBases !== undefined && thread.debugBases[thread.debugBases.length - 1] === base) thread.debugBases.pop();
     if (parked !== null) { thread.blocked = parked.blocked; thread.blockKind = parked.kind; thread.state = parked.state; thread.timedOut = parked.timedOut; }
     else if (failure !== null) rt.scheduler.dropAbandonedWait(thread, failure);   // a wait this run's frames were in, left by an error that ended the run: it ends with them (Scheduler.dropAbandonedWait)
     if (rt.nestedRuns === 0 && thread === rt.scheduler.main) rt.platform?.looperHost?.hostEventRan(rt);   // the host event is over: its Looper goes back to MessageQueue.next() (IdleHandlers run once)
@@ -694,10 +714,10 @@ function runLoop(rt, owner, base, single = null) {
   // when one is due (rt.gcWanted). An allocation that finds a collection due zeroes rt.q (APKRuntime.makeObject), so the next back-edge or call of either kind reaches the safepoint at once:
   // a loop that allocates several objects per iteration can otherwise fill the whole headroom inside one quantum, and a run stays interpreted for its first JIT_LOOPS iterations.
   let need = owner === null, quantum = QUANTUM, ran = false, input = null;
-  const max = rt.maxInstructionsPerEvent, heapChunks = rt.heap.chunks, heapList = { get: id => { const chunk = heapChunks[id >>> 12]; return chunk === undefined ? undefined : chunk[id & 4095]; } }, fastCalls = rt.fastCallPaths !== false; let probe = rt.instructionProbe;
+  const max = rt.maxInstructionsPerEvent, heapChunks = rt.heap.chunks, heapList = { get: id => { const chunk = heapChunks[id >>> 12]; return chunk === undefined ? undefined : chunk[id & 4095]; } }, fastCalls = rt.fastCallPaths !== false; let probe = rt.debugRearm === null ? rt.instructionProbe : rt.debugRearm.probe;
   if (owner !== null) { frames = owner.frames; f = frames[frames.length - 1]; if (f === undefined) fail(`The run owner thread ${owner.name} (${owner.state}) has no frames to run`); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; pc = f.pc; start = pc; }
   for (;;) {
-    probe = rt.instructionProbe;
+    probe = rt.debugRearm === null ? rt.instructionProbe : rt.debugRearm.probe;   // a debugger's step (src/debugger.js) or a breakpoint it steps over
     try {
       // ---- host steps and thread drivers: advance them until a Java frame is on top again, the thread blocks, or a value/error reaches a DEX frame
       while (input !== null) {
@@ -761,9 +781,24 @@ function runLoop(rt, owner, base, single = null) {
         if (++rt.steps > max) rt.budgetExceeded(`Instruction budget (${max}/event) exceeded`);
         stats.instructions++;
         const w = u[pc], op = w & 255, a = w >> 8, lo = a & 15, hi = a >> 4;
-        if (probe) probe(f.method, dex, pc, op, probeWord(u, pc));
+        if (probe && probe(f.method, dex, pc, op, probeWord(u, pc)) === true && rt.debugger !== null) {   // the debugger's probe stops the thread here (a step ended: src/debugger.js)
+          if (debugStop(rt, thread, f, pc, owner, single, 'step', null)) { rt.steps--; stats.instructions--; need = true; break inner; }   // parked: this instruction runs when it resumes
+          probe = rt.debugRearm === null ? rt.instructionProbe : rt.debugRearm.probe; u = prog.units;   // held in place and resumed: what the debugger changed meanwhile
+          if (rt.debugger !== null && rt.debugger.returns.size) { const early = rt.debugger.takeReturn(thread, f); if (early !== undefined) { rt.steps--; stats.instructions--; returnValue = early.value; returning = true; break interp; } }   // force-early-return
+        }
         switch (op) {
           case 0x00: if (w) fail('Attempted to execute a DEX data payload'); pc++; break;
+          case 0x73: {   // the debugger's breakpoint (src/debugger.js wrote it over this instruction's opcode in the method's own copy of its code): stop, then run the instruction once
+            rt.steps--; stats.instructions--;   // counted when the instruction itself runs
+            const dbg = rt.debugger;
+            if (dbg !== null && !dbg.passing(thread, f, pc)) {
+              if (debugStop(rt, thread, f, pc, owner, single, 'breakpoint', null)) { need = true; break inner; }   // parked: the breakpoint is passed over when it resumes
+            }
+            if (rt.debugger !== null && rt.debugger.returns.size) { const early = rt.debugger.takeReturn(thread, f); if (early !== undefined) { returnValue = early.value; returning = true; break; } }   // force-early-return: the frame returns this value now
+            if (rt.debugger === null || !rt.debugger.passOver(prog, pc, thread, f)) { if ((u[pc] & 255) === 0x73) fail(`A debugger breakpoint opcode is left at PC 0x${pc.toString(16)} of ${f.method.key}`); }
+            probe = rt.debugRearm === null ? rt.instructionProbe : rt.debugRearm.probe;
+            break;   // the original instruction at pc runs next; the breakpoint is written back after it (APKRuntime.debugRearm)
+          }
           case 0x01: case 0x07: regs[lo] = regs[hi]; pc++; break;
           case 0x02: case 0x08: regs[a] = regs[u[pc + 1]]; pc += 2; break;
           case 0x03: case 0x09: regs[u[pc + 1]] = regs[u[pc + 2]]; pc += 3; break;
@@ -1123,6 +1158,9 @@ function runLoop(rt, owner, base, single = null) {
           try { rt.throwJava('Ljava/lang/ArithmeticException;', current.message); } catch (converted) { current = converted; }
         }
         if (current instanceof JavaException) {
+          if (innermost && rt.debugger !== null && rt.debugger.wantsThrow(current) && debugStop(rt, thread, f, start, owner, single, 'exception', current)) {   // an exception breakpoint (src/debugger.js)
+            f.pc = start; f.callPc = start; need = true; break;   // parked (Debugger.parkThrow): unwinding goes on from here when the thread resumes
+          }
           const target = catchTarget(rt, f, start, current.value);
           if (target !== null) { f.pendingException = current.value; pc = target; rt.record(`CATCH ${rt.typeOf(current.value)} in ${f.method.key}`); rt.noteCaught(current.value, f.method.key); regs = f.regs; prog = f.prog; u = prog.units; dex = prog.dex; stats = prog.stats; break; }
           current.message = `${f.method.key} [${prog.filename}] at PC 0x${start.toString(16).padStart(4, '0')}: ${current.message}`;

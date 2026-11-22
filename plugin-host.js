@@ -7,22 +7,25 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=d826b7643adc';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d826b7643adc';
-import { encodeVariantImages } from './render-variant-image.js?v=d826b7643adc';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=d826b7643adc';
-import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=d826b7643adc';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=d826b7643adc';
+import { pluginWorkerSource } from './plugin-runtime.js?v=97135b36a679';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=97135b36a679';
+import { encodeVariantImages } from './render-variant-image.js?v=97135b36a679';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=97135b36a679';
+import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=97135b36a679';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=97135b36a679';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
 const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
 for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
 for (const method of ['frame', 'invoke', 'adb']) ACTION_METHODS.add(method);   // where the device is on the page (src/lab-overlays.js) and a call of one of the app's methods (src/app-invoke.js), a page operation like a click
-for (const method of ['hook', 'unhook', 'hooks']) ACTION_METHODS.add(method);   // the plugin's method changes (src/method-hooks.js through src/method-hooks-panel.js: listed on the page as "App modified")
+for (const method of ['hook', 'unhook', 'hooks']) ACTION_METHODS.add(method);
+for (const method of ['code', 'debug']) ACTION_METHODS.add(method);   // lab.code (the Code browser's reads and edits) and lab.debug (the page's debugger session): src/debugger-plugin-actions.js over src/debugger-controller.js
+const PACED_ACTIONS = new Set(['code', 'debug']);   // one at a time per caller, the Plugin power gap (vmGapMs) between two: they reach the VM Worker
+export const MAX_DEBUG_EVENTS = 500;   // debugger events per flush to the plugins that listen (a logpoint in a hot loop is bounded here; `dropped` counts the rest)   // the plugin's method changes (src/method-hooks.js through src/method-hooks-panel.js: listed on the page as "App modified")
 /** The events a plugin can listen to ('frame': the device moved or resized; 'modal' / 'tab' / 'overlay' / 'track': the runtime's own, for the handles of lab.modal, lab.tab, lab.overlay, lab.track;
  *  'call': the batches of observed calls of the plugin's own method changes, src/method-hooks.js). */
-export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call']);   // 'call': calls of the methods the plugin observes (lab.hook { observe })
+export const PLUGIN_EVENTS = Object.freeze(['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call', 'debug']);   // 'debug': the debugger's events (src/debugger-controller.js)   // 'call': calls of the methods the plugin observes (lab.hook { observe })
 const UNCACHED_VM_METHODS = new Set(['scrollState']);   // read again on every call: lab.scrollTo steers by it between two scroll steps, and an animated scroll moves without a new answer of the cache's frame
 const VM_METHODS = new Set(['batch', 'methods', 'scrollState', 'resourceIds', 'viewModels', 'fragments', 'activity', 'inspect', 'field', 'composeTree', 'statics', 'staticField', 'classes', 'instances', 'referrers', 'compositionLocals', 'findCompositionLocal']);
 
@@ -130,6 +133,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   const plugins = new Map();   // id -> runtime record of a plugin the panel knows
   let lastFreshenAt = -Infinity, lastSnapshot = null, frame = 0, screen = null, screenSig = null, wantsLogs = false, lastLogSeq = -1;
   let logBuffer = [], logDropped = 0, netPending = new Map(), eventTimer = null;
+  let debugBuffer = [], debugDropped = 0;
   const cache = new Map(); let cacheFrame = -1;   // VM answers of the current frame: key -> Promise
   const vmQueue = []; let vmBusy = false, vmLastAt = -Infinity, vmTimer = null;
   let workerStats = null;
@@ -148,6 +152,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
   function flushEvents() {
     eventTimer = null;
     if (logBuffer.length) { const batch = logBuffer; logBuffer = []; const dropped = logDropped; logDropped = 0; for (const plugin of subscribed('log')) { plugin.stats.logLines += batch.length; plugin.stats.logDropped += dropped; send(plugin, { t: 'event', name: 'log', data: batch }); } stats.events++; }
+    if (debugBuffer.length) { const batch = debugBuffer, dropped = debugDropped; debugBuffer = []; debugDropped = 0; for (const plugin of subscribed('debug')) send(plugin, { t: 'event', name: 'debug', data: dropped ? batch.map(event => ({ ...event, dropped })) : batch }); stats.events++; }
     if (netPending.size) { const batch = [...netPending.values()]; netPending = new Map(); for (const plugin of subscribed('network')) send(plugin, { t: 'event', name: 'network', data: batch }); stats.events++; }
   }
 
@@ -239,6 +244,7 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     }
     if (ACTION_METHODS.has(method)) {   // the lab's own controls (reload, endpoint mocks, modals): only where the page provides them (not in the embedded player or a backend)
       const action = actions?.[method]; if (typeof action !== 'function') throw Object.assign(new Error(`lab.${method} is not available here.`), { code: 'unsupported' });
+      if (PACED_ACTIONS.has(method) && args?.op !== 'wait') return paced(plugin, () => action({ id: plugin.id, name: plugin.name }, args ?? {}));
       return action({ id: plugin.id, name: plugin.name }, args ?? {});
     }
     if (method === 'find') {   // lab.find: the components a target names, as lab.layoutBounds() elements (Views with the resource name of their android:id)
@@ -290,6 +296,17 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     if (!VM_METHODS.has(method)) throw Object.assign(new Error(`Unknown method: ${String(method).slice(0, 40)}`), { code: 'bad-query' });
     try { return await ask(plugin, method, args); }
     catch (error) { if (error?.code === 'no-apk' && EMPTY[method]) return EMPTY[method](); throw error; }
+  }
+  /** lab.code / lab.debug calls of one caller: one at a time, at least the Plugin power gap apart (a plugin in a loop cannot flood the VM Worker). */
+  async function paced(plugin, run) {
+    const previous = plugin.pacedChain ?? Promise.resolve(); let release; const mine = new Promise(resolve => { release = resolve; });
+    plugin.pacedChain = previous.then(() => mine);
+    await previous;
+    try {
+      const wait = (plugin.pacedAt ?? -Infinity) + P.vmGapMs - now(); if (wait > 0) await new Promise(resolve => setTimer(resolve, wait));
+      if (plugin !== pageCaller && !plugin.worker) throw Object.assign(new Error('Plugin stopped.'), { code: 'stopped' });
+      return await run();
+    } finally { plugin.pacedAt = now(); release(); }
   }
   async function ask(plugin, method, args) {
     if (!vm?.worker && EMPTY[method]) return EMPTY[method]();
@@ -456,6 +473,13 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
         const plugin = plugins.get(String(batch?.owner ?? '')); if (!plugin?.worker || !plugin.subs.has('call') || !Array.isArray(batch.calls) || !batch.calls.length) continue;
         plugin.stats.calls = (plugin.stats.calls ?? 0) + batch.calls.length; send(plugin, { t: 'event', name: 'call', data: batch.calls }); stats.events++;
       }
+    },
+    /** A debugger event (src/debugger-controller.js onEvent): batched to the plugins that listen to 'debug', at most MAX_DEBUG_EVENTS per flush. */
+    debugEvent(event) {
+      if (!plugins.size || !subscribed('debug').length || !event || typeof event !== 'object') return;
+      if (debugBuffer.length >= MAX_DEBUG_EVENTS) { debugDropped++; return; }
+      let data; try { data = JSON.parse(JSON.stringify(event)); } catch { return; }
+      debugBuffer.push(data); scheduleEvents();
     },
     /** A network-log batch from the Worker (src/netlog.js): new and updated entries, merged by seq until the next flush. */
     netlog(message) {

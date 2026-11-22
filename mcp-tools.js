@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=d826b7643adc';
+import { blockValue, outputsOf } from './plugin-host.js?v=97135b36a679';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -52,9 +52,10 @@ export function readyReport(result) {
  * query(method, args): the plugin host's page-level query (screen, layoutBounds, screenshot, composeTree, viewModels, inspect, field, statics, staticField, classes,
  * instances, referrers, compositionLocals, findCompositionLocal). plugins(): the host's read model of the plugins. logcat() / network(): the entries of the page stores.
  * pluginStore: { list() -> stored plugins with code, save(spec) -> { plugin, created } } (src/plugins-panel.js), for get_plugin / save_plugin.
+ * debug: { controller() (src/debugger-controller.js), actions (src/debugger-plugin-actions.js), owner } for the code_* and debug_* tools; hook(spec): a method change by MCP (App modified).
  * frameStats(): the summary of "Show frame rate" (current / average / minimum FPS, janky frames, idle) while that option is on, else null; lab_status adds it as `frameRate`. status(): what the page knows about the loaded APK. clickButton(pluginId, buttonId): a click on a plugin's button (lab.button), resolved when its handler finished. sleep(ms).
  */
-export function createMcpTools({ controls = null, query, plugins = () => [], pluginStore = null, clickButton = null, logcat = () => [], network = () => [], status = () => ({}), frameStats = () => null, actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
+export function createMcpTools({ debug = null, hook = null, controls = null, query, plugins = () => [], pluginStore = null, clickButton = null, logcat = () => [], network = () => [], status = () => ({}), frameStats = () => null, actions = null, input = null, sleep = ms => new Promise(resolve => setTimeout(resolve, ms)), now = () => Date.now() }) {
   const waitReady = (timeoutMs = 15000, networkMs = NETWORK_WAIT_MS) => waitScreenReady({ screen: () => query('screen', {}), requests: network, sleep, now }, bounded(timeoutMs, 15000, 100, 120000), bounded(networkMs, NETWORK_WAIT_MS, 0, 120000));
   /** instances / referrers: the runtime's short pages, walked until `limit` items or the end (as lab.instances does). */
   async function paged(method, args, limit) {
@@ -92,6 +93,46 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
     const { note, ...report } = readyReport(settledNow), content = [text({ ...result, ...report })];
     if (args.screenshot) { const shot = await query('screenshot', { maxWidth: args.max_width }); content.unshift(await image(shot)); }
     return content;
+  }
+  // ---- code and debugger helpers (debug: { controller(), actions: src/debugger-plugin-actions.js, owner }) ----
+  const dbg = () => { const c = debug?.controller?.(); if (!c) throw fail('The debugger is not available on this page.'); return c; };
+  const owner = debug?.owner ?? { id: 'mcp', name: 'MCP' };
+  const codeAction = args => { if (!debug?.actions?.code) throw fail('The Code browser is not available on this page.'); return debug.actions.code(owner, args); };
+  const compact = value => JSON.parse(JSON.stringify(value, (key, item) => item === null || item === false ? undefined : item));
+  const pcOf = value => { const text = String(value ?? '').trim(); const n = /^0x/i.test(text) ? parseInt(text, 16) : Number(text); if (!Number.isInteger(n) || n < 0) throw fail(`pc: a dex code-unit offset (decimal or 0x hex), got ${text}`); return n; };
+  const methodRef = args => {
+    const m = String(args.method ?? ''); if (!m) throw fail('method is required with pc ("name(params)ret", or the name alone when it has one version).');
+    if (m.includes('->')) return m;
+    const owner = String(args.class_name ?? ''); if (!owner) throw fail('class_name is required with method.');
+    const d = owner.startsWith('L') && owner.endsWith(';') ? owner : `L${owner.replaceAll('.', '/')};`;
+    return `${d}->${m}`;   // without a signature: the method of that name (src/debugger.js parseMethodRef)
+  };
+  function breakpointSpec(args) {
+    const common = { ...(args.condition ? { condition: String(args.condition) } : {}), ...(args.hit_condition ? { hitCondition: String(args.hit_condition) } : {}), ...(args.log_message !== undefined && args.log_message !== null && args.log_message !== '' ? { logMessage: String(args.log_message) } : {}), ...(args.suspend === 'thread' ? { suspend: 'thread' } : {}), ...(args.thread ? { thread: String(args.thread) } : {}) };
+    if (args.exception !== undefined || args.type === 'exception') return { type: 'exception', ...(args.exception && args.exception !== '*' ? { exceptionClass: String(args.exception) } : {}), caught: args.caught !== false, uncaught: args.uncaught !== false, ...common };
+    if (args.field) return { type: 'field', className: String(args.class_name ?? ''), field: String(args.field), access: ['read', 'write'].includes(args.access) ? args.access : 'any', ...common };
+    if (args.type === 'entry' || args.type === 'exit') { const ref = methodRef(args); return { type: args.type, ...(typeof ref === 'string' ? { method: ref } : { className: ref.className, method: ref.method }), ...common }; }
+    if (args.pc !== undefined) { const ref = methodRef(args); return { type: 'location', ...(typeof ref === 'string' ? { method: ref } : { className: ref.className, method: ref.method }), pc: pcOf(args.pc), ...common }; }
+    if (args.line !== undefined) { if (!args.class_name) throw fail('class_name is required with line.'); return { type: 'line', className: String(args.class_name), line: Number(args.line), ...(args.method ? { method: String(args.method).split('(')[0] } : {}), ...common }; }
+    throw fail('Give class_name + line (a source line), class_name + method + pc (a dex pc, from code_disassemble), exception (a class, or "*"), or class_name + field.');
+  }
+  const where = location => location ? `${location.className ?? '?'}.${location.methodName ?? '?'}${location.signature ?? ''}${location.line ? ` line ${location.line}` : ''} pc ${location.pc}` : null;
+  const compactBreakpoint = bp => compact({ id: bp.id, where: bp.where, enabled: bp.enabled, resolved: bp.resolved, verified: bp.verified === false ? false : undefined, message: bp.message, hits: bp.hits, condition: bp.condition, hitCondition: bp.hitCondition, logMessage: bp.logMessage, owner: bp.owner, locations: (bp.locations ?? []).slice(0, 8).map(where) });
+  const frameOut = f => f.host ? { host: true } : { index: f.index, at: where(f), source: f.source ?? undefined, ...(f.receiver ? { receiver: f.receiver.$handle } : {}) };
+  const localsOut = (out, registers) => ({ at: where(out.location), debugInfo: out.debugInfo, locals: Object.fromEntries((out.locals ?? []).map(local => [local.name, local.value])), types: Object.fromEntries((out.locals ?? []).map(local => [local.name, local.type])), ...(registers || out.debugInfo === false ? { registers: out.registers } : {}) });
+  const threadOf = args => args.thread ? String(args.thread) : dbg().paused?.thread ?? undefined;
+  const summaryOf = state => compact({ attached: state.attached, engine: state.engine, crossOriginIsolated: state.channel, paused: state.paused ? where(state.paused.location) : null, breakpoints: state.breakpoints?.length ?? 0 });
+  /** What debug_wait / debug_step / debug_run_to answer: where the thread stopped, why, its stack and the locals of the innermost frame. */
+  async function pauseReport(event, args = {}) {
+    if (!event) { const st = dbg().state(); return compact({ paused: false, timedOut: true, attached: st.attached, breakpoints: st.breakpoints.map(compactBreakpoint), note: 'No stop within the time: trigger the code (tap, invoke_method, open_app), then debug_wait again.' }); }
+    const base = compact({ paused: event.held !== false, seq: event.seq, thread: event.thread, threadName: event.threadName, reason: event.reason, breakpoints: (event.reasons ?? []).map(r => r.id).filter(Boolean), at: where(event.location), mode: event.mode,
+      exception: event.exception ? { type: event.exception.type, message: event.exception.message, caught: event.exception.caught, handle: event.exception.handle } : undefined, conditionError: event.conditionError });
+    if (event.held === false) return { ...base, snapshot: true, note: `Snapshot only, no stepping: ${event.why ?? 'the thread ran on'}.`, stack: (event.frames?.frames ?? []).slice(0, 16).map(frameOut) };
+    const depth = bounded(args.stack_depth, 16, 1, 128);
+    let stack = null, locals = null;
+    try { const frames = await dbg().command('frames', { thread: event.thread, count: depth }); stack = frames.frames.map(frameOut); } catch (error) { stack = { error: error.message }; }
+    if (args.include_locals !== false) { try { locals = localsOut(await dbg().command('locals', { thread: event.thread, frame: 0 }), false); delete locals.at; } catch (error) { locals = { error: error.message }; } }
+    return { ...base, stack, ...(locals ? { locals: locals.locals, types: locals.types, ...(locals.error ? { localsError: locals.error } : {}) } : {}), next: 'debug_step (over/into/out), debug_evaluate, debug_set_local, debug_continue then debug_wait.' };
   }
   const tools = {
     async lab_status() {
@@ -299,6 +340,77 @@ export function createMcpTools({ controls = null, query, plugins = () => [], plu
       return Object.assign(content, { isError: result.code !== 0 });
     },
     async host_redirects(args) { if (!controls?.hostRedirects) throw fail('Redirect hosts is not available on this page.'); return [text(controls.hostRedirects(Array.isArray(args.rules) ? args.rules : null))]; },
+    // ---- the app's code (src/code-service.js through the page's debugger controller, src/debugger-controller.js) ----
+    async code_search(args) {
+      const out = await codeAction({ op: 'search', query: String(args.query ?? ''), kinds: Array.isArray(args.kinds) ? args.kinds.map(String) : undefined, limit: bounded(args.limit, 50, 1, 500), framework: args.framework === true });
+      return [text({ count: out.results.length, more: out.more, results: out.results.map(r => compact(r)) })];
+    },
+    async code_disassemble(args) {
+      if (!args.class_name) throw fail('class_name is required (pkg.Name or Lpkg/Name;).');
+      const out = await codeAction({ op: 'disassemble', descriptor: String(args.class_name), method: args.method ? String(args.method) : null });
+      if (!args.method) return [text({ descriptor: out.descriptor, file: out.file, framework: out.framework || undefined, lineCount: out.lineCount, methods: out.methods.map(m => ({ key: m.key, lines: `${m.startLine}-${m.endLine}`, hasCode: m.hasCode || undefined, modified: m.modified || undefined })), smali: out.text })];
+      // one method: each instruction line with its dex pc, the unit breakpoints and steps use
+      const m = out.methods.find(item => item.key === out.method.key), lines = out.text.split('\n'), pcAt = new Map(m.pcToLine.map(([pc, line]) => [line, pc]));
+      const listing = lines.slice(m.startLine - 1, m.endLine).map((line, i) => { const pc = pcAt.get(m.startLine + i); return `${pc === undefined ? '    ' : pc.toString(16).padStart(4, '0')}  ${line}`; }).join('\n');
+      return [text({ key: m.key, registers: m.registers, units: m.units, modified: m.modified || undefined, note: 'Each instruction line starts with its dex pc in hex: debug_set_breakpoint takes it as pc (decimal or "0x..").', listing })];
+    },
+    async code_class_info(args) { if (!args.class_name) throw fail('class_name is required.'); return [text(await codeAction({ op: 'classInfo', descriptor: String(args.class_name) }))]; },
+    async code_read_file(args) {
+      if (!args.path) throw fail('path is required (an APK entry such as assets/config.json; code_search with kinds ["file"] lists them).');
+      const out = await codeAction({ op: 'readFile', path: String(args.path) }), { bytes, ...rest } = out;
+      return [text({ ...rest, ...(bytes ? { note: `${out.kind} (${out.mime ?? ''}, ${out.size} bytes): shown in the Code tool, not returned here` } : {}) })];
+    },
+    async code_edit_file(args) {
+      if (!args.path || typeof args.text !== 'string') throw fail('path and text are required.');
+      const edit = await codeAction({ op: 'editFile', path: String(args.path), text: args.text });
+      return [text({ edited: edit, note: 'Listed as "App modified" (owner MCP): the app reads the new bytes the next time it opens the file; reload (mode reopen) to see it everywhere. code_revert_file restores the APK\'s bytes.' })];
+    },
+    async code_revert_file(args) { if (!args.path) throw fail('path is required.'); return [text(await codeAction({ op: 'revertFile', path: String(args.path) }))]; },
+    async code_edit_method(args) {
+      if (typeof hook !== 'function') throw fail('Method changes are not available on this page.');
+      if (!args.class_name || !args.method || typeof args.smali !== 'string') throw fail('class_name, method ("name(params)ret", as code_disassemble lists it) and smali (the body) are required.');
+      const key = String(args.method).includes('->') ? String(args.method) : `${String(args.class_name).startsWith('L') ? String(args.class_name) : `L${String(args.class_name).replaceAll('.', '/')};`}->${args.method}`;
+      try { const out = await hook({ method: key, kind: 'smali', smali: args.smali, persist: args.persist === true }); return [text({ id: out.id, method: out.method, kind: out.kind, persist: out.persist || undefined, note: 'Listed as "App modified" (owner MCP); the next call runs the new body. Remove it in App modified.' })]; }
+      catch (error) { if (Array.isArray(error?.errors) && error.errors.length) throw Object.assign(new Error(`${error.message}\n${error.errors.slice(0, 20).map(e => `  line ${e.line}: ${e.message}`).join('\n')}`), { code: error.code ?? 'verify' }); throw error; }
+    },
+    // ---- the debugger (src/debugger-controller.js: the same session as the Code tool's debugger UI) ----
+    async debug_attach(args) { return [text(summaryOf(await dbg().attach({ suspend: args.suspend })))]; },
+    async debug_detach() { return [text(await dbg().detach())]; },
+    async debug_set_breakpoint(args) {
+      const spec = breakpointSpec(args), bp = await dbg().setBreakpoint(spec, owner);
+      return [text({ ...compactBreakpoint(bp), next: 'Trigger the code (tap, invoke_method, open_app...), then debug_wait.' })];
+    },
+    async debug_remove_breakpoint(args) { if (!args.id) throw fail('id is required (debug_breakpoints lists them).'); return [text(await dbg().removeBreakpoint(String(args.id)))]; },
+    async debug_breakpoints() { return [text(dbg().breakpoints().map(compactBreakpoint))]; },
+    async debug_pause() { await dbg().command('pause', {}); return [text({ ...summaryOf(dbg().state()), note: 'A running VM event finishes first; a breakpoint is the way to stop inside one.' })]; },
+    async debug_continue(args) { await dbg().command('resume', args.thread ? { thread: String(args.thread) } : {}); return [text({ resumed: true, thread: args.thread ?? 'all' })]; },
+    async debug_step(args) {
+      const thread = args.thread ? String(args.thread) : dbg().paused?.thread; if (!thread) throw Object.assign(new Error('Nothing is paused (debug_wait first).'), { code: 'not-paused' });
+      const before = dbg().paused?.seq ?? null;
+      await dbg().command('step', { thread, kind: ['into', 'over', 'out'].includes(args.kind) ? args.kind : 'over', unit: args.unit === 'instruction' ? 'instruction' : 'line' });
+      if (args.wait === false) return [text({ stepping: true })];
+      return [text(await pauseReport(await dbg().waitForPause(bounded(args.timeout_ms, 5000, 0, 60000), { after: before }), args))];
+    },
+    async debug_run_to(args) {
+      const thread = args.thread ? String(args.thread) : dbg().paused?.thread;
+      const target = args.pc !== undefined ? { method: methodRef(args), pc: pcOf(args.pc) } : { className: String(args.class_name ?? ''), line: Number(args.line) };
+      if (target.method === undefined && !target.className) throw fail('class_name and line, or class_name, method and pc.');
+      const before = dbg().paused?.seq ?? null;
+      const out = await dbg().command('run-to', { ...(thread ? { thread } : {}), ...target });
+      if (args.wait === false) return [text(out)];
+      return [text(await pauseReport(await dbg().waitForPause(bounded(args.timeout_ms, 10000, 0, 60000), { after: before }), args))];
+    },
+    async debug_threads() { return [text((await dbg().command('threads')).map(t => ({ id: t.id, name: t.name, state: t.state, held: t.held || undefined, main: t.main || undefined, stop: t.stop ? `${t.stop.reason} at ${where(t.stop.location)}` : undefined })))]; },
+    async debug_stack(args) { const out = await dbg().command('frames', { thread: threadOf(args), count: bounded(args.count, 32, 1, 256) }); return [text({ thread: out.thread, total: out.total, frames: out.frames.map(frameOut) })]; },
+    async debug_locals(args) { const out = await dbg().command('locals', { thread: threadOf(args), frame: bounded(args.frame, 0, 0, 10000) }); return [text(localsOut(out, args.registers === true))]; },
+    async debug_evaluate(args) { if (!args.expression) throw fail('expression is required (Java-like, read-only: names, fields, arrays, arithmetic, comparisons).'); return [text(await dbg().command('evaluate', { thread: threadOf(args), frame: bounded(args.frame, 0, 0, 10000), expression: String(args.expression) }))]; },
+    async debug_set_local(args) { if (!args.name) throw fail('name and value are required.'); return [text(await dbg().command('set-local', { thread: threadOf(args), frame: bounded(args.frame, 0, 0, 10000), name: String(args.name), value: args.value }))]; },
+    /** The agent's main loop: waits for the next stop (or returns the current one) with its location, stack and locals. */
+    async debug_wait(args) {
+      const c = dbg(); if (!c.attached) throw Object.assign(new Error('The debugger is not attached: debug_set_breakpoint first.'), { code: 'not-attached' });
+      const event = await c.waitForPause(bounded(args.timeout_ms, 10000, 0, 120000), { current: args.current !== false, after: Number.isFinite(Number(args.after)) ? Number(args.after) : null });
+      return [text(await pauseReport(event, args))];
+    },
     async wait_ready(args) { const report = readyReport(await waitReady(args.timeout_ms, args.network_ms)); return [text({ ...report, waitingFor: report.waitingFor ?? [] })]; },
   };
   return {

@@ -201,7 +201,7 @@ export function pluginWorkerMain(scope) {
         lab.screen().then(screen => { if (screen?.ready?.ready && !was) { was = true; fn(screen); } }).catch(() => {});
         return () => { readyWrappers.delete(fn); off(); };
       }
-      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call'].includes(name)) throw new TypeError(`Unknown event: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh', 'frame' or 'call')`);
+      if (!['screen', 'log', 'network', 'refresh', 'frame', 'modal', 'tab', 'overlay', 'track', 'call', 'debug'].includes(name)) throw new TypeError(`Unknown event: ${name} (use 'screen', 'ready', 'log', 'network', 'refresh', 'frame', 'call' or 'debug')`);
       let set = handlers.get(name); if (!set) { set = new Set(); handlers.set(name, set); post({ t: 'sub', name, on: true }); }
       set.add(fn); return () => lab.off(name, fn);
     },
@@ -373,6 +373,53 @@ export function pluginWorkerMain(scope) {
     unhook: id => call('unhook', { id: String(id?.id ?? id ?? '') }),
     /** The plugin's changes, with their live call counts: [{ id, method, kind, hits, dropped, state, ... }] ({ all: true }: every change of the VM). */
     hooks: (options = {}) => call('hooks', { all: options?.all === true }),
+    // ---- the app's code and the debugger (src/debugger-plugin-actions.js; docs/PLUGINS.md "Code and the debugger") ----
+    /**
+     * lab.code: the Code browser's reads of the running APK and the user-chosen edits (listed as "App modified" with this plugin as owner, removed when it stops).
+     * search(query, { kinds, limit, framework }) -> { results, more, cursor }; disassemble(descriptor, method?) -> { text, methods: [{ key, startLine, endLine, pcToLine }], method? };
+     * classInfo(descriptor); readFile(path) -> { path, kind, text, editable, refusal, edited }; editFile(path, text | Uint8Array); revertFile(path);
+     * editMethod(descriptor, 'name(params)ret', smali, { persist }): lab.hook(method, { smali }).
+     */
+    code: Object.freeze({
+      search: (query, options = {}) => call('code', { op: 'search', query: String(query ?? ''), kinds: Array.isArray(options?.kinds) ? options.kinds.map(String) : undefined, limit: options?.limit, framework: options?.framework === true, cursor: options?.cursor ?? null }),
+      disassemble: (descriptor, method) => call('code', { op: 'disassemble', descriptor: String(descriptor ?? ''), method: method === undefined || method === null ? null : typeof method === 'object' ? { name: String(method.name ?? ''), signature: method.signature === undefined ? null : String(method.signature) } : String(method) }),
+      classInfo: descriptor => call('code', { op: 'classInfo', descriptor: String(descriptor ?? '') }),
+      readFile: path => call('code', { op: 'readFile', path: String(path ?? '') }),
+      files: () => call('code', { op: 'files' }),
+      editFile: (path, content) => call('code', { op: 'editFile', path: String(path ?? ''), ...(content instanceof Uint8Array ? { bytes: content } : content instanceof ArrayBuffer ? { bytes: new Uint8Array(content) } : { text: String(content ?? '') }) }),
+      revertFile: path => call('code', { op: 'revertFile', path: String(path ?? '') }),
+      editMethod: (descriptor, method, smali, options = {}) => {
+        const d = String(descriptor ?? '').trim(), owner = d.startsWith('L') && d.endsWith(';') ? d : `L${d.replaceAll('.', '/')};`, m = String(method ?? '');
+        return lab.hook(m.includes('->') ? m : `${owner}->${m}`, { smali: String(smali ?? ''), persist: options?.persist === true });
+      },
+    }),
+    /**
+     * lab.debug: the page's debugger session (the same one as the Code tool's debugger UI). attach / detach (detach takes this plugin's breakpoints away), setBreakpoint(spec)
+     * (docs/DEBUGGER.md breakpoints: line, location, entry, exit, exception, field; condition, hitCondition, logMessage), removeBreakpoint(id), enableBreakpoint(id, on),
+     * breakpoints({ all }), pause, resume, step({ kind: 'into'|'over'|'out', unit: 'line'|'instruction', thread }), runTo({ method, pc } | { className, line }), threads(),
+     * frames({ thread }), locals({ thread, frame }), evaluate(expression, { thread, frame }), setLocal(name, value, { thread, frame }), inspect(handle), wait({ timeoutMs }) -> the
+     * next stop or null. Events: lab.on('debug', fn) -- paused, resumed, breakpoint-resolved, log, exception, detached, one per fn().
+     */
+    debug: Object.freeze({
+      attach: (options = {}) => call('debug', { op: 'attach', suspend: options?.suspend === 'thread' ? 'thread' : 'all' }),
+      detach: () => call('debug', { op: 'detach' }),
+      state: () => call('debug', { op: 'state' }),
+      setBreakpoint: spec => call('debug', { op: 'setBreakpoint', breakpoint: spec && typeof spec === 'object' ? JSON.parse(JSON.stringify(spec)) : {} }),
+      removeBreakpoint: id => call('debug', { op: 'removeBreakpoint', id: String(id?.id ?? id ?? '') }),
+      enableBreakpoint: (id, enabled = true) => call('debug', { op: 'enableBreakpoint', id: String(id?.id ?? id ?? ''), enabled: enabled !== false }),
+      breakpoints: (options = {}) => call('debug', { op: 'breakpoints', all: options?.all === true }),
+      pause: (options = {}) => call('debug', { op: 'pause', thread: options?.thread }),
+      resume: (options = {}) => call('debug', { op: 'resume', thread: options?.thread }),
+      step: (options = {}) => call('debug', { op: 'step', kind: typeof options === 'string' ? options : options?.kind, unit: options?.unit, thread: options?.thread }),
+      runTo: (target = {}) => call('debug', { op: 'runTo', method: target?.method, pc: target?.pc, className: target?.className, line: target?.line, thread: target?.thread }),
+      threads: () => call('debug', { op: 'threads' }),
+      frames: (options = {}) => call('debug', { op: 'frames', thread: options?.thread, start: options?.start, count: options?.count }),
+      locals: (options = {}) => call('debug', { op: 'locals', thread: options?.thread, frame: options?.frame ?? 0 }),
+      evaluate: (expression, options = {}) => call('debug', { op: 'evaluate', expression: String(expression ?? ''), thread: options?.thread, frame: options?.frame ?? 0 }),
+      setLocal: (name, value, options = {}) => call('debug', { op: 'setLocal', name: String(name ?? ''), value: typeof value === 'bigint' ? String(value) : value, thread: options?.thread, frame: options?.frame ?? 0 }),
+      inspect: (handle, options = {}) => call('debug', { op: 'inspect', handle: String(handle?.$handle ?? handle ?? ''), options: { depth: options?.depth ?? 1 } }),
+      wait: (options = {}) => call('debug', { op: 'wait', timeoutMs: options?.timeoutMs ?? 10000, current: options?.current !== false }),
+    }),
     viewModels: () => call('viewModels', {}),
     fragments: () => call('fragments', {}),
     activity: () => call('activity', {}),
@@ -459,7 +506,7 @@ export function pluginWorkerMain(scope) {
     if (data.t === 'power') { const ms = Number(data.watchMinMs); if (Number.isFinite(ms)) watchMinMs = Math.max(10, Math.min(1000, ms)); return; }
     if (data.t === 'event') {
       const set = handlers.get(data.name); if (!set) return;
-      if (data.name === 'call' && Array.isArray(data.data)) {   // a batch of observed calls: each handler gets them one by one, in order
+      if ((data.name === 'call' || data.name === 'debug') && Array.isArray(data.data)) {   // a batch of observed calls: each handler gets them one by one, in order
         for (const item of data.data) for (const fn of [...set]) { try { const result = fn(item); if (result && typeof result.then === 'function') result.then(undefined, error => reportError(error, "on('call')")); } catch (error) { reportError(error, "on('call')"); } }
         return;
       }

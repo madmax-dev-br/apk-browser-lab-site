@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>APK player frame</title>
-  <link rel="stylesheet" href="../styles.css?v=d826b7643adc">
-  <link rel="stylesheet" href="./frame.css?v=d826b7643adc">
+  <link rel="stylesheet" href="../styles.css?v=97135b36a679">
+  <link rel="stylesheet" href="./frame.css?v=97135b36a679">
 </head>
 <body class="player-frame">
   <main id="preview-stage" class="preview-stage player-stage">
@@ -16,6 +16,7 @@
               <canvas id="layout-bounds-canvas" class="layout-bounds-canvas" aria-hidden="true" hidden></canvas>
               <canvas id="frame-graph-canvas" class="frame-graph-canvas" aria-hidden="true" hidden></canvas>
               <div id="lab-highlight-layer" class="lab-highlight-layer" aria-hidden="true"></div>
+              <div id="debug-paused-overlay" class="debug-paused-overlay" role="status" aria-live="polite" hidden><div class="dpo-plate"><p class="dpo-title">Paused in the debugger</p><p class="dpo-where"></p><p class="dpo-note">The app's threads are suspended: taps and keys wait until it resumes.</p><button class="dpo-resume" type="button">Resume <kbd>F8</kbd></button></div></div>
               <div id="permission-dialog" class="perm-scrim" hidden><div class="perm-card" role="alertdialog" aria-modal="true" aria-labelledby="perm-question" aria-describedby="perm-detail" tabindex="-1"><div class="perm-icon" id="perm-icon" aria-hidden="true"></div><p id="perm-question" class="perm-question"></p><p id="perm-detail" class="perm-detail"></p><div class="perm-actions"><button id="perm-allow" type="button" class="perm-button"></button><button id="perm-once" type="button" class="perm-button" hidden>Only this time</button><button id="perm-deny" type="button" class="perm-button">Don't allow</button></div></div></div>
               <div id="system-picker" class="sp-scrim" hidden></div>
               <div class="system-bars" aria-hidden="true">
@@ -27,6 +28,6 @@
     <div id="player-status" class="player-status" role="status" aria-live="polite">Waiting for the host page…</div>
     <div id="player-error" class="player-error" role="alert" hidden><strong id="player-error-title"></strong><p id="player-error-message"></p><button id="player-error-copy" class="player-error-copy" type="button">Copy diagnostics</button><pre id="player-error-report" class="player-error-report" hidden></pre></div>
   </main>
-  <script type="module" src="./frame.js?v=d826b7643adc"></script>
+  <script type="module" src="./frame.js?v=97135b36a679"></script>
 </body>
 </html>

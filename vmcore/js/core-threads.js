@@ -29,14 +29,14 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=d826b7643adc';
+import { Blocked } from '../../runtime/scheduler.js?v=97135b36a679';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d826b7643adc';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=d826b7643adc';
-import { CLASS } from './linker.js?v=d826b7643adc';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=97135b36a679';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=97135b36a679';
+import { CLASS } from './linker.js?v=97135b36a679';
 const CLASS_INIT_STATE = CLASS.initState, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZING
 
-export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, HOST_THROW: 0x7fff0110 });
+export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, BREAKPOINT: 96, STEPPED: 97, EXCEPTION_EVENT: 98, HOST_THROW: 0x7fff0110 });
 const S = CORE_STATUS, CORE_UNSUPPORTED = 6;   // vmcore/abi.h: also what resume/resume_host answer for a record with nothing to resume (detail 0)
 const T = { status: 12, detail: 16, steps: 32, result: 48, calls: 56, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148,
   tid: 2152, state: 2156, flags: 2160, blockWord: 2164, blockValue: 2168, blockedOn: 2172, waitNext: 2176, waitState: 2180, waitMonitor: 2184, waitCount: 2188, waitPhase: 2192,
@@ -132,6 +132,7 @@ export class CoreThreads {
       get: () => u32()[(thread.core.t + T.interrupted) >> 2] !== 0, set: value => x.thr_set_interrupted(thread.core.t, value ? 1 : 0) });
     if (!x.thr_attach(t, flags)) throw new APKError('vmcore: no thread id left in the core');
     if (pending) x.thr_set_interrupted(t, 1);
+    this.rt.debugger?.adapter?.bound?.(thread);   // the debugger's flags for a new record (src/debugger.js: exceptions it watches)
   }
   /** A thread ended: whoever waits on its Thread object wakes (ART's Thread exit: notifyAll), and its record is recycled. */
   ended(thread) {
@@ -217,6 +218,7 @@ export class CoreThreads {
     if (wait === null || wait === undefined) return null;
     if (wait.kind === 'yield') return x.resume(t) >>> 0;
     const blocked = thread.blocked, timedOut = thread.timedOut === true; thread.blocked = null; thread.state = 'runnable';
+    if (wait.kind === 'debug') return this.debugContinue(thread, wait.status);   // held by the debugger at a breakpoint, a step or an exception: go on past it
     if (wait.kind === 'entry') {   // parkEntry: the class is ready (or its initializer failed): the run starts again from the same stack
       const entry = wait.entry; thread.core.deadline = undefined;
       this.u32[(t + T.stackTop) >> 2] = entry.stackTop; this.u32[(t + T.depth) >> 2] = entry.depth;
@@ -365,6 +367,11 @@ export class CoreThreads {
         case S.THREAD_BLOCKED:
           if (!this.u32[(t + T.frame) >> 2]) { if (thread.core.entry === null || thread.core.entry === undefined) break; this.parkEntry(thread); return PARKED; }   // the run did not start: it starts again (parkEntry)
           this.parkCore(thread); return PARKED;
+        case S.BREAKPOINT: case S.STEPPED: case S.EXCEPTION_EVENT: {   // the debugger's stops (vmcore/abi.h; src/debugger.js, vmcore/js/core-debug.js): frames kept at the instruction
+          const dbg = this.rt.debugger;
+          if (dbg !== null && dbg !== undefined && dbg.adapter.coreStop(thread, owner, status)) { thread.blocked = dbg.parkBlocked(thread, 'core', null); thread.state = 'blocked'; thread.coreWait = { kind: 'debug', status }; this.stats.parks++; return PARKED; }
+          status = this.debugContinue(thread, status); continue;
+        }
         case S.HOST_BLOCKED: {   // a host answered a step at a call site (a wait, a call into Java): the invoke is complete but for its value
           const parked = engine.takeParked();
           steps.push({ kind: 'wait', wait: { kind: 'host', result: parked.result } });
@@ -374,6 +381,13 @@ export class CoreThreads {
       if (steps.length !== 0 && steps[steps.length - 1].kind === 'own') return status;   // the end of a run host code waits for
       status = this.leave(thread, status);
     }
+  }
+  /** Past a debugger stop: the debugger's adapter resumes it (a breakpoint's instruction runs once); with no debugger left, the record's debug state is cleared and it resumes. */
+  debugContinue(thread, status) {
+    const dbg = this.rt.debugger;
+    if (dbg !== null && dbg !== undefined) return dbg.adapter.continueFrom(thread, status);
+    const t = thread.core.t; this.u32[(t + 2208) >> 2] = 0; this.engine.view.setBigUint64(t + T.steps + 8, 1n << 60n, true);   // abi.h Thread.debugFlags, maxSteps
+    return this.x.resume(t) >>> 0;
   }
   /** A quantum of a background thread in a slice ended: the next one is sized from how long this one took (the geometric mean of its size and the size that would have taken QUANTUM_TARGET_MS). */
   sizeQuantum(thread, t) {
@@ -403,6 +417,8 @@ export class CoreThreads {
       // nested in returns, which a long wait never does -- a main thread parked for minutes while the pump served millions of host tasks grew the pins past what a JavaScript
       // array can hold ("RangeError: Invalid array length"). What a turn keeps is in a rooted table, a record or a thread's steps, as at a bridge call's return.
       if (engine.pins.length > mark) engine.pins.length = mark;
+      // The debugger parked the main thread in the event that may suspend (src/debugger.js): it is suspended at once, the event pump returns and the Worker stays free.
+      if (owner.blocked?.debugHold === true && engine.maySuspend(owner)) { engine.noteSuspend(owner, null, null, 'the debugger suspended it'); throw MAIN_SUSPEND; }
       // The main thread's event that may suspend (WasmEngine.suspendable) and has waited LONG_WAIT_MS of host time here: the wait is suspended as a network wait is, so the
       // event pump returns to the browser's event loop (the page, its watchdog and a driver's wall clock see the wait) and resumes the event once the wait is over. Waits
       // that end in less (most: a skip of the VM clock, another thread's short work) keep the nested path.

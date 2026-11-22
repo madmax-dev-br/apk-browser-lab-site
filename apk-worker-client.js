@@ -1,8 +1,9 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=d826b7643adc';
-import { createRasterReceiver } from './raster-cache.js?v=d826b7643adc';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=d826b7643adc';
+import { createWebAudioPlayer } from './web-audio-player.js?v=97135b36a679';
+import { createRasterReceiver } from './raster-cache.js?v=97135b36a679';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=97135b36a679';
+import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=97135b36a679';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=d826b7643adc', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=97135b36a679', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -40,7 +41,8 @@ export class APKWorkerClient {
       if (data?.type === 'microg-account') { this.onMicrogAccount?.(data.outcome); return; }   // the answer of "Add Google account (microG)": { ok, accountName, accountType, error }   // the stored microG (device) data, per package (src/app-data-store.js attachDeviceData)
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
-      if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
+      if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }
+      if (data?.type === 'debug-event' || data?.type === 'debug-held' || data?.type === 'debug-reply') { this.debugMessage(data); return; }   // the Java debugger (src/debugger.js, docs/DEBUGGER.md)   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
       if (data?.type === 'webview') { this.onWebView?.(data); return; }
       if (data?.type === 'gl-frame') { this.onGlFrame?.(data.frame); return; }   // a frame of an OpenGL ES window surface (src/gles-native.js, drawn by src/gl-surfaces.js)   // a WebView command for the page's iframes (src/webview-frame.js)
       if (data?.type === 'api-gaps') { this.apiGaps = data.report ?? null; this.onApiGaps?.(this.apiGaps); const waiting = this.apiGapWaiters; this.apiGapWaiters = null; for (const resolve of waiting ?? []) resolve(this.apiGaps); return; }   // static estimate, posted once per `requestApiGaps()`; never part of a request
@@ -148,6 +150,47 @@ export class APKWorkerClient {
       try { this.worker.postMessage({ ...payload, type, requestId }); } catch (error) { clearTimeout(timer); calls.delete(requestId); reject(error); }
     });
   }
+  // ---- the Java debugger (docs/DEBUGGER.md). debug(name, args) sends one command ("debug-" + name in the Worker); its result is the command's. Events arrive at
+  // onDebugEvent(event). While the Worker is held in place (a stop inside host code, event.mode 'in-place') it cannot take messages: commands go through the shared channel,
+  // and the operation the stop interrupted (an input, lab.invoke) waits without its timeout.
+  /** Attaches the debugger to the loaded VM ({ suspend: 'all' | 'thread' }); shares the synchronous channel where SharedArrayBuffer is available. */
+  async debugAttach(options = {}) {
+    this.debugChannel ??= createDebugChannelBuffer();
+    return (await this.sideCall('debug-attach', { ...options, ...(this.debugChannel ? { channel: this.debugChannel } : {}) })).debug;
+  }
+  async debug(name, args = {}, timeoutMs = 30000) {
+    const command = String(name).replace(/^debug-/, '');
+    if (command === 'attach') return this.debugAttach(args);
+    if (this.debugHeld) return this.debugInPlace(command, args, timeoutMs);
+    return (await this.sideCall(`debug-${command}`, args, timeoutMs)).debug;
+  }
+  debugInPlace(name, args, timeoutMs) {
+    const id = `c${++this.sequence}`, replies = this.debugReplies ??= new Map();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => { replies.delete(id); reject(new Error(`The held VM did not answer "${name}" in ${Math.round(timeoutMs / 1000)} s.`)); }, timeoutMs);
+      replies.set(id, { resolve, reject, timer });
+      const queue = this.debugQueue ??= [];
+      queue.push({ id, name, args }); this.flushDebugQueue();
+    });
+  }
+  flushDebugQueue() {
+    const queue = this.debugQueue; if (!queue?.length || !this.debugHeld || this.debugBusy) return;
+    if (!sendDebugCommand(this.debugChannel, queue[0])) return;
+    queue.shift(); this.debugBusy = true;
+  }
+  debugMessage(data) {
+    if (data.type === 'debug-held') { this.debugHeld = true; this.debugBusy = false; const pending = this.pending; if (pending) clearTimeout(pending.timer); this.flushDebugQueue(); this.onDebugHeld?.(data.state); return; }
+    if (data.type === 'debug-reply') {
+      const call = this.debugReplies?.get(data.id); this.debugBusy = false;
+      if (call) { clearTimeout(call.timer); this.debugReplies.delete(data.id); if (data.error) call.reject(Object.assign(new Error(data.error.message), data.error)); else call.resolve(data.result); }
+      return;
+    }
+    const event = data.event;
+    if (event?.type === 'resumed' || event?.type === 'detached') { if (this.debugHeld) { this.debugHeld = false; this.rearm?.(); } }
+    // a stop held in place: the Worker waits on the channel from now on (its 'debug-held' message comes next), so a command sent by a listener of this very event goes there
+    if (event?.type === 'paused' && event.mode === 'in-place' && event.held !== false && this.debugChannel) this.debugHeld = true;
+    this.onDebugEvent?.(event);
+  }
   /** Debugging tool: installs the return-value overrides ([{ method, value, enabled }]) in the running VM; resolves with one status per entry. */
   /** The device's radio receives an SMS from `from` with text `body` (src/telephony-sms.js): SMS_RECEIVED goes to the holders of RECEIVE_SMS. */
   async receiveSms(from, body) { return this.sideCall('incoming-sms', { from, body }); }
@@ -190,6 +233,15 @@ export class APKWorkerClient {
   /** The plugins' method changes (lab.hook, src/method-hooks.js), answered between two VM events: op 'add' ({ spec, owner: { id, name }, id }), 'remove' ({ id, owner }),
    *  'remove-owner' ({ owner }) or 'list'. Resolves { loaded, hook?, removed?, hooks } (hooks: every change of the VM); rejects with `code` (and `errors` for a smali body). */
   async methodHooks(op, payload = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); return this.sideCall('method-hooks', { ...payload, op, power: this.pluginPower }, 15000); }
+  /** The Code browser's reads and file edits (src/code-service.js), answered between two VM events: op 'search' | 'class-tree' | 'class-info' | 'disassemble' | 'java-outline' |
+   *  'read-file' | 'check-smali' | 'edit-file' | 'revert-file' | 'file-edits' with its `args`. Resolves the operation's value; rejects with `code` ('no-apk' without a VM). */
+  async codeService(op, args = {}) {
+    if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' });
+    if (this.debugHeld) return this.debugInPlace('code', { op, args }, 20000);   // held in place at a breakpoint: the debugger serves the reads through its channel (src/debugger.js CODE_READS)
+    const reply = await this.sideCall('code-service', { op, args }, 20000);
+    if (!reply.loaded) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' });
+    return reply.value;
+  }
   /** The "com microG" entry points (src/microg-entry-points.js): sets the page's constant-value mocks ([{ id, value }]; an id left out is unmocked) and resolves the entry-point rows. */
   async setMicrogMocks(mocks) { return (await this.sideCall('microg-mocks', { mocks })).entryPoints ?? []; }
   /** "microG services" (src/microg-services.js): the user's choice of microG's online services, applied to a running microG as its settings screen applies a switch; resolves microG's state ({ chosen, effective, ... }) or null without microG. */
