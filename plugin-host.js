@@ -7,12 +7,12 @@
 //     state only changes through events, and every processed event draws a frame), composeTree at most once per COMPOSE_TREE_MS per plugin; the Worker serves them at a low
 //     priority with its own time budget;
 //   - a plugin's output is applied to a bounded model and rendered by the panel at most every RENDER_MS; console lines, errors and blocks are bounded.
-import { pluginWorkerSource } from './plugin-runtime.js?v=7233a7b1ab13';
-import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=7233a7b1ab13';
-import { encodeVariantImages } from './render-variant-image.js?v=7233a7b1ab13';
-import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=7233a7b1ab13';
-import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=7233a7b1ab13';
-import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=7233a7b1ab13';
+import { pluginWorkerSource } from './plugin-runtime.js?v=5fccdbc9ed78';
+import { buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5fccdbc9ed78';
+import { encodeVariantImages } from './render-variant-image.js?v=5fccdbc9ed78';
+import { BUTTON_LIMITS, buttonId, buttonOut, sanitizeButtonConfig } from './plugin-buttons.js?v=5fccdbc9ed78';
+import { sanitizePower, powerParams, BATCH_QUERIES, BATCH_MAX } from './plugin-power.js?v=5fccdbc9ed78';
+import { targetSelector, selectorResourceNames, resolveSelector, matchTargets, chooseTarget, targetNotFound } from './lab-target.js?v=5fccdbc9ed78';
 
 export const EVENT_MS = 250, RENDER_MS = 100, COMPOSE_TREE_MS = 1000, SCREENSHOT_MS = 500, MAX_IMAGE_BYTES = 8 * 1024 * 1024, VM_QUERY_GAP_MS = 25, MAX_CONSOLE = 200, MAX_ERRORS = 20, MAX_BLOCKS = 50, MAX_LOG_BATCH = 2000;
 export const MAX_PENDING_CALLS = 16, MAX_MESSAGES_PER_SECOND = 1000, MAX_TEXT = 10000, MAX_TABLE_ROWS = 500, MAX_TABLE_COLUMNS = 20, MAX_JSON_CHARS = 50000;
@@ -20,6 +20,7 @@ const ACTION_METHODS = new Set(['reload', 'mock', 'unmock', 'mocks', 'modal']);
 for (const method of ['scrollTo', 'scrollInfo', 'tab']) ACTION_METHODS.add(method);   // scrolling the app to a position / percentage (src/lab-scroll.js) and the side tabs (src/lab-side-tabs.js)
 for (const method of ['frame', 'invoke', 'adb']) ACTION_METHODS.add(method);   // where the device is on the page (src/lab-overlays.js) and a call of one of the app's methods (src/app-invoke.js), a page operation like a click
 for (const method of ['hook', 'unhook', 'hooks']) ACTION_METHODS.add(method);
+ACTION_METHODS.add('route');   // lab.route / unroute / routes: the plugin's network routes (src/plugin-net-routes.js, src/network-routes.js)
 for (const method of ['code', 'debug']) ACTION_METHODS.add(method);   // lab.code (the Code browser's reads and edits) and lab.debug (the page's debugger session): src/debugger-plugin-actions.js over src/debugger-controller.js
 const PACED_ACTIONS = new Set(['code', 'debug']);   // one at a time per caller, the Plugin power gap (vmGapMs) between two: they reach the VM Worker
 export const MAX_DEBUG_EVENTS = 500;   // debugger events per flush to the plugins that listen (a logpoint in a hot loop is bounded here; `dropped` counts the rest)   // the plugin's method changes (src/method-hooks.js through src/method-hooks-panel.js: listed on the page as "App modified")
@@ -421,6 +422,8 @@ export function createPluginHost({ vm = null, createWorker = defaultCreateWorker
     /** Atualizar on the card: the plugin's lab.on('refresh') handlers run (a plugin that reads on demand recomputes). Returns whether the plugin listens. */
     refresh(id) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has('refresh')) return false; send(plugin, { t: 'event', name: 'refresh', data: { at: Date.now() } }); stats.events++; return true; },
     /** An event for one plugin (a modal's message or its closing): delivered only while the plugin listens. */
+    /** A message of a network route (src/plugin-net-routes.js) for one plugin: a held request or the outcome of its decision. False when the plugin is not running. */
+    routeMessage(id, message) { const plugin = plugins.get(id); if (!plugin?.worker) return false; send(plugin, { t: 'route', data: message }); stats.events++; return true; },
     emit(id, name, data) { const plugin = plugins.get(id); if (!plugin?.worker || !plugin.subs.has(name)) return false; send(plugin, { t: 'event', name, data }); stats.events++; return true; },
     /**
      * A click on a plugin's button (the panel, the preview bar, the MCP click_plugin_button tool): the plugin's handlers run in its Worker; the button is busy until they

@@ -4,9 +4,9 @@
 // write is the socket's output, poll readiness comes from the same buffers, options and names are the socket's own, and closing either side's descriptor closes the
 // description when its last descriptor goes (dup rules). Each function answers as the kernel does: bytes or a count, { errno }, or { wait } (the caller parks the thread
 // until `wait()` holds and makes the call again). What the lab has no equivalent for (a peeked read, a datagram sent through a Java datagram socket) fails by name.
-import { APKError } from '../apk-error.js?v=7233a7b1ab13';
-import { readSocket, writeSocket, descriptorRevents, shutdownDescriptor, descriptorAvailable } from '../libcore-io-native.js?v=7233a7b1ab13';
-import { Blocked } from '../scheduler.js?v=7233a7b1ab13';
+import { APKError } from '../apk-error.js?v=5fccdbc9ed78';
+import { readSocket, writeSocket, descriptorRevents, shutdownDescriptor, descriptorAvailable } from '../libcore-io-native.js?v=5fccdbc9ed78';
+import { Blocked } from '../scheduler.js?v=5fccdbc9ed78';
 
 const EAGAIN = 11, EBADF = 9, EPIPE = 32, ENOTCONN = 107, ECONNRESET = 104, ECONNREFUSED = 111, ENETUNREACH = 101, EINVAL = 22, ENOPROTOOPT = 92, ETIMEDOUT = 110;
 const MSG_PEEK = 2, MSG_DONTWAIT = 0x40, O_ACCMODE = 3, O_RDONLY = 0, O_WRONLY = 1, SOCK_STREAM = 1, SOCK_DGRAM = 2;

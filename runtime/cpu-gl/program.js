@@ -1,9 +1,9 @@
 // Shader objects and program linking of the CPU OpenGL ES implementation (docs/OPENGL-ES-ON-CPU.md): compile (src/cpu-gl/glsl-check.js), then link (ES 3.0 2.11.3 / GLSL ES
 // 3.00 4.3.4): the interface between the stages matched by name, attribute locations (layout qualifiers, glBindAttribLocation, then the lowest free ones), the uniform store and
 // its locations, std140 uniform blocks, fragment outputs, transform feedback varyings, and both stages generated (src/cpu-gl/glsl-codegen.js). No process.*.
-import { checkShader } from './glsl-check.js?v=7233a7b1ab13';
-import { generate } from './glsl-codegen.js?v=7233a7b1ab13';
-import { comps, glType, std140, needsStore, same } from './glsl-types.js?v=7233a7b1ab13';
+import { checkShader } from './glsl-check.js?v=5fccdbc9ed78';
+import { generate } from './glsl-codegen.js?v=5fccdbc9ed78';
+import { comps, glType, std140, needsStore, same } from './glsl-types.js?v=5fccdbc9ed78';
 
 export const VARYING_BASE = 8, MAX_VARYING_COMPONENTS = 64, MAX_DRAW_BUFFERS = 4, MAX_VERTEX_ATTRIBS = 16, MAX_COMBINED_UNITS = 32;
 

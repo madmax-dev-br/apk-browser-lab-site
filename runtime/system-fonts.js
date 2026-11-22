@@ -1,6 +1,6 @@
-import { SYSTEM_FONT_FAMILIES, SYSTEM_FONT_ALIASES, SYSTEM_FONT_FILES, SYSTEM_FALLBACK_AXES } from './system-font-families.js?v=7233a7b1ab13';
-import { sfntAxes, sfntBounds } from './sfnt.js?v=7233a7b1ab13';
-import { APKError } from './apk-error.js?v=7233a7b1ab13';
+import { SYSTEM_FONT_FAMILIES, SYSTEM_FONT_ALIASES, SYSTEM_FONT_FILES, SYSTEM_FALLBACK_AXES } from './system-font-families.js?v=5fccdbc9ed78';
+import { sfntAxes, sfntBounds } from './sfnt.js?v=5fccdbc9ed78';
+import { APKError } from './apk-error.js?v=5fccdbc9ed78';
 
 // The system font map of android-13.0.0_r1 (frameworks/base data/fonts/fonts.xml, read by SystemFonts.buildSystemFallback / Typeface.setSystemFontMap): the named families and
 // their aliases, from the generated table src/system-font-families.js. Typeface.create(String, int) looks the name up in that map exactly as written; a name that is not there

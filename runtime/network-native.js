@@ -1,19 +1,20 @@
-import { APKError } from './apk-error.js?v=7233a7b1ab13';
-import { throwNew } from './java-throw.js?v=7233a7b1ab13';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=7233a7b1ab13';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=7233a7b1ab13';
-import { Blocked } from './scheduler.js?v=7233a7b1ab13';
-import { captureBody } from './network-capture.js?v=7233a7b1ab13';
-import { OS_CONSTANTS } from './os-constants-data.js?v=7233a7b1ab13';
-import { openExchange, describeFailure } from './network-transport.js?v=7233a7b1ab13';
-import { WorkerExecutor } from './network-worker-executor.js?v=7233a7b1ab13';
-import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=7233a7b1ab13';
-import { TransportAuthority } from './transport-ca.js?v=7233a7b1ab13';
-import { openWebSocketSession } from './websocket-bridge.js?v=7233a7b1ab13';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=7233a7b1ab13';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=7233a7b1ab13';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=7233a7b1ab13';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=7233a7b1ab13';
+import { APKError } from './apk-error.js?v=5fccdbc9ed78';
+import { throwNew } from './java-throw.js?v=5fccdbc9ed78';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=5fccdbc9ed78';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=5fccdbc9ed78';
+import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=5fccdbc9ed78';
+import { Blocked } from './scheduler.js?v=5fccdbc9ed78';
+import { captureBody } from './network-capture.js?v=5fccdbc9ed78';
+import { OS_CONSTANTS } from './os-constants-data.js?v=5fccdbc9ed78';
+import { openExchange, describeFailure } from './network-transport.js?v=5fccdbc9ed78';
+import { WorkerExecutor } from './network-worker-executor.js?v=5fccdbc9ed78';
+import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=5fccdbc9ed78';
+import { TransportAuthority } from './transport-ca.js?v=5fccdbc9ed78';
+import { openWebSocketSession } from './websocket-bridge.js?v=5fccdbc9ed78';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=5fccdbc9ed78';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=5fccdbc9ed78';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=5fccdbc9ed78';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=5fccdbc9ed78';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -84,9 +85,9 @@ export class NetworkBridge {
   /** The timelines of the finished exchanges (src/net-trace.js): a measurement aid. */
   get trace() { return this.traces ??= new NetTrace(); }
   get pending() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (op.executor !== 'mock' && !op.ended && op.error === null && !op.closed) n++; return n; }   // a mocked answer is a timer on the VM clock (delay()), not I/O
-  /** Exchanges whose progress reaches the VM only through this realm's event loop (its own fetch, not the network worker's shared memory), and asynchronous host jobs: what a
+  /** Exchanges whose progress reaches the VM only through this realm's event loop (its own fetch, not the network worker's shared memory; a request a plugin's route holds), and asynchronous host jobs: what a
    *  pump that never returns to the event loop holds back (src/apk-worker.js ioYieldMs). */
-  get pendingInRealm() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if (op.executor === 'main' && !op.ended && op.error === null && !op.closed) n++; return n; }
+  get pendingInRealm() { let n = this.jobs ?? 0; for (const op of this.ops.values()) if ((op.executor === 'main' || op.executor === 'route') && !op.ended && op.error === null && !op.closed) n++; return n; }
   /** Asynchronous host work the VM may have to wait for (WebCrypto certificate signing): counted as pending so the scheduler waits for the event loop instead of reporting a deadlock. */
   track(promise) { this.jobs = (this.jobs ?? 0) + 1; const done = () => { this.jobs--; this.signal(); }; promise.then(done, done); return promise; }
   /** The session's lab transport CA (src/transport-ca.js): the certificates SSLSockets over virtual HTTP sockets present. */
@@ -152,9 +153,16 @@ export class NetworkBridge {
     return 'main';
   }
   /** The active mock (src/endpoint-mocks.js) that answers `request` { method, url, body }, or null. Asked before the policy: a mocked request is never refused. */
-  matchMock(request) { const mocks = this.platform.endpointMocks; return mocks ? matchEndpointMock(mocks, request) : null; }
-  /** Can a mock answer requests for this host (name lookups and Socket.connect let it through)? */
-  mockServesHost(host, port = null, options) { const mocks = this.platform.endpointMocks; return mocks ? mockServesHost(mocks, host, port, options) : false; }
+  /** A plugin's network route (src/network-routes.js, lab.route) comes first: the request waits for the plugin, which may still answer with the network, a mock or its own response. */
+  matchMock(request) {
+    const routes = this.platform.netRoutes; if (routes) { const route = matchEndpointMock(routes, request); if (route) return route; }
+    const mocks = this.platform.endpointMocks; return mocks ? matchEndpointMock(mocks, request) : null;
+  }
+  /** Can a mock (or a plugin's route) answer requests for this host (name lookups and Socket.connect let it through)? */
+  mockServesHost(host, port = null, options) {
+    const routes = this.platform.netRoutes; if (routes && mockServesHost(routes, host, port, options)) return true;
+    const mocks = this.platform.endpointMocks; return mocks ? mockServesHost(mocks, host, port, options) : false;
+  }
   /** request.mock: the caller's matchMock() answer (null = checked, none); when absent the request is matched here. */
   start(request, reserved = null) {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
@@ -162,9 +170,14 @@ export class NetworkBridge {
     this.stats.requests++; this.noteHost(new URL(request.url).hostname);
     const mock = request.mock !== undefined ? request.mock : this.matchMock(request);
     if (this.requestObserver) this.requestObserver(request, mock);   // a background render lists the requests made while it runs (src/render-variant.js)
+    if (mock?.route) return this.startRoute(op, mock);
+    return this.proceed(op, request, mock);
+  }
+  /** The exchange of `op` once nothing (or a plugin's route) holds it any more: a mock's answer, or the executor's real exchange. */
+  proceed(op, request, mock) {
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
-    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null }) ?? null;
+    op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null, route: op.routed ?? null }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
     if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url), relayChannel: this.relayChannelSpec() }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { this.noteChannelOf(op, error); op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
@@ -260,7 +273,7 @@ export class NetworkBridge {
   startMock(op, record) {
     const request = op.request, response = record.compiled.response;
     op.executor = 'mock'; this.stats.mocked = (this.stats.mocked ?? 0) + 1;
-    op.log = this.log?.begin(request, { api: request.api, mock: { id: record.id, label: record.label } }) ?? null;
+    op.log = this.log?.begin(request, { api: request.api, mock: { id: record.id, label: record.label }, route: op.routed ?? null }) ?? null;
     noteMockHit(this.runtime, record, request);
     op.mock = { readyAt: this.platform.clock.now() + response.delayMs, response, delivered: false };
     (this.mockWaiting ??= new Set()).add(op);
@@ -281,6 +294,92 @@ export class NetworkBridge {
     op.ended = true; this.observe(op); this.activity = true;
     return true;
   }
+  // ---- plugin network routes (src/network-routes.js, lab.route) ---------------------------------------------------------------------------------------------------------------
+  /** A request a plugin's route takes: it waits (counted as pending network, so the screen is not "ready") until the plugin decides; platform.onNetRoute carries the question. */
+  startRoute(op, record) {
+    const request = op.request, rid = this.routeSeq = (this.routeSeq ?? 0) + 1;
+    op.executor = 'route'; this.stats.routed = (this.stats.routed ?? 0) + 1; noteRouteHit(this.runtime, record, request);
+    op.route = { rid, record, phase: 'asking', timer: null };
+    (this.routeOps ??= new Map()).set(rid, op);
+    const ask = this.platform.onNetRoute;
+    if (typeof ask !== 'function') { this.routeDecision(rid, { action: 'continue' }, 'no plugin host in this environment'); return op; }
+    op.route.timer = setTimeout(() => this.routeDecision(rid, { action: 'continue' }, `the plugin did not answer within ${ROUTE_TIMEOUT_MS / 1000} s`), ROUTE_TIMEOUT_MS);
+    op.route.timer?.unref?.();
+    try { ask({ rid, routeId: record.id, owner: record.owner, request: { method: request.method, url: request.url, headers: (request.headers ?? []).map(([n, v]) => [n, v]), body: request.body ? request.body.slice() : null, api: request.api ?? 'java.net' } }); }
+    catch (error) { this.routeDecision(rid, { action: 'continue' }, `the question could not be sent (${error?.message ?? error})`); }
+    return op;
+  }
+  /** Tells the plugin how its decision went ({ ok, error }), or hands it the real response of a 'fetch'. */
+  routeReply(op, message) { try { this.platform.onNetRoute?.({ rid: op.route.rid, routeId: op.route.record.id, owner: op.route.record.owner, ...message }); } catch { /* the page is gone */ } }
+  /**
+   * The plugin's decision for a held request (src/network-routes.js): continue (with its changes), fulfill (its response), fetch (the real exchange, its response back to the plugin,
+   * which decides again), abort. `fallback`: the lab continues on its own (no answer in time, the route removed); said in the trace.
+   */
+  routeDecision(rid, decision = {}, fallback = null) {
+    const op = this.routeOps?.get(rid); if (!op || op.route.phase === 'done') return false;
+    const state = op.route, record = state.record, action = String(decision?.action ?? 'continue');
+    if (fallback) this.runtime?.record?.(`NET plugin route ${record.label}: ${op.request.method} ${op.request.url} goes on unchanged: ${fallback}`);
+    if (op.closed || op.error !== null) { this.finishRoute(op); return false; }   // the app closed it, or the link dropped (connectivityChanged) while it was held
+    if (state.phase === 'fetching' && !fallback) { this.routeReply(op, { phase: 'done', ok: false, error: 'the real response is still being fetched' }); return false; }
+    const fail = message => { this.routeReply(op, { phase: 'done', ok: false, error: message }); return false; };
+    try {
+      if (action === 'fetch') return this.routeFetch(op, decision);
+      if (action === 'continue') {
+        const { request, changed } = continuedRequest(op.request, decision.request);
+        const mock = this.platform.endpointMocks ? matchEndpointMock(this.platform.endpointMocks, request) : null;
+        const url = new URL(request.url), port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+        this.finishRoute(op); op.routed = { id: record.id, label: record.label, changed: changed.length ? `request ${changed.join(', ')}` : '' };
+        if (!mock && !this.permits(request.url, url.hostname, port)) {   // the allow list and the offline state apply to what the plugin lets go out, as to any request
+          this.stats.denied++; if (!this.online) this.stats.offlineRejections++;
+          this.logRefusal({ api: request.api, method: request.method, url: request.url, host: url.hostname, port, headers: request.headers, bytes: request.body?.length ?? 0 });
+          op.request = request; op.error = { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${url.hostname} (port ${port}): ENETUNREACH (Network is unreachable)` }; this.signal();
+          this.routeReply(op, { phase: 'done', ok: true, note: this.online ? `${url.hostname} is not in the allow list (Controls › Network): the request failed as on the device` : 'the device is offline: the request failed' });
+          return true;
+        }
+        op.request = request; this.proceed(op, request, mock); this.signal();
+        this.routeReply(op, { phase: 'done', ok: true }); return true;
+      }
+      if (action === 'fulfill') {
+        const response = fulfilledResponse(decision.response, op.request.method);
+        this.finishRoute(op); op.routed = { id: record.id, label: record.label, changed: decision.fetched ? 'response' : 'answered' };
+        this.startMock(op, { id: record.id, label: `${record.label}${decision.fetched ? ' (real response changed)' : ''}`, hits: 1, warned: true, compiled: { response } }); this.signal();
+        this.routeReply(op, { phase: 'done', ok: true }); return true;
+      }
+      if (action === 'abort') {
+        this.finishRoute(op); op.routed = { id: record.id, label: record.label, changed: 'aborted' };
+        op.log = this.log?.begin(op.request, { api: op.request.api, route: op.routed }) ?? null;
+        op.error = abortFailure(decision.error, op.request); this.observe(op); this.signal();
+        this.routeReply(op, { phase: 'done', ok: true }); return true;
+      }
+      return fail(`unknown action "${action.slice(0, 20)}"`);
+    } catch (error) { return fail(String(error?.message ?? error)); }
+  }
+  /** 'fetch': the real exchange (a mock if one matches, else the network under the policy), read whole here; the response goes to the plugin, the request stays held. */
+  routeFetch(op, decision) {
+    const state = op.route, record = state.record;
+    const { request } = continuedRequest(op.request, decision.request);
+    state.phase = 'fetching'; clearTimeout(state.timer); state.timer = null;
+    const deliver = message => { if (state.phase !== 'fetching' || op.closed) return; state.phase = 'asking'; state.timer = setTimeout(() => this.routeDecision(state.rid, { action: 'continue' }, `the plugin did not answer within ${ROUTE_TIMEOUT_MS / 1000} s after its fetch`), ROUTE_TIMEOUT_MS); state.timer?.unref?.(); this.routeReply(op, { phase: 'response', ...message }); };
+    const mock = this.platform.endpointMocks ? matchEndpointMock(this.platform.endpointMocks, request) : null;
+    if (mock) { const r = mock.compiled.response; noteMockHit(this.runtime, mock, request); deliver({ response: { status: r.status, reason: r.reason, url: request.url, headers: r.headers.map(([n, v]) => [n, v]), body: request.method === 'HEAD' ? new Uint8Array(0) : r.body.slice(), mock: mock.label } }); return true; }
+    const url = new URL(request.url), port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
+    if (!this.permits(request.url, url.hostname, port)) { deliver({ error: this.online ? `${url.hostname} is not in the allow list (Controls › Network)` : 'the device is offline' }); return true; }
+    const shadow = new Operation(0, request); shadow.executor = 'main'; shadow.highWater = Infinity; state.shadow = shadow;
+    this.stats.bytesOut += request.body?.length ?? 0;
+    this.track(this.run(shadow).then(() => {
+      if (shadow.error) throw Object.assign(new Error(shadow.error.message), { failure: shadow.error });
+      if (!shadow.head) throw new Error('no response');
+      const total = shadow.queue.reduce((n, piece) => n + piece.length, 0); if (total > MAX_ROUTED_BODY_BYTES) throw new Error(`the response is larger than ${MAX_ROUTED_BODY_BYTES / 1048576} MiB`);
+      const body = new Uint8Array(total); let at = 0; for (const piece of shadow.queue) { body.set(piece, at); at += piece.length; }
+      deliver({ response: { status: shadow.head.status, reason: shadow.head.reason, url: shadow.head.url ?? request.url, headers: shadow.head.headers.map(([n, v]) => [n, v]), body } });
+    }).catch(error => { const failure = error?.failure ?? describeFailure(error, request); deliver({ error: `${failure.type ? failure.type.slice(1, -1).replaceAll('/', '.') + ': ' : ''}${failure.message ?? error?.message ?? error}`, failure }); })
+      .finally(() => { state.shadow = null; }));
+    return true;
+  }
+  finishRoute(op) { const state = op.route; if (!state) return; state.phase = 'done'; clearTimeout(state.timer); state.timer = null; state.shadow?.abort(); this.routeOps?.delete(state.rid); }
+  /** Routes removed (their plugin stopped): what they hold goes on unchanged. */
+  dropRoutes(gone) { for (const op of [...(this.routeOps?.values() ?? [])]) if (gone(op.route.record)) this.routeDecision(op.route.rid, { action: 'continue' }, 'its route was removed (the plugin stopped)'); }
+
   /** Moves what a worker exchange has produced into the operation (head, body bytes, end, failure); true if anything changed. */
   refresh(op) { if (op.executor === 'mock') return this.deliverMock(op); if (op.executor !== 'worker' || op.closed) return false; const changed = this.worker.poll(op); this.observe(op); return changed; }
 
@@ -367,7 +466,7 @@ export class NetworkBridge {
     op.reader = reader;
     for (;;) {
       if (op.closed || op.error !== null) { try { await op.reader.cancel(); } catch { /* ignored */ } return; }
-      if (op.queued >= HIGH_WATER) { await new Promise(resolve => { op.resume = resolve; }); continue; }
+      if (op.queued >= (op.highWater ?? HIGH_WATER)) { await new Promise(resolve => { op.resume = resolve; }); continue; }
       let step;
       try { step = await op.reader.read(); } catch (error) { if (op.closed) return; op.error = describeFailure(error, request, request.timedOut); this.stats.failures++; return; }
       if (step.done) { op.ended = true; op.trace?.arrived('end'); return; }
@@ -396,7 +495,7 @@ export class NetworkBridge {
     if (pieces.length && op.resume) { const resume = op.resume; op.resume = null; resume(); }
     return pieces;
   }
-  discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); this.mockWaiting?.delete(op); op.resume?.(); if (op.trace && !op.trace.socket) this.trace.finish(op.trace); }
+  discard(op) { op.closed = true; this.observe(op); op.abort(); this.ops.delete(op.handle); this.mockWaiting?.delete(op); if (op.route && op.route.phase !== 'done') this.finishRoute(op); op.resume?.(); if (op.trace && !op.trace.socket) this.trace.finish(op.trace); }
 }
 
 /** The parsed res/xml network security config of the app (cached per manifest), or null when the manifest names none. A config that cannot be read fails explicitly. */

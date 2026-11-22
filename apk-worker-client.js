@@ -1,9 +1,9 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=7233a7b1ab13';
-import { createRasterReceiver } from './raster-cache.js?v=7233a7b1ab13';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=7233a7b1ab13';
-import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=7233a7b1ab13';
+import { createWebAudioPlayer } from './web-audio-player.js?v=5fccdbc9ed78';
+import { createRasterReceiver } from './raster-cache.js?v=5fccdbc9ed78';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=5fccdbc9ed78';
+import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=5fccdbc9ed78';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=7233a7b1ab13', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=5fccdbc9ed78', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -42,6 +42,7 @@ export class APKWorkerClient {
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
       if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }
+      if (data?.type === 'net-route') { this.onNetRoute?.(data); return; }   // a request a plugin's route holds, or the outcome of its decision (src/network-routes.js)
       if (data?.type === 'debug-event' || data?.type === 'debug-held' || data?.type === 'debug-reply') { this.debugMessage(data); return; }   // the Java debugger (src/debugger.js, docs/DEBUGGER.md)   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
       if (data?.type === 'webview') { this.onWebView?.(data); return; }
       if (data?.type === 'gl-frame') { this.onGlFrame?.(data.frame); return; }   // a frame of an OpenGL ES window surface (src/gles-native.js, drawn by src/gl-surfaces.js)   // a WebView command for the page's iframes (src/webview-frame.js)
@@ -230,6 +231,10 @@ export class APKWorkerClient {
   /** The Worker's plugin serving stats { served, ms, deferred, rejected, maxMs, batches, batched, queued } and its level; null without a Worker. */
   async pluginPowerStatus() { if (!this.worker) return null; const reply = await this.sideCall('plugin-power', {}, 2000); return { level: reply.level, stats: reply.stats }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
+  /** Plugin network routes (lab.route): replaces the VM's list ([{ id, owner, ownerName, name, filter }]); one status per route. */
+  async setNetworkRoutes(routes) { return (await this.sideCall('net-routes', { routes })).statuses; }
+  /** A plugin's decision for a held request (no reply: the outcome arrives at onNetRoute). */
+  netRouteDecision(rid, decision) { try { this.worker?.postMessage({ type: 'net-route-decision', rid, decision }); } catch { /* the Worker is gone */ } }
   /** The plugins' method changes (lab.hook, src/method-hooks.js), answered between two VM events: op 'add' ({ spec, owner: { id, name }, id }), 'remove' ({ id, owner }),
    *  'remove-owner' ({ owner }) or 'list'. Resolves { loaded, hook?, removed?, hooks } (hooks: every change of the VM); rejects with `code` (and `errors` for a smali body). */
   async methodHooks(op, payload = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); return this.sideCall('method-hooks', { ...payload, op, power: this.pluginPower }, 15000); }

@@ -1,14 +1,15 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=7233a7b1ab13';
-import { staticRetentionLines } from './heap-gc.js?v=7233a7b1ab13';
-import { overrideSummaryLines } from './method-overrides.js?v=7233a7b1ab13';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=7233a7b1ab13';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=7233a7b1ab13';
-import { hostMapSummaryLines } from './host-map.js?v=7233a7b1ab13';
-import { attributeGap } from './worker-task-log.js?v=7233a7b1ab13';
-import { loadImageText } from './load-image.js?v=7233a7b1ab13';
-import { identityText } from './device-identity.js?v=7233a7b1ab13';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=5fccdbc9ed78';
+import { staticRetentionLines } from './heap-gc.js?v=5fccdbc9ed78';
+import { overrideSummaryLines } from './method-overrides.js?v=5fccdbc9ed78';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=5fccdbc9ed78';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=5fccdbc9ed78';
+import { networkRouteSummaryLines } from './network-routes.js?v=5fccdbc9ed78';
+import { hostMapSummaryLines } from './host-map.js?v=5fccdbc9ed78';
+import { attributeGap } from './worker-task-log.js?v=5fccdbc9ed78';
+import { loadImageText } from './load-image.js?v=5fccdbc9ed78';
+import { identityText } from './device-identity.js?v=5fccdbc9ed78';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -75,7 +76,8 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
   part(() => { const lines = overrideSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/method-overrides.js)
   part(() => { const lines = entryEditLines(runtime); if (lines) out.push(...lines); });   // APK files edited by the user in the Code browser (src/code-service.js): never silent
   part(() => { const line = ignoredActivitiesLine(runtime); if (line) out.push(line); });   // debugging tool in use: never silent (src/ignored-activities.js)
-  part(() => { const lines = endpointMockSummaryLines(runtime); if (lines) out.push(...lines); });   // debugging tool in use: never silent (src/endpoint-mocks.js)
+  part(() => { const lines = endpointMockSummaryLines(runtime); if (lines) out.push(...lines); });
+  part(() => { const lines = networkRouteSummaryLines(runtime); if (lines) out.push(...lines); });   // plugin network routes (lab.route): never silent   // debugging tool in use: never silent (src/endpoint-mocks.js)
   part(() => { const lines = hostMapSummaryLines(runtime.network?.policy?.hostMap ?? runtime.platform?.device?.network?.hostMap, runtime.network?.redirectTable); if (lines) out.push(...lines); });   // "Redirect hosts" in use: never silent (src/host-map.js)
   if (tela?.length) out.push(...tela);   // "Tela:" lines computed by the screen-state report (activity, first frame verdict, Compose, layout)
   part(() => {   // reflection over hidden members the lab cannot back: answered with NoSuchFieldException / NoSuchMethodException (src/apk-runtime.js reflectionLookup), never silent

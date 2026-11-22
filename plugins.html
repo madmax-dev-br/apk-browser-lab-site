@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=7233a7b1ab13">
-  <link rel="stylesheet" href="./lab-tokens.css?v=7233a7b1ab13">
+  <link rel="stylesheet" href="./site-pages.css?v=5fccdbc9ed78">
+  <link rel="stylesheet" href="./lab-tokens.css?v=5fccdbc9ed78">
 </head>
 <body>
   <header class="topbar">
@@ -245,6 +245,7 @@
               <li><a href="#api-reload"><code>reload</code></a></li>
               <li><a href="#api-mock"><code>mock</code></a></li>
               <li><a href="#api-unmock"><code>unmock</code>, <code>mocks</code></a></li>
+              <li><a href="#api-route"><code>route</code>, <code>unroute</code>, <code>routes</code></a></li>
               <li><a href="#api-adb"><code>adb</code></a></li>
               <li><a href="#api-modal-open"><code>modal.open</code></a></li>
               <li><a href="#api-modal-handle"><code>m.update</code>, <code>m.post</code>…</a></li>
@@ -639,6 +640,23 @@
         <div class="api" id="api-unmock">
           <h4 class="api-sig"><code>await lab.unmock(id)</code><code>await lab.mocks()</code></h4>
           <p>Removes a mock; lists the package's mocks with the responses they give.</p>
+        </div>
+
+        <div class="api" id="api-route">
+          <h4 class="api-sig"><code>const off = await lab.route(filter, async route =&gt; { ... }, { name })</code><code>await lab.unroute(id)</code><code>await lab.routes()</code></h4>
+          <p>A proxy for the app's API calls. Every request the <code>filter</code> takes (HttpURLConnection, OkHttp and other clients over a socket, DownloadManager) waits for your handler, which decides what happens to it. Without a filter (or with <code>'*'</code>) it takes every request.</p>
+          <dl class="facts">
+            <div><dt>Filter</dt><dd>A URL pattern like the endpoint mocks' (<code>'https://api.example.com/v1/**'</code>, <code>'/v1/users/*'</code> on any host) or <code class="shape">{ url, method, query: 'ignore' | 'exact', bodyContains }</code>.</dd></div>
+            <div><dt>Request</dt><dd><code class="shape">route.request = { method, url, headers, headerList, body, text(), json(), api }</code> (<code>headers</code> with lowercase names; <code>body</code> is a <code>Uint8Array</code> or <code>null</code>).</dd></div>
+            <div><dt>Decide</dt><dd>One of:
+              <code>route.continue({ url, method, headers, body })</code> lets it go on, unchanged or rewritten;
+              <code>route.fulfill({ status, headers, body | json, delayMs })</code> answers with your response (it does not go to the network);
+              <code>route.abort('connection' | 'reset' | 'timeout' | 'unknown-host' | message)</code> fails it like a dropped connection.
+              A handler that decides nothing lets the request go on.</dd></div>
+            <div><dt>Change the response</dt><dd><code>const res = await route.fetch()</code> makes the real request and gives you the whole response (<code class="shape">{ status, reason, headers, headerList, body, text(), json() }</code>); then <code>route.fulfill({ response: res, json: changed })</code>. Content-Length is computed for the body you give.</dd></div>
+            <div><dt>Rules</dt><dd>Routes come before the endpoint mocks; what you continue or fetch still meets the mocks, the allow list and the offline state (a blocked host fails as on the device). A route never acts in silence: the request is marked <b>[ROUTE]</b> in the network log, the first one of each route is a Logcat warning, and the Resumo lists the active routes. They go away when the plugin stops; a plugin that does not answer within 30 s lets the request go on unchanged.</dd></div>
+            <div><dt>Returns</dt><dd>A function that removes the route (also <code>off.id</code>). <code>lab.routes()</code> lists <code class="shape">[{ id, name, filter, state, hits }]</code>.</dd></div>
+          </dl>
         </div>
 
         <div class="api" id="api-adb">
@@ -1331,6 +1349,7 @@ adb push contract.pdf /sdcard/Download/ &amp;&amp; adb pull /sdcard/Download/con
           <li><a href="#ex-dica">Tip on a component</a></li>
           <li><a href="#ex-nota">Note that scrolls with an item</a></li>
           <li><a href="#ex-di">Dependency injection inspector</a></li>
+          <li><a href="#ex-proxy">API proxy</a></li>
         </ul>
 
         <h3 id="ex-tela-atual">Current screen</h3>
@@ -1748,6 +1767,66 @@ await lab.track(ITEM, ({ visible, elements: [e] }) =&gt; lab.ui.kv({
 }, { id: 'where' }));</code></pre></div>
         <figure class="ex-shot anim"><img src="./plugin-examples/ex-nota.gif" width="520" height="672" loading="lazy" decoding="async" alt="The Note that scrolls with an item example running in the lab, in the approvals example app"><figcaption>The note pinned to the order “Monitor para QA” after scrolling the list (here <code>ITEM = { text: 'Monitor para QA' }</code>): the list scrolls down and back, and the note follows the item.</figcaption></figure>
       
+        <h3 id="ex-proxy">API proxy</h3>
+        <p>Every request of the app goes through the plugin: the card lists them with their status and time, and the rules at the top change the ones they name: a field of the real JSON response, an answer of your own, an extra header, or a blocked call. Uncomment a rule and save to try it.</p>
+        <div class="code" data-name="API proxy"><pre><code>// API proxy (a plugin for Controls › Extensions › Plugins: paste this file as the plugin's code).
+// Every request of the app goes through this plugin (lab.route): it lists them with their status and time, and the RULES below change the ones they name:
+//   { url, method, set: { 'a.b': value } }   fetch the real response and change fields of its JSON
+//   { url, method, json: {...} | body, status } answer with this response (the request never goes to the network)
+//   { url, method, headers: {...} }           add or replace request headers, then let the request go on
+//   { url, method, block: 'connection' }      fail the request ('connection', 'reset', 'timeout', 'unknown-host')
+// url uses the endpoint mocks' patterns: 'https://api.example.com/v1/**', '/v1/users/*' (any host). The first rule that matches wins; the rest go on unchanged.
+// Each routed request is marked [ROUTE] in the network log, and the routes are listed in the Resumo. Stopping the plugin removes them.
+const RULES = [
+  // { url: '/v1/profile', method: 'GET', set: { 'user.premium': true } },
+  // { url: '/v1/flags', json: { newCheckout: true }, status: 200 },
+  // { url: '/v1/**', headers: { 'X-Debug': '1' } },
+  // { url: '/v1/ads/**', block: 'connection' },
+];
+const MAX_ROWS = 100;
+const rows = [];
+let paused = false;
+
+const glob = pattern =&gt; {   // the same shapes as the route filter, for picking the rule inside the handler
+  const [, scheme, host, path] = /^(?:(https?):\/\/([^/]+))?(\/.*)?$/.exec(pattern) ?? [];
+  const re = s =&gt; s.split('/').map(p =&gt; p === '**' ? '.*' : p.replace(/[.+?^${}()|[\]\\]/g, '\\$&amp;').replaceAll('*', '[^/]*')).join('/');
+  return url =&gt; { const u = new URL(url); return (!scheme || u.protocol === scheme + ':') &amp;&amp; (!host || new RegExp('^' + host.replace(/\./g, '\\.').replaceAll('*', '[^.]+') + '$').test(u.host)) &amp;&amp; new RegExp('^' + re(path || '/**') + '$').test(u.pathname); };
+};
+const rules = RULES.map(rule =&gt; ({ ...rule, test: glob(rule.url ?? '/**'), method: String(rule.method ?? 'ANY').toUpperCase() }));
+const setPath = (object, path, value) =&gt; { const keys = path.split('.'); let at = object; for (const key of keys.slice(0, -1)) at = at[key] ??= {}; at[keys.at(-1)] = value; };
+
+function show() {
+  lab.ui.badge(String(rows.length));
+  lab.ui.table(rows.slice().reverse(), ['time', 'method', 'url', 'rule', 'status', 'ms'], { id: 'requests' });
+}
+function note(row) { if (paused) return; rows.push(row); if (rows.length &gt; MAX_ROWS) rows.shift(); show(); }
+
+await lab.route('*', async route =&gt; {
+  const { method, url } = route.request, started = Date.now();
+  const row = { time: new Date().toLocaleTimeString(), method, url, rule: '—', status: '…', ms: '' };
+  const rule = rules.find(r =&gt; (r.method === 'ANY' || r.method === method) &amp;&amp; r.test(url));
+  try {
+    if (rule?.block) { row.rule = `block ${rule.block}`; await route.abort(rule.block); row.status = 'aborted'; }
+    else if (rule?.json !== undefined || rule?.body !== undefined) { row.rule = 'answer'; await route.fulfill({ status: rule.status ?? 200, ...(rule.json !== undefined ? { json: rule.json } : { body: rule.body }) }); row.status = rule.status ?? 200; }
+    else if (rule?.set) {
+      row.rule = 'change JSON';
+      const res = await route.fetch(); let json;
+      try { json = res.json(); } catch { await route.fulfill({ response: res }); row.status = `${res.status} (not JSON, unchanged)`; return; }
+      for (const [path, value] of Object.entries(rule.set)) setPath(json, path, value);
+      await route.fulfill({ response: res, json }); row.status = `${res.status} (changed)`;
+    }
+    else if (rule?.headers) { row.rule = 'headers'; await route.continue({ headers: { ...route.request.headers, ...rule.headers } }); row.status = 'sent'; }
+    else { await route.continue(); row.status = 'sent'; }
+  } catch (error) { row.status = `error: ${error.message}`; }
+  finally { row.ms = Date.now() - started; note(row); }
+}, { name: 'API proxy' });
+
+const pause = await lab.button({ id: 'pause', label: 'Pause list' }, () =&gt; { paused = !paused; pause.update({ label: paused ? 'Resume list' : 'Pause list' }); });
+await lab.button({ id: 'clear', label: 'Clear' }, () =&gt; { rows.length = 0; show(); });
+lab.ui.text(`${rules.length} rule(s) active; every other request goes on unchanged.`, { id: 'rules' });
+show();
+</code></pre></div>
+
         <h3 id="ex-di">Dependency injection inspector</h3>
         <p>Finds which dependency injection libraries the app ships (Koin, Dagger / Hilt, Kodein, Toothpick, kotlin-inject, Metro, Guice) and lists what their containers hold right now: each binding, its kind (single, factory, scoped), whether the instance was already created, and its class and handle. <b>DI window</b> opens the full table in a window with a filter and an "only created" switch; <b>Rescan DI</b> reads again. Read-only: it never calls a container, so nothing is created by looking. Also in the repository as <code>docs/plugins/di-inspector.js</code>.</p>
         <div class="code" data-name="Dependency injection inspector"><pre><code>// Dependency injection inspector (a plugin for Controls › Extensions › Plugins: paste this file as the plugin's code).
@@ -1929,6 +2008,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=7233a7b1ab13"></script>
+  <script type="module" src="./site-pages.js?v=5fccdbc9ed78"></script>
 </body>
 </html>

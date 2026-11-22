@@ -126,6 +126,60 @@ export function pluginWorkerMain(scope) {
     clear: () => pushUi({ op: 'clear' }),
     badge: text => pushUi({ op: 'badge', text: clip(textOf(text ?? '')).slice(0, 40) }),
   });
+  // lab.route (docs/PLUGINS.md "Network routes", src/network-routes.js): requests of the app the filter takes wait for the handler, which continues, fulfills, fetches or aborts them
+  const routeHandlers = new Map(), routeWaits = new Map(); let routeSeq = 0;
+  const utf8 = new TextDecoder('utf-8', { fatal: false });
+  const headerObject = list => { const out = {}; for (const [name, value] of list ?? []) { const key = String(name).toLowerCase(); out[key] = key in out ? `${out[key]}, ${value}` : String(value); } return out; };
+  const withBody = (target, body) => Object.assign(target, { body: body ?? null, text: () => (body ? utf8.decode(body) : ''), json: () => JSON.parse(body ? utf8.decode(body) : 'null') });
+  const routeBadArgs = message => Object.assign(new TypeError(message), { code: 'bad-args' });
+  const routeFilter = filter => {
+    if (filter === undefined || filter === null || filter === '*' || filter === '**') return {};
+    if (typeof filter === 'string') return { url: filter, method: 'ANY' };
+    if (typeof filter !== 'object') throw routeBadArgs('lab.route(filter, handler): filter is a URL pattern or { url, method, query, bodyContains }');
+    return { url: filter.url === undefined ? '' : String(filter.url), method: filter.method === undefined ? 'ANY' : String(filter.method), query: filter.query === 'exact' ? 'exact' : 'ignore', bodyContains: filter.bodyContains === undefined ? '' : String(filter.bodyContains) };
+  };
+  const routeBody = value => value !== null && typeof value === 'object' && !(value instanceof Uint8Array) && !ArrayBuffer.isView(value) && !(value instanceof ArrayBuffer) ? JSON.stringify(value) : value;
+  const runRoute = async message => {
+    const handler = routeHandlers.get(message.routeId), rid = message.rid, r = message.request ?? {};
+    let decided = null, fetched = false;
+    const wait = phase => new Promise((resolve, reject) => { routeWaits.set(`${rid}:${phase}`, { resolve, reject }); });
+    const decide = (action, extra = {}) => {
+      if (decided) return Promise.reject(Object.assign(new Error(`The request was already ${decided}.`), { code: 'decided' }));
+      decided = action === 'continue' ? 'continued' : action === 'fulfill' ? 'fulfilled' : 'aborted';
+      const done = wait('done'); call('route', { op: 'decide', rid, decision: { action, ...extra } }).catch(error => { const w = routeWaits.get(`${rid}:done`); routeWaits.delete(`${rid}:done`); w?.reject(error); });
+      return done;
+    };
+    const request = withBody({ method: r.method, url: r.url, headerList: (r.headers ?? []).map(([n, v]) => [n, v]), headers: headerObject(r.headers), api: r.api }, r.body ?? null);
+    const route = Object.freeze({
+      request,
+      continue: (change = {}) => decide('continue', { request: { url: change.url, method: change.method, headers: change.headers, ...(change.body !== undefined ? { body: routeBody(change.body) } : {}) } }),
+      fulfill: (options = {}) => {
+        const o = options ?? {}, base = o.response ?? null;
+        const response = { status: o.status ?? base?.status ?? 200, reason: o.reason ?? (o.status === undefined ? base?.reason : undefined) ?? '', headers: o.headers ?? base?.headerList ?? {}, delayMs: o.delayMs,
+          body: o.json !== undefined ? JSON.stringify(o.json) : o.body !== undefined ? routeBody(o.body) : base?.body ?? '' };
+        if (o.json !== undefined) { const list = Array.isArray(response.headers) ? response.headers : Object.entries(response.headers); if (!list.some(([n]) => String(n).toLowerCase() === 'content-type')) response.headers = [...list, ['Content-Type', 'application/json; charset=utf-8']]; }
+        return decide('fulfill', { response, fetched: fetched || !!base });
+      },
+      abort: (error = 'connection') => decide('abort', { error: String(error) }),
+      fetch: async (change = {}) => {
+        if (decided) throw Object.assign(new Error(`The request was already ${decided}.`), { code: 'decided' });
+        const answer = wait('response');
+        await call('route', { op: 'decide', rid, decision: { action: 'fetch', request: { url: change.url, method: change.method, headers: change.headers, ...(change.body !== undefined ? { body: routeBody(change.body) } : {}) } } });
+        const reply = await answer; fetched = true;
+        if (reply.error) throw Object.assign(new Error(`route.fetch: ${reply.error}`), { code: 'network' });
+        const res = reply.response;
+        return withBody({ status: res.status, reason: res.reason, url: res.url, headerList: res.headers, headers: headerObject(res.headers), mock: res.mock ?? null }, res.body ?? null);
+      },
+    });
+    try { if (handler) await handler(route, request); } catch (error) { reportError(error, 'route'); }
+    if (!decided) { try { await decide('continue'); } catch (error) { if (error?.code !== 'decided') reportError(error, 'route'); } }
+  };
+  const onRouteMessage = message => {
+    if (!message || typeof message !== 'object') return;
+    if (!message.phase) { runRoute(message); return; }
+    const key = `${message.rid}:${message.phase}`, w = routeWaits.get(key); if (!w) return; routeWaits.delete(key);
+    if (message.phase === 'done' && message.ok === false) w.reject(Object.assign(new Error(`lab.route: ${message.error}`), { code: 'bad-args' })); else w.resolve(message);
+  };
   const wrapError = error => Object.assign(new Error(error?.message ?? 'Query failed.'), { code: error?.code ?? 'failed' }, error?.exception ? { exception: error.exception } : {}, Array.isArray(error?.errors) ? { errors: error.errors } : {});
   // lab.hook: the method (smali 'Lpkg/C;->m(I)Z', Java 'pkg.C.m(int): boolean', or { className, name, signature }) and exactly one change: returns / throws (+ message) / observe / smali
   const HOOK_KINDS = ['returns', 'throws', 'observe', 'smali'];
@@ -368,6 +422,25 @@ export function pluginWorkerMain(scope) {
      * Changes one of the app's methods: hook(method, { returns } | { throws, message } | { observe: true, depth, maxString, maxItems } | { smali }, persist?) -> { id, method, kind, hits, ... }.
      * `method`: 'Lpkg/Class;->name(Params)Ret', 'pkg.Class.name(int): boolean' or { className, name, signature }. Observed calls arrive through lab.on('call', fn), one call per fn().
      */
+    // ---- network routes (src/network-routes.js; docs/PLUGINS.md "Network routes"): never silent, removed when the plugin stops ----
+    /**
+     * route(filter, handler, { name }) -> a function that removes the route (also .id). filter: a URL pattern ('https://api.example.com/v1/**', '/v1/*', '*' = every request) or
+     * { url, method, query: 'ignore' | 'exact', bodyContains }. handler(route): route.request { method, url, headers, headerList, body, text(), json() }; then one of
+     * route.continue({ url, method, headers, body }), route.fulfill({ status, headers, body | json, response, delayMs }), route.abort('connection' | 'reset' | 'timeout' | 'unknown-host' | message),
+     * after an optional `const res = await route.fetch()` (the real response: { status, reason, headers, headerList, body, text(), json() }). A handler that decides nothing continues.
+     */
+    route: async (filter, handler, options = {}) => {
+      if (typeof filter === 'function') { options = handler ?? {}; handler = filter; filter = undefined; }
+      if (typeof handler !== 'function') throw routeBadArgs('lab.route(filter, handler): handler is a function (route) => ...');
+      const result = await call('route', { op: 'add', id: `x${++routeSeq}`, filter: routeFilter(filter), name: options?.name === undefined ? '' : String(options.name) });
+      routeHandlers.set(result.id, handler);
+      const remove = () => { routeHandlers.delete(result.id); return call('route', { op: 'remove', id: result.id }); };
+      return Object.assign(remove, { id: result.id, state: result.state, remove });
+    },
+    /** Removes one of the plugin's routes by id. -> { removed } */
+    unroute: id => { routeHandlers.delete(String(id?.id ?? id ?? '')); return call('route', { op: 'remove', id: String(id?.id ?? id ?? '') }); },
+    /** The plugin's routes with their counts: [{ id, name, filter, state, hits }]. */
+    routes: () => call('route', { op: 'list' }),
     hook: async (method, options = {}) => call('hook', hookSpec(method, options)),
     /** Removes one of the plugin's changes (the original method runs again). -> { removed } */
     unhook: id => call('unhook', { id: String(id?.id ?? id ?? '') }),
@@ -503,6 +576,7 @@ export function pluginWorkerMain(scope) {
     if (!data || typeof data !== 'object') return;
     if (data.t === 'reply') { const waiter = pending.get(data.id); if (!waiter) return; pending.delete(data.id); if (data.ok) waiter.resolve(data.value); else waiter.reject(wrapError(data.error)); return; }
     if (data.t === 'click') { runClick(data); return; }
+    if (data.t === 'route') { onRouteMessage(data.data); return; }
     if (data.t === 'power') { const ms = Number(data.watchMinMs); if (Number.isFinite(ms)) watchMinMs = Math.max(10, Math.min(1000, ms)); return; }
     if (data.t === 'event') {
       const set = handlers.get(data.name); if (!set) return;

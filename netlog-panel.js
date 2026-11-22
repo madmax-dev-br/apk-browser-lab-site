@@ -1,9 +1,9 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=7233a7b1ab13';
-import { createReadingHold } from './reading-hold.js?v=7233a7b1ab13';
-import { sanitizeHosts } from './device-settings.js?v=7233a7b1ab13';
+import { MAX_ENTRIES } from './netlog.js?v=5fccdbc9ed78';
+import { createReadingHold } from './reading-hold.js?v=5fccdbc9ed78';
+import { sanitizeHosts } from './device-settings.js?v=5fccdbc9ed78';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -21,12 +21,12 @@ export function categoryOf(entry) {
 
 /** The entry passes when its category is `category` (or 'all') and `text` (case-insensitive) is part of its method, host, path or status. */
 export function matchesFilter(entry, { text = '', category = 'all' } = {}) {
-  if (category === 'mocked') { if (!entry.mockId) return false; }   // "Mockadas": answered by a "Mock de endpoints" entry
+  if (category === 'mocked') { if (!entry.mockId && !entry.routeId) return false; }   // "Mockadas": answered by a "Mock de endpoints" entry
   else if (category === 'redirected') { if (!entry.mappedUrl) return false; }   // "Redirecionadas": sent elsewhere by a "Redirecionar hosts" rule
   else if (category === 'proxied') { if (!entry.proxiedVia) return false; }   // "Via proxy": went through Device › Proxy
   else if (category !== 'all' && categoryOf(entry) !== category) return false;
   const needle = String(text).trim().toLowerCase(); if (!needle) return true;
-  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}${entry.relayChannel === 'mux' ? ' channel' : entry.relayChannel === 'fallback' ? ' fallback' : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
+  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.routeId ? ` route ${entry.routeLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}${entry.relayChannel === 'mux' ? ' channel' : entry.relayChannel === 'fallback' ? ' fallback' : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
 }
 
 const pad = (value, width = 2) => String(value).padStart(width, '0');
@@ -68,7 +68,7 @@ export function describeOutcome(entry) {
 }
 
 /** One table row's text, `HH:MM:SS.mmm METHOD host/path -> status  size  duration`. */
-export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.mockId ? ' [MOCK]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}${entry.relayChannel === 'mux' ? ' [CHANNEL]' : entry.relayChannel === 'fallback' ? ' [CHANNEL FALLBACK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.routeId ? ' [ROUTE]' : ''}${entry.mockId && !entry.routeId ? ' [MOCK]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}${entry.relayChannel === 'mux' ? ' [CHANNEL]' : entry.relayChannel === 'fallback' ? ' [CHANNEL FALLBACK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
 /** The note of an entry sent while the relay's parallel channel is on (Device › Parallel relay channel): carried by it, or sent as a separate request and why. */
 export const channelNote = entry => entry.relayChannel === 'mux' ? 'Carried by the relay\'s parallel channel (Device › Parallel relay channel): one WebSocket to the relay holds every exchange at once, with no preflight and no per-origin connection limit.'
   : entry.relayChannel === 'fallback' ? `Parallel relay channel on, but not used for this exchange: ${entry.relayChannelNote ?? 'the channel was not open'}. It went as a separate request, as without the setting.`
@@ -89,6 +89,8 @@ export function redirectFailureHint(entry) {
   return parts.join(' ');
 }
 /** The note of an entry a mock answered. */
+/** The note of an entry a plugin's network route held (lab.route, src/network-routes.js). */
+export const routeNote = entry => `Held by a plugin network route: ${entry.routeLabel}${entry.routeChange ? ` (${entry.routeChange})` : ' (unchanged)'}.`;
 export const mockNote = entry => `Answered by the lab: mock "${entry.mockLabel}" (Endpoint mocks, Controls); the request did not go to the network.`;
 
 const stamp = date => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
@@ -101,7 +103,7 @@ export function buildText(entries, { dropped = 0 } = {}) {
   for (const entry of entries) {
     lines.push(`#${entry.seq} ${formatEntry(entry)}  [${entry.api}, thread ${entry.thread}]`, `    ${entry.url}`);
     if (entry.mappedUrl) { lines.push(`    ${redirectNote(entry)}`); const hint = redirectFailureHint(entry); if (hint) lines.push(`    ${hint}`); }
-    if (entry.mockId) lines.push(`    ${mockNote(entry)}`);
+    if (entry.routeId) lines.push(`    ${routeNote(entry)}`); else if (entry.mockId) lines.push(`    ${mockNote(entry)}`);
     if (entry.finalUrl) lines.push(`    the server redirected (3xx) to ${entry.finalUrl}`);
     const note = describeOutcome(entry); if (note) lines.push(`    ${note}`);
     for (const [name, value] of entry.requestHeaders) lines.push(`    > ${name}: ${value}`);
@@ -126,6 +128,7 @@ export function buildHar(entries, { dropped = 0, creator = { name: 'APK Web Lab'
           content: { size: entry.responseBytes, mimeType: (entry.contentType ?? '').split(';')[0].trim() || 'x-unknown' }, redirectURL: location, headersSize: -1, bodySize: entry.responseBytes },
         cache: {}, timings: { send: 0, wait: Math.max(time, 0), receive: 0 },
         ...(entry.mockId ? { _mock: { id: entry.mockId, label: entry.mockLabel }, comment: mockNote(entry) } : {}),
+        ...(entry.routeId ? { _route: { id: entry.routeId, label: entry.routeLabel, change: entry.routeChange }, comment: routeNote(entry) } : {}),
         ...(entry.mappedUrl ? { _redirect: { from: entry.url, to: entry.mappedUrl, rule: entry.mappedRule }, comment: [redirectNote(entry), redirectFailureHint(entry)].filter(Boolean).join(' ') } : {}),
         _seq: entry.seq, _api: entry.api, _thread: entry.thread, _outcome: entry.outcome, _failure: entry.failure?.message ?? null, _refusedHost: entry.refusedHost, _finalUrl: entry.finalUrl, _uptimeMs: entry.uptime,
       };
@@ -188,7 +191,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
       const hint = redirectFailureHint(entry); if (hint) block.append(el('div', 'netlog-note netlog-note-error', hint));
       box.append(block);
     }
-    if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
+    if (entry.routeId) box.append(el('div', 'netlog-note netlog-note-mock', routeNote(entry))); else if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
     if (entry.proxiedVia) box.append(el('div', 'netlog-note', `Via proxy ${entry.proxiedVia} (Controls › Network › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`));
     if (entry.relayChannel) box.append(el('div', 'netlog-note', channelNote(entry)));
     if (entry.finalUrl) box.append(el('div', 'netlog-note', `The server redirected (3xx) and the transport followed to ${entry.finalUrl}`));
@@ -208,7 +211,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     return box;
   };
   const row = entry => {
-    const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId ? ' is-mocked' : ''}${entry.mappedUrl ? ' is-redirected' : ''}${entry.proxiedVia ? ' is-proxied' : ''}`), line = el('div', 'netlog-line');
+    const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId || entry.routeId ? ' is-mocked' : ''}${entry.mappedUrl ? ' is-redirected' : ''}${entry.proxiedVia ? ' is-proxied' : ''}`), line = el('div', 'netlog-line');
     const target = el('span', 'netlog-target', `${entry.host}${entry.path}`); if (entry.mockId) target.prepend(el('b', 'netlog-mock', 'MOCK'));
     if (entry.relayChannel === 'mux' || entry.relayChannel === 'fallback') { const badge = el('b', `netlog-channel${entry.relayChannel === 'fallback' ? ' is-fallback' : ''}`, entry.relayChannel === 'mux' ? 'CHANNEL' : 'NO CHANNEL'); badge.title = channelNote(entry); target.prepend(badge); }
     if (entry.proxiedVia) { const badge = el('b', 'netlog-proxied', 'PROXY'); badge.title = `Via proxy ${entry.proxiedVia}`; target.prepend(badge); }
