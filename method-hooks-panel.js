@@ -9,6 +9,7 @@
 
 const KIND_TEXT = { returns: 'fixed return', throws: 'throws', observe: 'observed', smali: 'smali body' };
 /** The owner of the changes made in the Code browser (src/code-browser.js): its method edits are smali hooks of this owner, its file edits the `files` rows. */
+export const ATTACH_WAIT_MS = 60000;
 export const CODE_BROWSER = Object.freeze({ id: 'code-browser', name: 'Code browser' });
 export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow = null, getPackage = () => null, removeFile = null, documentRef = globalThis.document } = {}) {
   const S = { hooks: [], files: [], persisted: new Map(), failures: new Map(), seq: 0, open: false };
@@ -74,6 +75,9 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
     setHooks(reply.hooks);
     return { removed: !!reply.removed || hadFailure };
   }
+  // lab.hook calls made while a VM loads wait here for its attach() (resolved true), or for ATTACH_WAIT_MS (false)
+  const attachWaiters = new Set();
+  const nextAttach = ms => new Promise(resolve => { const done = ok => { clearTimeout(timer); attachWaiters.delete(done); resolve(ok); }; const timer = setTimeout(() => done(false), ms); attachWaiters.add(done); });
   if (chip()) chip().addEventListener('click', () => { S.open = !S.open; render(); });
 
   return {
@@ -81,7 +85,15 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
     async add(owner, spec) {
       if (!vm?.worker) throw Object.assign(new Error('No app is running: open an APK first.'), { code: 'no-apk' });
       const id = `h${++S.seq}`, packageName = getPackage() ?? null, clean = JSON.parse(JSON.stringify(spec ?? {}, (key, value) => typeof value === 'bigint' ? { long: String(value) } : value));
-      const reply = await vm.methodHooks('add', { spec: clean, owner: { id: String(owner?.id ?? ''), name: String(owner?.name ?? 'plugin') }, id });
+      const ask = () => vm.methodHooks('add', { spec: clean, owner: { id: String(owner?.id ?? ''), name: String(owner?.name ?? 'plugin') }, id });
+      let reply = await ask();
+      if (reply?.loaded === false) {   // the Worker is there but its VM is not loaded yet (an APK loading, a reopen): the change waits for the load and goes in before the app's code runs
+        trace(`${owner?.id === CODE_BROWSER.id ? CODE_BROWSER.name : `Plugin ${owner?.name}`}: method change waiting for the app to load (${id})`);
+        if (!(await nextAttach(ATTACH_WAIT_MS)) || !vm?.worker) throw Object.assign(new Error(`No app finished loading within ${ATTACH_WAIT_MS / 1000} s: open an APK first (or wait for lab.waitReady()).`), { code: 'no-apk' });
+        reply = await ask();
+        if (reply?.loaded === false) throw Object.assign(new Error('No app is loaded in the VM: open an APK first.'), { code: 'no-apk' });
+      }
+      if (!reply?.hook) throw Object.assign(new Error('The VM did not describe the change it installed.'), { code: 'failed' });
       if (clean.persist === true) S.persisted.set(id, { id, owner: { id: String(owner.id), name: String(owner.name) }, spec: clean, packageName, method: reply.hook.method });
       setHooks(reply.hooks);
       trace(`${owner?.id === CODE_BROWSER.id ? CODE_BROWSER.name : `Plugin ${owner?.name}`}: app modified, ${KIND_TEXT[reply.hook.kind] ?? reply.hook.kind} of ${reply.hook.method}${reply.hook.kind === 'returns' ? ` = ${reply.hook.value}` : ''} (${id}${clean.persist ? ', persists' : ''})`);
@@ -122,6 +134,7 @@ export function createMethodHooksPanel({ $, vm, trace = () => {}, removePageRow 
         catch (error) { S.failures.set(entry.id, { ...entry, error: String(error?.message ?? error).slice(0, 400) }); trace(`App modified: the persistent change ${entry.id} of plugin ${entry.owner.name} (${entry.method}) was not applied again: ${error?.message ?? error}`); }
       }
       if (applied) trace(`App modified: ${applied} persistent change${applied === 1 ? '' : 's'} applied again before the app started`);
+      for (const resolve of [...attachWaiters]) resolve(true);   // changes asked for during the load go in now, still before the app's code runs
       render();
       return applied;
     },

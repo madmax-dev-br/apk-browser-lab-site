@@ -3,8 +3,8 @@
 // same ones java.net.NetworkInterface lists (src/libcore-io-native.js deviceInterfaces), in the kernel's message layout (linux/netlink.h, linux/rtnetlink.h,
 // linux/if_link.h, linux/if_addr.h). Android 11 rules for apps (targetSdkVersion 30 and up, SELinux): bind() on a NETLINK_ROUTE socket and RTM_GETLINK requests are
 // denied with EACCES (no hardware addresses); RTM_GETADDR stays allowed. A request type the lab does not answer fails by name; nothing is invented.
-import { APKError } from '../apk-error.js?v=5fccdbc9ed78';
-import { deviceInterfaces } from '../libcore-io-native.js?v=5fccdbc9ed78';
+import { APKError } from '../apk-error.js?v=266d8da382fc';
+import { deviceInterfaces } from '../libcore-io-native.js?v=266d8da382fc';
 
 export const NETLINK = Object.freeze({ ROUTE: 0, NLMSG_ERROR: 2, NLMSG_DONE: 3, RTM_NEWLINK: 16, RTM_GETLINK: 18, RTM_NEWADDR: 20, RTM_GETADDR: 22, F_REQUEST: 1, F_MULTI: 2, F_ACK: 4, F_DUMP: 0x300 });
 const ARPHRD_ETHER = 1, ARPHRD_LOOPBACK = 772, AF_INET = 2, AF_INET6 = 10, AF_UNSPEC = 0;
