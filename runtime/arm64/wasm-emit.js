@@ -31,23 +31,34 @@ export const V = {
   swizzle: 14,
 };
 
+// The encoders take a Number or a BigInt. Indices, offsets and 32-bit constants (nearly every call while a region compiles) take the Number paths, which emit the same bytes
+// as the BigInt ones without allocating a BigInt per step; anything else (64-bit constants) goes through BigInt.
 export function uleb(out, value) {
+  if (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 0xffffffff) {
+    let v = value; do { let byte = v & 0x7f; v = Math.floor(v / 128); if (v !== 0) byte |= 0x80; out.push(byte); } while (v !== 0); return;
+  }
   let v = BigInt(value);
   do { let byte = Number(v & 0x7fn); v >>= 7n; if (v !== 0n) byte |= 0x80; out.push(byte); } while (v !== 0n);
 }
+const INT32_MIN = -0x80000000, INT32_MAX = 0x7fffffff;
 export function sleb(out, value) {
+  if (typeof value === 'bigint' && value >= -0x80000000n && value <= 0x7fffffffn) value = Number(value);
+  if (typeof value === 'number' && Number.isInteger(value) && value >= INT32_MIN && value <= INT32_MAX) {
+    let v = value; for (;;) { const byte = v & 0x7f; v >>= 7; const done = (v === 0 && !(byte & 0x40)) || (v === -1 && (byte & 0x40)); out.push(done ? byte : byte | 0x80); if (done) return; }
+  }
   let v = BigInt(value);
   for (;;) { const byte = Number(v & 0x7fn); v >>= 7n; const done = (v === 0n && !(byte & 0x40)) || (v === -1n && (byte & 0x40)); out.push(done ? byte : byte | 0x80); if (done) return; }
 }
-const f64Bytes = value => { const b = new Uint8Array(8); new DataView(b.buffer).setFloat64(0, value, true); return [...b]; };
+const f64View = new DataView(new ArrayBuffer(8));
+const pushF64 = (out, value) => { f64View.setFloat64(0, value, true); for (let i = 0; i < 8; i++) out.push(f64View.getUint8(i)); };
 
 /** A function body under construction: bytes, plus the open structured blocks (for br depths). */
 export class Code {
   constructor() { this.b = []; this.level = 0; }
   op(...codes) { for (const c of codes) this.b.push(c); return this; }
-  i32(value) { this.b.push(OP.i32_const); sleb(this.b, BigInt.asIntN(32, BigInt(value))); return this; }
+  i32(value) { this.b.push(OP.i32_const); sleb(this.b, typeof value === 'number' && Number.isInteger(value) ? value | 0 : BigInt.asIntN(32, BigInt(value))); return this; }
   i64(value) { this.b.push(OP.i64_const); sleb(this.b, BigInt.asIntN(64, BigInt(value))); return this; }
-  f64(value) { this.b.push(OP.f64_const, ...f64Bytes(value)); return this; }
+  f64(value) { this.b.push(OP.f64_const); pushF64(this.b, value); return this; }
   get(local) { this.b.push(OP.local_get); uleb(this.b, local); return this; }
   set(local) { this.b.push(OP.local_set); uleb(this.b, local); return this; }
   tee(local) { this.b.push(OP.local_tee); uleb(this.b, local); return this; }

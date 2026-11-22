@@ -1,7 +1,7 @@
 // "Show frame rate": draws the FrameMeter (src/frame-meter.js) over the device screen, in the spirit of Android's "Profile HWUI rendering > On screen as bars": one stacked bar per frame
 // with the green 16.67 ms line, and a realtime FPS line with its current / average / minimum values and the count of janky frames. A page canvas: it takes no input, it is not part of the
 // app's pixels and the screenshots plugins take never include it. Pure drawing over a 2D context; no DOM besides the canvas it is given, no process.*.
-import { FRAME_STAGES, FRAME_BUDGET_MS, SAMPLES_KEPT, SAMPLE_MS, BAR_FRAMES } from './frame-meter.js?v=67f3eead5b24';
+import { FRAME_STAGES, FRAME_BUDGET_MS, SAMPLES_KEPT, SAMPLE_MS, BAR_FRAMES } from './frame-meter.js?v=7233a7b1ab13';
 
 const GREEN = '#38d65a', AMBER = '#f5a623', RED = '#ff5252', TEXT = '#f2f4f7', DIM = '#9aa3af', PANEL = 'rgba(14,17,22,0.9)';
 const MARGIN = 4, PAD = 6, SCALE = 2;   // the bitmap is drawn at twice the layout size: the screen is often scaled to fit the page

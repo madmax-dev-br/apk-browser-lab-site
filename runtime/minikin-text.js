@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=67f3eead5b24';
-import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=67f3eead5b24';
+import { APKError } from './apk-error.js?v=7233a7b1ab13';
+import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=7233a7b1ab13';
 
 // The virtual device's side of Minikin (src/minikin-provider.js): font collections built from the lab's Typeface state, the Paint state as hwui hands it to Minikin, and the
 // MeasuredText / LineBreaker / Paint measurement calls of hwui's JNI (libs/hwui/jni/text/MeasuredText.cpp, LineBreaker.cpp, jni/Paint.cpp). Handles are wasm32 pointers kept
@@ -16,6 +16,48 @@ import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=67
 const fail = message => { throw new APKError(message, { kind: 'text-layout-backend-unsupported', backend: 'AOSP-Minikin-android-13.0.0_r1/Wasm' }); };
 const tag = s => ((s.charCodeAt(0) << 24) | (s.charCodeAt(1) << 16) | (s.charCodeAt(2) << 8) | s.charCodeAt(3)) >>> 0;
 const inRanges = (ranges, cp) => { let lo = 0, hi = ranges.length - 1; while (lo <= hi) { const mid = (lo + hi) >> 1, r = ranges[mid]; if (cp < r[0]) hi = mid - 1; else if (cp > r[1]) lo = mid + 1; else return true; } return false; };
+const isVariationSelector = cp => (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef);
+/**
+ * The code points a font maps to a glyph, from its cmap as Minikin's CmapCoverage reads it (the subtable of the best priority among (3,10) (0,6) (0,4) (3,1) (0,3) (0,2)
+ * (0,1) (0,0) of format 12 or 4). Returns `cp => boolean`, or null when the font has no such table or the table does not parse: the caller then treats every code point as
+ * not covered (the fallback families join as before). A code point counts only when its glyph is not 0 (by the spec's arithmetic and by Minikin's), so `true` is never
+ * wrong where Minikin would say false.
+ */
+export function cmapCoverage(bytes, ttc = 0) {
+  try {
+    const v = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    let base = 0;
+    if (v.getUint32(0) === 0x74746366) { if (ttc >= v.getUint32(8)) return null; base = v.getUint32(12 + ttc * 4); }   // 'ttcf'
+    const numTables = v.getUint16(base + 4); let cmap = -1;
+    for (let i = 0; i < numTables; i++) { const rec = base + 12 + i * 16; if (v.getUint32(rec) === 0x636d6170) { cmap = v.getUint32(rec + 8); break; } }   // 'cmap'
+    if (cmap < 0) return null;
+    const PRIORITY = { '3.10': 0, '0.6': 1, '0.4': 2, '3.1': 3, '0.3': 4, '0.2': 5, '0.1': 6, '0.0': 7 };
+    let best = null;
+    for (let i = 0, n = v.getUint16(cmap + 2); i < n; i++) {
+      const rec = cmap + 4 + i * 8, priority = PRIORITY[v.getUint16(rec) + '.' + v.getUint16(rec + 2)]; if (priority === undefined) continue;
+      const at = cmap + v.getUint32(rec + 4), format = v.getUint16(at);
+      if ((format === 12 || format === 4) && (!best || priority < best.priority)) best = { priority, at, format };
+    }
+    if (!best) return null;
+    const at = best.at;
+    if (best.format === 12) {
+      const groups = v.getUint32(at + 12), starts = new Uint32Array(groups), ends = new Uint32Array(groups), glyphs = new Uint32Array(groups);
+      for (let i = 0; i < groups; i++) { const g = at + 16 + i * 12; starts[i] = v.getUint32(g); ends[i] = v.getUint32(g + 4); glyphs[i] = v.getUint32(g + 8); }
+      return cp => { let lo = 0, hi = groups - 1; while (lo <= hi) { const mid = (lo + hi) >> 1; if (cp < starts[mid]) hi = mid - 1; else if (cp > ends[mid]) lo = mid + 1; else return glyphs[mid] + (cp - starts[mid]) !== 0; } return false; };
+    }
+    const segX2 = v.getUint16(at + 6), segs = segX2 / 2, endAt = at + 14, startAt = endAt + segX2 + 2, deltaAt = startAt + segX2, offsetAt = deltaAt + segX2;
+    const ends = new Uint16Array(segs); for (let i = 0; i < segs; i++) ends[i] = v.getUint16(endAt + i * 2);
+    return cp => {
+      if (cp > 0xffff) return false;
+      let lo = 0, hi = segs - 1; while (lo < hi) { const mid = (lo + hi) >> 1; if (ends[mid] < cp) lo = mid + 1; else hi = mid; }
+      if (ends[lo] < cp || v.getUint16(startAt + lo * 2) > cp) return false;
+      const start = v.getUint16(startAt + lo * 2), delta = v.getUint16(deltaAt + lo * 2), rangeOffset = v.getUint16(offsetAt + lo * 2);
+      if (rangeOffset === 0) return ((cp + delta) & 0xffff) !== 0;
+      const glyphAt = offsetAt + lo * 2 + rangeOffset + (cp - start) * 2; if (glyphAt + 2 > v.byteLength) return false;
+      const raw = v.getUint16(glyphAt); return raw !== 0 && ((raw + delta) & 0xffff) !== 0;
+    };
+  } catch { return null; }
+}
 const ROBOTO_VARIABLE = 'Roboto-Regular.ttf', ROBOTO_STATIC = 'RobotoStatic-Regular.ttf';
 const DEFAULT_INSTANCE = [{ tag: 'ital', value: 0 }, { tag: 'wdth', value: 100 }, { tag: 'wght', value: 400 }];
 export const PAINT_BYTES = 64;
@@ -38,13 +80,14 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
   const localeList = tags => { const key = tags ?? ''; let id = locales.get(key); if (id === undefined) { const p = cString(key); try { id = api.mk_locale_list(p); } finally { api.mk_free(p); } locales.set(key, id); } return id; };
 
   const data = new Map(), fontHandles = new Map(), families = new Map(), collections = new Map();
+  const dataBytes = new Map(), fontSource = new Map(), familyFonts = new Map(), familyCoverage = new Map();   // for the first family's coverage (collectionFor)
   const dataFor = (key, read) => {
     let handle = data.get(key);
     if (handle === undefined) {
       const bytes = read(); if (!(bytes instanceof Uint8Array) || !bytes.length) fail('No font bytes for ' + key);
       const p = malloc(bytes.length); new Uint8Array(api.memory.buffer, p, bytes.length).set(bytes);
       handle = api.mk_data_new(p, bytes.length); if (!handle) fail('Minikin rejected font data ' + key + ': ' + error());
-      data.set(key, handle);
+      data.set(key, handle); dataBytes.set(handle, bytes);
     }
     return handle;
   };
@@ -59,7 +102,7 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
         handle = guarded(() => api.mk_font_new(dataHandle, ttc, tags, values, axes.length, weight, italic));
       } finally { api.mk_free(tags); api.mk_free(values); }
       if (!handle) fail('Minikin could not open font ' + dataKey + ': ' + error());
-      fontHandles.set(key, handle);
+      fontHandles.set(key, handle); fontSource.set(handle, { data: dataHandle, ttc });
     }
     return handle;
   };
@@ -70,7 +113,7 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
       try { list.forEach((font, i) => view().setInt32(p + i * 4, font, true)); handle = guarded(() => api.mk_family_new(p, list.length, localeList(lang), variant, customFallback ? 1 : 0)); }
       finally { api.mk_free(p); }
       if (!handle) fail('Minikin could not make font family ' + key + ': ' + error());
-      families.set(key, handle);
+      families.set(key, handle); familyFonts.set(handle, list);
     }
     return handle;
   };
@@ -116,10 +159,35 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
   const fallbackFamily = entry => familyFor(entry.key, () => [fontFor(entry.key, () => fonts.fallbackBytes(entry.file.stem), { ttc: 0 })],
     // fonts.xml marks the UI cuts of a script variant="compact" (FamilyVariant::COMPACT = 1)
     { lang: entry.family.lang ? entry.family.lang.replaceAll(' ', ',') : '', variant: /UI$/.test(entry.family.id) ? 1 : 0 });
-  /** The FontCollection for a Typeface and the code points of `text`. */
+  /**
+   * Whether every font of `family` maps `cp` (the intersection of their cmaps: Minikin's family coverage is one of them, the closest to the regular style, so a code point all
+   * of them map is in it). A font whose cmap cannot be read covers nothing here.
+   */
+  const familyCovers = (family, cp) => {
+    let covers = familyCoverage.get(family);
+    if (covers === undefined) {
+      const tests = (familyFonts.get(family) ?? []).map(font => { const source = fontSource.get(font), bytes = source && dataBytes.get(source.data); return bytes ? cmapCoverage(bytes, source.ttc) : null; });
+      covers = tests.length && tests.every(Boolean) ? (c => tests.every(t => t(c))) : (() => false);
+      familyCoverage.set(family, covers);
+    }
+    return covers(cp);
+  };
+  /**
+   * The FontCollection for a Typeface and the code points of `text`. A code point the collection's first family maps never goes to a fallback family (FontCollection::
+   * getFamilyForChar: "If the first font family supports the given character or variation sequence, always use it"; a sticky or combining character that continues
+   * another run continues a family chosen for a code point the first family does not map, which is kept), so only the code points it does not map pick fallback families:
+   * a no-break space, a curly quote or a dash in Latin text does not bring in the dozens of fallback fonts that also map them. A code point before a variation selector,
+   * and the selector, always pick (the first family wins there only if it has the sequence).
+   */
   function collectionFor(info, text) {
-    const primary = primaryFamilies(info), points = new Set();
-    for (const ch of text) { const cp = ch.codePointAt(0); if (cp > 0x7e || cp < 0x20) points.add(cp); }
+    const primary = primaryFamilies(info), points = new Set(), first = primary.list[0];
+    let previous = -1;
+    for (const ch of text) {
+      const cp = ch.codePointAt(0);
+      if (isVariationSelector(cp)) { points.add(cp); if (previous >= 0) points.add(previous); }
+      else if ((cp > 0x7e || cp < 0x20) && !familyCovers(first, cp)) points.add(cp);
+      previous = cp;
+    }
     const used = [];
     if (points.size) for (const [index, entry] of fallbackChain().entries()) { for (const cp of points) if (inRanges(entry.file.ranges, cp)) { used.push(index); break; } }
     const key = primary.key + '|' + used.join(',');
@@ -137,12 +205,14 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
   // ---- Paint ----
   /** Writes hwui's Paint state (LabPaint of lab/minikin-wrapper.cpp) for paint state `p` (src/paint-host.js) with Typeface `info` into `at`; returns the C strings to free. */
   function writePaint(at, p, info, text) {
-    const v = view(), features = p.fontFeatureSettings ? cString(p.fontFeatureSettings) : 0;
-    v.setInt32(at, collectionFor(info, text), true);
+    // everything that allocates first (a font read into the module can grow its memory, which detaches an earlier view)
+    const features = p.fontFeatureSettings ? cString(p.fontFeatureSettings) : 0, collection = collectionFor(info, text), locales = localeList(p.textLocaleTags ?? p.textLocaleTag ?? '');
+    const v = view();
+    v.setInt32(at, collection, true);
     v.setFloat32(at + 4, p.textSize, true); v.setFloat32(at + 8, p.textScaleX ?? 1, true); v.setFloat32(at + 12, p.textSkewX ?? 0, true);
     v.setFloat32(at + 16, p.letterSpacing ?? 0, true); v.setFloat32(at + 20, p.wordSpacing ?? 0, true);
     v.setUint32(at + 24, p.flags >>> 0, true); v.setInt32(at + 28, p.hinting ?? 1, true);
-    v.setUint32(at + 32, localeList(p.textLocaleTags ?? p.textLocaleTag ?? ''), true);
+    v.setUint32(at + 32, locales, true);
     v.setInt32(at + 36, p.elegantTextHeight ? 2 : 0, true);   // Paint.setElegantTextHeight: FamilyVariant::ELEGANT, else DEFAULT
     v.setInt32(at + 40, info.weight ?? 400, true); v.setInt32(at + 44, info.italic ? 1 : 0, true);
     v.setInt32(at + 48, (p.hyphenEdit ?? 0) >>> 3, true); v.setInt32(at + 52, (p.hyphenEdit ?? 0) & 7, true);

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=67f3eead5b24';
-import { throwNew } from './java-throw.js?v=67f3eead5b24';
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=67f3eead5b24';
+import { APKError } from './apk-error.js?v=7233a7b1ab13';
+import { throwNew } from './java-throw.js?v=7233a7b1ab13';
+import { sharedAssetBytes, knownDigest, noteDigest } from './shared-asset-bytes.js?v=7233a7b1ab13';
 
 // com.android.icu.charset.NativeConverter converter natives (open/close/decode/encode/reset/callbacks) over the unmodified ICU4C 70.1 ucnv implementation compiled to
 // WebAssembly (vendor/icu/70.1/icu-converter.wasm, scripts/build-icu-converter.sh). The wrapper code follows external/icu android-13.0.0_r1
@@ -26,7 +26,8 @@ export class IcuConverterProvider {
     const metadata = this.metadata || JSON.parse(decoder.decode(await this.read(new URL('converter-provenance.json' + this.revision, this.baseURL), 256 * 1024)));
     if (metadata.schemaVersion !== 1 || !/^[0-9a-f]{64}$/.test(metadata.wasm?.sha256 ?? '') || !/^[0-9a-f]{64}$/.test(metadata.data?.sha256 ?? '')) fail('Unsupported ICU converter provenance');
     const [wasm, data] = await Promise.all([this.wasmBytes || this.read(new URL(metadata.wasm.file + this.revision, this.baseURL), 4 * 1024 * 1024), this.dataBytes || sharedAssetBytes(new URL(metadata.data.file + this.revision, this.baseURL), url => this.read(url, 16 * 1024 * 1024))]);
-    if (await sha(wasm) !== metadata.wasm.sha256 || await sha(data) !== metadata.data.sha256) fail('ICU converter assets do not match their pinned SHA-256', 'icu-converter-hash-mismatch');
+    const dataHex = knownDigest(data) ?? await sha(data); noteDigest(data, dataHex);   // the shared ICU data is hashed once per Worker (src/shared-asset-bytes.js)
+    if (await sha(wasm) !== metadata.wasm.sha256 || dataHex !== metadata.data.sha256) fail('ICU converter assets do not match their pinned SHA-256', 'icu-converter-hash-mismatch');
     return { module: await WebAssembly.compile(wasm), data, metadata: { ...metadata, source: 'original-ICU4C70.1-ucnv/Wasm', verified: true } };
   }
 }

@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=67f3eead5b24';
-import {DIGESTS} from './crypto-host.js?v=67f3eead5b24';
+import {APKError} from './apk-runtime.js?v=7233a7b1ab13';
+import {DIGESTS} from './crypto-host.js?v=7233a7b1ab13';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -53,6 +53,7 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
     return provider;
   };
   /** Reads, verifies and registers one fallback font file the first time a run needs it. */
+  const systemFontBytes = new Map();   // system font file -> its checked bytes (read-only: every reader copies them into its own memory)
   const ensureLoaded = stem => {
     if (loaded.has(stem)) return;
     const entry = lookup.get(stem); if (!entry) fail('Unknown fallback font ' + stem);
@@ -164,9 +165,11 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
     readSystemFont(file, expected) {
       if (typeof readSync !== 'function') fail('Android system font families need a synchronous font reader (Worker XMLHttpRequest or Node fs)');
       if (!/^[A-Za-z0-9_.-]+\.(ttf|otf)$/.test(file) || !expected) fail('Unknown system font file ' + file);
+      const known = systemFontBytes.get(file); if (known) return known;   // the system-font store (Skia) and Minikin ask for the same file: one read, one SHA-256 (~45 ms for Roboto's 2.3 MB)
       const bytes = readSync(new URL('system/' + file, baseURL), MAX_FONT);
       if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + file);
       stats.loadedFiles.push('system/' + file); stats.loadedBytes += bytes.length;
+      systemFontBytes.set(file, bytes);
       return bytes;
     },
     /** The bytes of fallback file `stem`, read and checked against the manifest (Minikin's collections, src/minikin-text.js, keep their own copy in its memory). */

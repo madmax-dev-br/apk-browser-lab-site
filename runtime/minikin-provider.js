@@ -1,5 +1,6 @@
-import { APKError } from './apk-error.js?v=67f3eead5b24';
-import { DIGESTS } from './crypto-host.js?v=67f3eead5b24';
+import { APKError } from './apk-error.js?v=7233a7b1ab13';
+import { DIGESTS } from './crypto-host.js?v=7233a7b1ab13';
+import { knownDigest, noteDigest } from './shared-asset-bytes.js?v=7233a7b1ab13';
 
 // AOSP Minikin (android-13.0.0_r1 frameworks/minikin) with HarfBuzz 3.1.1 and ICU 70.1 in one wasm32 module (vendor/minikin/android-13.0.0_r1/minikin.wasm,
 // scripts/wasm/build-minikin.sh). The module is loaded synchronously the first time a text native needs it (a Worker's synchronous read, Node's fs), so an app
@@ -10,7 +11,9 @@ const hex = bytes => [...DIGESTS['SHA-256'].fn(bytes)].map(value => value.toStri
 const IMPORTS = new Set(['env.emscripten_notify_memory_growth', 'wasi_snapshot_preview1.fd_close', 'wasi_snapshot_preview1.fd_write', 'wasi_snapshot_preview1.fd_seek', 'wasi_snapshot_preview1.environ_sizes_get', 'wasi_snapshot_preview1.environ_get']);
 
 function checked(bytes, record, name) {
-  if (!record || bytes.length !== record.bytes || hex(bytes) !== record.sha256) fail(`${name} size/SHA-256 differs from its provenance`);
+  if (!record || bytes.length !== record.bytes) fail(`${name} size/SHA-256 differs from its provenance`);
+  const digest = knownDigest(bytes) ?? hex(bytes); noteDigest(bytes, digest);   // the ICU common data shared with the break iterators was hashed when they checked it
+  if (digest !== record.sha256) fail(`${name} size/SHA-256 differs from its provenance`);
   return bytes;
 }
 

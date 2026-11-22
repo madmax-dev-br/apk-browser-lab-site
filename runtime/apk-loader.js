@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=67f3eead5b24';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=67f3eead5b24';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=67f3eead5b24';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=67f3eead5b24';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=67f3eead5b24';
-import { inspectELF } from './native-inspector.js?v=67f3eead5b24';
-import { elfBuildId } from './elf-build-id.js?v=67f3eead5b24';
-import { crc32 } from './zip-entry.js?v=67f3eead5b24';
-import { resolveDevice } from './device-profile.js?v=67f3eead5b24';
-import { resourceProfileFor } from './device-configuration.js?v=67f3eead5b24';
-import { JniBridge } from './jni-host.js?v=67f3eead5b24';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=67f3eead5b24';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=67f3eead5b24';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=67f3eead5b24';
-import { AndroidResources } from './android-resources.js?v=67f3eead5b24';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=67f3eead5b24';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=67f3eead5b24';
-import { FrameworkProvider } from './framework-provider.js?v=67f3eead5b24';
-import { APKArchive } from './apk-archive.js?v=67f3eead5b24';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=67f3eead5b24';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=67f3eead5b24';
+import { usesProcesses } from './system-programs.js?v=7233a7b1ab13';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=7233a7b1ab13';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=7233a7b1ab13';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=7233a7b1ab13';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=7233a7b1ab13';
+import { inspectELF } from './native-inspector.js?v=7233a7b1ab13';
+import { elfBuildId } from './elf-build-id.js?v=7233a7b1ab13';
+import { crc32 } from './zip-entry.js?v=7233a7b1ab13';
+import { resolveDevice } from './device-profile.js?v=7233a7b1ab13';
+import { resourceProfileFor } from './device-configuration.js?v=7233a7b1ab13';
+import { JniBridge } from './jni-host.js?v=7233a7b1ab13';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=7233a7b1ab13';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=7233a7b1ab13';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=7233a7b1ab13';
+import { AndroidResources } from './android-resources.js?v=7233a7b1ab13';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=7233a7b1ab13';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=7233a7b1ab13';
+import { FrameworkProvider } from './framework-provider.js?v=7233a7b1ab13';
+import { APKArchive } from './apk-archive.js?v=7233a7b1ab13';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=7233a7b1ab13';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=7233a7b1ab13';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -435,11 +435,23 @@ export function prepareCompanionPackage(input, { apiLevel = 33 } = {}) {
   if (total > MAX_DEX_TOTAL) fail(`${manifest.packageName}: DEX files exceed the combined ${MAX_DEX_TOTAL / 1048576} MiB limit`);
   const minSdk = Number(manifest.usesSdk?.minSdkVersion ?? 1);
   if (Number.isFinite(minSdk) && minSdk > apiLevel) throw new APKError(`INSTALL_FAILED_OLDER_SDK: ${manifest.packageName} requires newer sdk version #${minSdk} (current version is #${apiLevel})`, { kind: 'install-failed-older-sdk', minSdkVersion: minSdk, deviceSdk: apiLevel });
-  let certificates;
+  let certificates, prefetching = false; const expanded = new Map(), taken = new Set();
   return { packageName: manifest.packageName, manifest, archive, bytes, entries: new Set(names), dexFiles, dexBytes: total,
     nativeLibraries: names.filter(name => name.endsWith('.so')).sort(), hasResources: archive.entries.has('resources.arsc'),
-    signingCertificates: () => certificates ??= apkSigningCertificates(archive), reader: name => archive.extractSync(name, 256 * 1024 * 1024), entryRange: name => archive.entryRange(name) };
+    signingCertificates: () => certificates ??= apkSigningCertificates(archive), entryRange: name => archive.entryRange(name),
+    // the DEX files expanded ahead (prefetchDex), else on this thread when the package's class loader reads them
+    reader: name => { const bytes = expanded.get(name); taken.add(name); if (bytes) { expanded.delete(name); return bytes; } return archive.extractSync(name, COMPANION_ENTRY_LIMIT); },
+    /** Starts expanding the package's DEX files off this thread (the load's helper Workers, else the platform's DecompressionStream), checked as extract() checks them: the
+     *  package's class loader, created when its process starts inside a run, then takes them instead of a synchronous inflate in JavaScript (~0.5 s for microG's). Not awaited;
+     *  a file not ready by then (or that failed) is expanded synchronously as before. */
+    prefetchDex(pool = null) {
+      if (prefetching) return prefetching;
+      archive.prefetch(dexFiles, COMPANION_ENTRY_LIMIT, pool);
+      return prefetching = Promise.all(dexFiles.map(name => archive.extract(name, COMPANION_ENTRY_LIMIT).then(bytes => { if (!taken.has(name)) expanded.set(name, bytes); }, () => {})));
+    },
+  };
 }
+const COMPANION_ENTRY_LIMIT = 256 * 1024 * 1024;
 let defaultFrameworkProvider = null;
 /** Node tests: a factory of the framework provider loadAPK uses when the caller names none (the browser Worker always passes its own). */
 export function setDefaultFrameworkProvider(factory) { defaultFrameworkProvider = factory; }
@@ -775,6 +787,9 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // (no android.graphics type in its own code) needs the text backend like any other.
   const needsSkia=program.types.some(type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||(framework?.metadata?.profiles??[]).some(profile=>profile.name==='layouts')||
     usesViewTransforms || program.files.some(({ dex }) => dex.methodsNamed('onMeasure').some(method => method.signature === '(II)V'))&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
+  // the system programs (below), started now so their download and compile overlap the backends and resources this load still waits for
+  const systemProgramsLoading=!options.systemPrograms&&options.systemProgramsProvider&&usesProcesses(program.types)?(typeof options.systemProgramsProvider==='function'?options.systemProgramsProvider():options.systemProgramsProvider.load()):null;
+  systemProgramsLoading?.catch?.(()=>{});   // its failure is reported where it is awaited
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
@@ -819,10 +834,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
     const provider=options.zlibProvider;zlibBackend=typeof provider==='function'?await provider():await provider.load();
     if(!zlibBackend?.module)fail('Invalid zlib provider');
   }
-  // The system programs of /system/bin (toybox, mksh, toolbox: src/system-programs.js), loaded when the app's code can start a process (Runtime.exec / ProcessBuilder).
+  // The system programs of /system/bin (toybox, mksh, toolbox: src/system-programs.js), loaded when the app's code can start a process (Runtime.exec / ProcessBuilder); their
+  // download and compile started with the Skia backend (systemProgramsLoading above), so the load does not wait for them here unless they are still on their way.
   let systemPrograms=options.systemPrograms??null;
-  if(!systemPrograms&&options.systemProgramsProvider&&usesProcesses([...program.types])){
-    const provider=options.systemProgramsProvider;systemPrograms=typeof provider==='function'?await provider():await provider.load();
+  if(!systemPrograms&&systemProgramsLoading){
+    systemPrograms=await systemProgramsLoading;
     if(!systemPrograms?.modules)fail('Invalid system programs provider');
   }
   // ICU4C converters (Wasm) behind the original java.nio.charset coders (CharsetDecoderICU/EncoderICU); needed by anything that encodes/decodes through a Charset object.
@@ -873,7 +889,14 @@ export async function loadAPK(arrayBuffer, options = {}) {
   }
   runtime.strictCrash = options.strictCrash === true;   // an uncaught exception ends the app run (Android) instead of only the thread that failed
   if (loadImage) { runtime.loadImage = loadImage.status; if (companions.length) loadImage.status.companions = companions.map(c => c.packageName); }   // the summary's "Load image:" line (src/load-image.js loadImageText); the companion packages are APKs of their own, not in the image
+  // microG's packages: an app whose code talks to Play services (com.google.android.gms.*) or the Play Store (com.android.vending.*) starts their processes in its run, so their
+  // DEX files are expanded now in the load's helper Workers (prefetchDex; the browser Worker's inflate pool: where there is none, as in Node, expanding here would only move
+  // the same work onto this thread); an app that does not gets nothing expanded ahead.
+  const companionDex = [];   // awaited before the load returns: the expansion runs alongside the rest of the load, and is done before the app's first instruction
+  const appReaches = prefix => program.types.some(type => type.startsWith(prefix));
+  const reachesGms = companions.some(c => c.deviceOption === 'microg') && appReaches('Lcom/google/android/gms/'), reachesVending = companions.some(c => c.deviceOption === 'microg') && appReaches('Lcom/android/vending/');
   for (const companion of companions) {
+    if (options.inflatePool && companion.deviceOption === 'microg' && ((companion.packageName === 'com.google.android.gms' && reachesGms) || (companion.packageName === 'com.android.vending' && reachesVending))) companionDex.push(companion.prefetchDex?.(options.inflatePool));
     runtime.platform.packages.install(companion);
     if (companion.nativeLibraries.length) warnings.push(`Companion package ${companion.packageName} packages ${companion.nativeLibraries.length} native files; they are not offered to JNI (a companion's System.loadLibrary fails naming the library)`);
   }
@@ -925,6 +948,14 @@ export async function loadAPK(arrayBuffer, options = {}) {
       runtime.record(`React Native: the lab's wasm32 build ${provider.get('libreactnative.so').requires?.reactNative ?? '(release not recorded)'}${runtime.arm64 ? '' : ' (ARM64 native code off)'}`);
     }
     runtime.jni = new JniBridge(runtime, provider, runtime.platform);
+    // The lab's wasm32 React Native build serves this app: the libraries it ships that the lab builds, and their DT_NEEDED closure, are fetched, checked (Web Crypto SHA-256)
+    // and compiled now, off the interpreter's path; SoLoader's link inside the launch then takes the ready module instead of a synchronous request and a JavaScript SHA-256
+    // (~0.25 s for React Native, Hermes and JSI in the browser Worker). Not awaited: a library not ready by then is read synchronously as before.
+    if (runtime.reactNativeNatives === 'wasm32') {
+      const wanted = new Set(names.filter(name => /^lib\/[^/]+\/[^/]+\.so$/.test(name)).map(name => name.slice(name.lastIndexOf('/') + 1)).filter(soname => provider.has(soname)));
+      for (const soname of wanted) for (const dep of provider.get(soname)?.needed ?? []) if (provider.has(dep)) wanted.add(dep);
+      for (const soname of wanted) provider.get(soname)?.prefetch?.()?.catch?.(() => {});
+    }
   }
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
   const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));
@@ -992,6 +1023,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     return nativeLibraryDetails.filter(l => selected.includes(l.path));
   };
   if (options.inspectNative) await inspectNativeLibraries(options.inspectNative === true ? nativeLibraries : options.inspectNative, options.nativeInspectionLimits);
+  await Promise.all(companionDex);   // microG's DEX files expanded off the VM thread (prefetchDex above)
   await report('complete', dexFiles.length, dexFiles.length, undefined, `Loaded ${dexFiles.length} DEX files and ${program.classes.size} classes`);
   let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
   runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);

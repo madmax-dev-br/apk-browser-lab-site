@@ -7,8 +7,8 @@
 // The visible difference from ART, recorded in the trace once: such a buffer has no backing array (hasArray() false, array() throws UnsupportedOperationException,
 // compact() fails as it does on ART for a NewDirectByteBuffer buffer). The block lives as long as the process (the lab does not observe the MemoryRef's collection).
 // Without a native process MemoryRef(int) runs its own body (a pinned array of the VM heap), as before.
-import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=67f3eead5b24';
-import { allocateNativeBlock, nativeHeapKind, writeNativeBytes } from './unsafe-native.js?v=67f3eead5b24';
+import { RUN_BODY, setMethodInterceptor } from './method-overrides.js?v=7233a7b1ab13';
+import { allocateNativeBlock, nativeHeapKind, writeNativeBytes } from './unsafe-native.js?v=7233a7b1ab13';
 
 export const MEMORY_REF_INIT = 'Ljava/nio/DirectByteBuffer$MemoryRef;-><init>(I)V';
 const REF = 'Ljava/nio/DirectByteBuffer$MemoryRef;';

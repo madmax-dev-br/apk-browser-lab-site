@@ -1,4 +1,4 @@
-import { sharedAssetBytes } from './shared-asset-bytes.js?v=67f3eead5b24';
+import { sharedAssetBytes, knownDigest, noteDigest } from './shared-asset-bytes.js?v=7233a7b1ab13';
 
 const TYPES = { character: 0, word: 1, line: 2, sentence: 3 };
 // MAX_REGEX_INPUT: the text a Matcher runs over (an app may match a whole JSON or HTML response, which Android does not bound): copied as UTF-16 into the module's 64 MiB, so at
@@ -14,7 +14,9 @@ async function digest(value) {
 }
 async function checked(value, record, maximum, name) {
   const data = bytes(value);
-  if (!record || data.byteLength !== record.bytes || data.byteLength > maximum || !/^[a-f0-9]{64}$/.test(record.sha256 || '') || await digest(data) !== record.sha256) fail(`invalid ${name} size/digest`);
+  if (!record || data.byteLength !== record.bytes || data.byteLength > maximum || !/^[a-f0-9]{64}$/.test(record.sha256 || '')) fail(`invalid ${name} size/digest`);
+  const hex = knownDigest(data) ?? await digest(data); noteDigest(data, hex);   // the shared ICU data is hashed once per Worker (src/shared-asset-bytes.js)
+  if (hex !== record.sha256) fail(`invalid ${name} size/digest`);
   return data;
 }
 function createRegexSessionFactory(api, allocate, errorName) {

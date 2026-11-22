@@ -14,3 +14,10 @@ export function sharedAssetBytes(url, read) {
 }
 /** The bytes of `url` (whatever its revision query) once an earlier sharedAssetBytes read has finished, else null: a synchronous reader takes them instead of reading the file again. */
 export function sharedAssetBytesIfLoaded(url) { return resolved.get(withoutQuery(url)) ?? null; }
+// The SHA-256 a provider computed for a byte array it checked (the arrays are shared read-only, so the digest stays true): a later provider that checks the same array against
+// its own record compares with it instead of hashing the 3.4 MB again (the synchronous JavaScript SHA-256 of src/minikin-provider.js takes ~20 ms for the ICU data).
+const digests = new WeakMap();
+/** Records `hex` (lowercase SHA-256) as the digest of `bytes`, computed by the caller. */
+export function noteDigest(bytes, hex) { if (bytes && typeof bytes === 'object') digests.set(bytes, hex); }
+/** The SHA-256 recorded for this very array, else null. */
+export function knownDigest(bytes) { return (bytes && typeof bytes === 'object' && digests.get(bytes)) || null; }

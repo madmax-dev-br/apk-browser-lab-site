@@ -13,11 +13,11 @@
 //     a cached string) keeps what was read before; the page re-applies the edits when the APK is opened again (Reopen), before the app's code runs. Every edit is listed on
 //     the page as "App modified", recorded in the trace (EDIT FILE / UNEDIT FILE) and in the diagnostics summary (src/report-summary.js entryEditLines), and removable.
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { APKError } from './apk-error.js?v=67f3eead5b24';
-import { DexFile } from './apk-runtime.js?v=67f3eead5b24';
-import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=67f3eead5b24';
-import { javaOutline } from './java-outline.js?v=67f3eead5b24';
-import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=67f3eead5b24';
+import { APKError } from './apk-error.js?v=7233a7b1ab13';
+import { DexFile } from './apk-runtime.js?v=7233a7b1ab13';
+import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=7233a7b1ab13';
+import { javaOutline } from './java-outline.js?v=7233a7b1ab13';
+import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=7233a7b1ab13';
 
 export const CODE_LIMITS = Object.freeze({ sliceMs: 30, results: 200, textBytes: 4 * 1024 * 1024, hexBytes: 64 * 1024, editBytes: 8 * 1024 * 1024, edits: 200, queryChars: 200, dexListClasses: 200000 });
 const KINDS = ['class', 'method', 'field', 'string', 'file'];
