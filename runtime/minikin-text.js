@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=97135b36a679';
-import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=97135b36a679';
+import { APKError } from './apk-error.js?v=67f3eead5b24';
+import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=67f3eead5b24';
 
 // The virtual device's side of Minikin (src/minikin-provider.js): font collections built from the lab's Typeface state, the Paint state as hwui hands it to Minikin, and the
 // MeasuredText / LineBreaker / Paint measurement calls of hwui's JNI (libs/hwui/jni/text/MeasuredText.cpp, LineBreaker.cpp, jni/Paint.cpp). Handles are wasm32 pointers kept

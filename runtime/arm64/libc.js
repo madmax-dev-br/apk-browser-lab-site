@@ -3,16 +3,16 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=97135b36a679';
-import { addProcesses } from './processes.js?v=97135b36a679';
-import { APKError } from '../apk-error.js?v=97135b36a679';
-import { BLOCKED } from './cpu.js?v=97135b36a679';
-import { extendLibc } from './libc-extra.js?v=97135b36a679';
-import { addGles } from './gles.js?v=97135b36a679';
-import { utf8 } from './text.js?v=97135b36a679';
-import { createProcfs } from './procfs.js?v=97135b36a679';
-import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=97135b36a679';
-import { release } from '../libcore-io-native.js?v=97135b36a679';
+import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=67f3eead5b24';
+import { addProcesses } from './processes.js?v=67f3eead5b24';
+import { APKError } from '../apk-error.js?v=67f3eead5b24';
+import { BLOCKED } from './cpu.js?v=67f3eead5b24';
+import { extendLibc } from './libc-extra.js?v=67f3eead5b24';
+import { addGles } from './gles.js?v=67f3eead5b24';
+import { utf8 } from './text.js?v=67f3eead5b24';
+import { createProcfs } from './procfs.js?v=67f3eead5b24';
+import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=67f3eead5b24';
+import { release } from '../libcore-io-native.js?v=67f3eead5b24';
 
 const EISDIR = 21, ENOTDIR = 20, EACCES = 13, EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js

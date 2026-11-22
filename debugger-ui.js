@@ -4,7 +4,9 @@
 // log message) and drawn there with setMarkers; the paused line is highlighted and the reader follows the paused pc and the frame chosen in the call stack. While a thread is
 // held the page says so near the device and in the status bar (`page.paused`), and the device's screen explains that it does not take input until the VM resumes.
 // Everything goes through the page's debugger controller (src/debugger-controller.js), shared with plugins and MCP. Keyboard: F8 resume, F10 over, F11 into, Shift+F11 out,
-// F9 toggles a breakpoint on the selected line. DOM only through `root` (the Code tool's <details>) and its document; no work at all while nobody attached.
+// F9 toggles a breakpoint on the selected line. DOM only through `root` (the Code tool's <details>) and its document; no work at all while nobody attached, and nothing
+// rendered or read while the tool is closed (it catches up when it opens; the page's paused indicators come from src/code-tool-loader.js then). Loaded on first use.
+import { pausedInfo, pauseReasonText } from './code-tool-loader.js?v=67f3eead5b24';
 
 const shortClass = name => { const text = String(name ?? ''); return text.slice(text.lastIndexOf('.') + 1); };
 const dottedOf = descriptor => { const d = String(descriptor ?? ''); return d.startsWith('L') && d.endsWith(';') ? d.slice(1, -1).replaceAll('/', '.') : d; };
@@ -40,7 +42,7 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     for (const child of children.flat()) if (child !== null && child !== undefined && child !== false) el.append(child);
     return el;
   };
-  const U = { frames: null, frame: 0, locals: null, threads: [], expanded: new Map(), watch: loadWatch(), watchValues: new Map(), seq: 0, popover: null, note: '', busy: false, lastPausedSeq: null, openKey: null };
+  const U = { frames: null, frame: 0, locals: null, threads: [], expanded: new Map(), watch: loadWatch(), watchValues: new Map(), seq: 0, popover: null, note: '', busy: false, lastPausedSeq: null, openKey: null, dirty: false };
   function loadWatch() { try { const list = JSON.parse(storage?.getItem?.(WATCH_KEY) ?? '[]'); return Array.isArray(list) ? list.filter(item => typeof item === 'string').slice(0, 30) : []; } catch { return []; } }
   function saveWatch() { try { storage?.setItem?.(WATCH_KEY, JSON.stringify(U.watch)); } catch { /* not kept */ } }
 
@@ -144,7 +146,8 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     if (!location?.method) return;
     const descriptor = ownerOfKey(location.method) ?? descriptorOf(location.className);
     const key = `${location.method}@${location.pc}`; if (U.openKey === key && api.currentSelection()?.descriptor === descriptor) { paintMarkers(); return; }
-    U.openKey = key; root.open = true;
+    if (!root.open) { U.dirty = true; return; }   // closed meanwhile: shown when it opens
+    U.openKey = key;
     try { await api.open(descriptor, { method: location.method, pc: location.pc }); } catch (error) { setNote(`The paused class cannot be shown: ${error?.message ?? error}`); }
     paintMarkers();
   }
@@ -266,10 +269,10 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     const bps = st.breakpoints;
     setCount(sections.breakpoints, bps.length ? String(bps.length) : '');
     bpList.replaceChildren(...(bps.length ? bps.map(bp => breakpointRow(bp)) : [h('li', { class: 'dbg-empty', text: 'None yet.' })]));
-    page?.paused?.(held ? { where: `${shortClass(p.location?.className)}.${p.location?.methodName ?? '?'}${p.location?.line ? ` line ${p.location.line}` : ''}`, thread: p.threadName ?? p.thread, mode: p.mode, reason: reasonText(p), resume: () => act(resume) } : null);
+    page?.paused?.(held ? { ...pausedInfo(p), resume: () => act(resume) } : null);
     paintMarkers();
   }
-  const reasonText = p => p.reason === 'exception' ? `exception ${shortClass(p.exception?.type)}` : p.reason === 'step' ? 'step' : p.reason === 'pause' ? 'paused' : p.reason === 'run-to' ? 'run to cursor' : p.conditionError ? 'condition failed' : 'breakpoint';
+  const reasonText = pauseReasonText;
   const setCount = (s, text) => { s.querySelector('.dbg-section-count').textContent = text; };
   function localRow(local) {
     const shown = valueText(local.value, local.type), canEdit = !local.readOnly && (PRIMITIVES.has(local.type) || local.type === 'java.lang.String'), open = shown.handle && U.expanded.has(shown.handle);
@@ -335,7 +338,11 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     if (key === 'F8') act(resume); else if (key === 'F10') act(() => step('over')); else if (key === 'F11') act(() => step(event.shiftKey ? 'out' : 'into'));
   });
 
-  controller.onChange(() => { const p = controller.paused; if ((p?.seq ?? null) !== U.lastPausedSeq || (!p && U.frames)) refreshPaused(); else render(); });
+  controller.onChange(() => {
+    if (!root.open) { U.dirty = true; page?.paused?.(controller.paused ? { ...pausedInfo(controller.paused), resume: () => act(resume) } : null); return; }   // closed: no render, no read
+    const p = controller.paused; if ((p?.seq ?? null) !== U.lastPausedSeq || (!p && U.frames)) refreshPaused(); else render();
+  });
+  root.addEventListener?.('toggle', () => { if (root.open && U.dirty) { U.dirty = false; refreshPaused(); } });
   render();
   return {
     render, refreshPaused, toggleAtLine, locationAtLine, chooseFrame, addWatch, openPopover, closePopover,

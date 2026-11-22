@@ -62,24 +62,24 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=97135b36a679';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=97135b36a679';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=97135b36a679';
-import { HandleTable } from './handles.js?v=97135b36a679';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=97135b36a679';
-import { coreImports } from './boundary-imports.js?v=97135b36a679';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=97135b36a679';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=97135b36a679';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=97135b36a679';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=97135b36a679';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=97135b36a679';
-import { timedExports, timedBridge } from './core-timing.js?v=97135b36a679';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=97135b36a679';
-import { Blocked } from '../../runtime/scheduler.js?v=97135b36a679';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=97135b36a679';
-import { CoreDebugAdapter } from './core-debug.js?v=97135b36a679';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=97135b36a679';
-import { PaintRecords } from './paint-record.js?v=97135b36a679';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=67f3eead5b24';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=67f3eead5b24';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=67f3eead5b24';
+import { HandleTable } from './handles.js?v=67f3eead5b24';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=67f3eead5b24';
+import { coreImports } from './boundary-imports.js?v=67f3eead5b24';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=67f3eead5b24';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=67f3eead5b24';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=67f3eead5b24';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=67f3eead5b24';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=67f3eead5b24';
+import { timedExports, timedBridge } from './core-timing.js?v=67f3eead5b24';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=67f3eead5b24';
+import { Blocked } from '../../runtime/scheduler.js?v=67f3eead5b24';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=67f3eead5b24';
+import { CoreDebugAdapter } from './core-debug.js?v=67f3eead5b24';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=67f3eead5b24';
+import { PaintRecords } from './paint-record.js?v=67f3eead5b24';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */

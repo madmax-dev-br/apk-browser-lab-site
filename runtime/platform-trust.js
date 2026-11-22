@@ -10,8 +10,8 @@
 // One addition, the lab's own: a chain made of certificates the lab transport CA issued (src/transport-ca.js: an SSLSocket over a virtual HTTP socket, whose real TLS the browser
 // did and validated) is accepted for servers, as before. A native TLS stack (BoringSSL in an app's .so through the raw TCP tunnel) presents the server's real chain, which only
 // the path above can accept.
-import { trustPolicy } from './network-native.js?v=97135b36a679';
-import { Sha256 } from './fast-digests.js?v=97135b36a679';
+import { trustPolicy } from './network-native.js?v=67f3eead5b24';
+import { Sha256 } from './fast-digests.js?v=67f3eead5b24';
 
 const STRING = 'Ljava/lang/String;', X509 = 'Ljava/security/cert/X509Certificate;', CERT = 'Ljava/security/cert/Certificate;', KEYSTORE = 'Ljava/security/KeyStore;', LIST = 'Ljava/util/List;';
 const TMI_IMPL = 'Lcom/android/org/conscrypt/TrustManagerImpl;', CERT_FACTORY = 'Ljava/security/cert/CertificateFactory;', OBJECT = 'Ljava/lang/Object;';

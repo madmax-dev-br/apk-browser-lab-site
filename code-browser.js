@@ -6,9 +6,9 @@
 // Responsiveness: every list and the viewer are virtualized (only the rows in view are in the DOM, painted per frame); the search runs in the Worker in steps of about
 // 30 ms with a cursor; the page never loops over a whole class or result set on an event. DOM only through `root` (index.html #code-browser) and its document.
 // The debugger UI and the plugin / MCP APIs build on src/code-browser-api.js (open, reveal, gutter clicks, markers, selection), not on this module's internals.
-import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=97135b36a679';
-import { createCodeEditor } from './code-editor.js?v=97135b36a679';
-import { CODE_BROWSER } from './method-hooks-panel.js?v=97135b36a679';
+import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=67f3eead5b24';
+import { createCodeEditor } from './code-editor.js?v=67f3eead5b24';
+import { CODE_BROWSER } from './method-hooks-panel.js?v=67f3eead5b24';
 
 const LINE_H = 18, ROW_H = 24, OVERSCAN = 12, MAX_RESULTS = 3000, AUTO_RESULTS = 400, CHECK_MS = 500;
 const KIND_LABEL = { class: 'Classes', method: 'Methods', field: 'Fields', string: 'Strings', file: 'Files' };
@@ -54,7 +54,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   const S = {
     attached: false, packageName: null, inited: false, side: 'classes', query: '', framework: false, search: null, searchSeq: 0, tree: [], treeLoaded: new Map(), expanded: new Set(), files: null, fileExpanded: new Set(),
     doc: null, tab: 'smali', views: new Map(), history: [], selection: { line: -1 }, markers: new Map(), gutterListeners: new Set(), openListeners: new Set(), find: { query: '', hits: [], at: -1 },
-    edit: null, modified: new Map(), fileEdits: new Map(), checkTimer: null,
+    edit: null, modified: new Map(), fileEdits: new Map(), checkTimer: null, stale: false,
   };
   const countNode = root.querySelector('.cb-count');
   // ---- markup ------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -97,13 +97,14 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   const body = root.querySelector('.cb-body') ?? root.appendChild(h('div', { class: 'cb-body' }));
   body.replaceChildren(side, main);
   const byId = id => doc.getElementById(id);
-  const editor = createCodeEditor({ $: byId, id: 'cb-editor', language: 'smali', label: 'smali', onChange: () => { scheduleCheck(); }, onStatus: () => {} });
+  const editor = createCodeEditor({ $: byId, id: 'cb-editor', language: 'smali', label: 'smali', tokenizers: { smali: tokenizeSmaliLine }, onChange: () => { scheduleCheck(); }, onStatus: () => {} });
 
   // ---- virtual rows ------------------------------------------------------------------------------------------------------------------------------------------------------
   const raf = typeof win?.requestAnimationFrame === 'function' ? fn => win.requestAnimationFrame(fn) : fn => setTimeout(fn, 16);
+  // closed tool (the Code tab not shown): nothing is painted; what changed is painted when it opens (the toggle handler below)
   let listFrame = false, viewFrame = false;
-  const scheduleList = () => { if (!listFrame) { listFrame = true; raf(paintList); } };
-  const scheduleView = () => { if (!viewFrame) { viewFrame = true; raf(paintView); } };
+  const scheduleList = () => { if (!root.open) return; if (!listFrame) { listFrame = true; raf(paintList); } };
+  const scheduleView = () => { if (!root.open) return; if (!viewFrame) { viewFrame = true; raf(paintView); } };
   list.addEventListener('scroll', () => { scheduleList(); maybeMoreResults(); });
   view.addEventListener('scroll', scheduleView);
   if (typeof win?.ResizeObserver === 'function') { new win.ResizeObserver(() => { scheduleList(); scheduleView(); }).observe(list); new win.ResizeObserver(scheduleView).observe(view); }
@@ -627,7 +628,13 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     if (root.open) await init();
   }
   async function init() { if (!S.attached) return; S.inited = true; try { await rebuildTree(); if (S.side === 'files') await loadFiles(); } catch (error) { setSideStatus(error.message); } }
-  root.addEventListener('toggle', () => { if (root.open && S.attached && !S.tree.length) init(); if (root.open) { scheduleList(); scheduleView(); editor.refresh(); } });
+  // the tool's work runs while it is open: on opening, the class tree of a new APK is read, a file someone else edited meanwhile is read again, and the rows are painted
+  root.addEventListener('toggle', () => {
+    if (!root.open) return;
+    if (S.attached && !S.tree.length) init();
+    if (S.stale) { S.stale = false; if (S.doc?.kind === 'file' && !S.edit) open(S.doc.path, { push: false }).catch(() => {}); }
+    scheduleList(); scheduleView(); editor.refresh();
+  });
   function vmEnded() {
     S.attached = false; S.doc = null; S.tree = []; S.files = null; S.search = null; S.treeLoaded.clear(); closeEditor(true);
     setCount('no app'); showStage('empty'); empty.firstChild.textContent = 'Open an APK to read its code.'; renderHead(); scheduleList();
@@ -654,7 +661,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     },
     lineText(line) { const t = currentText(); return t?.lines[line - 1] ?? null; },
     /** An APK file edited or restored by someone else (a plugin's lab.code.editFile, MCP code_edit_file): its badge, and the open file read again. */
-    noteFileEdit(path, edited) { markFileEdited(path, !!edited); if (S.doc?.kind === 'file' && S.doc.path === path && !S.edit) open(path, { push: false }).catch(() => {}); },
+    noteFileEdit(path, edited) { markFileEdited(path, !!edited); if (S.doc?.kind === 'file' && S.doc.path === path && !S.edit) { if (root.open) open(path, { push: false }).catch(() => {}); else S.stale = true; } },
     get state() { return S; },
     get root() { return root; },
   };

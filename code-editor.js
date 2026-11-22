@@ -9,9 +9,8 @@
 //     it in memory, shows its first PREVIEW_CHARS read-only and says so; Paste replaces it, Format / Minify / Clear / Download work on the whole text in slices.
 // Markup (index.html), for an editor with id X: textarea#X.ce-input inside .ce-main next to pre.ce-hl > code#X-hl, a gutter #X-gutter, and optional #X-status (role=status),
 // #X-pos (caret line and column) and #X-large (the banner of a large text, with #X-large-text).
-import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=97135b36a679';
-import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=97135b36a679';
-import { tokenizeSmaliLine } from './smali-tools.js?v=97135b36a679';
+import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=67f3eead5b24';
+import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=67f3eead5b24';
 
 export const LARGE_CHARS = 512 * 1024, PREVIEW_CHARS = 64 * 1024, LONG_LINE = 2000, CHECK_DELAY_MS = 300, SLICE_CHARS = 131072;
 const INDENT = '  ', OPENERS = '{[(', CLOSERS = '}])';
@@ -80,9 +79,10 @@ export function editKey(area, event, { tabMoves = false, autoIndent = true } = {
 /**
  * Wires one editor. `language`: 'json' (colours, JSON check, Format / Minify), 'js' (colours, syntax check of plugin code) or 'text' (size only). Answers the editor's API:
  * value (the whole text, large or not), setValue, setLanguage, large, status, whenChecked(), format({ indent }), clear(), focus().
+ * `tokenizers`: { [language]: line => [[start, end, kind]] } for a language its caller brings (the Code browser passes smali), so this module never loads them itself.
  * `onChange(editor)` after each edit; `onStatus(status)` when a check finishes: { state: 'idle' | 'checking' | 'ok' | 'error', bytes, lines, error: { line, col, message } | null }.
  */
-export function createCodeEditor({ $, id, language = 'json', onChange = () => {}, onStatus = () => {}, largeChars = LARGE_CHARS, previewChars = PREVIEW_CHARS, checkDelay = CHECK_DELAY_MS, label = 'text', yieldTask }) {
+export function createCodeEditor({ $, id, language = 'json', onChange = () => {}, onStatus = () => {}, largeChars = LARGE_CHARS, previewChars = PREVIEW_CHARS, checkDelay = CHECK_DELAY_MS, label = 'text', yieldTask, tokenizers = {} }) {
   const area = $(id), code = $(`${id}-hl`), gutter = $(`${id}-gutter`), statusNode = $(`${id}-status`), posNode = $(`${id}-pos`), largeNode = $(`${id}-large`), largeText = $(`${id}-large-text`);
   const doc = area.ownerDocument ?? globalThis.document, view = doc?.defaultView ?? globalThis;
   const raf = typeof view.requestAnimationFrame === 'function' ? fn => view.requestAnimationFrame(fn) : fn => setTimeout(fn, 16);
@@ -113,8 +113,7 @@ export function createCodeEditor({ $, id, language = 'json', onChange = () => {}
       if (S.statesVersion !== S.version) { S.states = lineStates(area.value); S.statesVersion = S.version; }
       return tokenizeJsLine(line, S.states[n]).tokens;
     }
-    if (S.language === 'smali') return tokenizeSmaliLine(line);
-    return [];
+    return tokenizers[S.language]?.(line) ?? [];   // a language its user brings (the Code browser's smali: src/smali-tools.js, loaded with it)
   }
   function bracketMarks() {
     if (S.language === 'text' || S.language === 'smali' || area.selectionStart !== area.selectionEnd || doc.activeElement !== area) return [];

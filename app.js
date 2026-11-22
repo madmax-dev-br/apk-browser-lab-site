@@ -1,73 +1,69 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=97135b36a679';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=97135b36a679';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=97135b36a679';
-import { drawFrameGraph } from './frame-graph.js?v=97135b36a679';
-import { clientIdentityStatus } from './client-identity.js?v=97135b36a679';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=97135b36a679';
-import { initCollapsibleSections } from './panel-sections.js?v=97135b36a679';
-import { warmupLabel } from './warmup.js?v=97135b36a679';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=97135b36a679';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=97135b36a679';
-import { initHelpTips } from './help-tips.js?v=97135b36a679';
-import { initControlPanelUI } from './control-panel-ui.js?v=97135b36a679';
-import { createToolDock } from './tool-dock.js?v=97135b36a679';
-import { createPermissionsPanel } from './permissions-panel.js?v=97135b36a679';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=97135b36a679';
-import { createAppDataPanel } from './app-data-panel.js?v=97135b36a679';
-import { createCameraLab } from './camera-lab.js?v=97135b36a679';
-import { createOverridesPanel } from './overrides-panel.js?v=97135b36a679';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=97135b36a679';
-import { createCodeBrowser } from './code-browser.js?v=97135b36a679';
-import { createCodeBrowserApi } from './code-browser-api.js?v=97135b36a679';
-import { createDebuggerController } from './debugger-controller.js?v=97135b36a679';
-import { createDebuggerUi } from './debugger-ui.js?v=97135b36a679';
-import { debuggerPluginActions } from './debugger-plugin-actions.js?v=97135b36a679';
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=97135b36a679';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=97135b36a679';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=97135b36a679';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=97135b36a679';
-import { MICROG_SERVICES } from './microg-services.js?v=97135b36a679';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=97135b36a679';
-import { createOrientationLock } from './orientation-lock.js?v=97135b36a679';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=97135b36a679';
-import { createHostMapPanel } from './host-map-panel.js?v=97135b36a679';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=97135b36a679';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=97135b36a679';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=97135b36a679';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=97135b36a679';
-import { createDeviceView, createViewState } from './device-view.js?v=97135b36a679';
-import { createTaskSwitcher } from './task-switcher.js?v=97135b36a679';
-import { createDeviceZoom } from './device-zoom.js?v=97135b36a679';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=97135b36a679';
-import { formatApiGapReport } from './api-gap-scan.js?v=97135b36a679';
-import { createLogcatPanel } from './logcat-panel.js?v=97135b36a679';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=97135b36a679';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=97135b36a679';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=97135b36a679';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=97135b36a679';
-import { createAppPalette } from './app-palette.js?v=97135b36a679';
-import { createScreenRecorder } from './screen-recorder.js?v=97135b36a679';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=97135b36a679';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=97135b36a679';
-import { createAdb } from './adb-commands.js?v=97135b36a679';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=97135b36a679';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=97135b36a679';
-import { createAdbTerminal } from './adb-terminal.js?v=97135b36a679';
-import { memorySummary } from './worker-memory.js?v=97135b36a679';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=97135b36a679';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=97135b36a679';
-import { createModalHost } from './lab-modal.js?v=97135b36a679';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=97135b36a679';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=97135b36a679';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=97135b36a679';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=97135b36a679';
-import { createDragLayer } from './lab-drag.js?v=97135b36a679';
-import { createLabScroll } from './lab-scroll.js?v=97135b36a679';
-import { createGlSurfaces } from './gl-surfaces.js?v=97135b36a679';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=97135b36a679';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=97135b36a679';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=97135b36a679';
-import { resolveIntentFields } from './intent-resolver.js?v=97135b36a679';
+import { APKWorkerClient } from './apk-worker-client.js?v=67f3eead5b24';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=67f3eead5b24';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=67f3eead5b24';
+import { drawFrameGraph } from './frame-graph.js?v=67f3eead5b24';
+import { clientIdentityStatus } from './client-identity.js?v=67f3eead5b24';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=67f3eead5b24';
+import { initCollapsibleSections } from './panel-sections.js?v=67f3eead5b24';
+import { warmupLabel } from './warmup.js?v=67f3eead5b24';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=67f3eead5b24';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=67f3eead5b24';
+import { initHelpTips } from './help-tips.js?v=67f3eead5b24';
+import { initControlPanelUI } from './control-panel-ui.js?v=67f3eead5b24';
+import { createToolDock } from './tool-dock.js?v=67f3eead5b24';
+import { createPermissionsPanel } from './permissions-panel.js?v=67f3eead5b24';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=67f3eead5b24';
+import { createAppDataPanel } from './app-data-panel.js?v=67f3eead5b24';
+import { createCameraLab } from './camera-lab.js?v=67f3eead5b24';
+import { createOverridesPanel } from './overrides-panel.js?v=67f3eead5b24';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=67f3eead5b24';
+import { createCodeTool } from './code-tool-loader.js?v=67f3eead5b24';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=67f3eead5b24';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=67f3eead5b24';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=67f3eead5b24';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=67f3eead5b24';
+import { MICROG_SERVICES } from './microg-services.js?v=67f3eead5b24';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=67f3eead5b24';
+import { createOrientationLock } from './orientation-lock.js?v=67f3eead5b24';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=67f3eead5b24';
+import { createHostMapPanel } from './host-map-panel.js?v=67f3eead5b24';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=67f3eead5b24';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=67f3eead5b24';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=67f3eead5b24';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=67f3eead5b24';
+import { createDeviceView, createViewState } from './device-view.js?v=67f3eead5b24';
+import { createTaskSwitcher } from './task-switcher.js?v=67f3eead5b24';
+import { createDeviceZoom } from './device-zoom.js?v=67f3eead5b24';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=67f3eead5b24';
+import { formatApiGapReport } from './api-gap-scan.js?v=67f3eead5b24';
+import { createLogcatPanel } from './logcat-panel.js?v=67f3eead5b24';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=67f3eead5b24';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=67f3eead5b24';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=67f3eead5b24';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=67f3eead5b24';
+import { createAppPalette } from './app-palette.js?v=67f3eead5b24';
+import { createScreenRecorder } from './screen-recorder.js?v=67f3eead5b24';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=67f3eead5b24';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=67f3eead5b24';
+import { createAdb } from './adb-commands.js?v=67f3eead5b24';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=67f3eead5b24';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=67f3eead5b24';
+import { createAdbTerminal } from './adb-terminal.js?v=67f3eead5b24';
+import { memorySummary } from './worker-memory.js?v=67f3eead5b24';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=67f3eead5b24';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=67f3eead5b24';
+import { createModalHost } from './lab-modal.js?v=67f3eead5b24';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=67f3eead5b24';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=67f3eead5b24';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=67f3eead5b24';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=67f3eead5b24';
+import { createDragLayer } from './lab-drag.js?v=67f3eead5b24';
+import { createLabScroll } from './lab-scroll.js?v=67f3eead5b24';
+import { createGlSurfaces } from './gl-surfaces.js?v=67f3eead5b24';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=67f3eead5b24';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=67f3eead5b24';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=67f3eead5b24';
+import { resolveIntentFields } from './intent-resolver.js?v=67f3eead5b24';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -534,8 +530,8 @@ let mcpLink = null;
 const modalHost = createModalHost();   // src/lab-modal.js: plugin screens (lab.modal) and "Expand" on a plugin card
 const pluginModals = new Map();   // modal id -> { modal, pluginId }
 /** What a plugin may do with the lab (src/plugin-host.js ACTION_METHODS): the page's own controls, which show in Controls and in the Logcat like the user's. */
-let methodHooksPanel = null, codeBrowser = null, debuggerController = null, debuggerUi = null;   // "App modified" (src/method-hooks-panel.js): made with the Controls panels below
-let debugActionsMade = null; const debugActions = { code: (caller, args) => (debugActionsMade ??= debuggerPluginActions(() => debuggerController)).code(caller, args), debug: (caller, args) => (debugActionsMade ??= debuggerPluginActions(() => debuggerController)).debug(caller, args) };   // lab.code / lab.debug (src/debugger-plugin-actions.js): the Code browser's reads and edits, the page's debugger session
+let methodHooksPanel = null, codeTool = null;   // "App modified" (src/method-hooks-panel.js) and the Code tool (src/code-tool-loader.js): made with the Controls panels below
+const debugActions = { code: (caller, args) => codeTool.actions.code(caller, args), debug: (caller, args) => codeTool.actions.debug(caller, args) };   // lab.code / lab.debug (src/debugger-plugin-actions.js, loaded on the first call): the Code browser's reads and edits, the page's debugger session
 const pluginActions = {
   code: (plugin, args) => debugActions.code(plugin, args),
   debug: (plugin, args) => debugActions.debug(plugin, args),
@@ -641,7 +637,7 @@ async function freshenSemantics() {
   if (snapshot && token === state.operation && state.runtime === apkVM) renderSnapshot(snapshot);
 }
 const pluginHost = createPluginHost({ vm: apkVM, actions: pluginActions, freshen: freshenSemantics, getPackage: () => state.inventory?.packageName ?? null, captureImage: request => captureImage({ ...request, getHost: id => state.viewElements.get(String(id)) ?? null }), onChange: id => { pluginsPanel?.changed(id); if (!pluginHost?.get?.(id)?.worker) { for (const [modalId, entry] of pluginModals) if (entry.pluginId === id) entry.modal.close('stopped'); sideTabs.closeOwner(id, 'stopped'); labHighlights.closeOwner(id); labOverlays.closeOwner(id); } }, onLogStreaming: () => { syncLogcatStreaming().catch(() => {}); }, onFrameWatch: on => labOverlays.setFrameWatch(on),
-  onStopped: id => { methodHooksPanel?.removeOwner(id).catch(error => appendTrace(`App modified: the changes of a stopped plugin could not be removed: ${error?.message ?? error}`)); debuggerController?.removeOwner(id).catch(() => {}); } });   // a plugin's session ended: its method changes, file edits and breakpoints go with it   // a plugin's session ended: its method changes go with it
+  onStopped: id => { methodHooksPanel?.removeOwner(id).catch(error => appendTrace(`App modified: the changes of a stopped plugin could not be removed: ${error?.message ?? error}`)); codeTool?.removeOwner(id).catch(() => {}); } });   // a plugin's session ended: its method changes, file edits and breakpoints go with it
 window.apkLabPlugins = pluginHost;   // test and console access: .list(), .stats
 window.apkLabVM = apkVM;   // test and console access: await apkLabVM.screenState() is the text Copy diagnostics copies
 window.apkLabOpen = (url, name = String(url).split('/').pop()) => importSource({ name, url: new URL(url, location.href).href }, true);   // test and console access: open and run an APK by URL (scripts/capture-plugin-examples.mjs)
@@ -807,7 +803,7 @@ async function importSource(source, autoRun = false) {
   if (state.busy || state.runStarting) { cancelOperation(); state.runStarting = false; }
   state.reimportShelfId = null;   // set again if this load fails for an installed app
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
-  glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); methodHooksPanel?.vmEnded(); codeBrowser?.vmEnded(); debuggerController?.vmEnded(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
+  glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); methodHooksPanel?.vmEnded(); codeTool?.vmEnded(); ignoredPanel?.detach(); mocksPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
   orientationLock.reset();   // no Activity on top until the new run has one
   // A new run (another APK, or the app opened again from its launcher icon) starts clean: the Worker of the previous run is terminated by apkVM.load, and what the page still shows of it goes too
   // (Logcat, network requests, memory meter, error report, last frame and heartbeat). App data follows the "Keep app data" option; the panel settings are kept.
@@ -846,7 +842,7 @@ async function importSource(source, autoRun = false) {
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
       showLoadTimes(); appendTrace(`Loaded in ${times.loadMs} ms: ${times.phases.filter(item => item.ms > 0).map(item => `${item.phase} ${item.ms} ms`).join(', ')}`); }
-    await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await methodHooksPanel.attach(result.inventory); await codeBrowser.attach(result.inventory); await debuggerController.vmAttached(result.inventory?.packageName ?? null).catch(error => appendTrace(`Debugger: the saved breakpoints were not set again: ${error?.message ?? error}`)); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
+    await permissionsPanel.attach(result.inventory); await filesPanel.attach(); cameraLab.attach(); await overridesPanel.attach(result.inventory); await methodHooksPanel.attach(result.inventory); await codeTool.vmAttached(result.inventory); await ignoredPanel.attach(result.inventory); await mocksPanel.attach(result.inventory); pluginHost.vmChanged(); if (logcatPanelOpen || pluginHost.wantsLogs) syncLogcatStreaming(true).catch(() => {});   // before any app code runs: permission state, simulated location, method return overrides, ignored Activities, endpoint mocks
     showInventory(result.inventory); showDeviceHome('installed');
     if (source.file && apkShelf) {   // an APK from a file is kept on the home screen (one entry per package: a new build replaces the old one); a hosted example is not
       try { const saved = await apkShelf.save({ name: source.name, packageName: result.inventory.packageName || null, blob: source.file, handle: source.handle ?? null, previousId: source.shelfId ?? null }); state.shelfId = saved.id; source.shelfId = saved.id; describeSavedApp(); apkShelf.describe(saved.id, { activities: intentActivities(result.inventory) }).catch(() => {}); navigator.storage?.persist?.().catch(() => {}); }
@@ -874,7 +870,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=67f3eead5b24');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -981,12 +977,9 @@ const appDataPanel = createAppDataPanel({ $, vm: apkVM, modals: modalHost, ready
 $('cp-sec-data')?.addEventListener('toggle', () => { if ($('cp-sec-data').open) appDataPanel.refresh(); });
 const cameraLab = createCameraLab({ $, vm: apkVM });   // the device's cameras: source, frames for the VM, the camera screen of the capture Intents
 const overridesPanel = createOverridesPanel({ $, vm: apkVM });
-methodHooksPanel = createMethodHooksPanel({ $, vm: apkVM, trace: appendTrace, removePageRow: key => overridesPanel.removeKey(key), getPackage: () => state.inventory?.packageName ?? null, removeFile: path => codeBrowser?.revertFile(path) });
-codeBrowser = createCodeBrowser({ root: $('code-browser'), vm: apkVM, hooks: methodHooksPanel, trace: appendTrace, getPackage: () => state.inventory?.packageName ?? null });
-window.apkLabCodeBrowser = createCodeBrowserApi(codeBrowser);   // the Code browser's API (src/code-browser-api.js, docs/CODE-BROWSER.md): open, reveal, gutter clicks, markers, selection
+methodHooksPanel = createMethodHooksPanel({ $, vm: apkVM, trace: appendTrace, removePageRow: key => overridesPanel.removeKey(key), getPackage: () => state.inventory?.packageName ?? null, removeFile: path => codeTool.revertFile(path) });
 // The Java debugger on the page (docs/DEBUGGER.md "The page, plugins and MCP"): one controller shared by the debugger UI of the Code tool, the plugins' lab.debug and MCP's debug_* tools.
-debuggerController = createDebuggerController({ vm: apkVM, hooks: methodHooksPanel, trace: appendTrace, getPackage: () => state.inventory?.packageName ?? null, onFileEdit: (path, edited) => codeBrowser?.noteFileEdit?.(path, edited) });
-apkVM.onDebugEvent = event => { debuggerController.handleEvent(event); pluginHost.debugEvent(event); };
+apkVM.onDebugEvent = event => { codeTool.handleDebugEvent(event); pluginHost.debugEvent(event); };   // only an attached session sends events
 const debugPausedView = {   // "Paused in the debugger": the preview bar's chip, the device's cover (it takes no input meanwhile) and the status bar
   last: null,
   paused(info) {
@@ -1001,8 +994,11 @@ const debugPausedView = {   // "Paused in the debugger": the preview bar's chip,
 };
 $('debug-paused-overlay')?.querySelector('.dpo-resume')?.addEventListener('click', () => debugPausedView.resume?.());
 $('debug-paused')?.addEventListener('click', () => { const tool = $('code-browser'); if (tool) { tool.open = true; tool.scrollIntoView?.({ block: 'nearest' }); } });
-debuggerUi = createDebuggerUi({ root: $('code-browser'), api: window.apkLabCodeBrowser, controller: debuggerController, page: debugPausedView, trace: appendTrace, getPackage: () => state.inventory?.packageName ?? null });
-window.apkLabDebugger = debuggerController;   // test and console access: .state(), .breakpoints(), await .setBreakpoint({ className, line })
+// The Code tool (docs/CODE-BROWSER.md) and the debugger: nothing of them is fetched or runs until the Code tab opens, a plugin / MCP / the console calls code.* or debug.*, or
+// an APK with saved breakpoints opens (src/code-tool-loader.js). With the tab closed a session someone attached keeps working (pauses show here and flag or open the tab).
+codeTool = createCodeTool({ root: $('code-browser'), vm: apkVM, hooks: methodHooksPanel, trace: appendTrace, getInventory: () => state.inventory ?? null, page: debugPausedView });
+window.apkLabCodeBrowser = codeTool.browserApi;   // the Code browser's API (src/code-browser-api.js, docs/CODE-BROWSER.md): open, reveal, gutter clicks, markers, selection
+window.apkLabDebugger = codeTool.debugger;   // test and console access: .state(), .breakpoints(), await .setBreakpoint({ className, line })
 window.apkLabMethodHooks = methodHooksPanel;   // test and console access: .list(), .summary()
 const microgEntriesPanel = createMicrogEntriesPanel({ $, vm: apkVM });
 // "microG services" (src/microg-services-panel.js): each switch is a device setting, saved, recorded in the trace and, with a running microG, applied to it at once.
@@ -1308,7 +1304,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=67f3eead5b24')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
@@ -1340,7 +1336,7 @@ mcpControls.adb = (input, io) => runAdb('MCP', input, io);
 const runAdb = (who, input, io) => { appendTrace(`adb (${who}): ${typeof input.command === 'string' ? input.command : (input.args ?? []).join(' ')}`.slice(0, 400)); return adbInterpreter.run(input, io); };
 if ($('adb-terminal')?.querySelector?.('.adb-output')) window.apkLabTerminal = createAdbTerminal({ root: $('adb-terminal'), run: (command, io) => runAdb('terminal', { command }, io) });
 window.apkLabAdb = adbInterpreter;   // test and console access: await apkLabAdb.run({ command: 'adb shell wm size' })
-const mcpTools = createMcpTools({ debug: { controller: () => debuggerController, actions: debugActions, owner: mcpCaller }, hook: spec => methodHooksPanel.add(mcpCaller, spec), controls: mcpControls, input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], pluginStore: { list: () => pluginsPanel?.list?.() ?? [], save: spec => { const saved = pluginsPanel.save(spec); appendTrace(`MCP (save_plugin): plugin "${saved.plugin.name}" ${saved.created ? 'created' : 'changed'}${saved.plugin.enabled ? '' : ' (off)'}`); return saved; } }, clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries, frameStats: () => frameMeter.enabled ? frameMeter.summary() : null,
+const mcpTools = createMcpTools({ debug: { controller: () => codeTool.debugger, actions: debugActions, owner: mcpCaller }, hook: spec => methodHooksPanel.add(mcpCaller, spec), controls: mcpControls, input: mcpInput, actions: { mock: spec => pluginActions.mock(mcpCaller, spec), unmock: id => pluginActions.unmock(mcpCaller, { id }), mocks: () => pluginActions.mocks(mcpCaller), reload: mode => pluginActions.reload(mcpCaller, { mode }) }, query: (method, args) => pluginHost.query(method, args), plugins: () => pluginHost.list?.() ?? [], pluginStore: { list: () => pluginsPanel?.list?.() ?? [], save: spec => { const saved = pluginsPanel.save(spec); appendTrace(`MCP (save_plugin): plugin "${saved.plugin.name}" ${saved.created ? 'created' : 'changed'}${saved.plugin.enabled ? '' : ' (off)'}`); return saved; } }, clickButton: (id, button) => pluginHost.clickButton(id, button, { by: 'mcp' }), logcat: () => logcatPanel.store.entries, network: () => netlogPanel.store.entries, frameStats: () => frameMeter.enabled ? frameMeter.summary() : null,
   status: () => ({ running: !!apkVM.worker, packageName: state.inventory?.packageName ?? null, file: state.fileName ?? null, appModified: methodHooksPanel?.summary() ?? { count: 0 } }) });
 window.apkLabMcpTools = mcpTools;   // test and console access: await apkLabMcpTools.execute('plugins', {})
 mcpLink = createMcpLink({ execute: (tool, args, context) => mcpTools.execute(tool, args, context), onState: ({ state: linkState, message, calls, lastTool }) => {

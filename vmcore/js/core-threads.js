@@ -29,11 +29,11 @@
 //   - One flag and one set of monitors: Thread.interrupted of a VMThread is the record's word (thr_interrupt also takes the thread out of Object.wait); the runtime's monitor
 //     entry points used by host code (monitorTryEnter, monitorExit, monitorFree, monitorEnter, ownsMonitor) are the core's lock words; a thread that ends wakes whoever waits on
 //     its Thread object (ART's notifyAll at thread exit).
-import { Blocked } from '../../runtime/scheduler.js?v=97135b36a679';
+import { Blocked } from '../../runtime/scheduler.js?v=67f3eead5b24';
 const MAX_LIVE_THREADS = 1000;   // threads.h: tids 1..1022, the collector's thread table holds 1024 (host-bridge.js)
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=97135b36a679';
-import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=97135b36a679';
-import { CLASS } from './linker.js?v=97135b36a679';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=67f3eead5b24';
+import { APKError, JavaException } from '../../runtime/apk-runtime.js?v=67f3eead5b24';
+import { CLASS } from './linker.js?v=67f3eead5b24';
 const CLASS_INIT_STATE = CLASS.initState, CLASS_INITIALIZING = 1;   // vmcore/abi.h CLASS_INITIALIZING
 
 export const CORE_STATUS = Object.freeze({ OK: 0, OUT_OF_MEMORY: 5, UNCAUGHT: 48, HOST_STOPPED: 64, HOST_FAILED: 65, HOST_BLOCKED: 66, THREAD_BLOCKED: 80, YIELDED: 81, BREAKPOINT: 96, STEPPED: 97, EXCEPTION_EVENT: 98, HOST_THROW: 0x7fff0110 });
