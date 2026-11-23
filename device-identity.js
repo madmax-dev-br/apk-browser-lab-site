@@ -4,7 +4,7 @@
 // (the ABIs the device really runs), as a 32-bit image and a 64-bit one of the same build differ.
 // android.os.Build reads its fields from these properties as Build.java does (src/build-host.js); Java's SystemProperties and native code read the same table
 // (src/framework-provider.js, src/arm64/glue.js), so every reader sees one device.
-import { DEVICE_IDENTITY_TAG, DEVICE_IDENTITY_PROPERTIES, DEVICE_IDENTITY_ABI_PROPERTIES, FINGERPRINT_PARTS, BUILD_FIELD_PROPERTIES, VARIANT_RULES, RELEASE_TAG_CHANGES, LAB_PLATFORM_CERTIFICATE_SHA256 } from './device-identity-data.js?v=d0b27a2b509b';
+import { DEVICE_IDENTITY_TAG, DEVICE_IDENTITY_PROPERTIES, DEVICE_IDENTITY_ABI_PROPERTIES, FINGERPRINT_PARTS, BUILD_FIELD_PROPERTIES, VARIANT_RULES, RELEASE_TAG_CHANGES, LAB_PLATFORM_CERTIFICATE_SHA256 } from './device-identity-data.js?v=cbf1579510f6';
 
 export { BUILD_FIELD_PROPERTIES, FINGERPRINT_PARTS, LAB_PLATFORM_CERTIFICATE_SHA256 };
 export const IDENTITY_PROPERTIES = new Map(DEVICE_IDENTITY_PROPERTIES);

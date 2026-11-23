@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=d0b27a2b509b';
+import { blockValue, outputsOf } from './plugin-host.js?v=cbf1579510f6';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -353,6 +353,18 @@ export function createMcpTools({ debug = null, hook = null, controls = null, que
       const m = out.methods.find(item => item.key === out.method.key), lines = out.text.split('\n'), pcAt = new Map(m.pcToLine.map(([pc, line]) => [line, pc]));
       const listing = lines.slice(m.startLine - 1, m.endLine).map((line, i) => { const pc = pcAt.get(m.startLine + i); return `${pc === undefined ? '    ' : pc.toString(16).padStart(4, '0')}  ${line}`; }).join('\n');
       return [text({ key: m.key, registers: m.registers, units: m.units, modified: m.modified || undefined, note: 'Each instruction line starts with its dex pc in hex: debug_set_breakpoint takes it as pc (decimal or "0x..").', listing })];
+    },
+    async code_decompile(args) {
+      if (!args.class_name) throw fail('class_name is required (pkg.Name or Lpkg/Name;).');
+      const out = await codeAction({ op: 'decompile', descriptor: String(args.class_name), method: args.method ? String(args.method) : null });
+      const source = out.text.split('\n'), firstPc = new Map(out.lines.map(([line, , pc]) => [line, pc]));
+      const from = out.method ? out.method.startLine : 1, to = out.method ? out.method.endLine : source.length;
+      const listing = source.slice(from - 1, to).map((line, i) => { const n = from + i, pc = firstPc.get(n); return `${String(n).padStart(5)} ${pc === undefined ? '    ' : pc.toString(16).padStart(4, '0')}  ${line}`; }).join('\n');
+      const methodsShown = out.method ? out.methods.filter(m => m.key === out.method.key) : out.methods;
+      return [text({ descriptor: out.descriptor, file: out.file, framework: out.framework || undefined, lineCount: out.lineCount, stats: out.stats,
+        methods: methodsShown.map(m => ({ key: m.key, lines: `${m.startLine}-${m.endLine}`, notDecompiled: m.fallback ? `${m.fallback}: ${m.reason}` : undefined, modified: m.modified || undefined })),
+        note: 'Decompiled Java, not the original source. Each line: its number, then the dex pc (hex) of the first instruction it runs, blank for lines that run no code. A breakpoint on a Java line: debug_set_breakpoint with class_name, method (the key of the method the line is in) and that pc.',
+        listing })];
     },
     async code_class_info(args) { if (!args.class_name) throw fail('class_name is required.'); return [text(await codeAction({ op: 'classInfo', descriptor: String(args.class_name) }))]; },
     async code_read_file(args) {

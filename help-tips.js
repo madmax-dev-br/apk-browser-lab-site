@@ -7,7 +7,7 @@
 //     before it, the sub-section it sits in (data-help-title, legend or .cp-subtitle), or "Overview"; a debugging warning (p.cp-note.ov-warning) gets a "!" on its tab and on the icon.
 //   - texts inside [data-help-skip] are left where they are: a block that shows its own notes (the microG settings dialog, src/microg-settings-dialog.js).
 // A section made of groups (section.cp-sub with an h4.cp-subtitle: Device › Screen, Network › Proxy and relay…) gets its tabs listed under the group names, in page order.
-import { createModalHost } from './lab-modal.js?v=d0b27a2b509b';
+import { createModalHost } from './lab-modal.js?v=cbf1579510f6';
 
 const KEEP = new Set(['perms-empty', 'vm-memory-device']);   // state messages without role="status": they say what to do next
 const OVERVIEW = 'Overview';

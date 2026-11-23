@@ -6,7 +6,7 @@
 // Everything goes through the page's debugger controller (src/debugger-controller.js), shared with plugins and MCP. Keyboard: F8 resume, F10 over, F11 into, Shift+F11 out,
 // F9 toggles a breakpoint on the selected line. DOM only through `root` (the Code tool's <details>) and its document; no work at all while nobody attached, and nothing
 // rendered or read while the tool is closed (it catches up when it opens; the page's paused indicators come from src/code-tool-loader.js then). Loaded on first use.
-import { pausedInfo, pauseReasonText } from './code-tool-loader.js?v=d0b27a2b509b';
+import { pausedInfo, pauseReasonText } from './code-tool-loader.js?v=cbf1579510f6';
 
 const shortClass = name => { const text = String(name ?? ''); return text.slice(text.lastIndexOf('.') + 1); };
 const dottedOf = descriptor => { const d = String(descriptor ?? ''); return d.startsWith('L') && d.endsWith(';') ? d.slice(1, -1).replaceAll('/', '.') : d; };
@@ -92,14 +92,23 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
   function setNote(text) { U.note = text; render(); }
   const pausedThread = () => controller.paused?.thread ?? null;
   async function resume() { if (!controller.paused) return; await controller.command('resume', {}); }
-  async function step(kind) { const thread = pausedThread(); if (!thread) throw Object.assign(new Error('Nothing is paused: set a breakpoint or pause first.'), { code: 'not-paused' }); await controller.command('step', { thread, kind }); }
+  /**
+   * A step. On the Java tab (the paused method's class decompiled on screen), over and into go by Java statement: the step leaves the pcs of the current Java line and stops at
+   * the first pc of another (src/debugger.js step `pcs`, `stops`); elsewhere, and for out, by the source line table as before.
+   */
+  async function step(kind) {
+    const thread = pausedThread(); if (!thread) throw Object.assign(new Error('Nothing is paused: set a breakpoint or pause first.'), { code: 'not-paused' });
+    const here = controller.paused?.location, statement = kind !== 'out' && U.frame === 0 && here?.method ? api.javaStatement?.(here.method, here.pc) : null;
+    await controller.command('step', { thread, kind, ...(statement ? { method: here.method, pcs: statement.pcs, stops: statement.stops } : {}) });
+  }
   async function runToCursor() {
     const sel = api.currentSelection(); const at = sel?.line ? locationAtLine(sel.line) : null;
-    if (!at) throw Object.assign(new Error('Select a line of a method in the Smali view first.'), { code: 'bad-args' });
+    if (!at) throw Object.assign(new Error('Select a line of a method that runs code first.'), { code: 'bad-args' });
     await controller.command('run-to', { thread: pausedThread() ?? undefined, method: at.key, pc: at.pc });
   }
-  /** { key, pc } of the instruction at a 1-based line, or the first instruction after it in the same method (a .line or label line). */
+  /** { key, pc, line } of a 1-based line: a Java line's first instruction; on smali, the instruction there or the first one after it in the same method (a .line or label line). */
   function locationAtLine(line) {
+    if (api.locationAt) return api.locationAt(line);
     const d = api.document(); if (!d || d.kind !== 'class') return null;
     for (const m of d.methods) {
       if (line < m.startLine || line > m.endLine || !m.hasCode) continue;
@@ -108,7 +117,7 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     return null;
   }
   async function toggleAtLine(line, { shift = false } = {}) {
-    const at = locationAtLine(line); if (!at) { setNote('Breakpoints go on the lines of a method with code (Smali view).'); return; }
+    const at = locationAtLine(line); if (!at) { setNote(api.document()?.tab === 'java' ? 'Breakpoints go on the Java lines that run code (the ones with a pc in the gutter).' : 'Breakpoints go on the lines of a method with code.'); return; }
     if (shift) { openPopover(at); return; }
     await controller.toggleAt(at.key, at.pc);
   }
@@ -124,7 +133,7 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
   }
 
   // ---- the gutter --------------------------------------------------------------------------------------------------------------------------------------------------------
-  api.onGutterClick(detail => { if (detail.tab !== 'smali' || !detail.method) return; act(() => toggleAtLine(detail.line, { shift: detail.shiftKey })); });
+  api.onGutterClick(detail => { if ((detail.tab !== 'smali' && detail.tab !== 'java') || !detail.method) return; act(() => toggleAtLine(detail.line, { shift: detail.shiftKey })); });
   api.onOpen(() => { closePopover(); paintMarkers(); });
   function paintMarkers() {
     const d = api.document(); if (!d || d.kind !== 'class') return;
@@ -338,7 +347,10 @@ export function createDebuggerUi({ root, api, controller, page = null, trace = (
     if (key === 'F8') act(resume); else if (key === 'F10') act(() => step('over')); else if (key === 'F11') act(() => step(event.shiftKey ? 'out' : 'into'));
   });
 
+  let javaPrepared = false;
   controller.onChange(() => {
+    if (controller.attached && !javaPrepared) { javaPrepared = true; api.prepareJava?.(); }   // the user reads Java: the Worker loads the decompiler now, not while a thread is held
+    if (!controller.attached) javaPrepared = false;
     if (!root.open) { U.dirty = true; page?.paused?.(controller.paused ? { ...pausedInfo(controller.paused), resume: () => act(resume) } : null); return; }   // closed: no render, no read
     const p = controller.paused; if ((p?.seq ?? null) !== U.lastPausedSeq || (!p && U.frames)) refreshPaused(); else render();
   });

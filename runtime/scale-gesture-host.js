@@ -1,4 +1,4 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=d0b27a2b509b';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=cbf1579510f6';
 
 // android.view.ScaleGestureDetector (android-13.0.0_r1 core/java/android/view/ScaleGestureDetector.java): the span / focus arithmetic of onTouchEvent, the begin / scale / end
 // protocol with the listener, and the two anchored modes (double-tap-and-drag "quick scale", on by default for targetSdk > 19, and stylus-button scale, on for targetSdk > 22).

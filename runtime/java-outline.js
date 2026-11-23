@@ -1,8 +1,8 @@
-// The "Java outline" of the Code browser (docs/CODE-BROWSER.md): a class's declarations in Java syntax -- package, modifiers, superclass and interfaces, fields with their
+// The "Java outline" (src/code-service.js java-outline; the Code browser's Java tab shows the decompiled class now, src/java-decompiler.js): a class's declarations in Java syntax -- package, modifiers, superclass and interfaces, fields with their
 // constant values, constructors and methods with their signatures -- and, under each method, the string constants it loads, the methods it calls and the fields it reads
 // or writes, as comments. It is NOT a decompilation: no statement of a method body is reconstructed (a faithful decompiler does not run here yet; the reasons are in the
 // doc), and the text says so on its first line. The Smali tab has the exact code. Built from the class model of src/smali-disassembler.js. Pure module: no DOM, no process.*.
-import { ACC, decodeInstruction, OPCODES, valueText, javaFloatText, javaDoubleText, floatOfBits, doubleOfBits } from './smali-disassembler.js?v=d0b27a2b509b';
+import { ACC, decodeInstruction, OPCODES, valueText, javaFloatText, javaDoubleText, floatOfBits, doubleOfBits } from './smali-disassembler.js?v=cbf1579510f6';
 
 const PRIMITIVES = { V: 'void', Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double' };
 /** A descriptor as Java writes it: int[], java.lang.String, Outer.Inner (relative to `pkg` when given: the class's own package is left out). */

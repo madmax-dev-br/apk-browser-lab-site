@@ -18,6 +18,7 @@ export function debuggerPluginActions(controllerOrGetter) {
         case 'search': return c.code.search(String(args.query ?? ''), { kinds: Array.isArray(args.kinds) ? args.kinds.map(String) : undefined, limit: Math.min(PLUGIN_CODE_LIMITS.searchResults, Math.max(1, Number(args.limit) || 100)), framework: args.framework === true, cursor: args.cursor ?? null });
         case 'disassemble': return c.code.disassemble(String(args.descriptor ?? ''), args.method ?? null);
         case 'classInfo': return c.code.classInfo(String(args.descriptor ?? ''));
+        case 'decompile': return c.code.decompile(String(args.descriptor ?? ''), args.method ?? null);
         case 'readFile': return c.code.readFile(String(args.path ?? ''));
         case 'files': return c.code.files();
         case 'editFile': {
@@ -45,7 +46,8 @@ export function debuggerPluginActions(controllerOrGetter) {
         case 'breakpoints': return c.breakpoints({ owner: args.all === true ? null : owner });
         case 'pause': return c.command('pause', { thread });
         case 'resume': return c.command('resume', { thread });
-        case 'step': return c.command('step', { thread, kind: ['into', 'over', 'out'].includes(args.kind) ? args.kind : 'over', unit: args.unit === 'instruction' ? 'instruction' : 'line' });
+        case 'step': return c.command('step', { thread, kind: ['into', 'over', 'out'].includes(args.kind) ? args.kind : 'over', unit: args.unit === 'instruction' ? 'instruction' : 'line',
+          ...(Array.isArray(args.pcs) ? { pcs: args.pcs.slice(0, 65536).map(Number), method: args.method === undefined ? undefined : String(args.method), ...(Array.isArray(args.stops) ? { stops: args.stops.slice(0, 65536).map(Number) } : {}) } : {}) });
         case 'runTo': return c.command('run-to', { thread, ...(args.method ? { method: String(args.method), pc: Number(args.pc) } : { className: String(args.className ?? ''), line: Number(args.line) }) });
         case 'threads': return c.command('threads');
         case 'frames': return c.command('frames', { thread, start: args.start, count: Math.min(256, Math.max(1, Number(args.count) || 64)) });

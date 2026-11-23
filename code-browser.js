@@ -1,4 +1,4 @@
-// The Code browser (docs/CODE-BROWSER.md): a tool of the bottom dock (src/tool-dock.js) to search the running APK, read its classes as smali (with a Java outline and the
+// The Code browser (docs/CODE-BROWSER.md): a tool of the bottom dock (src/tool-dock.js) to search the running APK, read its classes as smali and as decompiled Java (with the
 // class information) and its files, and change them -- a method body through the method changes of src/method-hooks.js (lab.hook { smali }: listed as "App modified",
 // counted, traced, removable, in effect from the next call), an APK file through src/code-service.js editFile (read by the app from its next read). Both are re-applied
 // when the APK is opened again.
@@ -6,10 +6,10 @@
 // Responsiveness: every list and the viewer are virtualized (only the rows in view are in the DOM, painted per frame); the search runs in the Worker in steps of about
 // 30 ms with a cursor; the page never loops over a whole class or result set on an event. DOM only through `root` (index.html #code-browser) and its document.
 // The debugger UI and the plugin / MCP APIs build on src/code-browser-api.js (open, reveal, gutter clicks, markers, selection), not on this module's internals.
-import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=d0b27a2b509b';
-import { createCodeEditor } from './code-editor.js?v=d0b27a2b509b';
-import { CODE_BROWSER } from './method-hooks-panel.js?v=d0b27a2b509b';
-import { createCodePanes } from './code-panes.js?v=d0b27a2b509b';
+import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=cbf1579510f6';
+import { createCodeEditor } from './code-editor.js?v=cbf1579510f6';
+import { CODE_BROWSER } from './method-hooks-panel.js?v=cbf1579510f6';
+import { createCodePanes } from './code-panes.js?v=cbf1579510f6';
 
 const LINE_H = 18, ROW_H = 24, OVERSCAN = 12, MAX_RESULTS = 3000, AUTO_RESULTS = 400, CHECK_MS = 500;
 const KIND_LABEL = { class: 'Classes', method: 'Methods', field: 'Fields', string: 'Strings', file: 'Files' };
@@ -17,7 +17,7 @@ const dotted = d => d.startsWith('L') && d.endsWith(';') ? d.slice(1, -1).replac
 const simpleName = d => { const n = dotted(d); return n.slice(n.lastIndexOf('.') + 1); };
 const JAVA_KEYWORDS = new Set('abstract boolean byte char class double else enum extends final float for if implements import int interface long native new null package private protected public return short static strictfp super synchronized this throw throws transient true false try void volatile while'.split(' '));
 
-/** [[start, end, kind]] of a line of the Java outline, an XML file or plain text (the viewer's colours; smali has its own tokenizer). */
+/** [[start, end, kind]] of a line of the Java view, an XML file or plain text (the viewer's colours; smali has its own tokenizer). */
 export function tokenizeViewLine(line, language) {
   if (language === 'smali') return tokenizeSmaliLine(line);
   const out = [];
@@ -41,11 +41,13 @@ export function tokenizeViewLine(line, language) {
   return out;
 }
 
+const VIEW_KEY = 'apkweb.code.view.v1';   // the view the user reads classes in: 'smali' or 'java' (the debugger follows it)
 /**
  * root: the dock's <details id="code-browser">. vm: the Worker client (codeService, methodHooks via `hooks`). hooks: the "App modified" panel (src/method-hooks-panel.js),
- * through which method edits are made. Returns the browser (see src/code-browser-api.js for the stable surface).
+ * through which method edits are made. debugging(): true while a debugger session is attached (the Java view's results are kept then when the tool closes).
  */
-export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackage = () => null, win = globalThis.window, doc = globalThis.document }) {
+export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackage = () => null, debugging = () => false, storage = (() => { try { return globalThis.localStorage ?? null; } catch { return null; } })(), win = globalThis.window, doc = globalThis.document }) {
+  const savedView = (() => { try { return storage?.getItem?.(VIEW_KEY) === 'java' ? 'java' : 'smali'; } catch { return 'smali'; } })();
   const h = (tag, props = {}, ...children) => {
     const el = doc.createElement(tag);
     for (const [k, v] of Object.entries(props)) { if (v === undefined || v === null || v === false) continue; if (k === 'class') el.className = v; else if (k === 'text') el.textContent = v; else if (k.startsWith('on')) el.addEventListener(k.slice(2), v); else el.setAttribute(k, v === true ? '' : String(v)); }
@@ -54,7 +56,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   };
   const S = {
     attached: false, packageName: null, inited: false, side: 'classes', query: '', framework: false, search: null, searchSeq: 0, tree: [], treeLoaded: new Map(), expanded: new Set(), files: null, fileExpanded: new Set(),
-    doc: null, tab: 'smali', views: new Map(), history: [], selection: { line: -1 }, markers: new Map(), gutterListeners: new Set(), openListeners: new Set(), find: { query: '', hits: [], at: -1 },
+    doc: null, tab: savedView, views: new Map(), javaUsed: false, history: [], selection: { line: -1 }, markers: new Map(), gutterListeners: new Set(), openListeners: new Set(), find: { query: '', hits: [], at: -1 },
     edit: null, modified: new Map(), fileEdits: new Map(), checkTimer: null, stale: false,
   };
   const countNode = root.querySelector('.cb-count');
@@ -68,7 +70,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   const side = h('div', { class: 'cb-side' }, h('div', { class: 'cb-search' }, query, h('label', { class: 'cb-check', title: 'Also search the framework (the AOSP classes the lab runs from DEX)' }, frameworkBox, ' Framework')),
     h('div', { class: 'cb-modes', role: 'tablist', 'aria-label': 'Browse' }, ...modeButtons), list, sideStatus);
   const title = h('div', { class: 'cb-title' }), meta = h('div', { class: 'cb-meta' });
-  const tabs = ['smali', 'java', 'info'].map(tab => h('button', { type: 'button', class: 'cb-tab', role: 'tab', 'data-tab': tab, 'aria-selected': String(tab === 'smali'), text: tab === 'smali' ? 'Smali' : tab === 'java' ? 'Java outline' : 'Info' }));
+  const tabs = ['smali', 'java', 'info'].map(tab => h('button', { type: 'button', class: 'cb-tab', role: 'tab', 'data-tab': tab, 'aria-selected': String(tab === savedView), text: tab === 'smali' ? 'Smali' : tab === 'java' ? 'Java' : 'Info', title: tab === 'java' ? 'Decompiled Java (readable, not the original source): breakpoints and steps work on its lines' : null }));
   const backButton = h('button', { type: 'button', class: 'cb-button cb-back', title: 'Back (Alt+Left)', disabled: true, text: 'Back' });
   const findButton = h('button', { type: 'button', class: 'cb-button', title: 'Find in this file (Ctrl+F)', text: 'Find' });
   const editButton = h('button', { type: 'button', class: 'cb-button cb-edit-button', disabled: true, text: 'Edit method' });
@@ -268,7 +270,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   // ---- the viewer -------------------------------------------------------------------------------------------------------------------------------------------------------
   /** The document on screen: { kind: 'class' | 'file', descriptor?, path?, lines, language, pcOfLine?, methodOfLine?, methods?, ... } for the current tab. */
   function showStage(which) { view.hidden = which !== 'view'; info.hidden = which !== 'info'; image.hidden = which !== 'image'; empty.hidden = which !== 'empty'; editPane.hidden = which !== 'edit'; }
-  function currentText() { const d = S.doc; if (!d) return null; return d.kind === 'file' ? d.file : S.tab === 'java' ? d.java : d.smali; }
+  function currentText() { const d = S.doc; if (!d) return null; return d.kind === 'file' ? d.file : S.tab === 'java' ? d.java ?? d.javaWait ?? null : d.smali; }
   function paintView() {
     viewFrame = false;
     const t = currentText(); if (!t || view.hidden) return;
@@ -284,10 +286,10 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   function viewLine(t, n, hits) {
     const line = t.lines[n], pc = t.pcOfLine ? t.pcOfLine[n] : -1, marker = S.markers.get(n), selected = S.selection.line === n;
     const row = h('div', { class: `cb-line${selected ? ' is-selected' : ''}${marker ? ` cb-marker-${marker}` : ''}${t.modifiedLines?.has(n) ? ' is-modified' : ''}`, 'data-line': n });
-    const gutter = h('span', { class: 'cb-gutter', 'data-line': n, title: pc >= 0 ? `line ${n + 1}, dex pc ${pc} (0x${pc.toString(16)})` : `line ${n + 1}` },
+    const gutter = h('span', { class: 'cb-gutter', 'data-line': n, title: pc >= 0 ? `line ${n + 1}, dex pc ${pc} (0x${pc.toString(16)})${t.language === 'java' && t.pcsOfLine?.[n]?.length > 3 ? `, ${t.pcsOfLine[n].length - 2} instructions` : ''}` : `line ${n + 1}` },
       h('span', { class: 'cb-mark', 'aria-hidden': 'true' }), h('span', { class: 'cb-ln', text: String(n + 1) }), h('span', { class: 'cb-pc', text: pc >= 0 ? pc.toString(16).padStart(4, '0') : '' }));
     const code = h('code', { class: 'cb-text' });
-    paintText(code, line, tokenizeViewLine(line, t.language), t.language === 'smali' ? smaliReferences(line) : [], hits, n);
+    paintText(code, line, tokenizeViewLine(line, t.language), referencesOf(t, line), hits, n);
     row.append(gutter, code);
     return row;
   }
@@ -312,16 +314,24 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     const n = Number(lineEl.dataset.line);
     if (gutter) { emitGutter(n, event); return; }
     const ref = event.target.closest?.('.cb-ref');
-    if (ref && !(win?.getSelection?.()?.toString?.())) { const r = smaliReferences(currentText().lines[n])[Number(ref.dataset.ref)]; if (r) { goToDefinition(r); return; } }
+    if (ref && !(win?.getSelection?.()?.toString?.())) { const t = currentText(), r = referencesOf(t, t.lines[n])[Number(ref.dataset.ref)]; if (r) { goToDefinition(r); return; } }
     select(n);
   });
+  /** The references a line of the open text links to: smali's members and types; in the Java view, the class names the decompiler resolved. */
+  function referencesOf(t, line) {
+    if (t.language === 'smali') return smaliReferences(line);
+    if (t.language !== 'java' || !t.typeRefs) return [];
+    const out = [], comment = line.indexOf('//'), code = comment < 0 ? line : line.slice(0, comment);
+    for (const m of code.matchAll(/"(?:[^"\\]|\\.)*"|\b[A-Z][\w$]*\b/g)) { const d = m[0][0] !== '"' ? t.typeRefs[m[0]] : null; if (d) out.push({ kind: 'class', descriptor: d, start: m.index, end: m.index + m[0].length }); }
+    return out;
+  }
   function select(n) {
     S.selection = { line: n }; updateEditButton(); scheduleView();
     if (S.tab === 'java' && S.doc?.java?.methodOfLine?.[n] >= 0) { /* a line of a method's outline: the Smali tab opens on that method */ }
   }
   view.addEventListener('dblclick', event => {
     const n = Number(event.target.closest?.('.cb-line')?.dataset.line); if (!(n >= 0)) return;
-    if (S.tab === 'java') { const index = S.doc?.java?.methodOfLine?.[n]; const m = index >= 0 ? S.doc.java.methods[index] : null; if (m) { setTab('smali'); revealMethod(m.name, m.signature); } }
+    if (S.tab === 'java') { const j = S.doc?.java, index = j?.methodOfLine?.[n], m = index >= 0 ? j.methods[index] : null; if (m) { const pc = j.pcOfLine?.[n]; setTab('smali').then(() => revealMethod(m.name, m.signature, pc >= 0 ? pc : null)); } }
   });
   function emitGutter(n, event) {
     const t = currentText(), d = S.doc, pc = t?.pcOfLine ? t.pcOfLine[n] : -1, method = methodAtLine(n);
@@ -329,7 +339,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     select(n);
     for (const fn of S.gutterListeners) { try { fn(detail); } catch (error) { trace(`Code browser: a gutter listener failed: ${error?.message ?? error}`); } }
   }
-  function methodAtLine(n) { const d = S.doc; if (!d || d.kind !== 'class' || S.tab !== 'smali') return null; const i = d.smali.methodOfLine?.[n] ?? -1; return i >= 0 ? d.smali.methods[i] : null; }
+  function methodAtLine(n) { const d = S.doc; if (!d || d.kind !== 'class' || (S.tab !== 'smali' && S.tab !== 'java')) return null; const t = S.tab === 'java' ? d.java : d.smali; const i = t?.methodOfLine?.[n] ?? -1; return i >= 0 ? t.methods[i] : null; }
   async function goToDefinition(ref) {
     if (ref.kind === 'class') return open(ref.descriptor).catch(() => {});
     // a member: its class, or the first superclass that declares it
@@ -375,13 +385,45 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     if (S.tab !== 'smali') return null;
     const i = d.smali.methodOfLine?.[n] ?? -1; return i >= 0 ? d.smali.methods[i] : null;
   }
-  for (const t of tabs) t.addEventListener('click', () => setTab(t.dataset.tab));
-  async function setTab(tab) {
+  for (const t of tabs) t.addEventListener('click', () => { if (t.dataset.tab !== 'info') { try { storage?.setItem?.(VIEW_KEY, t.dataset.tab); } catch { /* not kept */ } } setTab(t.dataset.tab).catch(error => { if (error?.code !== 'left') setNote(error.message); }); });
+  /** Shows a tab of the open class; `keep`: leave the scroll position and the selection (the caller places them). Resolves once the Java view is there (or failed). */
+  async function setTab(tab, { keep = false } = {}) {
     S.tab = tab; const d = S.doc; renderHead(); closeFind(true);
     if (!d || d.kind !== 'class') return;
     if (tab === 'info') { renderInfo(); showStage('info'); return; }
-    if (tab === 'java' && !d.java) { const out = await vm.codeService('java-outline', { descriptor: d.descriptor }); d.java = { lines: out.text.split('\n'), language: 'java', methodOfLine: out.methodOfLine, methods: out.methods }; }
-    showStage('view'); view.scrollTop = 0; S.selection = { line: -1 }; scheduleView(); updateEditButton();
+    if (tab === 'java' && !d.java) {
+      showStage('view'); d.javaWait = { lines: ['// Decompiling…'], language: 'java' }; scheduleView();
+      try { await loadJava(d); }
+      catch (error) { if (S.doc === d && S.tab === 'java' && error?.code !== 'left') { d.javaWait = { lines: [`// The Java view is not available: ${error?.message ?? error}`, '// The Smali tab has the code.'], language: 'java' }; scheduleView(); } throw error; }
+      if (S.doc !== d || S.tab !== tab) return;
+    }
+    showStage('view'); if (!keep) { view.scrollTop = 0; S.selection = { line: -1 }; } scheduleView(); updateEditButton(); renderHead();
+  }
+  /**
+   * The class's Java view, from the Worker's decompiler (src/java-decompiler.js through src/code-service.js 'decompile'): asked for step by step (the VM runs between two
+   * steps), and no longer once the user left this class or its Java tab, or closed the tool (unless the debugger needs the view: `force`).
+   */
+  function loadJava(d, { force = false } = {}) {
+    if (d.java) return Promise.resolve(d.java);
+    if (d.javaLoading) return d.javaLoading;
+    S.javaUsed = true;
+    d.javaLoading = (async () => {
+      for (;;) {
+        const out = await vm.codeService('decompile', { descriptor: d.descriptor });
+        if (S.doc !== d) throw Object.assign(new Error('the class is no longer open'), { code: 'left' });
+        if (out.done) {
+          const pcOfLine = new Int32Array(out.lineCount).fill(-1); out.pcsOfLine.forEach((map, i) => { if (map) pcOfLine[i] = map[1]; });
+          const modifiedLines = new Set(); out.methods.forEach(m => { if (m.modified || S.modified.has(m.key)) for (let n = m.startLine; n <= m.endLine; n++) modifiedLines.add(n); });
+          d.java = { lines: out.text.split('\n'), language: 'java', pcOfLine, pcsOfLine: out.pcsOfLine, lineOfPc: out.lineOfPc, methodOfLine: out.methodOfLine, methods: out.methods, typeRefs: out.typeRefs ?? null, stats: out.stats, modifiedLines };
+          d.javaWait = null;
+          return d.java;
+        }
+        if (!force && (S.tab !== 'java' || !root.open)) throw Object.assign(new Error('the Java tab was left'), { code: 'left' });
+        d.javaWait = { lines: [`// Decompiling… ${out.progress?.done ?? 0} of ${out.progress?.total ?? '?'} methods`], language: 'java' }; scheduleView();
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+    })().finally(() => { d.javaLoading = null; });
+    return d.javaLoading;
   }
   function renderInfo() {
     const d = S.doc, i = d.info; if (!i) { info.replaceChildren(h('p', { text: 'Loading…' })); return; }
@@ -399,10 +441,22 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   }
   function revealMethod(name, signature, pc = null) {
     const d = S.doc; if (!d?.smali) return false;
+    if (S.tab === 'java' && d.java) {
+      const m = d.java.methods.find(x => x.name === name && (!signature || x.signature === signature)); if (!m) return false;
+      const line = pc !== null && pc !== undefined ? javaLineOfPc(d.java, m.key, pc) : null;
+      reveal(line ?? m.startLine); return true;
+    }
     const m = d.smali.methods.find(x => x.name === name && (!signature || x.signature === signature)); if (!m) return false;
     let line = m.startLine;
     if (pc !== null && pc !== undefined) { const hit = m.pcToLine.find(([p]) => p === pc); if (hit) line = hit[1]; }
     reveal(line); return true;
+  }
+  /** The Java line (0-based) of `pc` in method `key`: its own line, else the line of the closest pc before it (a jump or a constant the Java text folded away). */
+  function javaLineOfPc(j, key, pc) {
+    const map = j.lineOfPc?.[key]; if (!map) return null;
+    if (map[pc] !== undefined) return map[pc];
+    let best = -1; for (const p of Object.keys(map)) { const n = Number(p); if (n <= pc && n > best) best = n; }
+    return best >= 0 ? map[best] : null;
   }
   /** Scrolls 0-based line `n` into view (a third from the top) and selects it. */
   function reveal(n) {
@@ -436,10 +490,12 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
       }
       const wantTab = tab ?? (S.tab === 'info' ? 'smali' : S.tab);
       S.tab = wantTab === 'java' || wantTab === 'info' ? wantTab : 'smali';
-      if (S.tab !== 'smali') await setTab(S.tab); else { showStage('view'); renderHead(); }
+      if (S.tab !== 'smali') { try { await setTab(S.tab, { keep: true }); } catch (error) { if (error?.code === 'left') return S.doc; S.tab = 'smali'; showStage('view'); renderHead(); setNote(`Java view: ${error?.message ?? error}`); } }
+      else { showStage('view'); renderHead(); }
       view.scrollTop = 0; S.selection = { line: -1 };
-      if (method && S.tab === 'smali') revealMethod(method.name ?? String(method), method.signature ?? null, pc);
+      if (method && S.tab !== 'info') revealMethod(method.name ?? String(method), method.signature ?? null, pc);
       else if (field && S.tab === 'smali') { const n = S.doc.smali.lines.findIndex(l => l.startsWith('.field ') && l.includes(` ${field}:`)); if (n >= 0) reveal(n); }
+      else if (field && S.tab === 'java') { const n = S.doc.java?.lines.findIndex(l => /^ {4}\S/.test(l) && new RegExp(`\\b${field.replace(/[$]/g, '\\$')}( =|;)`).test(l)) ?? -1; if (n >= 0) reveal(n); }
       else if (line !== null) reveal(line);
       scheduleView(); renderHead(); notifyOpen();
       return S.doc;
@@ -625,15 +681,22 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     if (reapplied.length) trace(`Code browser: ${reapplied.length} edited file${reapplied.length === 1 ? '' : 's'} applied again before the app started (${reapplied.join(', ')})`);
     const classes = inventory?.classCount ?? inventory?.classes ?? null;
     setCount(typeof classes === 'number' ? `${classes} classes` : 'ready');
-    showStage('empty'); empty.firstChild.textContent = 'Search the app, or open a package on the left.'; empty.lastChild.textContent = 'Smali is exact (baksmali syntax); the Java outline shows declarations only.';
+    showStage('empty'); empty.firstChild.textContent = 'Search the app, or open a package on the left.'; empty.lastChild.textContent = 'Smali is exact (baksmali syntax); Java is decompiled from it (readable, not the original source). The debugger works on both.';
     renderHead();
     if (root.open) await init();
   }
   async function init() { if (!S.attached) return; S.inited = true; try { await rebuildTree(); if (S.side === 'files') await loadFiles(); } catch (error) { setSideStatus(error.message); } }
   // the tool's work runs while it is open: on opening, the class tree of a new APK is read, a file someone else edited meanwhile is read again, and the rows are painted
   root.addEventListener('toggle', () => {
-    if (!root.open) return;
+    if (!root.open) {
+      if (S.javaUsed && !debugging()) {   // nothing of the Java view is kept for a closed tool: the Worker forgets its classes, the page its texts
+        S.javaUsed = false; if (S.doc?.kind === 'class') { S.doc.java = null; S.doc.javaWait = null; }
+        if (S.attached) vm.codeService('decompile-drop').catch(() => {});
+      }
+      return;
+    }
     if (S.attached && !S.tree.length) init();
+    if (S.doc?.kind === 'class' && S.tab === 'java' && !S.doc.java && !S.edit) setTab('java', { keep: true }).catch(() => {});
     if (S.stale) { S.stale = false; if (S.doc?.kind === 'file' && !S.edit) open(S.doc.path, { push: false }).catch(() => {}); }
     scheduleList(); scheduleView(); editor.refresh();
   });
@@ -655,11 +718,42 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
     setMarkers(markers) { S.markers = new Map((markers ?? []).filter(m => Number.isInteger(m?.line) && m.line >= 1).map(m => [m.line - 1, String(m.kind ?? 'mark').replace(/[^\w-]/g, '').slice(0, 32) || 'mark'])); scheduleView(); },
     onGutterClick(fn) { S.gutterListeners.add(fn); return () => S.gutterListeners.delete(fn); },
     onOpen(fn) { S.openListeners.add(fn); return () => S.openListeners.delete(fn); },
-    /** The document on screen, for the API: { kind, descriptor, path, tab, lineCount, methods: [{ key, name, signature, startLine, endLine, pcToLine }] } (lines 1-based). */
+    /**
+     * The document on screen, for the API: { kind, descriptor, path, tab, lineCount, methods: [{ key, name, signature, startLine, endLine, pcToLine }] } (lines 1-based). On the
+     * Java tab the lines are the Java view's: pcToLine has every pc a Java line covers.
+     */
     document() {
       const d = S.doc; if (!d) return null; const t = currentText();
-      return { kind: d.kind, descriptor: d.descriptor ?? null, path: d.path ?? null, tab: d.kind === 'class' ? S.tab : 'file', lineCount: t?.lines.length ?? 0,
-        methods: d.kind === 'class' && d.smali ? d.smali.methods.map(m => ({ key: m.key, name: m.name, signature: m.signature, startLine: m.startLine + 1, endLine: m.endLine + 1, hasCode: m.hasCode, modified: S.modified.has(m.key) || !!m.modified, pcToLine: m.pcToLine.map(([pc, line]) => [pc, line + 1]) })) : [] };
+      const java = d.kind === 'class' && S.tab === 'java' && d.java ? d.java : null;
+      const methods = java ? java.methods.map(m => ({ key: m.key, name: m.name, signature: m.signature, startLine: m.startLine + 1, endLine: m.endLine + 1, hasCode: m.hasCode, modified: S.modified.has(m.key) || !!m.modified,
+          pcToLine: Object.entries(java.lineOfPc[m.key] ?? {}).map(([pc, line]) => [Number(pc), line + 1]).sort((a, b) => a[0] - b[0]) }))
+        : d.kind === 'class' && d.smali && S.tab !== 'java' ? d.smali.methods.map(m => ({ key: m.key, name: m.name, signature: m.signature, startLine: m.startLine + 1, endLine: m.endLine + 1, hasCode: m.hasCode, modified: S.modified.has(m.key) || !!m.modified, pcToLine: m.pcToLine.map(([pc, line]) => [pc, line + 1]) })) : [];
+      return { kind: d.kind, descriptor: d.descriptor ?? null, path: d.path ?? null, tab: d.kind === 'class' ? S.tab : 'file', lineCount: t?.lines.length ?? 0, methods };
+    },
+    /** { key, pc, line } where a breakpoint on 1-based `line` goes: the Java line's first pc, or the smali instruction on (or after, in the same method) that line; null elsewhere. */
+    locationAt(line) {
+      const d = S.doc; if (!d || d.kind !== 'class') return null;
+      if (S.tab === 'java') { const map = d.java?.pcsOfLine?.[line - 1]; return map ? { key: map[0], pc: map[1], line } : null; }
+      if (S.tab !== 'smali') return null;
+      for (const m of d.smali.methods) { if (line < m.startLine + 1 || line > m.endLine + 1 || !m.hasCode) continue; const hit = m.pcToLine.find(([, l]) => l + 1 >= line); return hit ? { key: m.key, pc: hit[0], line: hit[1] + 1 } : null; }
+      return null;
+    },
+    /** The Java statement around `pc` of method `key` when the Java view of its class is on screen: { line, pcs, stops } (stops: the first pc of every Java line of the method), else null. */
+    javaStatement(key, pc) {
+      const d = S.doc, j = d?.kind === 'class' && S.tab === 'java' ? d.java : null; if (!j || !key?.startsWith(`${d.descriptor}->`)) return null;
+      const line = javaLineOfPc(j, key, Number(pc)); if (line === null) return null;
+      const stops = [...new Set(Object.values(j.lineOfPc[key] ?? {}))].map(l => j.pcsOfLine[l]?.[1]).filter(p => p !== undefined);
+      return { line: line + 1, pcs: j.pcsOfLine[line].slice(2), stops };
+    },
+    /** Loads the decompiler in the Worker ahead of a stop (a debugger attached while the user reads Java: the Worker cannot import it while a thread is held). */
+    prepareJava() { if (S.tab === 'java' && S.attached) return vm.codeService('decompile-load').catch(() => null); return Promise.resolve(null); },
+    /** The line of `pc` in method `key` on the open tab (1-based), the closest earlier pc's line when it has none. */
+    lineForPc(key, pc) {
+      const d = S.doc; if (!d || d.kind !== 'class') return null;
+      if (S.tab === 'java') { const n = d.java ? javaLineOfPc(d.java, key, Number(pc)) : null; return n === null ? null : n + 1; }
+      const m = d.smali?.methods.find(x => x.key === key); if (!m) return null;
+      let best = null; for (const [p, l] of m.pcToLine) { if (p === Number(pc)) return l + 1; if (p < Number(pc)) best = l + 1; }
+      return best;
     },
     lineText(line) { const t = currentText(); return t?.lines[line - 1] ?? null; },
     /** An APK file edited or restored by someone else (a plugin's lab.code.editFile, MCP code_edit_file): its badge, and the open file read again. */

@@ -4,7 +4,7 @@
 // the table names become binary XML, base/resources.pb becomes resources.arsc, and base/dex, base/res, base/assets, base/lib and base/root move to the APK's root.
 // Only the base module is taken: other modules (feature modules, asset packs) are listed in `notes`, never merged silently. No signature is made: the bundle's own signature
 // files (META-INF, the upload key's) are kept as they are. No process.*.
-import { APKArchive } from './apk-archive.js?v=d0b27a2b509b';
+import { APKArchive } from './apk-archive.js?v=cbf1579510f6';
 
 const fail = message => { throw Object.assign(new Error(message), { kind: 'aab-unsupported' }); };
 const MAX_ENTRY = 256 * 1024 * 1024;

@@ -450,13 +450,15 @@ export function pluginWorkerMain(scope) {
     /**
      * lab.code: the Code browser's reads of the running APK and the user-chosen edits (listed as "App modified" with this plugin as owner, removed when it stops).
      * search(query, { kinds, limit, framework }) -> { results, more, cursor }; disassemble(descriptor, method?) -> { text, methods: [{ key, startLine, endLine, pcToLine }], method? };
-     * classInfo(descriptor); readFile(path) -> { path, kind, text, editable, refusal, edited }; editFile(path, text | Uint8Array); revertFile(path);
+     * decompile(descriptor, method?) -> { text (Java), methods: [{ key, startLine, endLine, fallback }], lines: [[line, methodKey, firstPc, ...pcs]] } (a breakpoint at a Java
+     * line is lab.debug.setBreakpoint({ method: methodKey, pc: firstPc })); classInfo(descriptor); readFile(path) -> { path, kind, text, editable, refusal, edited }; editFile(path, text | Uint8Array); revertFile(path);
      * editMethod(descriptor, 'name(params)ret', smali, { persist }): lab.hook(method, { smali }).
      */
     code: Object.freeze({
       search: (query, options = {}) => call('code', { op: 'search', query: String(query ?? ''), kinds: Array.isArray(options?.kinds) ? options.kinds.map(String) : undefined, limit: options?.limit, framework: options?.framework === true, cursor: options?.cursor ?? null }),
       disassemble: (descriptor, method) => call('code', { op: 'disassemble', descriptor: String(descriptor ?? ''), method: method === undefined || method === null ? null : typeof method === 'object' ? { name: String(method.name ?? ''), signature: method.signature === undefined ? null : String(method.signature) } : String(method) }),
       classInfo: descriptor => call('code', { op: 'classInfo', descriptor: String(descriptor ?? '') }),
+      decompile: (descriptor, method) => call('code', { op: 'decompile', descriptor: String(descriptor ?? ''), method: method === undefined || method === null ? null : typeof method === 'object' ? { name: String(method.name ?? ''), signature: method.signature === undefined ? null : String(method.signature) } : String(method) }),
       readFile: path => call('code', { op: 'readFile', path: String(path ?? '') }),
       files: () => call('code', { op: 'files' }),
       editFile: (path, content) => call('code', { op: 'editFile', path: String(path ?? ''), ...(content instanceof Uint8Array ? { bytes: content } : content instanceof ArrayBuffer ? { bytes: new Uint8Array(content) } : { text: String(content ?? '') }) }),

@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=d0b27a2b509b">
-  <link rel="stylesheet" href="./lab-tokens.css?v=d0b27a2b509b">
+  <link rel="stylesheet" href="./site-pages.css?v=cbf1579510f6">
+  <link rel="stylesheet" href="./lab-tokens.css?v=cbf1579510f6">
 </head>
 <body>
   <header class="topbar">
@@ -976,10 +976,10 @@
         <p>The running APK's code as the <b>Code</b> tool shows it, and the Java debugger of that tool (docs/DEBUGGER.md). Reads change nothing. An edit is a change chosen by you, as with <code>lab.hook</code>: it shows in <b>App modified</b> with the plugin as its owner, is recorded in the trace and goes when the plugin stops. The debugger session is the page's own: the plugin's breakpoints appear in the Code tool's list with its name, and they go when it stops. The app never sees the debugger (<code>Debug.isDebuggerConnected()</code> stays false).</p>
 
         <div class="api" id="api-code-read">
-          <h4 class="api-sig"><code>await lab.code.search(query, { kinds, limit, framework })</code>, <code>disassemble(descriptor, method?)</code>, <code>classInfo(descriptor)</code>, <code>readFile(path)</code></h4>
-          <p>Search classes, methods, fields, string constants and APK files; a class as exact smali (lines numbered from 1, with each method's <code>pcToLine</code>), or one method's smali; a class's superclass, interfaces, fields and methods; an APK entry as text (compiled XML decoded).</p>
+          <h4 class="api-sig"><code>await lab.code.search(query, { kinds, limit, framework })</code>, <code>disassemble(descriptor, method?)</code>, <code>decompile(descriptor, method?)</code>, <code>classInfo(descriptor)</code>, <code>readFile(path)</code></h4>
+          <p>Search classes, methods, fields, string constants and APK files; a class as exact smali (lines numbered from 1, with each method's <code>pcToLine</code>), or one method's smali; a class as decompiled Java (the Code tool's Java tab; each line that runs code with its method key and dex pcs, so <code>lab.debug.setBreakpoint({ method, pc })</code> stops on that Java line); a class's superclass, interfaces, fields and methods; an APK entry as text (compiled XML decoded).</p>
           <dl class="facts">
-            <div><dt>Returns</dt><dd><code class="shape">{ results: [{ kind, descriptor, name, signature, key, value, path }], more, cursor }</code>; <code class="shape">{ descriptor, text, methods: [{ key, startLine, endLine, hasCode, pcToLine }], method?: { key, text } }</code>; <code class="shape">{ path, kind, text, editable, refusal, edited }</code></dd></div>
+            <div><dt>Returns</dt><dd><code class="shape">{ results: [{ kind, descriptor, name, signature, key, value, path }], more, cursor }</code>; <code class="shape">{ descriptor, text, methods: [{ key, startLine, endLine, hasCode, pcToLine }], method?: { key, text } }</code>; <code class="shape">{ descriptor, text, methods: [{ key, startLine, endLine, fallback, reason }], lines: [[line, methodKey, firstPc, ...pcs]] }</code>; <code class="shape">{ path, kind, text, editable, refusal, edited }</code></dd></div>
             <div><dt>Cost</dt><dd>One call at a time per plugin, the <b>Plugin power</b> pause between two; a search is at most 500 results per call (<code>more</code> and <code>cursor</code> continue).</dd></div>
           </dl>
         </div>
@@ -1152,8 +1152,8 @@ url = "http://127.0.0.1:8790/mcp"</code></pre></div>
         <p>What the MCP client sees. The reads are the same as the plugins'; the actions use the lab's controls.</p>
 
         <div class="api" id="mcp-code">
-          <h4 class="api-sig names"><code>code_search</code><code>code_disassemble</code><code>code_class_info</code><code>code_read_file</code><code>code_edit_file</code><code>code_revert_file</code><code>code_edit_method</code></h4>
-          <p>The Code tool's reads and edits: search, a class as smali (or one method with each instruction's dex pc, the unit of breakpoints and steps), class information, an APK entry as text; an edit of an APK file or of a method body is listed in <b>App modified</b> with MCP as owner.</p>
+          <h4 class="api-sig names"><code>code_search</code><code>code_disassemble</code><code>code_decompile</code><code>code_class_info</code><code>code_read_file</code><code>code_edit_file</code><code>code_revert_file</code><code>code_edit_method</code></h4>
+          <p>The Code tool's reads and edits: search, a class as smali (or one method with each instruction's dex pc, the unit of breakpoints and steps), a class as decompiled Java with the dex pc of each line (<code>code_decompile</code>: a breakpoint on a Java line is that method and pc), class information, an APK entry as text; an edit of an APK file or of a method body is listed in <b>App modified</b> with MCP as owner.</p>
         </div>
 
         <div class="api" id="mcp-debug">
@@ -2008,6 +2008,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=d0b27a2b509b"></script>
+  <script type="module" src="./site-pages.js?v=cbf1579510f6"></script>
 </body>
 </html>

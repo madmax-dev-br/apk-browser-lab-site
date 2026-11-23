@@ -23,16 +23,16 @@
 //             thread is suspended, as nothing else can run.
 //   snapshot  neither: the stop is reported with the thread's frames and values as they were (`held: false`) and the thread goes on; no step can start from it.
 // While every thread is suspended the VM clock stands still (VMClock.debugPause: the host time of the pause is not part of it) and no timer or event of the VM runs.
-import { APKError } from './apk-error.js?v=d0b27a2b509b';
-import { createHeapReader, handleOf, parseHandle, dotted, typeName, primitiveValue, PluginQueryError, classDescriptor, resolveStaticPath, runPluginQuery } from './plugin-queries.js?v=d0b27a2b509b';
-import { debugInfoOf, lineAt, pcsOfLine, isLineStart, localsAt, wordsOf } from './debug-info.js?v=d0b27a2b509b';
-import { Blocked } from './scheduler.js?v=d0b27a2b509b';
-import { debugCatchTarget } from './interpreter.js?v=d0b27a2b509b';
+import { APKError } from './apk-error.js?v=cbf1579510f6';
+import { createHeapReader, handleOf, parseHandle, dotted, typeName, primitiveValue, PluginQueryError, classDescriptor, resolveStaticPath, runPluginQuery } from './plugin-queries.js?v=cbf1579510f6';
+import { debugInfoOf, lineAt, pcsOfLine, isLineStart, localsAt, wordsOf } from './debug-info.js?v=cbf1579510f6';
+import { Blocked } from './scheduler.js?v=cbf1579510f6';
+import { debugCatchTarget } from './interpreter.js?v=cbf1579510f6';
 
 /** The Code browser's read-only operations (src/code-service.js) the `code` command serves while the Worker is held in place. */
-export const CODE_READS = new Set(['search', 'class-tree', 'class-info', 'disassemble', 'java-outline', 'read-file', 'file-edits', 'files']);
-import { WIDE_HIGH } from './apk-runtime.js?v=d0b27a2b509b';
-import { invokeAppMethod } from './app-invoke.js?v=d0b27a2b509b';
+export const CODE_READS = new Set(['search', 'class-tree', 'class-info', 'disassemble', 'java-outline', 'decompile', 'decompile-drop', 'read-file', 'file-edits', 'files']);
+import { WIDE_HIGH } from './apk-runtime.js?v=cbf1579510f6';
+import { invokeAppMethod } from './app-invoke.js?v=cbf1579510f6';
 
 export const DEBUG_OPCODE = 0x73;
 export const DEBUG_LIMITS = Object.freeze({ breakpoints: 500, expression: 2000, log: 4000, frames: 256, events: 64, steps: 2_000_000 });
@@ -543,7 +543,9 @@ export class JavaDebugger {
         if (typeof this.codeService !== 'function') fail('unsupported', 'The Code browser\'s reads are not available in this VM.');
         const op = String(args.op ?? '');
         if (!CODE_READS.has(op)) fail('debugger-paused', `"${op.slice(0, 40)}" changes the app: resume the VM first (only the Code browser's reads are served while it is held).`);
-        return this.codeService(op, args.args ?? {});
+        const value = this.codeService(op, args.args ?? {});
+        if (typeof value?.then === 'function') { value.catch?.(() => {}); fail('unavailable', 'The Java view\'s decompiler is loaded the first time the Java tab is used while the VM runs: resume once (or use the Smali tab) and it is there from then on.'); }
+        return value;
       }
       default: fail('bad-command', `Unknown debugger command: ${String(name).slice(0, 40)}`);
     }
@@ -583,14 +585,23 @@ export class JavaDebugger {
   /**
    * Steps `thread` (default: the stopped one): kind 'into' | 'over' | 'out', unit 'line' (default, by the .line table) or 'instruction'. Every thread runs meanwhile (as a JDWP
    * debugger resumes the VM for a step) and every thread is suspended again where the step ends.
+   * `pcs` (with `method`, the key of the stopped method): a statement of the Code tool's Java view -- the step leaves those pcs of this frame and stops at the first pc of
+   * `stops` (the pcs where a Java line starts; any pc when absent) outside them. Only this step reads them: no cost for any other step or run.
    */
   step(args = {}) {
     const thread = this.threadById(args.thread), stop = this.stops.get(thread);
-    const kind = ['into', 'over', 'out'].includes(args.kind) ? args.kind : 'over', unit = args.unit === 'instruction' ? 'instruction' : 'line';
+    const kind = ['into', 'over', 'out'].includes(args.kind) ? args.kind : 'over';
+    let unit = args.unit === 'instruction' ? 'instruction' : 'line';
     if (!stop && !this.held.has(thread)) fail('not-paused', `${thread.name} is not paused`);
     const frames = this.adapter.frames(thread); if (!frames.length) fail('no-frames', `${thread.name} has no Java frames to step in`);
     const top = frames[0]; if (top.host || top.compiled) fail('no-frames', `${thread.name} is in host code: no Java instruction to step from`);
     const step = { thread, kind, unit, depth: top.depth, frame: top.frame, method: top.key, line: this.frameLocation(top).line, pc: top.pc, started: false, count: 0, exceptions: false };
+    if (Array.isArray(args.pcs) && args.pcs.length && unit !== 'instruction' && (args.method === undefined || args.method === top.key)) {
+      const ints = list => new Set(list.slice(0, 65536).map(Number).filter(pc => Number.isInteger(pc) && pc >= 0));
+      step.pcs = ints(args.pcs); if (!step.pcs.has(top.pc)) step.pcs.add(top.pc);
+      step.stops = Array.isArray(args.stops) && args.stops.length ? ints(args.stops) : null;
+      step.unit = unit = 'statement';
+    }
     this.stepsByThread.set(thread, step); this.stats.steps++;
     this.adapter.beginStep(thread, step, top);
     this.trace('step', `${threadId(thread)} ${kind} ${unit} from ${describeMethod(top.key)}@${top.pc} line ${top.line}`);
@@ -630,7 +641,9 @@ export class JavaDebugger {
     if (step.kind === 'out') return depth < step.depth ? 'stop' : 'go';
     if (depth < step.depth) return 'stop';   // returned (or unwound) into a caller: the step ends there, after the call
     if (depth > step.depth) return step.kind === 'into' ? 'stop' : 'go';   // into: the callee's first instruction; over: inside the call
-    if (step.unit === 'instruction' || where.frame !== step.frame || !where.hasLines) return 'stop';   // another activation at the same depth: the frame returned and the caller called again
+    if (step.unit === 'instruction' || where.frame !== step.frame) return 'stop';   // another activation at the same depth: the frame returned and the caller called again
+    if (step.pcs) return step.pcs.has(where.pc) || (step.stops !== null && !step.stops.has(where.pc)) ? 'go' : 'stop';   // a Java statement of the Code tool's Java view
+    if (!where.hasLines) return 'stop';
     return where.line !== step.line && where.lineStart ? 'stop' : 'go';
   }
   stepReturnHit(thread, reason, where) {

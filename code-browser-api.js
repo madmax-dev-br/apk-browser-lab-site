@@ -10,7 +10,8 @@ export function createCodeBrowserApi(browser) {
   const api = {
     /**
      * Opens a class (descriptor 'Lpkg/Name;' or 'pkg.Name') or an APK entry ('assets/x.txt', 'AndroidManifest.xml'). Options: method ('name(sig)ret', a full key
-     * 'Lpkg/Name;->name(sig)ret', or { name, signature }), pc (with method: the line of that instruction), line (1-based), tab ('smali' | 'java' | 'info').
+     * 'Lpkg/Name;->name(sig)ret', or { name, signature }), pc (with method: the line of that instruction), line (1-based), tab ('smali' | 'java' | 'info'; default: the
+     * tab the user reads classes in -- the Java tab is decompiled on demand).
      * Resolves the selection after opening.
      */
     async open(target, { method = null, pc = null, line = null, tab = null } = {}) {
@@ -39,13 +40,21 @@ export function createCodeBrowserApi(browser) {
     currentSelection() { return browser.selection(); },
     /** The open document: { kind, descriptor, path, tab, lineCount, methods: [{ key, name, signature, startLine, endLine, hasCode, modified, pcToLine: [[pc, line]] }] } or null. */
     document() { return browser.document(); },
-    /** The 1-based line of instruction `pc` of method `key` in the open class's smali, or null. */
-    lineForPc(key, pc) { const m = browser.document()?.methods.find(x => x.key === key); return m?.pcToLine.find(([p]) => p === Number(pc))?.[1] ?? null; },
-    /** { key, pc } of the instruction on 1-based `line` of the open class's smali, or null for a line that is no instruction. */
+    /** The 1-based line of instruction `pc` of method `key` in the open class's tab (smali, or the Java line that runs it), or null. */
+    lineForPc(key, pc) { return browser.lineForPc(key, pc); },
+    /** { key, pc } of the instruction on 1-based `line` of the open class (smali: that instruction; Java: the first instruction of that line), or null for a line that runs no code. */
     pcForLine(line) {
-      for (const m of browser.document()?.methods ?? []) { if (line < m.startLine || line > m.endLine) continue; const hit = m.pcToLine.find(([, l]) => l === Number(line)); return hit ? { key: m.key, pc: hit[0] } : null; }
+      const doc = browser.document(); if (!doc) return null;
+      if (doc.tab === 'java') { const at = browser.locationAt(Number(line)); return at ? { key: at.key, pc: at.pc } : null; }
+      for (const m of doc.methods ?? []) { if (line < m.startLine || line > m.endLine) continue; const hit = m.pcToLine.find(([, l]) => l === Number(line)); return hit ? { key: m.key, pc: hit[0] } : null; }
       return null;
     },
+    /** { key, pc, line } where a breakpoint on 1-based `line` goes (a smali line without an instruction: the next instruction of its method), or null. */
+    locationAt(line) { return browser.locationAt(Number(line)); },
+    /** The Java statement of `pc` in method `key` when the Java tab of its class is on screen: { line, pcs, stops } (what a step by Java statement leaves and stops at), else null. */
+    javaStatement(key, pc) { return browser.javaStatement(key, pc); },
+    /** Prepares the Java view for a debugger session (loads the decompiler in the Worker when the user reads Java). */
+    prepareJava() { return browser.prepareJava(); },
     /** The text of 1-based `line` of the open document. */
     lineText(line) { return browser.lineText(Number(line)); },
   };

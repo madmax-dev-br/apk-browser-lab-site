@@ -1,4 +1,4 @@
-// The Worker side of the Code browser (docs/CODE-BROWSER.md): search, class tree, class information, smali, Java outline and APK files of the running VM, and the user's
+// The Worker side of the Code browser (docs/CODE-BROWSER.md): search, class tree, class information, smali, decompiled Java, the Java outline and APK files of the running VM, and the user's
 // edits of APK files. The page asks through the Worker's "code-service" message (src/apk-worker.js, client src/apk-worker-client.js codeService).
 //
 //   - search(query, { kinds, limit, cursor, framework }): classes by name, methods and fields by name or signature (the ones a class of the DEX defines), string constants at
@@ -6,6 +6,11 @@
 //     works for at most SLICE_MS and answers what it found with a cursor to go on: a large APK (or the framework) is searched in steps, never in one long task;
 //   - classTree(pkg): the packages and classes under a package (the app's DEX files, splits and code loaded at run time; the framework's under its own root);
 //   - classInfo / disassemble / javaOutline: read from the DEX bytes by src/smali-disassembler.js and src/java-outline.js (no class record of the VM is built);
+//   - decompile(descriptor): the class as Java (src/java-decompiler.js), with each line's dex pcs. Only on demand (the Java tab shows the class, a plugin or MCP asks):
+//     the decompiler module is imported on the first request, a class is decompiled in steps of at most `sliceMs` (each call does one step and answers
+//     { done: false, progress } until the text is ready; the caller asks again, or stops asking when the user leaves the class), and the results are kept for the
+//     last CODE_LIMITS.decompileCache classes of this VM only (a new APK is a new VM: nothing kept; 'decompile-drop' forgets them, as the page does when the Code tab closes
+//     with no debugger attached);
 //   - readFile(path): text (UTF-8), binary XML decoded to XML, resources.arsc summarized, a .dex as its class list, an image's bytes, or a hex dump;
 //   - checkSmali(method, text): what lab.hook({ smali }) would say of a method body, with line and column (the edit itself goes through src/method-hooks.js from the page);
 //   - editFile / revertFile / fileEdits: a user change to an APK entry, kept on the installed copy of this VM: the app reads the edited bytes the next time it reads the
@@ -13,17 +18,24 @@
 //     a cached string) keeps what was read before; the page re-applies the edits when the APK is opened again (Reopen), before the app's code runs. Every edit is listed on
 //     the page as "App modified", recorded in the trace (EDIT FILE / UNEDIT FILE) and in the diagnostics summary (src/report-summary.js entryEditLines), and removable.
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { APKError } from './apk-error.js?v=d0b27a2b509b';
-import { DexFile } from './apk-runtime.js?v=d0b27a2b509b';
-import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=d0b27a2b509b';
-import { javaOutline } from './java-outline.js?v=d0b27a2b509b';
-import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=d0b27a2b509b';
+import { APKError } from './apk-error.js?v=cbf1579510f6';
+import { DexFile } from './apk-runtime.js?v=cbf1579510f6';
+import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=cbf1579510f6';
+import { javaOutline } from './java-outline.js?v=cbf1579510f6';
+import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=cbf1579510f6';
 
-export const CODE_LIMITS = Object.freeze({ sliceMs: 30, results: 200, textBytes: 4 * 1024 * 1024, hexBytes: 64 * 1024, editBytes: 8 * 1024 * 1024, edits: 200, queryChars: 200, dexListClasses: 200000 });
+export const CODE_LIMITS = Object.freeze({ decompileCache: 4, decompileLines: 400000, sliceMs: 30, results: 200, textBytes: 4 * 1024 * 1024, hexBytes: 64 * 1024, editBytes: 8 * 1024 * 1024, edits: 200, queryChars: 200, dexListClasses: 200000 });
 const KINDS = ['class', 'method', 'field', 'string', 'file'];
 const now = () => globalThis.performance?.now?.() ?? Date.now();
 const dotted = descriptor => descriptor.startsWith('L') && descriptor.endsWith(';') ? descriptor.slice(1, -1).replaceAll('/', '.') : descriptor;
 const fail = (code, message) => Object.assign(new APKError(message), { code });
+
+// ---- the decompiler: imported on its first use only ------------------------------------------------------------------------------------------------------------------
+let decompilerModule = null, decompilerLoading = null;
+/** Imports src/java-decompiler.js (once). */
+export function loadDecompiler() { if (decompilerModule) return Promise.resolve(decompilerModule); decompilerLoading ??= import('./java-decompiler.js?v=cbf1579510f6').then(m => (decompilerModule = m)); return decompilerLoading; }
+/** True once the decompiler module was imported (tests check that nothing imports it before the Java view asks). */
+export const decompilerLoaded = () => decompilerModule !== null;
 
 // ---- the DEX files of the VM ------------------------------------------------------------------------------------------------------------------------------------------
 /** [{ dex, filename, framework, dynamic }]: the app's DEX files (base and splits) first, then the code loaded at run time, then the framework's. */
@@ -66,13 +78,15 @@ function classMethods(dex, i) {
 export function codeService(rt) {
   if (!rt) throw fail('no-apk', 'No APK is running.');
   if (rt.codeService) return rt.codeService;
-  const S = { search: null, tree: null, entryAliases: null };
+  const S = { search: null, tree: null, entryAliases: null, decompiled: new Map() };
   const service = {
     search: (query, options) => search(rt, S, query, options),
     classTree: (pkg, options) => classTree(rt, S, pkg, options),
     classInfo: descriptor => classInfo(rt, descriptor),
     disassemble: (descriptor, options) => disassemble(rt, descriptor, options),
     javaOutline: descriptor => outline(rt, descriptor),
+    decompile: (descriptor, options) => decompile(rt, S, descriptor, options),
+    dropDecompiled: () => { const n = S.decompiled.size; S.decompiled.clear(); return { dropped: n }; },
     readFile: (path, options) => readFile(rt, path, options),
     checkSmali: (method, text) => checkSmali(rt, method, text),
     editFile: (path, text, options) => editFile(rt, path, text, options),
@@ -84,8 +98,9 @@ export function codeService(rt) {
   return service;
 }
 
-/** One operation of the Worker's "code-service" message (src/apk-worker.js): op 'search' | 'class-tree' | 'class-info' | 'disassemble' | 'java-outline' | 'read-file' |
- *  'check-smali' | 'edit-file' | 'revert-file' | 'file-edits' | 'files' with its `args`; returns the operation's value or throws (with `code`). */
+/** One operation of the Worker's "code-service" message (src/apk-worker.js): op 'search' | 'class-tree' | 'class-info' | 'disassemble' | 'java-outline' | 'decompile' |
+ *  'decompile-drop' | 'decompile-load' | 'read-file' | 'check-smali' | 'edit-file' | 'revert-file' | 'file-edits' | 'files' with its `args`; returns the operation's value
+ *  or throws (with `code`). 'decompile' and 'decompile-load' return a promise the first time (the decompiler module is imported then); every other call is synchronous. */
 export function runCodeService(rt, op, args) {
   const svc = codeService(rt), a = args && typeof args === 'object' ? args : {};
   switch (op) {
@@ -94,6 +109,9 @@ export function runCodeService(rt, op, args) {
     case 'class-info': return svc.classInfo(a.descriptor);
     case 'disassemble': return svc.disassemble(a.descriptor, a);
     case 'java-outline': return svc.javaOutline(a.descriptor);
+    case 'decompile': return decompilerModule ? svc.decompile(a.descriptor, a) : loadDecompiler().then(() => svc.decompile(a.descriptor, a));
+    case 'decompile-load': return decompilerModule ? { loaded: true } : loadDecompiler().then(() => ({ loaded: true }));
+    case 'decompile-drop': return svc.dropDecompiled();
     case 'read-file': return svc.readFile(a.path, a);
     case 'check-smali': return svc.checkSmali(a.method, a.smali);
     case 'edit-file': return svc.editFile(a.path, a.text, { by: a.by ?? 'Code browser', bytes: a.bytes instanceof Uint8Array ? a.bytes : null });
@@ -307,6 +325,38 @@ function disassemble(rt, descriptor, { method = null } = {}) {
     result.method = { index, key: methods[index].key, text: smaliOfMethod(model.dex, model.type, record).text };
   }
   return result;
+}
+/**
+ * One step of the Java view of a class: { done: false, descriptor, progress: { done, total } } while it is being decompiled (call again), then { done: true, descriptor, name,
+ * file, framework, text, lineCount, pcsOfLine (per line: null or [methodKey, firstPc, ...pcs]), lineOfPc ({ methodKey: { pc: line } }), methodOfLine, methods: [{ key, name,
+ * signature, startLine, endLine, ok, fallback, reason, modified }], stats } (lines 0-based). Synchronous: the module is loaded (runCodeService loads it first).
+ */
+function decompile(rt, S, descriptor, { sliceMs = CODE_LIMITS.sliceMs } = {}) {
+  const { createDecompileJob } = decompilerModule;
+  const type = String(descriptor ?? ''), hooks = hookedKeys(rt), modified = new Set([...hooks.keys()].filter(key => key.startsWith(`${type}->`)));
+  const stamp = [...modified].sort().join('|');
+  let entry = S.decompiled.get(type);
+  if (entry && entry.stamp !== stamp) { S.decompiled.delete(type); entry = null; }
+  if (!entry) {
+    const { file, model } = modelOf(rt, type);
+    entry = { stamp, file, model, job: createDecompileJob(model, { modified }), result: null };
+  }
+  S.decompiled.delete(type); S.decompiled.set(type, entry);   // most recent last
+  if (!entry.result) {
+    entry.job.step(Math.max(1, Math.min(200, Number(sliceMs) || CODE_LIMITS.sliceMs)));
+    if (!entry.job.done) { trimDecompiled(S); return { done: false, descriptor: entry.model.type, progress: entry.job.progress }; }
+    const out = entry.job.result();
+    entry.result = { done: true, descriptor: entry.model.type, name: dotted(entry.model.type), file: entry.file.filename, framework: entry.file.framework, text: out.text, lineCount: out.lineCount,
+      pcsOfLine: out.pcsOfLine, lineOfPc: out.lineOfPc, methodOfLine: out.methodOfLine, typeRefs: out.typeRefs, methods: out.methods.map(m => ({ ...m, modified: hooks.get(m.key)?.kind ?? null })), stats: out.stats };
+    entry.lines = out.lineCount; entry.job = null; entry.model = null;
+  }
+  trimDecompiled(S);
+  return entry.result;
+}
+/** The decompiled classes kept: the last CODE_LIMITS.decompileCache, and fewer when they are big. */
+function trimDecompiled(S) {
+  let lines = 0; for (const e of S.decompiled.values()) lines += e.lines ?? 0;
+  while (S.decompiled.size > CODE_LIMITS.decompileCache || (S.decompiled.size > 1 && lines > CODE_LIMITS.decompileLines)) { const [first, e] = S.decompiled.entries().next().value; lines -= e.lines ?? 0; S.decompiled.delete(first); }
 }
 function outline(rt, descriptor) {
   const { file, model } = modelOf(rt, descriptor), out = javaOutline(model);

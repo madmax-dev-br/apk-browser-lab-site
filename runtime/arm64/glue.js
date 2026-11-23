@@ -1,17 +1,17 @@
 // System.loadLibrary / System.load for the app's own arm64-v8a libraries (docs/ARM64-NATIVE.md): when the ARM64 interpreter option is on and the APK (with its
 // splits) has lib/arm64-v8a/<name>, the library is loaded into the app's ARM64 native process (src/arm64/process.js), its JNI_OnLoad runs, and its native methods
 // bind through the JNI bridge (src/jni-host.js) like the lab's WebAssembly libraries. A library the APK does not have keeps the genuine UnsatisfiedLinkError.
-import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=d0b27a2b509b';
-import { Arm64Process } from './process.js?v=d0b27a2b509b';
-import { tierSupported } from './translate.js?v=d0b27a2b509b';
-import { createLibc } from './libc.js?v=d0b27a2b509b';
-import { attachArm64Jni } from './jni.js?v=d0b27a2b509b';
-import { ArtView } from './art-runtime.js?v=d0b27a2b509b';
-import { registerNativeHeap, ARM64_WINDOW, ARM64_WINDOW_LIMIT } from '../unsafe-native.js?v=d0b27a2b509b';
-import { installDirectBuffers } from '../direct-buffers.js?v=d0b27a2b509b';
-import { APP_PID } from '../virtual-pids.js?v=d0b27a2b509b';
-import { deviceProperty, devicePropertyNames } from '../device-identity.js?v=d0b27a2b509b';
-import { BUCKET, inBucket } from '../time-breakdown.js?v=d0b27a2b509b';
+import { JniBridge, NativeLibraryProvider } from '../jni-host.js?v=cbf1579510f6';
+import { Arm64Process } from './process.js?v=cbf1579510f6';
+import { tierSupported } from './translate.js?v=cbf1579510f6';
+import { createLibc } from './libc.js?v=cbf1579510f6';
+import { attachArm64Jni } from './jni.js?v=cbf1579510f6';
+import { ArtView } from './art-runtime.js?v=cbf1579510f6';
+import { registerNativeHeap, ARM64_WINDOW, ARM64_WINDOW_LIMIT } from '../unsafe-native.js?v=cbf1579510f6';
+import { installDirectBuffers } from '../direct-buffers.js?v=cbf1579510f6';
+import { APP_PID } from '../virtual-pids.js?v=cbf1579510f6';
+import { deviceProperty, devicePropertyNames } from '../device-identity.js?v=cbf1579510f6';
+import { BUCKET, inBucket } from '../time-breakdown.js?v=cbf1579510f6';
 
 const VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 export const ARM64_LIB_DIR = 'lib/arm64-v8a/';

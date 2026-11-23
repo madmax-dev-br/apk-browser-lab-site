@@ -16,11 +16,11 @@ export const BREAKPOINT_STORE_KEY = 'apkweb.debugger.breakpoints.v1';   // = src
 /** The page modules this loader keeps out of the page's start (tests/code-tool-lazy.test.mjs). */
 export const LAZY_CODE_MODULES = Object.freeze(['code-browser.js', 'code-browser-api.js', 'debugger-ui.js', 'debugger-controller.js', 'debugger-plugin-actions.js', 'smali-tools.js']);
 const DEFAULT_IMPORTS = {
-  browser: () => import('./code-browser.js?v=d0b27a2b509b'),
-  api: () => import('./code-browser-api.js?v=d0b27a2b509b'),
-  ui: () => import('./debugger-ui.js?v=d0b27a2b509b'),
-  controller: () => import('./debugger-controller.js?v=d0b27a2b509b'),
-  actions: () => import('./debugger-plugin-actions.js?v=d0b27a2b509b'),
+  browser: () => import('./code-browser.js?v=cbf1579510f6'),
+  api: () => import('./code-browser-api.js?v=cbf1579510f6'),
+  ui: () => import('./debugger-ui.js?v=cbf1579510f6'),
+  controller: () => import('./debugger-controller.js?v=cbf1579510f6'),
+  actions: () => import('./debugger-plugin-actions.js?v=cbf1579510f6'),
 };
 function defaultStorage() { try { return globalThis.localStorage ?? null; } catch { return null; } }
 
@@ -75,7 +75,7 @@ export function createCodeTool({ root, vm, hooks = null, trace = () => {}, getIn
       const [browserModule, apiModule, uiModule, controller] = await Promise.all([imports.browser(), imports.api(), imports.ui(), ensureController()]);
       if (L.browser) return L.api;
       L.loads.push('browser');
-      const browser = browserModule.createCodeBrowser({ root, vm, hooks, trace, getPackage, win, doc });
+      const browser = browserModule.createCodeBrowser({ root, vm, hooks, trace, getPackage, debugging: () => !!L.controller?.attached, storage, win, doc });
       const api = apiModule.createCodeBrowserApi(browser);
       for (const fn of pendingGutter) api.onGutterClick(fn);
       for (const fn of pendingOpen) api.onOpen(fn);
@@ -154,7 +154,7 @@ export function createCodeTool({ root, vm, hooks = null, trace = () => {}, getIn
     handleEvent: event => L.controller?.handleEvent(event),
     vmAttached: pkg => ensureController().then(controller => controller.vmAttached(pkg)),
     vmEnded: () => L.controller?.vmEnded(),
-    code: Object.freeze(Object.fromEntries(['search', 'disassemble', 'classInfo', 'readFile', 'files', 'editFile', 'revertFile', 'editMethod'].map(name => [name, async (...args) => (await ensureController()).code[name](...args)]))),
+    code: Object.freeze(Object.fromEntries(['search', 'disassemble', 'decompile', 'classInfo', 'readFile', 'files', 'editFile', 'revertFile', 'editMethod'].map(name => [name, async (...args) => (await ensureController()).code[name](...args)]))),
     get attached() { return L.controller?.attached ?? false; },
     get paused() { return L.controller?.paused ?? null; },
     get crossOriginIsolated() { return L.controller?.crossOriginIsolated ?? false; },
@@ -176,6 +176,8 @@ export function createCodeTool({ root, vm, hooks = null, trace = () => {}, getIn
     document: () => L.api ? L.api.document() : null,
     lineForPc: (key, pc) => L.api ? L.api.lineForPc(key, pc) : null,
     pcForLine: line => L.api ? L.api.pcForLine(line) : null,
+    locationAt: line => L.api ? L.api.locationAt(line) : null,
+    javaStatement: (key, pc) => L.api ? L.api.javaStatement(key, pc) : null,
     lineText: line => L.api ? L.api.lineText(line) : null,
     get loaded() { return !!L.api; },
     /** Loads the browser now (resolves the API). */

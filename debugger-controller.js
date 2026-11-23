@@ -11,9 +11,9 @@
 // DOM-free; no process.*.
 
 export const DEBUG_STORE_KEY = 'apkweb.debugger.breakpoints.v1';
-export const DEBUG_CONTROLLER_LIMITS = Object.freeze({ breakpointsPerOwner: 200, logs: 200, searchResults: 1000, searchSteps: 40, storedPackages: 50 });
+export const DEBUG_CONTROLLER_LIMITS = Object.freeze({ breakpointsPerOwner: 200, logs: 200, searchResults: 1000, searchSteps: 40, storedPackages: 50, decompileMs: 60000 });
 const fail = (code, message) => Object.assign(new Error(message), { code });
-const READ_OPS = new Set(['search', 'class-tree', 'class-info', 'disassemble', 'java-outline', 'read-file', 'files', 'file-edits']);
+const READ_OPS = new Set(['search', 'class-tree', 'class-info', 'disassemble', 'java-outline', 'decompile', 'read-file', 'files', 'file-edits']);
 /** A descriptor from 'Lpkg/Name;', 'pkg.Name' or 'pkg/Name'. */
 export const toDescriptor = name => { const text = String(name ?? '').trim(); return text.startsWith('L') && text.endsWith(';') ? text : `L${text.replaceAll('.', '/')};`; };
 /** The method key 'Lpkg/C;->name(sig)ret' from a descriptor and 'name(sig)ret' (or a key already). */
@@ -250,6 +250,28 @@ export function createDebuggerController({ vm, hooks = null, getPackage = () => 
       return plainDisassembly(out);
     },
     classInfo: descriptor => codeRead('class-info', { descriptor: toDescriptor(descriptor) }),
+    /**
+     * A class as Java (src/java-decompiler.js), lines 1-based: { descriptor, name, file, framework, lineCount, text, methods: [{ key, name, signature, startLine, endLine, ok,
+     * fallback, reason, modified }], lines: [[line, methodKey, firstPc, ...pcs]] (the lines that run code), stats }; with `method` ('name(sig)ret', a key or { name,
+     * signature }), also { method: { key, startLine, endLine } }. Decompiled in the Worker in steps (the VM runs between them), on demand only.
+     */
+    async decompile(descriptor, method = null) {
+      const started = Date.now(); let out;
+      do {
+        out = await codeRead('decompile', { descriptor: toDescriptor(descriptor) });
+        if (!out.done && Date.now() - started > DEBUG_CONTROLLER_LIMITS.decompileMs) throw fail('timeout', `Decompiling ${descriptor} takes longer than ${DEBUG_CONTROLLER_LIMITS.decompileMs / 1000} s`);
+      } while (!out.done);
+      const lines = []; out.pcsOfLine.forEach((map, i) => { if (map) lines.push([i + 1, ...map]); });
+      const result = { descriptor: out.descriptor, name: out.name, file: out.file, framework: out.framework, lineCount: out.lineCount, text: out.text, stats: out.stats,
+        methods: out.methods.map(m => ({ key: m.key, name: m.name, signature: m.signature, startLine: m.startLine + 1, endLine: m.endLine + 1, hasCode: m.hasCode, ok: m.ok, fallback: m.fallback, reason: m.reason, modified: m.modified })), lines };
+      if (method !== null && method !== undefined) {
+        const spec = typeof method === 'object' ? method : (() => { const body = String(method).includes('->') ? String(method).slice(String(method).indexOf('->') + 2) : String(method), open = body.indexOf('('); return open < 0 ? { name: body, signature: null } : { name: body.slice(0, open), signature: body.slice(open) }; })();
+        const m = result.methods.find(x => x.name === spec.name && (!spec.signature || x.signature === spec.signature || x.signature.startsWith(spec.signature)));
+        if (!m) throw fail('no-method', `Method not found: ${out.name}.${spec.name}${spec.signature ?? ''}`);
+        result.method = { key: m.key, startLine: m.startLine, endLine: m.endLine };
+      }
+      return result;
+    },
     async readFile(path) { const out = await codeRead('read-file', { path: String(path ?? '') }); return out; },
     files: () => codeRead('files', {}),
     /** Replaces an APK entry's bytes (text, or a Uint8Array) for the app's next read; listed as App modified with its owner. */

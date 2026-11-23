@@ -1,9 +1,9 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=d0b27a2b509b';
-import { APKError } from './apk-runtime.js?v=d0b27a2b509b';
-import { ephemeronMap } from './heap-gc.js?v=d0b27a2b509b';
-import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=d0b27a2b509b';
-import { sniffMime } from './bitmap-codec-host.js?v=d0b27a2b509b';
-import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=d0b27a2b509b';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=cbf1579510f6';
+import { APKError } from './apk-runtime.js?v=cbf1579510f6';
+import { ephemeronMap } from './heap-gc.js?v=cbf1579510f6';
+import { hasNinePatchChunk } from './ninepatch-drawable-host.js?v=cbf1579510f6';
+import { sniffMime } from './bitmap-codec-host.js?v=cbf1579510f6';
+import { XML_ATTRIBUTE_GETTERS, XML_ATTRIBUTE_ENUMS } from './xml-attribute-readers.js?v=cbf1579510f6';
 const RESOURCES = 'Landroid/content/res/Resources;', THEME = 'Landroid/content/res/Resources$Theme;', TYPED_ARRAY = 'Landroid/content/res/TypedArray;', ASSETS = 'Landroid/content/res/AssetManager;', XML = 'Landroid/content/res/XmlBlock$Parser;';
 const VALUE = 'Landroid/util/TypedValue;';
 const NO_DRAWABLE = Symbol('no drawable');   // loadFileDrawable: a file that is neither XML nor an image (Resources.getDrawable answers null)

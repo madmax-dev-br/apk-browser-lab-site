@@ -6,11 +6,11 @@
 // Responsiveness (a large pasted body froze the page, 2026-11-21): the body editor (src/code-editor.js) checks JSON in slices after a pause in typing and keeps a text of
 // many megabytes out of the textarea; the dialog's own validation never encodes or parses the body (validateMock checkBody false); the list caches each mock's validation
 // (a snapshot arrives many times a second); storage is written after a pause, and a large body only when it changed.
-import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=d0b27a2b509b';
-import { createCodeEditor, formatBytes } from './code-editor.js?v=d0b27a2b509b';
-import { createBodyStore, splitForStorage } from './mock-body-store.js?v=d0b27a2b509b';
-import { listRow, detailList } from './list-rows.js?v=d0b27a2b509b';
-import { checkJson } from './json-tools.js?v=d0b27a2b509b';
+import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=cbf1579510f6';
+import { createCodeEditor, formatBytes } from './code-editor.js?v=cbf1579510f6';
+import { createBodyStore, splitForStorage } from './mock-body-store.js?v=cbf1579510f6';
+import { listRow, detailList } from './list-rows.js?v=cbf1579510f6';
+import { checkJson } from './json-tools.js?v=cbf1579510f6';
 
 const FIELD_ERROR = { method: 'em-err-method', url: 'em-err-url', query: 'em-err-query', status: 'em-err-status', reason: 'em-err-status', headers: 'em-err-headers', body: 'em-err-body', delayMs: 'em-err-delay' };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';

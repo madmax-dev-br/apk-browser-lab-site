@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=d0b27a2b509b';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=d0b27a2b509b';
-import { colorLongToArgb } from './color-long.js?v=d0b27a2b509b';
+import { APKError } from './apk-error.js?v=cbf1579510f6';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=cbf1579510f6';
+import { colorLongToArgb } from './color-long.js?v=cbf1579510f6';
 
 const PAINT = 'Landroid/graphics/Paint;';
 const METRICS = 'Landroid/graphics/Paint$FontMetrics;', METRICS_INT = 'Landroid/graphics/Paint$FontMetricsInt;';
