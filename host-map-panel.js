@@ -2,8 +2,8 @@
 // the other device settings (the running VM gets them at once; the app keeps its URLs, only the exchange goes elsewhere). One line per rule like the Plugins and Endpoint mocks
 // rows (src/list-rows.js): switch, "source → target", the live count of the requests it redirected (from every snapshot, snapshot.hostMap), and a menu; the two fields and the
 // rule's effective URL shape show when the row is expanded (a new rule opens expanded).
-import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=266d8da382fc';
-import { listRow } from './list-rows.js?v=266d8da382fc';
+import { parseRule, describeRule, ruleKey, hitText } from './host-map.js?v=728b804e603a';
+import { listRow } from './list-rows.js?v=728b804e603a';
 
 export function createHostMapPanel({ $, get, set }) {
   const list = () => $('hm-list');

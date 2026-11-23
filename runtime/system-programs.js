@@ -1,6 +1,6 @@
 // The system programs of /system/bin (vendor/system-programs, scripts/build-system-programs.sh): toybox, mksh (/system/bin/sh) and toolbox, compiled from AOSP's own
 // android-13.0.0_r1 sources to WebAssembly, checked against their pinned SHA-256 and compiled once. The process kernel (src/process-kernel.js) instantiates them.
-import { APKError } from './apk-error.js?v=266d8da382fc';
+import { APKError } from './apk-error.js?v=728b804e603a';
 
 const decoder = new TextDecoder();
 const fail = (message, kind = 'system-programs') => { throw new APKError(message, { kind }); };

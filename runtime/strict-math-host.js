@@ -1,4 +1,4 @@
-import { createHostRegistry, parseSignature } from './host-contract.js?v=266d8da382fc';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=728b804e603a';
 
 // java.lang.StrictMath: every method is java.lang.Math's, same name and signature. On ART Math is the intrinsic / fdlibm implementation StrictMath names (libcore's Math.java calls
 // StrictMath for the transcendental functions), so delegating gives the platform's results; anything Math itself does not provide fails by Math's name.

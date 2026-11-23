@@ -1033,7 +1033,7 @@ code.lr-text{padding:0;background:none;color:var(--ink);font:400 12px/18px var(-
 /* ---- The Code browser (src/code-browser.js, a tool of the dock): a list on the left (search results, the class tree, the APK's files), the reader on the right. The reader's
    gutter is the one strong element: line number and the dex pc of the instruction on that line (hex), side by side in the code face, with a marker slot the debugger uses
    (src/code-browser-api.js setMarkers). Lines of a method the user replaced carry an amber rule (amber = a change chosen by the user, as "App modified"). */
-.code-browser .cb-body{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);border-top:1px solid var(--line);background:var(--surface);height:420px}
+.code-browser .cb-body{position:relative;flex:1 1 auto;min-height:0;display:grid;grid-template-columns:var(--cb-left,minmax(220px,300px)) minmax(0,1fr);border-top:1px solid var(--line);background:var(--surface);height:420px}
 .tool-dock-slot>.code-browser[open]>.cb-body{height:auto}
 .cb-side{display:flex;flex-direction:column;min-height:0;border-right:1px solid var(--line);background:var(--surface-2)}
 .cb-search{display:flex;align-items:center;gap:8px;padding:8px}
@@ -1156,7 +1156,12 @@ code.lr-text{padding:0;background:none;color:var(--ink);font:400 12px/18px var(-
 }
 /* ---- The debugger (src/debugger-ui.js): a column of the Code tool beside the reader. Quiet, dense rows in the code face for names and values; the paused state is the one
    strong signal (amber, the lab's colour for "the app is not running as it would by itself"), on the reader's current line, the column's edge, the device and the status bar. */
-.code-browser .cb-body.has-debugger{grid-template-columns:minmax(200px,260px) minmax(0,1fr) minmax(260px,330px)}
+.code-browser .cb-body.has-debugger{grid-template-columns:var(--cb-left,minmax(200px,260px)) minmax(0,1fr) var(--cb-right,minmax(260px,330px))}
+.cb-splitter{position:absolute;top:0;bottom:0;width:8px;z-index:3;cursor:col-resize;touch-action:none;background:transparent}
+.cb-splitter::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:2px;background:transparent;transition:background .12s}
+.cb-splitter:hover::after,.cb-splitter.is-dragging::after,.cb-splitter:focus-visible::after{background:var(--accent)}
+.cb-splitter:focus-visible{outline:none}
+body.cb-resizing{cursor:col-resize;user-select:none}
 .dbg{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--line);background:var(--surface-2);font:400 12px/18px var(--sans);color:var(--soft)}
 .dbg[data-state=paused]{box-shadow:inset 3px 0 0 var(--amber)}
 .dbg-toolbar{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:2px;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--surface-2)}

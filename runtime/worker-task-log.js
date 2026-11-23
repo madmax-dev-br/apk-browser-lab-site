@@ -7,7 +7,7 @@
 // DOM-free, no process.*.
 
 export const TASK_LOG_CAPACITY = 4096;   // about 20 s of a busy screen (a pump, a snapshot and an input reply per frame); pumps that found nothing to run are not kept
-import { BUCKET, BUCKET_COUNT as BUCKETS } from './time-breakdown.js?v=266d8da382fc';
+import { BUCKET, BUCKET_COUNT as BUCKETS } from './time-breakdown.js?v=728b804e603a';
 
 /** The cumulative bucket times of a runtime (the per-operation breakdown plus what earlier resets moved to the lifetime totals, derived buckets settled), into `out`. */
 function bucketTotals(runtime, out) {

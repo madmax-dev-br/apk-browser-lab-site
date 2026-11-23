@@ -6,9 +6,10 @@
 // Responsiveness: every list and the viewer are virtualized (only the rows in view are in the DOM, painted per frame); the search runs in the Worker in steps of about
 // 30 ms with a cursor; the page never loops over a whole class or result set on an event. DOM only through `root` (index.html #code-browser) and its document.
 // The debugger UI and the plugin / MCP APIs build on src/code-browser-api.js (open, reveal, gutter clicks, markers, selection), not on this module's internals.
-import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=266d8da382fc';
-import { createCodeEditor } from './code-editor.js?v=266d8da382fc';
-import { CODE_BROWSER } from './method-hooks-panel.js?v=266d8da382fc';
+import { tokenizeSmaliLine, smaliReferences, lineDiff } from './smali-tools.js?v=728b804e603a';
+import { createCodeEditor } from './code-editor.js?v=728b804e603a';
+import { CODE_BROWSER } from './method-hooks-panel.js?v=728b804e603a';
+import { createCodePanes } from './code-panes.js?v=728b804e603a';
 
 const LINE_H = 18, ROW_H = 24, OVERSCAN = 12, MAX_RESULTS = 3000, AUTO_RESULTS = 400, CHECK_MS = 500;
 const KIND_LABEL = { class: 'Classes', method: 'Methods', field: 'Fields', string: 'Strings', file: 'Files' };
@@ -96,6 +97,7 @@ export function createCodeBrowser({ root, vm, hooks, trace = () => {}, getPackag
   const main = h('div', { class: 'cb-main' }, head, findBar, h('div', { class: 'cb-stage' }, view, info, image, empty, editPane));
   const body = root.querySelector('.cb-body') ?? root.appendChild(h('div', { class: 'cb-body' }));
   body.replaceChildren(side, main);
+  const panes = createCodePanes({ body, side, doc, win });   // drag handles between the list, the code and the debugger column (src/code-panes.js)
   const byId = id => doc.getElementById(id);
   const editor = createCodeEditor({ $: byId, id: 'cb-editor', language: 'smali', label: 'smali', tokenizers: { smali: tokenizeSmaliLine }, onChange: () => { scheduleCheck(); }, onStatus: () => {} });
 
