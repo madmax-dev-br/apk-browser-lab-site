@@ -39,7 +39,7 @@
 // Layout of one image (a directory named by the fingerprint): one file per DEX file (named as the entry), `other` (the other entries, each 8-aligned), and `header.json`
 // ("<checksum>\n<json>": format, lab revision, APK size, its splits' names and sizes, fingerprint and source hash, per file its size and checksum, per entry its name, file,
 // offset, size, compressed size, CRC-32). Storage goes through a backend (opfsImageBackend in the browser Worker, memoryImageBackend in tests): list, read, writer, remove, estimate.
-import { crc32, ContentSum, contentSum } from './zip-entry.js?v=728b804e603a';
+import { crc32, ContentSum, contentSum } from './zip-entry.js?v=d0b27a2b509b';
 export { ContentSum, contentSum };
 
 export const IMAGE_FORMAT = 3;   // 3: the header records the splits installed with the base (2 had the base APK alone)

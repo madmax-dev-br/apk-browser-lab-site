@@ -1,9 +1,10 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { MAX_ENTRIES } from './netlog.js?v=728b804e603a';
-import { createReadingHold } from './reading-hold.js?v=728b804e603a';
-import { sanitizeHosts } from './device-settings.js?v=728b804e603a';
+import { renderRequestDetails } from './netlog-details.js?v=d0b27a2b509b';
+import { MAX_ENTRIES } from './netlog.js?v=d0b27a2b509b';
+import { createReadingHold } from './reading-hold.js?v=d0b27a2b509b';
+import { sanitizeHosts } from './device-settings.js?v=d0b27a2b509b';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
@@ -171,7 +172,7 @@ function download(name, text, type) {
 }
 
 /** root: the <details id="netlog"> element (see index.html). allowHost(host) puts the host in the Dispositivo field. Returns { push(message), reset(), store }. */
-export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download, createMock = null, redirectHost = null } = {}) {
+export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download, createMock = null, redirectHost = null, openModal = null } = {}) {
   const q = selector => root.querySelector(selector), out = q('.netlog-rows'), count = q('.netlog-count'), filterInput = q('.netlog-filter'), categorySelect = q('.netlog-category'), scopeSelect = q('.netlog-scope'), formatSelect = q('.netlog-format'), auto = q('.netlog-autoscroll');
   const store = createNetlogStore(), expanded = new Set(); let timer = null, visibleCount = 0;
   const filter = () => ({ text: filterInput.value, category: categorySelect.value });
@@ -210,6 +211,35 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     box.append(el('div', 'netlog-note', 'Right-click the request: create a mock of it or redirect the host.'));
     return box;
   };
+  /** The notes of an entry ([className, text]): the large window's Overview (src/netlog-details.js). */
+  const notesOf = entry => {
+    const out = [], note = describeOutcome(entry);
+    if (entry.mappedUrl) { out.push(['nld-note-redirect', `Redirected (Redirect hosts, Controls): sent to ${entry.mappedUrl} by the rule ${entry.mappedRule}. The app sees the original URL; only the browser request went to the target.`]); const hint = redirectFailureHint(entry); if (hint) out.push(['nld-note-error', hint]); }
+    if (entry.routeId) out.push(['nld-note-mock', routeNote(entry)]); else if (entry.mockId) out.push(['nld-note-mock', mockNote(entry)]);
+    if (entry.proxiedVia) out.push(['', `Via proxy ${entry.proxiedVia} (Controls › Network › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`]);
+    if (entry.relayChannel) out.push(['', channelNote(entry)]);
+    if (entry.finalUrl) out.push(['', `The server redirected (3xx) and the transport followed to ${entry.finalUrl}`]);
+    if (note) out.push([`nld-note-${categoryOf(entry)}`, note]);
+    if (entry.outcome === 'refused-by-allowlist' && entry.refusedHost && hostIsAllowed(getAllowedHosts(), entry.refusedHost)) out.push(['', `${entry.refusedHost} is already on the list; the app has to try again.`]);
+    return out;
+  };
+  // ---- the large window of one request (a click on it): kept up to date while open; without a modal host (tests, the player) the row expands in place as before
+  let details = null;   // { seq, modal, box, view }
+  const renderDetails = () => {
+    if (!details) return; const entry = store.entries.find(item => item.seq === details.seq); if (!entry) return;
+    details.modal.setTitle?.(`${entry.method} ${entry.host}${entry.path}`);
+    renderRequestDetails(details.box, entry, { view: details.view, notes: notesOf, on: { view: next => { details.view = next; renderDetails(); } },
+      actions: { createMock: createMock ? item => { details?.modal.close('code'); createMock(item); } : null, redirectHost: redirectHost ? item => { details?.modal.close('code'); redirectHost(item); } : null, allowHost: host => { allowHost(host); renderDetails(); renderAll(); } },
+      labels: { status: statusLabel, size: formatSize, duration: formatDuration, time: formatTime, category: categoryOf } });
+  };
+  const openDetails = entry => {
+    if (details) details.modal.close('code');
+    const box = document.createElement('div'); box.className = 'nld';
+    const view = { tab: lastTab, raw: false };
+    const modal = openModal({ title: `${entry.method} ${entry.host}${entry.path}`, size: 'large', content: box, label: 'Network', onClose: () => { if (details?.modal === modal) { lastTab = details.view.tab; details = null; } } });
+    details = { seq: entry.seq, modal, box, view }; renderDetails();
+  };
+  let lastTab = 'overview';
   const row = entry => {
     const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId || entry.routeId ? ' is-mocked' : ''}${entry.mappedUrl ? ' is-redirected' : ''}${entry.proxiedVia ? ' is-proxied' : ''}`), line = el('div', 'netlog-line');
     const target = el('span', 'netlog-target', `${entry.host}${entry.path}`); if (entry.mockId) target.prepend(el('b', 'netlog-mock', 'MOCK'));
@@ -218,7 +248,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     if (entry.mappedUrl) { const badge = el('b', 'netlog-redirected', 'REDIRECTED'); badge.title = `Sent to ${entry.mappedUrl}`; target.prepend(badge); }
     line.append(el('span', 'netlog-time', formatTime(entry.wall)), el('span', 'netlog-method', entry.method), target, el('span', 'netlog-status', statusLabel(entry)), el('span', 'netlog-size', formatSize(entry.responseBytes)), el('span', 'netlog-duration', formatDuration(entry.durationMs)));
     line.title = entry.mappedUrl ? `${entry.url}\n→ ${entry.mappedUrl}` : entry.url; line.tabIndex = 0; line.setAttribute('role', 'button'); line.setAttribute('aria-expanded', String(expanded.has(entry.seq)));
-    const toggle = () => { if (expanded.has(entry.seq)) expanded.delete(entry.seq); else expanded.add(entry.seq); renderAll(); };
+    const toggle = () => { if (openModal) { openDetails(entry); return; } if (expanded.has(entry.seq)) expanded.delete(entry.seq); else expanded.add(entry.seq); renderAll(); };
     line.addEventListener('click', toggle); line.addEventListener('keydown', event => {
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
       else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); const r = line.getBoundingClientRect(); openMenu(entry, r.left + 24, r.bottom, line); }
@@ -262,6 +292,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     out.replaceChildren(...visible.slice(-RENDER_MAX).map(row));
     if (!visible.length) out.append(el('div', 'netlog-empty', store.entries.length ? 'No request matches the filter.' : 'The app\'s network requests will appear here (HTTP, DNS, refused connections).'));
     updateCount(); if (auto.checked) out.scrollTop = out.scrollHeight;
+    renderDetails();
   };
   // while the person selects text in the list or has a request's menu open, new requests wait (a redraw would drop the selection and its scroll would close the menu)
   const hold = createReadingHold(out, { alsoBusy: () => menu !== null });

@@ -1,70 +1,70 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=728b804e603a';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=728b804e603a';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=728b804e603a';
-import { drawFrameGraph } from './frame-graph.js?v=728b804e603a';
-import { clientIdentityStatus } from './client-identity.js?v=728b804e603a';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=728b804e603a';
-import { initCollapsibleSections } from './panel-sections.js?v=728b804e603a';
-import { warmupLabel } from './warmup.js?v=728b804e603a';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=728b804e603a';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=728b804e603a';
-import { initHelpTips } from './help-tips.js?v=728b804e603a';
-import { initControlPanelUI } from './control-panel-ui.js?v=728b804e603a';
-import { createToolDock } from './tool-dock.js?v=728b804e603a';
-import { createPermissionsPanel } from './permissions-panel.js?v=728b804e603a';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=728b804e603a';
-import { createAppDataPanel } from './app-data-panel.js?v=728b804e603a';
-import { createCameraLab } from './camera-lab.js?v=728b804e603a';
-import { createOverridesPanel } from './overrides-panel.js?v=728b804e603a';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=728b804e603a';
-import { createCodeTool } from './code-tool-loader.js?v=728b804e603a';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=728b804e603a';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=728b804e603a';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=728b804e603a';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=728b804e603a';
-import { MICROG_SERVICES } from './microg-services.js?v=728b804e603a';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=728b804e603a';
-import { createOrientationLock } from './orientation-lock.js?v=728b804e603a';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=728b804e603a';
-import { createHostMapPanel } from './host-map-panel.js?v=728b804e603a';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=728b804e603a';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=728b804e603a';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=728b804e603a';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=728b804e603a';
-import { createDeviceView, createViewState } from './device-view.js?v=728b804e603a';
-import { createTaskSwitcher } from './task-switcher.js?v=728b804e603a';
-import { createDeviceZoom } from './device-zoom.js?v=728b804e603a';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=728b804e603a';
-import { formatApiGapReport } from './api-gap-scan.js?v=728b804e603a';
-import { createLogcatPanel } from './logcat-panel.js?v=728b804e603a';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=728b804e603a';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=728b804e603a';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=728b804e603a';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=728b804e603a';
-import { createAppPalette } from './app-palette.js?v=728b804e603a';
-import { createScreenRecorder } from './screen-recorder.js?v=728b804e603a';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=728b804e603a';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=728b804e603a';
-import { createAdb } from './adb-commands.js?v=728b804e603a';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=728b804e603a';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=728b804e603a';
-import { createAdbTerminal } from './adb-terminal.js?v=728b804e603a';
-import { memorySummary } from './worker-memory.js?v=728b804e603a';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=728b804e603a';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=728b804e603a';
-import { createPluginNetRoutes } from './plugin-net-routes.js?v=728b804e603a';
-import { createModalHost } from './lab-modal.js?v=728b804e603a';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=728b804e603a';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=728b804e603a';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=728b804e603a';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=728b804e603a';
-import { createDragLayer } from './lab-drag.js?v=728b804e603a';
-import { createLabScroll } from './lab-scroll.js?v=728b804e603a';
-import { createGlSurfaces } from './gl-surfaces.js?v=728b804e603a';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=728b804e603a';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=728b804e603a';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=728b804e603a';
-import { resolveIntentFields } from './intent-resolver.js?v=728b804e603a';
+import { APKWorkerClient } from './apk-worker-client.js?v=d0b27a2b509b';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d0b27a2b509b';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=d0b27a2b509b';
+import { drawFrameGraph } from './frame-graph.js?v=d0b27a2b509b';
+import { clientIdentityStatus } from './client-identity.js?v=d0b27a2b509b';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=d0b27a2b509b';
+import { initCollapsibleSections } from './panel-sections.js?v=d0b27a2b509b';
+import { warmupLabel } from './warmup.js?v=d0b27a2b509b';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d0b27a2b509b';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d0b27a2b509b';
+import { initHelpTips } from './help-tips.js?v=d0b27a2b509b';
+import { initControlPanelUI } from './control-panel-ui.js?v=d0b27a2b509b';
+import { createToolDock } from './tool-dock.js?v=d0b27a2b509b';
+import { createPermissionsPanel } from './permissions-panel.js?v=d0b27a2b509b';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d0b27a2b509b';
+import { createAppDataPanel } from './app-data-panel.js?v=d0b27a2b509b';
+import { createCameraLab } from './camera-lab.js?v=d0b27a2b509b';
+import { createOverridesPanel } from './overrides-panel.js?v=d0b27a2b509b';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=d0b27a2b509b';
+import { createCodeTool } from './code-tool-loader.js?v=d0b27a2b509b';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d0b27a2b509b';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=d0b27a2b509b';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=d0b27a2b509b';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=d0b27a2b509b';
+import { MICROG_SERVICES } from './microg-services.js?v=d0b27a2b509b';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=d0b27a2b509b';
+import { createOrientationLock } from './orientation-lock.js?v=d0b27a2b509b';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d0b27a2b509b';
+import { createHostMapPanel } from './host-map-panel.js?v=d0b27a2b509b';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d0b27a2b509b';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d0b27a2b509b';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d0b27a2b509b';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d0b27a2b509b';
+import { createDeviceView, createViewState } from './device-view.js?v=d0b27a2b509b';
+import { createTaskSwitcher } from './task-switcher.js?v=d0b27a2b509b';
+import { createDeviceZoom } from './device-zoom.js?v=d0b27a2b509b';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d0b27a2b509b';
+import { formatApiGapReport } from './api-gap-scan.js?v=d0b27a2b509b';
+import { createLogcatPanel } from './logcat-panel.js?v=d0b27a2b509b';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d0b27a2b509b';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d0b27a2b509b';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d0b27a2b509b';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=d0b27a2b509b';
+import { createAppPalette } from './app-palette.js?v=d0b27a2b509b';
+import { createScreenRecorder } from './screen-recorder.js?v=d0b27a2b509b';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=d0b27a2b509b';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d0b27a2b509b';
+import { createAdb } from './adb-commands.js?v=d0b27a2b509b';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=d0b27a2b509b';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=d0b27a2b509b';
+import { createAdbTerminal } from './adb-terminal.js?v=d0b27a2b509b';
+import { memorySummary } from './worker-memory.js?v=d0b27a2b509b';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d0b27a2b509b';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=d0b27a2b509b';
+import { createPluginNetRoutes } from './plugin-net-routes.js?v=d0b27a2b509b';
+import { createModalHost } from './lab-modal.js?v=d0b27a2b509b';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=d0b27a2b509b';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d0b27a2b509b';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d0b27a2b509b';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d0b27a2b509b';
+import { createDragLayer } from './lab-drag.js?v=d0b27a2b509b';
+import { createLabScroll } from './lab-scroll.js?v=d0b27a2b509b';
+import { createGlSurfaces } from './gl-surfaces.js?v=d0b27a2b509b';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d0b27a2b509b';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d0b27a2b509b';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d0b27a2b509b';
+import { resolveIntentFields } from './intent-resolver.js?v=d0b27a2b509b';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -663,7 +663,7 @@ const composeInspector = createComposeInspectorPanel({ root: $('compose-inspecto
   resourceNames: ids => adbDevice.resourceNames(ids) });   // src/compose-inspector-panel.js: nothing runs while it is closed
 window.apkLabComposeInspector = composeInspector;   // test and console access: .state
 apkVM.onLogcat = message => { logcatPanel.push(message); pluginHost.logcat(message); };
-const netlogPanel = createNetlogPanel({ root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
+const netlogPanel = createNetlogPanel({ openModal: options => modalHost.open(options), root: $('netlog'), getPackage: () => state.inventory?.packageName ?? state.fileName ?? 'app', getAllowedHosts: () => deviceState.settings.network.allowedHosts,
   allowHost: host => { if ($('dev-hosts-all').checked) return; $('dev-hosts').value = addAllowedHost($('dev-hosts').value, host); $('dev-hosts').dispatchEvent(new Event('input')); },
   // right click on a request: a mock of it (the dialog opens filled; nothing is saved until Save) or a host redirect rule with that origin
   createMock: entry => {
@@ -882,7 +882,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js?v=728b804e603a');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=d0b27a2b509b');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -1316,7 +1316,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=728b804e603a')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=d0b27a2b509b')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');

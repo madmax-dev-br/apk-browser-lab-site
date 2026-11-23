@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=728b804e603a';
-import { lookup, allocateFd, state as libcoreState } from './libcore-io-native.js?v=728b804e603a';
-import { processKernel, newPipe, E as KERNEL_ERRNO, SIG } from './process-kernel.js?v=728b804e603a';
+import { APKError } from './apk-error.js?v=d0b27a2b509b';
+import { lookup, allocateFd, state as libcoreState } from './libcore-io-native.js?v=d0b27a2b509b';
+import { processKernel, newPipe, E as KERNEL_ERRNO, SIG } from './process-kernel.js?v=d0b27a2b509b';
 
 // The natives under java.lang.ProcessBuilder / Process (libcore ojluni UNIXProcess.java, ProcessEnvironment.java, UNIXProcess_md.c):
 //   forkAndExec   starts a program of the device's /system/bin (src/system-image.js: toybox, mksh as sh, toolbox) as a process of the lab's kernel (src/process-kernel.js), a

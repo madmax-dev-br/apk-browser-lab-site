@@ -1,7 +1,7 @@
 // Modals of the lab page: a plugin's output opened large ("Expandir" on its card) and the screens a plugin renders itself (lab.modal.open). Small, medium or full screen,
 // with a close button and Esc. Content is DOM the page builds, or HTML a plugin wrote, shown in a sandboxed iframe (opaque origin: no access to this page, its storage or the
 // VM; scripts run there only) that talks to the plugin by messages (window.lab.post / window.lab.on inside the iframe). No process.*.
-export const MODAL_SIZES = ['small', 'medium', 'full'];
+export const MODAL_SIZES = ['small', 'medium', 'large', 'full'];
 export const MAX_MODAL_HTML = 1_000_000;
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),iframe,[tabindex]:not([tabindex="-1"])';
 
