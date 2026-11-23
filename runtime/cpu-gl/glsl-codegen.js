@@ -6,9 +6,9 @@
 // Derivatives: a fragment shader that calls dFdx / dFdy / fwidth or samples a mipmapped texture with an implicit level needs the value of an expression at the next pixel in x
 // and in y. The values on which such an expression depends and that vary across pixels get two extra "lanes" (the same computation at x+1 and at y+1, fed by the interpolated
 // inputs there); control flow follows the pixel's own lane, as derivatives are only defined in uniform control flow (GLSL ES 3.00 8.9). No process.*.
-import { GlslError } from './glsl-parse.js?v=cbf1579510f6';
-import { FLOAT, INT, UINT, BOOL, vec, mat, comps, needsStore, containsSampler, fieldOffset, isInteger } from './glsl-types.js?v=cbf1579510f6';
-import { IMPLICIT_LOD, coerce } from './glsl-check.js?v=cbf1579510f6';
+import { GlslError } from './glsl-parse.js?v=7467c4d87e1f';
+import { FLOAT, INT, UINT, BOOL, vec, mat, comps, needsStore, containsSampler, fieldOffset, isInteger } from './glsl-types.js?v=7467c4d87e1f';
+import { IMPLICIT_LOD, coerce } from './glsl-check.js?v=7467c4d87e1f';
 
 const fail = (message, line) => { throw new GlslError(message, line); };
 const SIMPLE = /^(?:[A-Za-z_$][\w$]*|\(?-?(?:\d+(?:\.\d*)?(?:e[-+]?\d+)?|Infinity)\)?|NaN|[A-Za-z_$][\w$]*\[[^\[\]]+\])$/;

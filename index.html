@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=cbf1579510f6") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=cbf1579510f6">
-  <link rel="stylesheet" href="./lab-theme.css?v=cbf1579510f6">
-  <meta name="apk-browser-build" content="cbf1579510f6">
+  <style>@import url("./styles.css?v=7467c4d87e1f") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=7467c4d87e1f">
+  <link rel="stylesheet" href="./lab-theme.css?v=7467c4d87e1f">
+  <meta name="apk-browser-build" content="7467c4d87e1f">
 </head>
 <body>
   <header class="topbar">
@@ -321,7 +321,7 @@
         </section>
       </aside>
       <section class="preview" aria-label="Running app">
-        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="debug-paused" class="ready-chip debug-paused-chip" type="button" hidden title="Paused in the debugger: open the Code tool">Paused in the debugger</button><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
+        <div class="preview-bar"><div class="preview-title"><span id="preview-name">App preview</span></div><button id="device-photo" class="back-button dm-button" type="button" title="Take a photo of the screen (saved as a PNG)"><span class="dm-glyph" aria-hidden="true">◉</span><span class="dm-label">Photo</span></button><button id="device-record" class="back-button dm-button dm-record" type="button" aria-pressed="false"><span class="dm-dot" aria-hidden="true"></span><span class="dm-label">Record</span></button><button id="fullscreen-button" class="back-button fullscreen-button" type="button" title="Full screen: shows the enlarged device over the page (Esc closes). The VM resolution does not change" aria-pressed="false">Full screen</button><span id="plugin-toolbar" class="pb-toolbar" role="group" aria-label="Plugin buttons" hidden></span><button id="debug-paused" class="ready-chip debug-paused-chip" type="button" hidden title="Paused in the debugger: open the Code tool">Paused in the debugger</button><button id="app-modified" class="ready-chip app-modified-chip" type="button" hidden aria-expanded="false" aria-controls="app-modified-panel">App modified · 0</button><span id="vm-warmup" class="ready-chip warm-chip" role="status" hidden></span><span id="screen-ready" class="ready-chip" role="status" hidden></span><span class="runtime-badge" id="runtime-badge"><span></span> Inactive</span></div>
         <div id="app-modified-panel" class="app-modified-panel" role="region" aria-label="App modified: method changes in effect" hidden><p class="am-note">Changes chosen by the user are in effect: the app runs with them until they are removed (plugins' <code>lab.hook</code>, Controls › Debugging › Method returns, and the methods and APK files edited in the Code tool). Each one is counted, recorded in the trace and listed in the report.</p><ul id="app-modified-list" class="am-list"></ul></div>
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
@@ -386,7 +386,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=cbf1579510f6"></script>
+  <script type="module" src="./app.js?v=7467c4d87e1f"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

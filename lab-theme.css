@@ -1285,3 +1285,12 @@ body.cb-resizing{cursor:col-resize;user-select:none}
 .nld-empty,.nld-hint{margin:0;color:var(--muted)}
 @media (max-width:640px){.nld-kv{grid-template-columns:minmax(0,1fr)}.nld-kv dt{margin-top:6px}.nld-summary{flex-wrap:wrap}}
 .nld-status.nld-cat-redirect{background:var(--amber-soft);color:var(--amber-ink)}
+
+/* Photo and Record in the device bar (src/device-media.js) */
+.dm-button{display:inline-flex;align-items:center;gap:6px}
+.dm-glyph{font-size:12px;line-height:1}
+.dm-dot{width:8px;height:8px;border-radius:50%;background:var(--warn);flex:none}
+.dm-record.is-recording{border-color:var(--warn);color:var(--warn);font-variant-numeric:tabular-nums}
+.dm-record.is-recording .dm-dot{border-radius:2px;animation:dm-blink 1s steps(2,start) infinite}
+@keyframes dm-blink{to{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.dm-record.is-recording .dm-dot{animation:none}}

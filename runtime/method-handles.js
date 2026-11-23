@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=cbf1579510f6';
-import { Invoke } from './interpreter.js?v=cbf1579510f6';
-import { createHostRegistry } from './host-contract.js?v=cbf1579510f6';
+import { APKError } from './apk-error.js?v=7467c4d87e1f';
+import { Invoke } from './interpreter.js?v=7467c4d87e1f';
+import { createHostRegistry } from './host-contract.js?v=7467c4d87e1f';
 
 // java.lang.invoke on the lab VM: what ART's runtime does for the android-13.0.0_r1 libcore originals of framework-aosp/profiles/invoke (art/runtime/method_handles.cc,
 // interpreter invoke-polymorphic, java_lang_invoke_MethodHandleImpl.cc). The classes themselves -- MethodHandles.Lookup, MethodHandle, MethodHandleImpl, MethodType, Transformers
