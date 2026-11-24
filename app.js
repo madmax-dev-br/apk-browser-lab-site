@@ -1,71 +1,71 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=7467c4d87e1f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=7467c4d87e1f';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=7467c4d87e1f';
-import { drawFrameGraph } from './frame-graph.js?v=7467c4d87e1f';
-import { clientIdentityStatus } from './client-identity.js?v=7467c4d87e1f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=7467c4d87e1f';
-import { initCollapsibleSections } from './panel-sections.js?v=7467c4d87e1f';
-import { warmupLabel } from './warmup.js?v=7467c4d87e1f';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=7467c4d87e1f';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=7467c4d87e1f';
-import { initHelpTips } from './help-tips.js?v=7467c4d87e1f';
-import { initControlPanelUI } from './control-panel-ui.js?v=7467c4d87e1f';
-import { createToolDock } from './tool-dock.js?v=7467c4d87e1f';
-import { createPermissionsPanel } from './permissions-panel.js?v=7467c4d87e1f';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=7467c4d87e1f';
-import { createAppDataPanel } from './app-data-panel.js?v=7467c4d87e1f';
-import { createCameraLab } from './camera-lab.js?v=7467c4d87e1f';
-import { createOverridesPanel } from './overrides-panel.js?v=7467c4d87e1f';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=7467c4d87e1f';
-import { createCodeTool } from './code-tool-loader.js?v=7467c4d87e1f';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=7467c4d87e1f';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=7467c4d87e1f';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=7467c4d87e1f';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=7467c4d87e1f';
-import { MICROG_SERVICES } from './microg-services.js?v=7467c4d87e1f';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=7467c4d87e1f';
-import { createOrientationLock } from './orientation-lock.js?v=7467c4d87e1f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=7467c4d87e1f';
-import { createHostMapPanel } from './host-map-panel.js?v=7467c4d87e1f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=7467c4d87e1f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=7467c4d87e1f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=7467c4d87e1f';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=7467c4d87e1f';
-import { createDeviceView, createViewState } from './device-view.js?v=7467c4d87e1f';
-import { createTaskSwitcher } from './task-switcher.js?v=7467c4d87e1f';
-import { createDeviceZoom } from './device-zoom.js?v=7467c4d87e1f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=7467c4d87e1f';
-import { formatApiGapReport } from './api-gap-scan.js?v=7467c4d87e1f';
-import { createLogcatPanel } from './logcat-panel.js?v=7467c4d87e1f';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=7467c4d87e1f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=7467c4d87e1f';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=7467c4d87e1f';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=7467c4d87e1f';
-import { createAppPalette } from './app-palette.js?v=7467c4d87e1f';
-import { createScreenRecorder } from './screen-recorder.js?v=7467c4d87e1f';
-import { createDeviceMedia } from './device-media.js?v=7467c4d87e1f';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=7467c4d87e1f';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=7467c4d87e1f';
-import { createAdb } from './adb-commands.js?v=7467c4d87e1f';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=7467c4d87e1f';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=7467c4d87e1f';
-import { createAdbTerminal } from './adb-terminal.js?v=7467c4d87e1f';
-import { memorySummary } from './worker-memory.js?v=7467c4d87e1f';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=7467c4d87e1f';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=7467c4d87e1f';
-import { createPluginNetRoutes } from './plugin-net-routes.js?v=7467c4d87e1f';
-import { createModalHost } from './lab-modal.js?v=7467c4d87e1f';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=7467c4d87e1f';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=7467c4d87e1f';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=7467c4d87e1f';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=7467c4d87e1f';
-import { createDragLayer } from './lab-drag.js?v=7467c4d87e1f';
-import { createLabScroll } from './lab-scroll.js?v=7467c4d87e1f';
-import { createGlSurfaces } from './gl-surfaces.js?v=7467c4d87e1f';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=7467c4d87e1f';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=7467c4d87e1f';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=7467c4d87e1f';
-import { resolveIntentFields } from './intent-resolver.js?v=7467c4d87e1f';
+import { APKWorkerClient } from './apk-worker-client.js?v=935d0db9b854';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=935d0db9b854';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=935d0db9b854';
+import { drawFrameGraph } from './frame-graph.js?v=935d0db9b854';
+import { clientIdentityStatus } from './client-identity.js?v=935d0db9b854';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=935d0db9b854';
+import { initCollapsibleSections } from './panel-sections.js?v=935d0db9b854';
+import { warmupLabel } from './warmup.js?v=935d0db9b854';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=935d0db9b854';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=935d0db9b854';
+import { initHelpTips } from './help-tips.js?v=935d0db9b854';
+import { initControlPanelUI } from './control-panel-ui.js?v=935d0db9b854';
+import { createToolDock } from './tool-dock.js?v=935d0db9b854';
+import { createPermissionsPanel } from './permissions-panel.js?v=935d0db9b854';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=935d0db9b854';
+import { createAppDataPanel } from './app-data-panel.js?v=935d0db9b854';
+import { createCameraLab } from './camera-lab.js?v=935d0db9b854';
+import { createOverridesPanel } from './overrides-panel.js?v=935d0db9b854';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=935d0db9b854';
+import { createCodeTool } from './code-tool-loader.js?v=935d0db9b854';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=935d0db9b854';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=935d0db9b854';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=935d0db9b854';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=935d0db9b854';
+import { MICROG_SERVICES } from './microg-services.js?v=935d0db9b854';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=935d0db9b854';
+import { createOrientationLock } from './orientation-lock.js?v=935d0db9b854';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=935d0db9b854';
+import { createHostMapPanel } from './host-map-panel.js?v=935d0db9b854';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=935d0db9b854';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=935d0db9b854';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=935d0db9b854';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=935d0db9b854';
+import { createDeviceView, createViewState } from './device-view.js?v=935d0db9b854';
+import { createTaskSwitcher } from './task-switcher.js?v=935d0db9b854';
+import { createDeviceZoom } from './device-zoom.js?v=935d0db9b854';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=935d0db9b854';
+import { formatApiGapReport } from './api-gap-scan.js?v=935d0db9b854';
+import { createLogcatPanel } from './logcat-panel.js?v=935d0db9b854';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=935d0db9b854';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=935d0db9b854';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=935d0db9b854';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=935d0db9b854';
+import { createAppPalette } from './app-palette.js?v=935d0db9b854';
+import { createScreenRecorder } from './screen-recorder.js?v=935d0db9b854';
+import { createDeviceMedia } from './device-media.js?v=935d0db9b854';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=935d0db9b854';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=935d0db9b854';
+import { createAdb } from './adb-commands.js?v=935d0db9b854';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=935d0db9b854';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=935d0db9b854';
+import { createAdbTerminal } from './adb-terminal.js?v=935d0db9b854';
+import { memorySummary } from './worker-memory.js?v=935d0db9b854';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=935d0db9b854';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=935d0db9b854';
+import { createPluginNetRoutes } from './plugin-net-routes.js?v=935d0db9b854';
+import { createModalHost } from './lab-modal.js?v=935d0db9b854';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=935d0db9b854';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=935d0db9b854';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=935d0db9b854';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=935d0db9b854';
+import { createDragLayer } from './lab-drag.js?v=935d0db9b854';
+import { createLabScroll } from './lab-scroll.js?v=935d0db9b854';
+import { createGlSurfaces } from './gl-surfaces.js?v=935d0db9b854';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=935d0db9b854';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=935d0db9b854';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=935d0db9b854';
+import { resolveIntentFields } from './intent-resolver.js?v=935d0db9b854';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -98,7 +98,10 @@ async function openSavedApp(id) {
 const APK_PICKER_TYPES = [{ description: 'Android app (.apk, .aab, .apks, .xapk, .apkm)', accept: { 'application/vnd.android.package-archive': ['.apk', '.apks', '.xapk', '.apkm'], 'application/octet-stream': ['.aab', '.apks', '.xapk', '.apkm'] } }];
 // Some embedded browsers show the handle picker but then refuse handle.getFile() (NotAllowedError). Once that happens, this browser uses the plain input from then on (remembered).
 const HANDLE_PICKER_KEY = 'apkweb.handlePicker.unusable';
-const handlePickerUsable = () => { try { return typeof window.showOpenFilePicker === 'function' && localStorage.getItem(HANDLE_PICKER_KEY) !== '1'; } catch { return typeof window.showOpenFilePicker === 'function'; } };
+// An embedded Chromium (its brand list names no browser vendor, as an app's web view) shows the handle picker and refuses the file afterwards, so the person would choose the file
+// twice: there the plain input is used from the first time. Navigators without a brand list are not Chromium and have no handle picker.
+const isVendorBrowser = () => (navigator.userAgentData?.brands ?? []).some(({ brand }) => /Google Chrome|Microsoft Edge|Opera|Brave|Vivaldi|Yandex/i.test(brand));
+const handlePickerUsable = () => { if (!isVendorBrowser()) return false; try { return typeof window.showOpenFilePicker === 'function' && localStorage.getItem(HANDLE_PICKER_KEY) !== '1'; } catch { return typeof window.showOpenFilePicker === 'function'; } };
 async function pickApkWithHandle() {
   if (!handlePickerUsable()) return null;
   try { const [handle] = await window.showOpenFilePicker({ types: APK_PICKER_TYPES, excludeAcceptAllOption: false }); return handle ? { handle } : 'cancelled'; }
@@ -136,7 +139,7 @@ async function removeSavedApp(item) {
   if (!yes) return;
   if (state.shelfId === item.id && state.inventory) {   // the app on screen: it closes, as an uninstall closes it on a device
     cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.needsRestart = false;
-    $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; appInfo.render();
+    $('preview-name').textContent = 'App preview'; appInfo.render();
   }
   await apkShelf.remove(item.id); if (state.shelfId === item.id) state.shelfId = null; await refreshShelf(); setStatus(`${name} uninstalled`); appendTrace(`${name} uninstalled from the home screen (its stored copy deleted)`);
 }
@@ -152,7 +155,7 @@ function notifyParent(type, data = {}) {
   if (window.parent !== window) window.parent.postMessage({ type, ...data }, location.origin);
 }
 /** The empty stage's hint. The published site carries no example APKs (no catalog): there the hint does not point at an Examples tab that is not there. */
-function emptyPreviewHint() { return state.noBundledApks ? 'Select an APK: it is installed and opened right away.' : 'Select an APK: it is installed and opened right away.<br>Or pick one of the examples in the Examples tab, on the bottom bar.'; }
+function emptyPreviewHint() { return !state.bundledApks ? 'Select an APK: it is installed and opened right away.' : 'Select an APK: it is installed and opened right away.<br>Or pick one of the examples in the Examples tab, on the bottom bar.'; }
 function setStatus(message, kind = '') {
   $('status-text').textContent = message;
   $('status-dot').className = kind;
@@ -173,11 +176,9 @@ function showWarmup(warmup) {
 }
 function setBusy(busy) {
   state.busy = busy;
-  $('inspect-native-button').disabled = busy || !state.runtime;
   if ($('clear-app-data')) $('clear-app-data').disabled = busy || !state.runtime;
   if ($('clear-microg-data')) $('clear-microg-data').disabled = !canClearMicrogData({ busy, running: !!state.runtime, loadedMicrog: state.loadedMicrog });
   showMicrogAccount();
-  $('native-abi').disabled = busy; $('native-library').disabled = busy;
   document.querySelectorAll('[data-inspect-apk]').forEach((button) => { button.disabled = button.dataset.available === 'false'; });   // another APK can be picked at any time (it replaces the current VM)
 }
 function appendTrace(message) {
@@ -370,7 +371,7 @@ function showLoadTimes() {
   if (times.launchMs !== undefined) text += ` · Activity opened in ${seconds(times.launchMs)} s`;
   state.loadTimes.text = text; appInfo.render();
 }
-// ---- the open package: its line at the top of the controls, its line in the status bar (with the details on hover or focus), the Activity its icon opens ----
+// ---- the open package: its line in the status bar (with the details on hover or focus), the Activity its icon opens ----
 /** The Activity the launcher icon opens, per package: chosen in the Package window (src/package-modal.js), kept in localStorage across reloads (a per-viewer convenience: blocked
  *  storage keeps it for this page's life only); undefined: the manifest's own. An activity the APK no longer declares is ignored (launchActivity checks it). */
 const LAUNCH_CHOICES_KEY = 'apkweb.launchChoices.v1';
@@ -406,16 +407,6 @@ function showPackageWindow() {
   const inventory = state.inventory; if (!inventory) return null;
   return openPackageModal({ modalHost, inventory, label: appLabel(), icon: taskSwitcher?.icon?.() ?? null, file: { name: state.currentSource?.name ?? null, bytes: state.currentFileBytes ?? null },
     current: activityToLaunch() ?? null, busy: () => state.busy || !!state.runStarting || !state.currentSource, onLaunch: launchWith });
-}
-/** The package's one line at the top of the controls (icon, name, version); the details open under it. Without a package the "Open APK" drop zone is shown instead. */
-function showPackageLine() {
-  const panel = $('apk-panel'), strip = $('inspection-panel'); if (!panel || !strip) return;
-  const loaded = !!state.currentSource; panel.dataset.state = loaded ? 'loaded' : 'empty'; strip.hidden = !loaded; if (!loaded) return;
-  $('package-label').textContent = appLabel();
-  const version = state.inventory?.manifestAttrs?.versionName; $('package-version').textContent = version ? String(version) : '';
-  const box = $('package-icon'), url = taskSwitcher?.icon?.() ?? null, img = box.querySelector('img');
-  if (url) { if (img?.getAttribute('src') !== url) { const image = document.createElement('img'); image.alt = ''; image.src = url; box.replaceChildren(image); } box.classList.add('has-icon'); }
-  else { box.replaceChildren(); box.textContent = 'APK'; box.classList.remove('has-icon'); }
 }
 /** The status bar's line about the open app ("Counter · loaded in 0.43 s") and its details on hover, focus or a tap (load times by phase, package, version, Activity, engine, ABI). */
 const appInfo = (() => {
@@ -458,7 +449,7 @@ const appInfo = (() => {
   window.addEventListener?.('resize', place); window.addEventListener?.('scroll', place, true);
   return {
     render() {
-      const times = state.loadTimes; showPackageLine();
+      const times = state.loadTimes;
       if (!state.inventory || !times?.done) { button.hidden = true; show(false); return; }
       const text = `${appLabel()} · loaded in ${seconds(times.loadMs)}${times.launchMs !== undefined ? ` · opened in ${seconds(times.launchMs)}` : ''}`;
       button.hidden = false; button.querySelector('.app-info-text').textContent = text; button.setAttribute('aria-label', `${text}. Details on hover or focus.`); button.title = '';
@@ -734,82 +725,11 @@ showPreviousCrash();
 function formatSize(size) {
   return size < 1024 * 1024 ? `${(size / 1024).toFixed(1)} KB` : `${(size / (1024 * 1024)).toFixed(2)} MB`;
 }
-function listSection(title, items) {
-  const section = document.createElement('section');
-  const heading = document.createElement('h4'); heading.textContent = title; section.append(heading);
-  if (!items?.length) { const line = document.createElement('p'); line.textContent = 'No items found.'; section.append(line); return section; }
-  const list = document.createElement('ul');
-  items.slice(0, 200).forEach((item) => { const li = document.createElement('li'); li.textContent = typeof item === 'string' ? item : item.name || JSON.stringify(item); list.append(li); });
-  section.append(list); if (items.length > 200) { const note = document.createElement('p'); note.textContent = `${items.length} items in the inventory; showing the first 200.`; section.append(note); } return section;
-}
+/** The limits found in the file, under the drop zone (the package's details are in the home-screen icon's Package window). */
 function showInventory(inventory) {
-  $('inventory-empty').hidden = true; $('inventory').hidden = false;
-  $('package-name').textContent = inventory.packageName || 'Package not identified';
-  $('class-count').textContent = Array.isArray(inventory.classes) ? inventory.classes.length : inventory.classes ?? '—';
-  $('class-count').title = inventory.classes == null ? 'DEX classes not inspected' : 'Classes present in the DEX';
-  $('activity-count').textContent = inventory.activities?.length || 0;
-  $('dependency-count').textContent = inventory.dependencies?.length || 0;
-  { const badge = $('inspection-badge'); if (badge) badge.textContent = inventory.inspectionComplete === false ? 'Partial inspection' : inventory.compose ? 'Compose APK' : 'Analyzed'; }
   const unsupported = inventory.unsupportedFeatures || [];
   $('unsupported-notice').hidden = !unsupported.length;
   $('unsupported-list').replaceChildren(...unsupported.map((item) => { const li = document.createElement('li'); li.textContent = item; return li; }));
-  const archiveSummary = $('archive-summary'); archiveSummary.replaceChildren();
-  const dexSummary = document.createElement('strong'); dexSummary.textContent = `${inventory.dexFiles?.length || 0} DEX · ${inventory.inspectionComplete === false ? 'partial count' : 'complete class count'}`;
-  archiveSummary.append(dexSummary);
-  const nativeCount = inventory.nativeLibraries?.length || 0;
-  const nativeSummary = document.createElement('p'); nativeSummary.textContent = `${nativeCount} packaged libraries; JNI support will be checked on use.`; archiveSummary.append(nativeSummary); archiveSummary.hidden = false;
-  showPackageLine();
-  const details = $('inventory-details'); details.replaceChildren();
-  if (inventory.classNames?.length || Array.isArray(inventory.classes)) { const names = inventory.classNames || inventory.classes; details.append(listSection(`DEX CLASSES · ${Math.min(120, names.length)} NAMES SHOWN OF ${inventory.classes ?? names.length} · ${Math.max(0, names.length - 120)} MORE NAMES IN THE INVENTORY`, names.slice(0, 120))); }
-  if (inventory.dexSummaries?.length) details.append(listSection('INVENTORY PER DEX', inventory.dexSummaries.map((dex) => `${dex.filename}: ${dex.classes ?? '—'} classes · ${dex.methods ?? '—'} methods · ${formatSize(dex.bytes || 0)}`)));
-  if (inventory.nativeLibraryDetails?.length) {
-    const groups = new Map();
-    for (const lib of inventory.nativeLibraryDetails) { const abi = lib.abi || 'Unknown ABI'; if (!groups.has(abi)) groups.set(abi, []); groups.get(abi).push(`${lib.basename || lib.path} (${formatSize(lib.bytes || 0)})`); }
-    for (const [abi, libraries] of groups) details.append(listSection(`NATIVE · ${abi} · ${libraries.length} FILES`, libraries));
-  }
-  details.append(listSection('DEX FILES', inventory.dexFiles));
-  details.append(listSection('REFERENCED DEPENDENCIES', inventory.dependencies));
-  if (inventory.applicationName) details.append(listSection('APPLICATION', [inventory.applicationName]));
-  const components = ['activities', 'services', 'providers', 'receivers'].map((key) => `${key}: ${inventory[key]?.length || 0}`); details.append(listSection('MANIFEST COMPONENTS', components));
-  if (inventory.embeddedFrameworks?.length) details.append(listSection('PACKAGED FRAMEWORKS', inventory.embeddedFrameworks));
-  if (inventory.bundles?.length) details.append(listSection('BUNDLES', inventory.bundles.map((bundle) => `${bundle.path}: ${bundle.format}${bundle.bytecodeVersion ? ` v${bundle.bytecodeVersion}` : ''} · ${formatSize(bundle.bytes)} · not executed`)));
-  if (inventory.framework?.enabled) details.append(listSection('AOSP FRAMEWORK · SEPARATE DEX CODE', [`${inventory.framework.classes} classes · ${inventory.framework.bytes} bytes`, `Source: ${inventory.framework.source} · ${inventory.framework.policy}`, `SHA-256: ${inventory.framework.sha256 || 'unavailable'}`]));
-  if (inventory.framework?.profiles?.length) details.append(listSection('ORIGINAL PROFILES LOADED', inventory.framework.profiles.map(profile => `${profile.profile || profile.name || 'AOSP'} · ${profile.classes ?? profile.classCount ?? '—'} classes · ${profile.reason || 'explicit selection'} · SHA-256 ${profile.sha256 || 'unavailable'}`)));
-  if (inventory.frameworkResources?.enabled) details.append(listSection('FRAMEWORK RESOURCE DATA', [`${inventory.frameworkResources.selectedUniqueResourceIds} original IDs · partial profile without qualifiers`, inventory.frameworkResources.source || '', `Integrity: ${inventory.frameworkResources.integrity}`]));
-  if (inventory.resourceSummary) details.append(listSection('ANDROID RESOURCES', [`${inventory.resourceSummary.entries} resources · ${inventory.resourceSummary.parsedLayouts}/${inventory.resourceSummary.layoutFiles} XML layouts prepared${inventory.resourceSummary.xml?.deferred || inventory.resourceSummary.deferredLayouts ? ` · ${(inventory.resourceSummary.xml?.deferred || 0)} XML on demand` : ''}`, ...(inventory.resourceSummary.errors || [])]));
-  configureNativeInspection(inventory);
-  if (inventory.unsupportedFeatures?.length) details.append(listSection('LIMITATIONS FOUND', inventory.unsupportedFeatures));
-  if (inventory.warnings?.length) details.append(listSection('NOTES', inventory.warnings));
-}
-function configureNativeInspection(inventory) {
-  const libraries = inventory.nativeLibraryDetails || [];
-  $('native-inspection').hidden = !libraries.length;
-  const abiSelect = $('native-abi'); const selected = abiSelect.value; abiSelect.replaceChildren();
-  [...new Set(libraries.map((lib) => lib.abi))].sort().forEach((abi) => { const option = document.createElement('option'); option.value = abi; option.textContent = `${abi} · ${libraries.filter((lib) => lib.abi === abi).length} files`; abiSelect.append(option); });
-  if ([...abiSelect.options].some((option) => option.value === selected)) abiSelect.value = selected;
-  populateNativeLibraries();
-}
-function populateNativeLibraries() {
-  const select = $('native-library'); select.replaceChildren();
-  (state.inventory?.nativeLibraryDetails || []).filter((lib) => lib.abi === $('native-abi').value).forEach((library) => { const option = document.createElement('option'); option.value = library.path; option.textContent = `${library.basename} · ${formatSize(library.bytes)}`; select.append(option); });
-}
-async function inspectSelectedNative() {
-  if (!state.runtime || state.busy || !$('native-library').value) return;
-  const path = $('native-library').value;
-  const token = beginOperation('Analyzing ELF in the Worker…'); $('native-result').hidden = true;
-  try {
-    const response = await state.runtime.inspectNative([path], { maxFiles: 1, maxBytes: 32 * 1024 * 1024, maxTotalBytes: 32 * 1024 * 1024 }, { onProgress: onWorkerProgress });
-    if (token !== state.operation) return;
-    const library = response.libraries[0];
-    const target = state.inventory.nativeLibraryDetails.find((entry) => entry.path === path); if (target) Object.assign(target, library);
-    state.inventory.nativeInspection = response.nativeInspection;
-    const elf = library.elf;
-    $('native-result').textContent = elf ? JSON.stringify({ path, inspection: library.elfInspection, format: elf.format, bits: elf.bits, architecture: elf.architecture, soname: elf.soname, needed: elf.needed, jniOnLoad: elf.jniOnLoad, jniExports: elf.jniExports.slice(0, 80), jniExportsTotal: elf.jniExports.length, symbolInspectionComplete: elf.symbolInspectionComplete, warnings: elf.warnings, executed: false }, null, 2) : JSON.stringify({ path, inspection: library.elfInspection, error: library.elfError || 'Analysis skipped: file above the 32 MiB limit.' }, null, 2);
-    $('native-result').hidden = false;
-    if (state.mode === 'apk') setStatus('ELF metadata inspected · no native library was run');
-    appendTrace(`ELF ${path}: ${library.elfInspection}`);
-  } catch (error) { if (token === state.operation) reportAPKError(error, 'Could not inspect the ELF', { crash: false }); }
-  finally { finishOperation(token); }
 }
 async function importSource(source, autoRun = false) {
   // Another APK (a file, a launcher icon, an example) while one loads or runs: the current VM is ended first, with no button for it (the new load would end it too; this also drops the operation in flight).
@@ -824,8 +744,7 @@ async function importSource(source, autoRun = false) {
   taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false;
   $('empty-preview').querySelector('h2').textContent = 'Your app starts here.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
   const token = beginOperation('Reading the APK file…');
-  $('native-inspection').hidden = true; $('native-result').hidden = true; $('unsupported-notice').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('inventory-empty').firstElementChild.textContent = 'Reading the package…'; if ($('inspection-badge')) $('inspection-badge').textContent = 'Analyzing';
-  $('file-info').hidden = false; $('file-name').textContent = source.name; $('file-size').textContent = source.file ? `${formatSize(source.file.size)} · local file` : 'Test APK hosted locally';
+  $('unsupported-notice').hidden = true;
   $('preview-name').textContent = source.name;
   state.shelfId = source.shelfId ?? null; await refreshShelf();
   showDeviceHome('installing', source.name);   // the app shows up on the launcher at once, under a spinner, while the package is read
@@ -844,7 +763,7 @@ async function importSource(source, autoRun = false) {
     if (token !== state.operation) return;
     if (buffer.byteLength > 1024 * 1024 * 1024) throw new Error('The APK exceeds the 1 GiB limit.');
     state.currentFileBytes = buffer.byteLength;
-    $('file-size').textContent = `${formatSize(buffer.byteLength)} · processed in the browser`; state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
+    state.loadTimes.readMs = Math.round(performance.now() - state.loadTimes.startedAt); state.loadTimes.loadStartedAt = performance.now();
     state.apiGaps = null;
     frameMeter.reset();   // the frame counts of "Show frame rate" start with the app
     await refreshRelay(); if (token !== state.operation) return;   // the relay found by itself is the device's proxy from the first request (src/relay-detect.js)
@@ -869,7 +788,7 @@ async function importSource(source, autoRun = false) {
     }
   } catch (error) {
     if (token !== state.operation) return;
-    if ($('inspection-badge')) $('inspection-badge').textContent = 'Error'; state.homeMode = 'idle'; $('inventory-empty').firstElementChild.textContent = 'The package could not be read: the error window says why.'; appInfo.render();
+    state.homeMode = 'idle'; appInfo.render();
     // An installed app that failed to open keeps its icon on the launcher (it is not the app of a run any more: drawn as a saved app, to tap again), and the error offers to
     // choose its APK again, which replaces the stored copy. Before, the entry stayed "the app of this run", whose icon the idle launcher hides: the app vanished from the home screen.
     if (source.shelfId) { state.reimportShelfId = source.shelfId; state.shelfId = null; await refreshShelf(); }
@@ -883,7 +802,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js?v=7467c4d87e1f');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=935d0db9b854');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -1230,7 +1149,7 @@ const adbDevice = {
     if (!entries.length && !isCurrent) return false;
     if (!keepData) { await this.ensureLoaded(packageName); await waitIdle(); showAppData(await apkVM.clearAppData()); }   // the data goes with the package, as on a device
     await waitIdle();
-    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('file-info').hidden = true; $('inventory').hidden = true; $('inventory-empty').hidden = false; $('preview-name').textContent = 'App preview'; appInfo.render(); setStatus(`${packageName} uninstalled`); }
+    if (state.inventory?.packageName === packageName) { cancelOperation(); markLastRunEnded(); state.currentSource = null; state.inventory = null; state.shelfId = null; state.needsRestart = false; $('preview-name').textContent = 'App preview'; appInfo.render(); setStatus(`${packageName} uninstalled`); }
     for (const entry of entries) await apkShelf.remove(entry.id);
     await refreshShelf(); appendTrace(`adb: ${packageName} uninstalled${keepData ? ' (data kept)' : ' (data deleted)'}`); return true;
   },
@@ -1317,7 +1236,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=7467c4d87e1f')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=935d0db9b854')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
@@ -1446,7 +1365,7 @@ const deviceView = createDeviceView({ $, state, deviceState, frameMeter, hideErr
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
 const appPalette = createAppPalette({ origin: () => $('android-screen') });   // src/app-palette.js: the page in the open app's colours, as soon as the launcher knows its icon (task switcher onIcon: the stored icon of a saved app, then the VM's)
 window.apkLabPalette = appPalette;   // test and console access: .state
-taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item), hasPackage: item => !!state.inventory && (item.current || item.id === state.shelfId), package: () => showPackageWindow() }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); appInfo.render(); }, onIcon: url => { if (url) appPalette.fromURL(url); showPackageLine(); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
+taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item), hasPackage: item => !!state.inventory && (item.current || item.id === state.shelfId), package: () => showPackageWindow() }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); appInfo.render(); }, onIcon: url => { if (url) appPalette.fromURL(url); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
   begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Device navigation'); else appendTrace(message); },
   announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'App ended · tap its icon to open it again' : 'App in the background (onPause, onStop) · tap to go back'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENDED' : '<span></span> PAUSED'; } });
 // The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
@@ -1705,10 +1624,12 @@ async function loadScenarioCatalog() {
   try {
     const response = await fetch(new URL('./fixtures/catalog.json', import.meta.url), { cache: 'no-store' });
     // A build without bundled APKs (the public site: scripts/publish-site.mjs leaves them out) has no catalog: the page is only for the user's own APKs, so the library and the demo go away.
-    if (response.status === 404) { state.noBundledApks = true; $('scenario-catalog').hidden = true; document.querySelector('.demo-row')?.setAttribute('hidden', ''); if (!state.currentSource) $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint(); return; }
+    if (response.status === 404) { state.noBundledApks = true; return; }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const catalog = await response.json();
     if (!Array.isArray(catalog.scenarios)) throw new Error('Invalid catalog format');
+    // The page starts without the library and the demo (hidden in index.html) and shows them once there is a catalog, so a page without APKs never draws them.
+    $('scenario-catalog').hidden = false; document.querySelector('.demo-row')?.removeAttribute('hidden'); state.bundledApks = true; if (!state.currentSource) $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
     if ($('catalog-count')) $('catalog-count').textContent = String(catalog.scenarios.length);
     const cards = catalog.scenarios.map((entry) => {
       // The catalog names packaged fixtures; it never supplies runtime data or behavior.
@@ -1736,6 +1657,7 @@ async function loadScenarioCatalog() {
     });
     list.replaceChildren(...cards);
   } catch (error) {
+    $('scenario-catalog').hidden = false;
     const message = document.createElement('p'); message.className = 'catalog-loading'; message.textContent = `Catalog unavailable: ${error.message}. Try reloading the page.`; list.replaceChildren(message);
   }
 }
@@ -1798,8 +1720,6 @@ function reopenApp() {
   return runAPK();
 }
 $('cancel-operation').addEventListener('click', cancelOperation);
-$('native-abi').addEventListener('change', populateNativeLibraries);
-$('inspect-native-button').addEventListener('click', inspectSelectedNative);
 $('demo-button').addEventListener('click', runDemo);
 window.addEventListener('message', (event) => {
   if (event.origin !== location.origin || !event.data || typeof event.data !== 'object') return;

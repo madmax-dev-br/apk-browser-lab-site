@@ -59,6 +59,8 @@ export function packageFacts(inventory, { label = null, file = null } = {}) {
   return { title: label || inventory?.packageName || file?.name || 'Package', packageName: inventory?.packageName ?? null, version: attrs.versionName ? String(attrs.versionName) : null, facts, permissions };
 }
 
+/** Lists longer than this get a search box. */
+export const SEARCH_FROM = 3;
 let modalCounter = 0;
 /**
  * Opens the window. options: { modalHost (src/lab-modal.js), doc, inventory, label, icon (URL or null), file: { name, bytes }, current (the Activity the icon opens now, or null
@@ -67,32 +69,35 @@ let modalCounter = 0;
 export function openPackageModal({ modalHost, doc = globalThis.document, inventory, label = null, icon = null, file = null, current = null, busy = () => false, onLaunch = () => {} }) {
   const info = packageFacts(inventory, { label, file }), rows = activityRows(inventory, { current }), id = `pkg-${++modalCounter}`;
   const el = (tag, className, parent, text) => { const node = doc.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; parent?.append(node); return node; };
-  const root = el('div', 'pkg');
+  const root = el('div', 'pkg'), main = el('div', 'pkg-main', root);
 
   // who the package is
-  const head = el('div', 'pkg-head', root), badge = el('span', 'pkg-icon', head);
+  const head = el('div', 'pkg-head', main), badge = el('span', 'pkg-icon', head);
   if (icon) { const img = el('img', '', badge); img.alt = ''; img.src = icon; } else badge.textContent = 'APK';
   const who = el('div', 'pkg-who', head);
   el('strong', 'pkg-name', who, info.title);
   if (info.packageName) el('code', 'pkg-id', who, info.packageName);
-  const facts = el('dl', 'pkg-facts', root);
-  for (const [term, value] of info.facts) { const row = el('div', 'pkg-fact', facts); el('dt', '', row, term); el('dd', '', row, value); }
+  const facts = el('dl', 'pkg-facts', main);
+  for (const [term, value] of info.facts) { const row = el('div', 'pkg-fact', facts); el('dt', '', row, term); const [first, ...rest] = String(value).split(' · ').filter((part, at) => at === 0 || !/^0 /.test(part)); el('dd', '', row, first); if (rest.length) el('dd', 'pkg-fact-more', row, rest.join(' · ')); }
   // which Activity the icon opens
-  const launch = el('section', 'pkg-launch', root);
-  el('h3', 'pkg-launch-title', launch, 'Launch activity');
-  el('p', 'pkg-launch-note', launch, 'What the home-screen icon opens. Launch restarts the app with the selected one; the choice is kept for this package until the page reloads.');
+  const launch = el('section', 'pkg-launch', main);
+  el('h3', 'pkg-launch-title', launch, rows.length > 1 ? `Launch activity (${rows.length})` : 'Launch activity');
+  el('p', 'pkg-launch-note', launch, 'What the home-screen icon opens. Kept for this package until the page reloads.');
   const search = el('input', 'pkg-search', launch); search.type = 'search'; search.id = `${id}-search`; search.spellcheck = false; search.autocomplete = 'off';
   search.placeholder = `Search ${rows.length} ${rows.length === 1 ? 'activity' : 'activities'}`;
   search.setAttribute('role', 'combobox'); search.setAttribute('aria-label', 'Search activities'); search.setAttribute('aria-controls', `${id}-list`); search.setAttribute('aria-expanded', 'true'); search.setAttribute('aria-autocomplete', 'list');
-  const list = el('ul', 'pkg-activities', launch); list.id = `${id}-list`; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'Activities');
+  search.hidden = rows.length <= SEARCH_FROM;   // a short list is read at a glance: the list itself takes the keys
+  const list = el('ul', 'pkg-activities', launch); list.tabIndex = search.hidden ? 0 : -1; list.id = `${id}-list`; list.setAttribute('role', 'listbox'); list.setAttribute('aria-label', 'Activities');
   const empty = el('p', 'pkg-empty', launch); empty.hidden = true; empty.setAttribute('role', 'status');
-  const actions = el('div', 'pkg-actions', launch), status = el('span', 'pkg-status', actions), go = el('button', 'cp-button primary pkg-go', actions, 'Launch'); go.type = 'button';
+  const actions = el('div', 'pkg-actions'), status = el('span', 'pkg-status', actions), go = el('button', 'cp-button primary pkg-go', actions, 'Launch'); go.type = 'button';
   status.setAttribute('aria-live', 'polite');
 
   if (info.permissions.length) {
-    const more = el('details', 'pkg-perms', root); el('summary', '', more, `Requested permissions (${info.permissions.length})`);
+    const more = el('details', 'pkg-perms', main); el('summary', '', more, `Requested permissions (${info.permissions.length})`);
     const list = el('ul', 'pkg-perm-list', more); for (const name of info.permissions) { const item = el('li', '', list, name.replace(PERMISSION_PREFIX, '')); item.title = name; }
   }
+
+  root.append(actions);   // the foot stays in view while the rest scrolls
 
   let shown = rows, active = Math.max(0, rows.findIndex(row => row.isCurrent));
   const tag = (parent, text, kind) => el('span', `pkg-tag ${kind}`, parent, text);
@@ -101,10 +106,11 @@ export function openPackageModal({ modalHost, doc = globalThis.document, invento
     shown.forEach((row, index) => {
       const item = el('li', 'pkg-activity', list); item.id = `${id}-opt-${index}`; item.setAttribute('role', 'option'); item.setAttribute('aria-selected', index === active ? 'true' : 'false'); item.dataset.name = row.name;
       if (index === active) item.classList.add('active');
+      el('span', 'pkg-radio', item).setAttribute('aria-hidden', 'true');
       const text = el('span', 'pkg-activity-text', item); el('span', 'pkg-activity-short', text, row.short); if (row.pkg) el('span', 'pkg-activity-pkg', text, row.pkg);
       const tags = el('span', 'pkg-tags', item);
       if (row.isCurrent) tag(tags, 'opens now', 'current');
-      if (row.isDefault) tag(tags, 'manifest default', 'default'); else if (row.launcher) tag(tags, 'launcher', 'default');
+      if (row.isDefault) tag(tags, 'default', 'default'); else if (row.launcher) tag(tags, 'launcher', 'default');
       if (row.alias) tag(tags, 'alias', 'plain');
       if (row.enabled === false || row.enabled === 'false') tag(tags, 'disabled', 'plain');
       item.title = row.name;
@@ -113,19 +119,19 @@ export function openPackageModal({ modalHost, doc = globalThis.document, invento
       item.addEventListener('dblclick', () => { active = index; render(); start(); });
     });
     const row = shown[active];
-    search.setAttribute('aria-activedescendant', row ? `${id}-opt-${active}` : '');
+    for (const node of [search, list]) node.setAttribute('aria-activedescendant', row ? `${id}-opt-${active}` : '');
     list.querySelector?.('.active')?.scrollIntoView?.({ block: 'nearest' });
     empty.hidden = shown.length > 0 || !rows.length; empty.textContent = rows.length ? `No activity matches “${search.value}”.` : '';
     if (!rows.length) { empty.hidden = false; empty.textContent = 'The manifest declares no activity: the lab starts the first one it finds in the code.'; }
     go.disabled = !row || busy();
-    status.textContent = row ? (row.isCurrent ? 'The icon opens this one now' : `Opens ${row.short}`) : '';
+    status.textContent = row ? (row.isCurrent ? `The icon opens ${row.short}` : `Restarts the app with ${row.short}`) : '';
   };
   const start = () => {
     const row = shown[active]; if (!row || busy()) return;
     modal.close('launch'); onLaunch(row.name);
   };
   search.addEventListener('input', () => { shown = filterActivities(rows, search.value); const at = shown.findIndex(row => row.isCurrent); active = at >= 0 ? at : 0; render(); });
-  search.addEventListener('keydown', event => {
+  for (const node of [search, list]) node.addEventListener('keydown', event => {
     const last = shown.length - 1, move = to => { event.preventDefault?.(); active = Math.max(0, Math.min(last, to)); render(); };
     if (event.key === 'ArrowDown') move(active + 1);
     else if (event.key === 'ArrowUp') move(active - 1);
@@ -139,6 +145,6 @@ export function openPackageModal({ modalHost, doc = globalThis.document, invento
   render();
   const modal = modalHost.open({ title: 'Package', size: 'medium', content: root });
   modal.element.querySelector?.('.lab-modal')?.classList?.add('pkg-modal');
-  search.focus?.();
+  (search.hidden ? list : search).focus?.();
   return Object.assign(modal, { search, list, refresh: render });
 }

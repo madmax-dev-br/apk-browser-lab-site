@@ -127,11 +127,11 @@ export function initControlPanelUI(root, { doc = root?.ownerDocument ?? globalTh
         hide(sub, subHits === 0);
         sectionHits += subHits; hits += subWhole ? 1 : subHits;
       }
+      // Execution's foot (Restore defaults) is not a group: it shows when it matches or its section does
+      for (const foot of section.querySelectorAll('.cp-reset')) { const hit = whole || matchesQuery(searchText(foot), query); hide(foot, !hit); if (hit && !whole) { sectionHits++; hits++; } }
       hide(section, sectionHits === 0 && !whole);
       if (sectionHits || whole) { section.open = true; shownSections++; }
     }
-    const footer = $('cp-footer');
-    if (footer) { let footerHits = 0; for (const item of footer.querySelectorAll(ITEM)) { const hit = matchesQuery(searchText(item), query); hide(item, !hit); if (hit) footerHits++; } hits += footerHits; }
     if (empty) empty.hidden = hits > 0;
     if (status) status.textContent = hits ? `${plural(hits, 'match', 'matches')} in ${plural(shownSections, 'section')}` : 'No control matches';
     return hits;

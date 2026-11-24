@@ -62,6 +62,7 @@ summary{-webkit-tap-highlight-color:transparent}
 /* ---- 2. Page ------------------------------------------------------------------------------------------------------------------------------------------------ */
 body{font:400 14px/1.45 var(--sans);color:var(--ink);background:var(--bg)}
 main{max-width:none;margin:0;padding:0}
+body:has(>.tool-dock){padding-bottom:34px}   /* the dock's bar (tool-dock.js BAR_HEIGHT), from the first paint */
 body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .workspace,main>.workspace:first-child{grid-template-columns:420px minmax(0,1fr);gap:0;align-items:stretch;margin:0}
 
@@ -90,12 +91,6 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .demo-row{margin:12px 0 0;gap:12px}
 .demo-row>span{font-size:14px;color:var(--soft)}
 .demo-row button{padding:0;border:0;background-color:transparent;color:var(--accent-ink);font-weight:500;text-decoration:underline;text-underline-offset:.18em;text-decoration-thickness:1px}
-.file-info{margin:16px 0 0;padding:10px 12px;gap:8px 10px;flex-wrap:wrap;border:1px solid var(--line);border-radius:var(--r-control);background-color:transparent}
-.file-icon{padding:2px 6px;border-radius:4px;background-color:var(--accent-soft);color:var(--accent-ink);font:500 12px/16px var(--mono)}
-.file-info>div{flex:1 1 calc(100% - 64px);min-width:0}
-.file-info strong{max-width:none;font:500 12px/18px var(--mono);color:var(--ink)}
-.file-info>div>span{margin-top:0;font-size:12px;color:var(--muted)}
-.file-info button{font-size:12px;line-height:16px;padding:3px 10px;margin:0}
 
 .prepare-file{order:99;flex:1 0 100%;font-weight:500;color:var(--ink)}
 /* the loading line (app.js beginOperation / onWorkerProgress), in the status line under the device: while it shows, it takes the place of the status message */
@@ -108,62 +103,12 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .status-bar .operation-panel small{flex:none;font:400 12px/20px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 .status-bar .operation-panel button{flex:none;margin:0;font-size:12px;line-height:16px;padding:3px 10px}
 .spinner{border-color:var(--line);border-top-color:var(--accent)}
-.inspection-panel{margin:20px -20px 0;padding:0 20px;border-top:1px solid var(--line)}
-/* the open package at the top of the controls (app.js showPackageLine): one line (icon, name, version) that opens on its details; the "Open APK" drop zone shows only without a package, or under the open details */
-#apk-panel[data-state=loaded]{padding-top:10px;padding-bottom:10px}
-.package-strip.inspection-panel{margin:0;padding:0;border-top:0}
-.package-strip[hidden]{display:none}
-.package-strip>summary.package-line{display:flex;align-items:center;gap:10px;min-height:36px;padding:0;margin:0;list-style:none;cursor:pointer}
-.package-strip>summary.package-line::-webkit-details-marker{display:none}
-.package-strip[open]>summary.package-line{padding-bottom:0}
-.package-icon{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:7px;overflow:hidden;background-color:var(--surface-2);border:1px solid var(--line);color:var(--muted);font:600 9px/1 var(--mono)}
-.package-icon.has-icon{border-color:transparent;background:none}
-.package-icon img{width:100%;height:100%;object-fit:cover}
-.package-title{display:flex;align-items:baseline;gap:8px;flex:1 1 auto;min-width:0}
-.package-title strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;line-height:20px;font-weight:600;color:var(--ink)}
-.package-version{flex:none;font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.package-body{padding:4px 0 6px}
-.package-body .file-info{margin-top:8px}
-.package-hint{margin:10px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
-#apk-panel[data-state=loaded] .package-strip:not([open])~.apk-open{display:none}
-#apk-panel[data-state=loaded] .apk-open{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-#apk-panel[data-state=loaded] .apk-open>.rail-title{font-size:14px;line-height:20px;margin-bottom:8px}
-#apk-panel[data-state=loaded] .drop-zone{padding:10px 12px}
-#apk-panel[data-state=loaded] .drop-zone small{display:none}
-#apk-panel[data-state=loaded] .demo-row{display:none}
-.inspection-panel>summary{display:flex;align-items:center;gap:8px;margin:0;padding:14px 0;border-radius:6px}
-.inspection-panel:not([open])>summary{margin-bottom:0}
-.inspection-panel[open]>summary{padding-bottom:10px}
-.inspection-panel[open]{padding-bottom:4px}
-.quiet-badge,.inspection-panel>summary .quiet-badge,.device-panel>summary .quiet-badge,.cp-badge{margin-left:auto;padding:0;border-radius:0;background-color:transparent;font:400 12px/16px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.quiet-badge,.device-panel>summary .quiet-badge,.cp-badge{margin-left:auto;padding:0;border-radius:0;background-color:transparent;font:400 12px/16px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 /* app.js writes these two in capitals: shown in sentence case */
 #runtime-badge,#execution-engine{text-transform:lowercase}
 #runtime-badge{display:inline-block}
 #runtime-badge::first-letter{text-transform:uppercase}
-.inventory-empty{min-height:0;margin:0 0 16px;padding:0;border:0}
-.inventory-empty p{margin:0;font-size:14px;line-height:1.45;color:var(--muted)}
-.inventory{margin:0 0 16px;padding:0;border:0;border-radius:0}
 .tiny-label,.activity-label{display:block;margin:0 0 4px;font-size:12px;line-height:16px;color:var(--muted)}
-.inventory-heading strong{margin:0;font:500 12px/18px var(--mono);color:var(--ink);word-break:break-all}
-.stats{display:block;margin:12px 0 0;padding:0;border-top:1px solid var(--line)}
-.stats>div{display:flex;flex-direction:row-reverse;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--line)}
-.stats strong{font-size:14px;font-weight:500;color:var(--ink);font-variant-numeric:tabular-nums}
-.stats span{margin:0;font-size:14px;color:var(--soft)}
-.archive-summary{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
-.archive-summary strong{font-size:14px;font-weight:500;color:var(--ink)}
-.archive-summary p{margin:4px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
-.findings summary{display:flex;align-items:center;margin-top:14px;font-size:14px;font-weight:500;color:var(--ink);cursor:pointer}
-.findings summary>span{float:none}
-#inventory-details{margin-top:8px;max-height:220px;font:400 12px/1.6 var(--mono);color:var(--soft)}
-#inventory-details h4{margin:10px 0 4px;font:600 12px/16px var(--sans);color:var(--ink)}
-#inventory-details ul{padding-left:16px}
-.native-inspection{margin:0 0 16px;padding:12px;border:1px solid var(--line);border-radius:var(--r-control);background-color:transparent}
-.native-inspection summary{font-size:14px;font-weight:500;color:var(--ink)}
-.native-inspection summary>span{padding:1px 6px;border-radius:4px;background-color:var(--code-bg);color:var(--code-ink);font:500 12px/16px var(--mono)}
-.native-inspection>p{margin:10px 0;font-size:12px;line-height:1.5;color:var(--muted)}
-.native-inspection>label{margin:10px 0 4px;font-size:12px;color:var(--muted)}
-.native-inspection>button{width:100%;margin-top:12px}
-.native-inspection>pre{margin:12px 0 0;padding:10px;border-radius:6px;background-color:var(--code-bg);color:var(--code-ink);font:400 12px/1.6 var(--mono)}
 .unsupported-notice{margin:0 0 16px;padding:12px;border:1px solid var(--amber);border-radius:var(--r-control);background-color:var(--amber-soft);color:var(--ink)}
 .unsupported-notice strong{font-size:14px;font-weight:600;color:var(--amber-ink)}
 .unsupported-notice p{margin:6px 0;font-size:14px;line-height:1.45}
@@ -360,7 +305,7 @@ body.is-embedded{--bar-h:0px}   /* ?embed=1: no top bar, no footer */
 .scenario-catalog>summary .catalog-toggle{margin:0 0 4px 4px;font-size:0;color:transparent}
 .scenario-catalog[open]>summary .catalog-toggle{transform:rotate(-135deg);margin-bottom:-4px}
 .catalog-body{padding:0;border:0;max-width:1240px}
-.scenario-catalog,#inspection-badge,.preview{scroll-margin-top:calc(var(--bar-h) + 16px)}
+.scenario-catalog,.preview{scroll-margin-top:calc(var(--bar-h) + 16px)}
 .catalog-intro{display:block;max-width:76ch;margin:8px 0 20px;font-size:14px;line-height:1.55;color:var(--soft)}
 .catalog-head,.scenario-card{display:grid;grid-template-columns:minmax(0,1fr) 250px 116px 190px;column-gap:24px}
 .catalog-head{padding:0 0 8px;border-bottom:1px solid var(--line-strong);font-size:12px;line-height:16px;font-weight:500;color:var(--muted)}
@@ -598,7 +543,6 @@ div.ci-tree{min-width:0;max-height:480px;overflow:auto;border:1px solid var(--li
   .topnav{order:3;flex:1 0 100%;margin:0 -12px;overflow-x:auto;scrollbar-width:none}
   .topnav a,.topnav .site-link,.topnav .integration-link{padding:8px 12px;font-size:14px;margin:0}
   .controls{padding:16px}
-  .inspection-panel{margin:16px -16px 0;padding:0 16px}
   .device-panel>summary{padding:14px 16px}
   .cp-group>summary{padding:10px 16px}
   .cp-body{padding:4px 16px 16px}
@@ -857,18 +801,16 @@ span.files-thumb svg{width:22px;height:22px;fill:currentColor}
 .cp-core{margin:0 0 12px}
 .cp-core .cp-advanced[open]{padding-left:0;border-left:0}
 .cp-core .cp-advanced[open]>summary{margin-left:0}
-/* the panel's foot: page options, the line that says how a change reached the app, and Restore defaults (every setting of the panel) */
-.cp-footer{display:flex;flex-direction:column;gap:8px;padding:14px 20px 18px;border-top:1px solid var(--line);background-color:var(--surface-2)}
-.cp-footer .cp-item{margin:0}
-.cp-footer #device-status{margin:0}
-.cp-footer #device-reset{align-self:flex-start}
+/* the end of Execution: the line that says how a change reached the app, and Restore defaults (every setting of the panel) */
+.cp-reset{padding:14px 0 0}
+.cp-reset #device-status{margin:0 0 10px}
+.cp-reset .cp-item{margin:0}
 /* help dialog: the group names between the tabs */
 .help-group{padding:12px 12px 4px;font:600 12px/16px var(--sans);color:var(--soft)}
 .help-group:first-child{padding-top:4px}
 @media (max-width:620px){.help-group{display:none}}
 @media (max-width:700px){
   .cp-filter{padding:10px 16px 8px}
-  .cp-footer{padding:12px 16px 16px}
   .cp-filter-empty{padding:16px}
 }
 @media (max-width:360px){
@@ -960,6 +902,16 @@ code.lr-text{padding:0;background:none;color:var(--ink);font:400 12px/18px var(-
 .t-literal,.t-keyword{color:var(--syn-keyword)}
 .t-punct,.t-bracket,.t-comment{color:var(--muted)}
 .t-bad{color:var(--warn)}
+/* the Code tool's own colours (Java, smali, XML): the page's syntax tokens are greys, which is hard to read in long code */
+.code-browser{--code-keyword:#7A3E9D;--code-type:#0B6E6A;--code-method:#1F5FBF;--code-string:#2F7D32;--code-number:#A8500F;--code-annotation:#806000;--code-comment:#656D78}
+:root[data-theme=dark] .code-browser{--code-keyword:#C79BEB;--code-type:#66C7BF;--code-method:#8AB4F8;--code-string:#9CCB86;--code-number:#EFA77A;--code-annotation:#DEBE78;--code-comment:#8A93A0}
+.code-browser .t-keyword{color:var(--code-keyword)}
+.code-browser :is(.t-type,.t-key){color:var(--code-type)}
+.code-browser .t-method{color:var(--code-method)}
+.code-browser :is(.t-string,.t-template){color:var(--code-string)}
+.code-browser :is(.t-number,.t-constant,.t-literal,.t-regex){color:var(--code-number)}
+.code-browser .t-annotation{color:var(--code-annotation)}
+.code-browser .t-comment{color:var(--code-comment);font-style:italic}
 .ce-match{border-radius:2px;background-color:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
 .ce-errmark{background-color:var(--warn-soft);text-decoration:underline wavy var(--warn);text-decoration-skip-ink:none;text-underline-offset:3px}
 .ce-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 6px}
@@ -996,40 +948,50 @@ code.lr-text{padding:0;background:none;color:var(--ink);font:400 12px/18px var(-
 .lr-main>.lr-sub{flex-shrink:4}
 
 /* The Package window (src/package-modal.js): who the package is, then the Activity its launcher icon opens, chosen from a searchable list */
-.pkg-modal .lab-modal-body{font:400 13px/1.5 var(--sans)}
-.pkg{display:flex;flex-direction:column;gap:16px}
-.pkg-head{display:flex;align-items:center;gap:14px}
-.pkg-icon{flex:none;display:grid;place-items:center;width:48px;height:48px;border-radius:12px;overflow:hidden;background-color:var(--surface-2);border:1px solid var(--line);color:var(--muted);font:600 11px/1 var(--mono)}
+.lab-modal.pkg-modal{width:min(640px,100%);height:auto;max-height:min(760px,100%)}
+.pkg-modal .lab-modal-body{display:flex;min-height:0;padding:0;overflow:hidden;font:400 13px/1.5 var(--sans)}
+.pkg{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column}
+.pkg-main{flex:1 1 auto;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:20px;padding:20px}
+.pkg-head{display:flex;align-items:center;gap:16px}
+.pkg-icon{flex:none;display:grid;place-items:center;width:56px;height:56px;border-radius:14px;overflow:hidden;background-color:var(--surface-2);border:1px solid var(--line);color:var(--muted);font:600 12px/1 var(--mono)}
 .pkg-icon:has(img){border-color:transparent;background:none}
 .pkg-icon img{width:100%;height:100%;object-fit:cover}
-.pkg-who{display:flex;flex-direction:column;min-width:0}
+.pkg-who{display:flex;flex-direction:column;gap:2px;min-width:0}
 .pkg-name{font-size:18px;line-height:24px;font-weight:600;color:var(--ink);overflow-wrap:anywhere}
 .pkg-id{font:400 12px/18px var(--mono);color:var(--soft);overflow-wrap:anywhere}
-.pkg-facts{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:2px 24px;margin:0}
-.pkg-fact{display:grid;grid-template-columns:84px 1fr;gap:12px;min-width:0}
-.pkg-fact dt{color:var(--muted);font-size:12px;line-height:20px}
-.pkg-fact dd{margin:0;color:var(--ink);font-size:13px;line-height:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
-.pkg-perms>summary{cursor:pointer;color:var(--soft);font-size:12px}
-.pkg-perm-list{margin:6px 0 0;padding:0;list-style:none;columns:2 220px;column-gap:16px;font:400 12px/20px var(--mono);color:var(--soft)}
-.pkg-launch{display:flex;flex-direction:column;gap:8px;padding-top:14px;border-top:1px solid var(--line)}
+/* one cell per fact, its label over its value: the hairlines are the grid's own background showing in the 1px gaps */
+.pkg-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:1px;margin:0;border:1px solid var(--line);border-radius:var(--r-control);overflow:hidden;background-color:var(--line)}
+.pkg-fact{display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 14px;background-color:var(--surface)}
+.pkg-fact dt{color:var(--muted);font-size:12px;line-height:16px}
+.pkg-fact dd{margin:0;color:var(--ink);font-size:13px;line-height:18px;font-weight:500;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pkg-fact .pkg-fact-more{font-size:12px;line-height:16px;font-weight:400;color:var(--soft)}
+.pkg-launch{display:flex;flex-direction:column;gap:10px}
 .pkg-launch-title{margin:0;font-size:14px;line-height:20px;font-weight:600;color:var(--ink)}
-.pkg-launch-note{margin:-4px 0 0;font-size:12px;line-height:1.5;color:var(--muted)}
+.pkg-launch-note{margin:-8px 0 0;font-size:12px;line-height:18px;color:var(--muted)}
 .pkg-search{width:100%;box-sizing:border-box}
-.pkg-activities{margin:0;padding:4px;list-style:none;max-height:min(280px,40vh);overflow:auto;border:1px solid var(--line);border-radius:var(--r-control);background-color:var(--bg)}
-.pkg-activity{display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:calc(var(--r-control) - 2px);cursor:pointer}
+.pkg-activities{margin:0;padding:0;list-style:none;max-height:min(264px,36vh);overflow:auto;border:1px solid var(--line);border-radius:var(--r-control)}
+.pkg-activities:empty{display:none}
+.pkg-activities:focus-visible{outline:1px solid var(--accent);outline-offset:0}
+.pkg-activity{display:flex;align-items:center;gap:12px;padding:9px 14px;cursor:pointer}
+.pkg-activity+.pkg-activity{border-top:1px solid var(--line)}
 .pkg-activity:hover{background-color:var(--surface-2)}
-.pkg-activity.active{background-color:var(--accent-soft);box-shadow:inset 2px 0 0 var(--accent)}
+.pkg-activity.active{background-color:var(--accent-soft)}
+.pkg-radio{flex:none;box-sizing:border-box;width:16px;height:16px;border:1.5px solid var(--line-strong);border-radius:50%}
+.pkg-activity.active .pkg-radio{border:5px solid var(--accent)}
 .pkg-activity-text{display:flex;flex-direction:column;flex:1 1 auto;min-width:0}
 .pkg-activity-short{font-size:13px;line-height:18px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pkg-activity-pkg{font:400 11px/16px var(--mono);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pkg-tags{display:flex;gap:4px;flex:none}
-.pkg-tag{padding:1px 7px;border-radius:var(--r-pill);font:500 11px/16px var(--sans);white-space:nowrap;border:1px solid var(--line);color:var(--soft)}
+.pkg-tags{display:flex;gap:6px;flex:none}
+.pkg-tag{padding:1px 8px;border-radius:var(--r-pill);font:500 11px/16px var(--sans);white-space:nowrap;border:1px solid var(--line);color:var(--soft)}
 .pkg-tag.current{border-color:var(--accent);color:var(--accent-ink);background-color:var(--surface)}
 .pkg-empty{margin:0;font-size:12px;color:var(--muted)}
-.pkg-actions{display:flex;align-items:center;gap:12px}
+.pkg-perms>summary{cursor:pointer;color:var(--ink);font-size:14px;line-height:20px;font-weight:600}
+.pkg-perm-list{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;padding:0;list-style:none}
+.pkg-perm-list li{padding:2px 8px;border:1px solid var(--line);border-radius:6px;font:400 11px/18px var(--mono);color:var(--soft);overflow-wrap:anywhere}
+.pkg-actions{flex:none;display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid var(--line)}
 .pkg-status{flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pkg-go{flex:none}
-@media (max-width:560px){.pkg-tags{flex-direction:column;align-items:flex-end}}
+@media (max-width:560px){.pkg-facts{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.pkg-tags{flex-direction:column;align-items:flex-end}}
 /* ---- The Code browser (src/code-browser.js, a tool of the dock): a list on the left (search results, the class tree, the APK's files), the reader on the right. The reader's
    gutter is the one strong element: line number and the dex pc of the instruction on that line (hex), side by side in the code face, with a marker slot the debugger uses
    (src/code-browser-api.js setMarkers). Lines of a method the user replaced carry an amber rule (amber = a change chosen by the user, as "App modified"). */

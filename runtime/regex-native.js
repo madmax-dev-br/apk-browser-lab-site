@@ -1,5 +1,5 @@
-import {APKError} from './apk-error.js?v=7467c4d87e1f';
-import {MAX_REGEX_HANDLES} from './icu-break-provider.js?v=7467c4d87e1f';
+import {APKError} from './apk-error.js?v=935d0db9b854';
+import {MAX_REGEX_HANDLES} from './icu-break-provider.js?v=935d0db9b854';
 
 const PATTERN='Lcom/android/icu/util/regex/PatternNative;',MATCHER='Lcom/android/icu/util/regex/MatcherNative;',REGISTRY='Llibcore/util/NativeAllocationRegistry;';
 const FINALIZERS=new Map([[0x5245475001n,'pattern'],[0x5245474d01n,'matcher']]);

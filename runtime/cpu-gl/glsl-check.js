@@ -1,8 +1,8 @@
 // The semantic pass of the lab's GLSL ES compiler (docs/OPENGL-ES-ON-CPU.md): scopes and symbols, the types of every expression (GLSL ES has no implicit conversions), the
 // built-in variables and functions of 1.00 and 3.00 per stage, constant expressions (array sizes, const variables), and the checks a conformant compiler makes (undeclared names,
 // mismatched operands, l-values, returns, loop and switch jumps). It annotates the AST in place for the code generator (src/cpu-gl/glsl-codegen.js). No process.*.
-import { GlslError, preprocess, parse } from './glsl-parse.js?v=7467c4d87e1f';
-import { VOID, FLOAT, INT, UINT, BOOL, scalar, vec, mat, array, sampler, struct, basicType, comps, isNumeric, isInteger, isBoolean, same, fieldOffset, containsSampler, containsArray } from './glsl-types.js?v=7467c4d87e1f';
+import { GlslError, preprocess, parse } from './glsl-parse.js?v=935d0db9b854';
+import { VOID, FLOAT, INT, UINT, BOOL, scalar, vec, mat, array, sampler, struct, basicType, comps, isNumeric, isInteger, isBoolean, same, fieldOffset, containsSampler, containsArray } from './glsl-types.js?v=935d0db9b854';
 
 const fail = (message, line) => { throw new GlslError(message, line); };
 

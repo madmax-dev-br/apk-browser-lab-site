@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=7467c4d87e1f") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=7467c4d87e1f">
-  <link rel="stylesheet" href="./lab-theme.css?v=7467c4d87e1f">
-  <meta name="apk-browser-build" content="7467c4d87e1f">
+  <style>@import url("./styles.css?v=935d0db9b854") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=935d0db9b854">
+  <link rel="stylesheet" href="./lab-theme.css?v=935d0db9b854">
+  <meta name="apk-browser-build" content="935d0db9b854">
 </head>
 <body>
   <header class="topbar">
@@ -21,30 +21,16 @@
   <main>
     <div class="workspace">
       <aside class="controls-column">
-        <section id="apk-panel" class="controls apk-panel" data-state="empty">
-          <details id="inspection-panel" class="inspection-panel package-strip" hidden>
-          <summary class="package-line" title="The open package: details, classes and native libraries"><span id="package-icon" class="package-icon" aria-hidden="true">APK</span><span class="package-title"><strong id="package-label">App</strong><span id="package-version" class="package-version"></span></span><span class="visually-hidden">Package details</span><span class="trace-chevron" aria-hidden="true">⌄</span></summary>
-          <div class="package-body">
-          <div id="file-info" class="file-info" hidden><span class="file-icon">APK</span><div><strong id="file-name"></strong><span id="file-size"></span></div></div>
-          <div id="inventory-empty" class="inventory-empty"><p>Reading the package…</p></div>
-          <div id="inventory" class="inventory" hidden>
-            <div class="inventory-heading"><span class="tiny-label">Package name</span><strong id="package-name"></strong></div>
-            <div class="stats"><div><strong id="class-count">0</strong><span>DEX classes</span></div><div><strong id="activity-count">0</strong><span>Activities</span></div><div><strong id="dependency-count">0</strong><span>Dependencies</span></div></div>
-            <p class="package-hint">Hold the app's icon on the home screen (or right-click it) and choose Package to see its activities and change the one it opens.</p>
-            <div id="archive-summary" class="archive-summary" hidden></div><details class="findings"><summary>Classes and dependencies <span class="trace-chevron" aria-hidden="true">⌄</span></summary><div id="inventory-details"></div></details>
-          </div>
-          <details id="native-inspection" class="native-inspection" hidden><summary>Analyze native libraries <span>ELF</span></summary><p>Metadata inspection of one library at a time, up to 32 MiB. It does not run native code or implement JNI.</p><label for="native-abi">ABI</label><select id="native-abi"></select><label for="native-library">Library</label><select id="native-library"></select><button id="inspect-native-button">Analyze library</button><pre id="native-result" hidden></pre></details>
-          </div>
-          </details>
+        <section id="apk-panel" class="controls apk-panel">
           <div class="apk-open">
           <h2 class="rail-title">Open APK</h2>
           <label id="drop-zone" class="drop-zone" for="apk-file">
             <strong>Drop an APK here</strong><span>or <u>choose a file</u></span><small>Accepts .apk and .aab files (an App Bundle runs as its base module), and APK sets (.apks / .xapk / .apkm: a base APK with its splits). The file never leaves this browser.</small>
           </label>
           <input id="apk-file" type="file" accept=".apk,.aab,.apks,.xapk,.apkm,application/vnd.android.package-archive" class="visually-hidden">
-          <div class="demo-row"><span>No APK at hand?</span><button id="demo-button">Run demo</button></div>
+          <div class="demo-row" hidden><span>No APK at hand?</span><button id="demo-button">Run demo</button></div>
           </div>
-          <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>This APK cannot be run yet</strong><p>The report lists file limits that prevent the attempt. See the details below; a partial inspection does not prove compatibility.</p><ul id="unsupported-list"></ul></div>
+          <div id="unsupported-notice" class="unsupported-notice" role="status" hidden><strong>This APK cannot be run yet</strong><p>The report lists file limits that prevent the attempt. A partial inspection does not prove compatibility.</p><ul id="unsupported-list"></ul></div>
         </section>
         <section class="controls controls-card" aria-label="Controls">
           <details id="control-panel" class="device-panel control-panel" open>
@@ -263,6 +249,10 @@
                   <label class="cp-check" for="native-version-mismatch"><input id="native-version-mismatch" type="checkbox" role="switch"><span>Allow native library version mismatch<small>The lab's React Native native libraries are built for one release (0.79.4). On, an app of another React Native or Hermes version gets them anyway instead of an <code>UnsatisfiedLinkError</code>: it may fail later where the versions differ. Recorded as <code>NATIVE VERSION MISMATCH ALLOWED</code> in the log and the summary. Applies when the APK is reopened</small></span></label>
                 </details>
               </section>
+              <div class="cp-reset" id="cp-reset">
+                <p id="device-status" class="cp-note" role="status" aria-live="polite">Changes reach the app as on Android: Configuration, re-selected resources and a recreated Activity or onConfigurationChanged.</p>
+                <div class="cp-item" data-keywords="reset"><button id="device-reset" class="cp-button" type="button">Restore defaults</button></div>
+              </div>
             </div></details>
             <details class="cp-group" id="cp-sec-debug" data-section="debug">
               <summary><h3 id="cp-debug-title">Debugging</h3><span id="cp-sum-debug" class="cp-badge cp-sum" title="Developer options and method or activity changes in effect"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -313,10 +303,6 @@
               </section>
             </div></details>
             <p id="cp-filter-empty" class="cp-filter-empty" hidden>No control matches. Try another word, or clear the search.</p>
-            <div class="cp-footer" id="cp-footer">
-              <p id="device-status" class="cp-note" role="status" aria-live="polite">Changes reach the app as on Android: Configuration, re-selected resources and a recreated Activity or onConfigurationChanged.</p>
-              <button id="device-reset" class="cp-button" type="button">Restore defaults</button>
-            </div>
           </details>
         </section>
       </aside>
@@ -326,7 +312,7 @@
         <div class="preview-stage" id="preview-stage">
           <button id="fullscreen-close" class="fullscreen-close" type="button" hidden title="Exit full screen (Esc)" aria-label="Exit full screen">✕</button>
           <div id="lab-overlay-layer" class="lab-overlay-layer"></div>
-          <div id="empty-preview" class="empty-preview"><h2>Your app starts here.</h2><p>Select an APK: it is installed and opened right away.<br>Or pick one of the examples in the Examples tab, on the bottom bar.</p></div>
+          <div id="empty-preview" class="empty-preview" hidden><h2>Your app starts here.</h2><p>Select an APK: it is installed and opened right away.</p></div>
           <div id="boot-overlay" class="boot-overlay" hidden role="status" aria-live="polite"><div class="boot-screen"><img id="boot-app-icon" class="boot-app-icon" alt="" hidden><svg class="boot-logo" viewBox="0 0 24 24" width="84" height="84" aria-hidden="true"><path fill="currentColor" fill-rule="evenodd" d="M17.6 9.48l1.84-3.18c.16-.31.04-.69-.26-.85-.29-.15-.65-.06-.83.22l-1.88 3.24a11.463 11.463 0 00-8.94 0L5.65 5.67c-.19-.29-.58-.38-.87-.2-.28.18-.37.54-.22.83L6.4 9.48A10.78 10.78 0 001 18h22a10.78 10.78 0 00-5.4-8.52zM7 15.25a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm10 0a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5z"/></svg><div class="boot-bar"><i></i></div><p id="boot-caption" class="boot-caption">Starting…</p></div></div>
           <div id="android-device" class="android-device" hidden>
             <div id="android-screen" class="android-screen">
@@ -347,6 +333,14 @@
           <div id="error-panel" class="error-panel" role="alert" hidden><span class="error-icon">!</span><h2 id="error-title">Could not run</h2><p id="error-message"></p><details id="error-diagnostics" hidden><summary>Technical details of the run</summary><pre id="error-detail" hidden></pre></details><button id="error-reimport" type="button" title="Opens the file picker: the APK chosen replaces the copy stored for this app (its icon and app data stay)" hidden>Choose the APK again…</button> <button id="error-close" type="button" title="Closes this window; the app stays on the device home screen to open again (Esc)">Close</button> <button id="error-copy" type="button">Copy diagnostics</button> <button id="error-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Show summary</button></div>
         </div>
         <div class="status-bar"><span class="status-message"><i id="status-dot"></i><span id="status-text" role="status" aria-live="polite">Waiting for an app</span></span><button id="app-info" class="app-info" type="button" aria-describedby="app-info-detail" aria-expanded="false" hidden><span class="app-info-text"></span></button><div id="app-info-detail" class="memory-detail app-info-detail" role="tooltip" hidden></div><div id="operation-panel" class="operation-panel" hidden><span class="spinner" aria-hidden="true"></span><strong id="operation-message">Processing in the Web Worker…</strong><progress id="operation-progress" max="1" aria-label="Loading progress"></progress><small id="operation-detail" title="Runs in a Web Worker: the page keeps responding; Cancel ends the VM"></small><button id="cancel-operation" type="button">Cancel</button></div><span id="memory-meter" class="memory-meter" tabindex="0" aria-describedby="memory-detail" hidden><i></i><span class="memory-text" role="status"></span></span><div id="memory-detail" class="memory-detail" role="tooltip" hidden></div><span id="execution-engine">411 × 914 dp · density 1</span></div>
+      </section>
+    </div>
+  </main>
+  <div id="tool-dock" class="tool-dock" role="region" aria-label="Tools">
+    <div class="tool-dock-panel" hidden>
+      <div class="tool-dock-handle" role="separator" aria-orientation="horizontal" aria-label="Tools panel height (arrow keys to adjust)" aria-valuemin="140" tabindex="0"></div>
+      <button class="tool-dock-hide" type="button" aria-label="Hide the panel" title="Hide (Esc)">▾</button>
+      <div class="tool-dock-slot">
         <details id="trace" class="trace"><summary><span>Execution log</span><span id="trace-count">0 events</span><span class="trace-actions"><button id="screen-state-summary" type="button" title="Shows only the summary (memory, what retains it, exceptions, main thread) in large type: a photo is enough">Summary</button><button id="screen-state-copy" type="button" title="Copies a summary of what the VM shows (Activities, view tree, Compose, frames, queue, threads, memory) even without an error">State</button></span><span class="trace-chevron">⌄</span></summary><pre id="trace-output">The log will appear after the run.</pre></details>
         <details id="logcat" class="trace logcat"><summary><span>Logcat</span><span class="logcat-count">0 lines</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filter by tag or text" aria-label="Filter logcat by tag or text"><select class="logcat-level" aria-label="Minimum level"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Scroll</label><button class="logcat-clear" type="button">Clear</button><select class="logcat-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><button class="logcat-save" type="button">Save</button></div>
@@ -367,9 +361,7 @@
           <div class="cb-body"></div></details>
         <details id="plugins-output" class="trace logcat plugins-output" hidden><summary><span>Plugins</span><span class="po-count">0 running</span><span class="trace-chevron">⌄</span></summary>
           <div class="po-cards" aria-live="off"></div></details>
-      </section>
-    </div>
-    <details id="scenario-catalog" class="scenario-catalog">
+    <details id="scenario-catalog" class="scenario-catalog" hidden>
       <summary><h2>Examples</h2><span id="catalog-count" class="catalog-count"></span><span class="catalog-toggle trace-chevron" aria-hidden="true">⌄</span></summary>
       <div class="catalog-body">
         <p class="catalog-intro">Test APKs served by this page. Inspect reads the package's DEX files; Run tries to start the Activity and shows the first limit found. The experimental ones are real Android APKs for diagnostics and may stop at an API the VM does not have yet; native libraries in the package do not guarantee JNI support.</p>
@@ -377,16 +369,11 @@
         <div id="scenario-list" class="scenario-list" aria-live="polite"><p class="catalog-loading">Loading examples…</p></div>
       </div>
     </details>
-  </main>
-  <div id="tool-dock" class="tool-dock" role="region" aria-label="Tools">
-    <div class="tool-dock-panel" hidden>
-      <div class="tool-dock-handle" role="separator" aria-orientation="horizontal" aria-label="Tools panel height (arrow keys to adjust)" aria-valuemin="140" tabindex="0"></div>
-      <button class="tool-dock-hide" type="button" aria-label="Hide the panel" title="Hide (Esc)">▾</button>
-      <div class="tool-dock-slot"></div>
+      </div>
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=7467c4d87e1f"></script>
+  <script type="module" src="./app.js?v=935d0db9b854"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
