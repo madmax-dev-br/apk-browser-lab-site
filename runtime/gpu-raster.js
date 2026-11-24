@@ -17,7 +17,7 @@
 // View Drawable layers (background/foreground, the layers XML screens spend their raster time on) are replayed on the GPU as well (`{ transport: 'gpu-png' }`)
 // and read back as the same PNG the page already shows (a synchronous GPU read-back plus the CPU PNG encode: the replay moves, the encode does not).
 // What stays on the CPU even with GPU selected: Bitmap pixel reads (Bitmap.getPixel/compress, typed surfaces) and the other PNG rasters (shadows, nine-patches, text).
-import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=935d0db9b854';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=c542646b3fce';
 export const RENDERERS = Object.freeze(['cpu', 'gpu']);
 export const DEFAULT_RENDERER = 'cpu';   // what a caller that names no renderer gets (the Worker, Node, the servers): nothing of the GPU path is created
 /** The renderer of the device settings (the lab page and the player) when none was chosen: the GPU replay, which falls back to CPU by itself where WebGL is not available in the Worker. */

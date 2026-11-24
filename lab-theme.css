@@ -538,7 +538,8 @@ div.ci-tree{min-width:0;max-height:480px;overflow:auto;border:1px solid var(--li
 }
 @media(max-width:700px){
   .topbar{height:auto;min-height:var(--bar-h);padding:8px 16px;flex-wrap:wrap;gap:4px 10px}
-  .topbar .theme-toggle{margin-left:auto}
+  .topbar .repo-link{margin-left:auto}
+  .topbar .theme-toggle{margin-left:0}
   .beta{display:inline-block}
   .topnav{order:3;flex:1 0 100%;margin:0 -12px;overflow-x:auto;scrollbar-width:none}
   .topnav a,.topnav .site-link,.topnav .integration-link{padding:8px 12px;font-size:14px;margin:0}
