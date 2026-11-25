@@ -1,5 +1,5 @@
-import { APKError } from './apk-runtime.js?v=2e0bd04dc9d5';
-import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=2e0bd04dc9d5';
+import { APKError } from './apk-runtime.js?v=803d82a8b127';
+import { gcRoot, GC_ROOTS, ephemeronMap } from './heap-gc.js?v=803d82a8b127';
 
 const VIEW='Landroid/view/View;', CHOREOGRAPHER='Landroid/view/Choreographer;', TOKEN='Lapkweb/bridge/WindowToken;',DISPLAY='Landroid/view/Display;';
 const RUNNABLE='Ljava/lang/Runnable;', CALLBACK='Landroid/view/Choreographer$FrameCallback;';
@@ -127,7 +127,7 @@ export function createViewWindowHost(platform){
    }
    const view=runtime.object(receiver);
    if(name==='findOnBackInvokedDispatcher'){const frame=frameOf(runtime,receiver);return frame?platform.backDispatcher.forOwner(runtime,frame.activity):null;}   // View.findOnBackInvokedDispatcher: the dispatcher of the window the View is attached to, null when detached
-   if(name==='isHardwareAccelerated')return 0; // This window draws through the verified Skia CPU surface, with no HWUI/GPU window.
+   if(name==='isHardwareAccelerated')return platform.hardwareWindow===false?0:1;   // as a device's windows since Android 4: the View tree records through RecordingCanvas into RenderNodes (updateDisplayList) and the lab replays the display lists, on the GPU or the CPU; a Canvas over a Bitmap is still software
    if(name==='getDisplay'){if(!isAttached(runtime,receiver))return null;return platform.displayHost.get(runtime);}
    if(name==='isInTouchMode')return isAttached(runtime,receiver)&&inTouchMode?1:0;
    if(name==='hasFocusable'||name==='hasExplicitFocusable')return hasFocusable(runtime,receiver,name==='hasExplicitFocusable');

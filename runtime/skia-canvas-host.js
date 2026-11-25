@@ -1,20 +1,20 @@
-import {APKError} from './apk-runtime.js?v=2e0bd04dc9d5';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=2e0bd04dc9d5';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=2e0bd04dc9d5';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=2e0bd04dc9d5';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=2e0bd04dc9d5';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=2e0bd04dc9d5';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=2e0bd04dc9d5';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=2e0bd04dc9d5';
-import {createBitmapHost} from './bitmap-host.js?v=2e0bd04dc9d5';
-import { gcRoot } from './heap-gc.js?v=2e0bd04dc9d5';
-import {sha256Hex} from './sha256-sync.js?v=2e0bd04dc9d5';
-import {colorLongToArgb} from './color-long.js?v=2e0bd04dc9d5';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=2e0bd04dc9d5';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=2e0bd04dc9d5';
-import {renderNodeByHandle} from './rendernode-native.js?v=2e0bd04dc9d5';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=2e0bd04dc9d5';
-import {BUCKET} from './time-breakdown.js?v=2e0bd04dc9d5';
+import {APKError} from './apk-runtime.js?v=803d82a8b127';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=803d82a8b127';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=803d82a8b127';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=803d82a8b127';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=803d82a8b127';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=803d82a8b127';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=803d82a8b127';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=803d82a8b127';
+import {createBitmapHost} from './bitmap-host.js?v=803d82a8b127';
+import { gcRoot } from './heap-gc.js?v=803d82a8b127';
+import {sha256Hex} from './sha256-sync.js?v=803d82a8b127';
+import {colorLongToArgb} from './color-long.js?v=803d82a8b127';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=803d82a8b127';
+import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=803d82a8b127';
+import {renderNodeByHandle} from './rendernode-native.js?v=803d82a8b127';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=803d82a8b127';
+import {BUCKET} from './time-breakdown.js?v=803d82a8b127';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -179,7 +179,7 @@ const NO_KEY=Symbol('uncacheable'),OBJECT_IDS=new WeakMap();let nextObjectId=1; 
 // nothing live (no RenderNode reference, no CanvasProperty) is computed once and named by a small integer: an unchanged RenderNode display list costs one WeakMap
 // lookup per command per frame instead of a JSON.stringify of every path, paint and (large) bitmap raster. Commands that read live state (renderNode, *Props, ripple) are
 // re-serialized at every call. The integer table is bounded; after a reset the same text just gets a new id (a miss, never a wrong hit).
-const COMMAND_IDS=new WeakMap(),COMMAND_TEXTS=new Map();let nextCommandId=1,commandTextChars=0;
+const LIST_KEYS=new WeakMap(),COMMAND_IDS=new WeakMap(),COMMAND_TEXTS=new Map();let nextCommandId=1,commandTextChars=0;
 // Large data strings of recorded draws (a Bitmap's PNG data URL or pixel rows) get a short id for the raster keys: the key of a draw of a photo used to carry the whole
 // encoding, copied by JSON.stringify and hashed again on every frame. Equal strings get the same id (Map keys compare by value; V8 keeps a string's hash, so the same Bitmap's
 // string is hashed once). Cleared with the command texts when it grows large, like them.
@@ -216,10 +216,17 @@ function commandsKeyBody(runtime,graphics,commands,width){
   if(value.vectorTree!==undefined)throw NO_KEY;
   if(value.op==='renderNode'&&value.node!==undefined){
    if(++depth>128)throw NO_KEY;nodes=true;dynamic=true;
-   try{const snapshot=getRenderNodeSnapshot(runtime,value.node),{displayList,...rest}=snapshot;return {...value,node:JSON.stringify(rest,replacer)+'|'+(Array.isArray(displayList)?displayList.map(commandKey).join(','):String(displayList))};}finally{depth--;}
+   try{const snapshot=getRenderNodeSnapshot(runtime,value.node),{displayList,...rest}=snapshot;return {...value,node:JSON.stringify(rest,replacer)+'|'+(Array.isArray(displayList)?listKey(displayList):String(displayList))};}finally{depth--;}
   }
   if((value.op==='circleProps'||value.op==='roundRectProps'||value.op==='ripple')&&value.props){dynamic=true;return {...value,props:resolve(value.props)};}
   return value;
+ };
+ // The display list of a nested RenderNode, as a digest: its text would be a JSON string inside the JSON text of the node that draws it, and every level of nesting escapes the
+ // quotes and backslashes of the levels below again (the text doubles per level). A list is immutable once recorded; one that reads nothing live keeps its digest.
+ const listKey=list=>{
+  const known=LIST_KEYS.get(list);if(known!==undefined)return known;
+  const outer=dynamic;dynamic=false;
+  try{const digest=keyDigest(list.map(commandKey).join(','));if(!dynamic)LIST_KEYS.set(list,digest);return digest;}finally{dynamic=outer||dynamic;}
  };
  const commandKey=command=>{
   if(command===null||typeof command!=='object')return JSON.stringify(command,replacer);
@@ -779,7 +786,7 @@ export function createSkiaCanvasHost(runtime,backend){
   // A transform that makes the matrix non-finite (a rotation by NaN degrees, a scale by Infinity) leaves the canvas drawing nothing until the restore that undoes it, as every draw
   // through a non-finite SkMatrix is rejected.
   invoke(vm,method,args){
-   const canvasOp=vm.isSubtype?.(method.owner,CANVAS)&&args[0]&&vm.object(args[0]).nativeCanvasHandle!==undefined,state=canvasOp?canvasState(args[0]):null;
+   const canvasOp=vm.isSubtype?.(method.owner,CANVAS)&&typeof args[0]==='object'&&args[0]&&vm.object(args[0]).nativeCanvasHandle!==undefined,state=canvasOp?canvasState(args[0]):null;
    if(state?.nonFinite&&(method.name.startsWith('draw')||MATRIX_OPS.has(method.name)))return method.result==='Z'?0:undefined;
    if(state?.nonFinite&&CLIP_OPS.has(method.name))return 0;
    try{return host.invokeChecked(vm,method,args);}

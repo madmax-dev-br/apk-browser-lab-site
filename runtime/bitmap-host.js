@@ -1,7 +1,7 @@
-import {APKError} from './apk-error.js?v=2e0bd04dc9d5';
-import {getVectorGraphics} from './vector-native.js?v=2e0bd04dc9d5';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=2e0bd04dc9d5';
-import { gcRoot } from './heap-gc.js?v=2e0bd04dc9d5';
+import {APKError} from './apk-error.js?v=803d82a8b127';
+import {getVectorGraphics} from './vector-native.js?v=803d82a8b127';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=803d82a8b127';
+import { gcRoot } from './heap-gc.js?v=803d82a8b127';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -19,7 +19,7 @@ const base64=bytes=>{let binary='';for(let at=0;at<bytes.length;at+=16384)binary
 add(BITMAP,['getNativeInstance()J']);
 add(CONFIG,[`values()[${CONFIG}`]);add(NAMED,[`values()[${NAMED}`]);
 add(SPACE,[`get(${NAMED})${SPACE}`,'getId()I','getName()Ljava/lang/String;','isSrgb()Z','isWideGamut()Z','getComponentCount()I','getMinValue(I)F','getMaxValue(I)F']);
-add(CANVAS,['getWidth()I','getHeight()I',`throwIfCannotDraw(${BITMAP})V`,`<init>(${BITMAP})V`,`setBitmap(${BITMAP})V`,`drawBitmap(${BITMAP}FFLandroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/RectF;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Matrix;Landroid/graphics/Paint;)V`,
+add(CANVAS,['checkRange(III)V','getWidth()I','getHeight()I',`throwIfCannotDraw(${BITMAP})V`,`<init>(${BITMAP})V`,`setBitmap(${BITMAP})V`,`drawBitmap(${BITMAP}FFLandroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/Rect;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Rect;Landroid/graphics/RectF;Landroid/graphics/Paint;)V`,`drawBitmap(${BITMAP}Landroid/graphics/Matrix;Landroid/graphics/Paint;)V`,
  'drawBitmap([IIIFFIIZLandroid/graphics/Paint;)V','drawBitmap([IIIIIIIZLandroid/graphics/Paint;)V',`drawBitmapMesh(${BITMAP}II[FI[IILandroid/graphics/Paint;)V`]);
 /** Software Bitmap over the verified Skia canvas model: a Bitmap owns a recorded Canvas command list that Canvas(Bitmap) appends to;
  * its pixels are produced by the real Skia rasterizer when the bitmap is read or drawn (snapshot semantics at the draw call), on a Skia surface of the color type of its Config
@@ -132,7 +132,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
  const dpi=(canvasDensity,bitmapDensity)=>canvasDensity&&bitmapDensity&&canvasDensity!==bitmapDensity?canvasDensity/bitmapDensity:1;
  const intArgs=(vm,object,names)=>names.map(n=>vm.object(object).fields.get(`Landroid/graphics/Rect;->${n}:I`)??0);
  /** Canvas.drawBitmap(int[] colors, ...) / drawBitmapMesh: native-side checks of Canvas.java then a recorded raster. */
- const drawColors=(vm,handle,[colors,offset,stride,x,y,width,height,hasAlpha,paintRef])=>{
+ const drawColors=(vm,handle,[colors,offset,stride,x,y,width,height,hasAlpha,paintRef],paint=paintRef?{...getSolidPaint(vm,paintRef)}:null)=>{
   if(width<0)throwJava('Ljava/lang/IllegalArgumentException;','width must be >= 0');
   if(height<0)throwJava('Ljava/lang/IllegalArgumentException;','height must be >= 0');
   if(Math.abs(stride)<width)throwJava('Ljava/lang/IllegalArgumentException;','abs(stride) must be >= width');
@@ -141,9 +141,9 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   if(width===0||height===0)return;
   const bytes=new Uint8Array(width*height*4);
   for(let row=0;row<height;row++)for(let col=0;col<width;col++){const c=source[offset+row*stride+col]|0,at=(row*width+col)*4;bytes[at]=(c>>16)&255;bytes[at+1]=(c>>8)&255;bytes[at+2]=c&255;bytes[at+3]=hasAlpha?(c>>>24)&255:255;}
-  recordNative(handle,{op:'raster',pixelData:{width,height,colorType:'RGBA_8888',alphaType:'Unpremul',base64:base64(bytes)},raster:{kind:'raster',width,height},args:[x,y],paint:paintRef?{...getSolidPaint(vm,paintRef)}:null});
+  recordNative(handle,{op:'raster',pixelData:{width,height,colorType:'RGBA_8888',alphaType:'Unpremul',base64:base64(bytes)},raster:{kind:'raster',width,height},args:[x,y],paint});
  };
- const drawMesh=(vm,handle,[bitmap,meshWidth,meshHeight,verts,vertOffset,colors,colorOffset,paintRef])=>{
+ const drawMesh=(vm,handle,[bitmap,meshWidth,meshHeight,verts,vertOffset,colors,colorOffset,paintRef],paint=paintRef?{...getSolidPaint(vm,paintRef)}:null)=>{
   const range=(length,offset,count)=>{if((offset|count)<0||offset+count>length)throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',null);};
   if((meshWidth|meshHeight|vertOffset|colorOffset)<0)throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',null);
   if(meshWidth===0||meshHeight===0)return;
@@ -152,7 +152,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   const colorWords=colors?vm.array(colors).elements:null;if(colorWords)range(colorWords.length,colorOffset,count);
   if(count>65535)fail('Canvas.drawBitmapMesh mesh exceeds 65535 vertices');
   const positions=[];for(let i=0;i<count*2;i++)positions.push(num(vertexWords[vertOffset+i]));
-  const command={op:'raster',raster:render(b),args:[0,0],paint:paintRef?{...getSolidPaint(vm,paintRef)}:null,mesh:{width:meshWidth,height:meshHeight,positions,colors:colorWords?Array.from(colorWords.slice(colorOffset,colorOffset+count),c=>c|0):null,bitmapWidth:b.width,bitmapHeight:b.height}};
+  const command={op:'raster',raster:render(b),args:[0,0],paint,mesh:{width:meshWidth,height:meshHeight,positions,colors:colorWords?Array.from(colorWords.slice(colorOffset,colorOffset+count),c=>c|0):null,bitmapWidth:b.width,bitmapHeight:b.height}};
   if(storage(b)==='ALPHA_8')fail('Canvas.drawBitmapMesh of an ALPHA_8 bitmap is not implemented');
   recordNative(handle,command);
  };
@@ -177,6 +177,9 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    const scale=src?1:dpi(canvasDensity,bitmapDensity);
    drawInto(handle,bitmapRef,{left,top,src,dst,transform,scale,paint:paint?{...getSolidPaintByHandle(runtime,paint)}:null});
   },
+  /** RecordingCanvas.drawBitmap(int[], ...) / drawBitmapMesh: the same recorded rasters, the paint by its native token. */
+  nativeColors(vm,handle,values,paint){drawColors(vm,handle,values,paint?{...getSolidPaintByHandle(vm,paint)}:null);},
+  nativeMesh(vm,handle,values,paint){drawMesh(vm,handle,values,paint?{...getSolidPaintByHandle(vm,paint)}:null);},
   invoke(vm,method,args){
    const owner=method.owner,name=method.name;
    if(owner===CONFIG||owner===NAMED){const list=owner===CONFIG?CONFIGS:NAMES,array=vm.newArray('['+owner,list.length);vm.object(array).elements=list.map(item=>enumValue(owner,list,item));return array;}
@@ -191,6 +194,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
    }
    if(owner===CANVAS){
     if(name==='getWidth'||name==='getHeight'){const bitmap=vm.object(args[0]).canvasBitmap;const o=vm.object(args[0]);return bitmap?state(bitmap)[name==='getWidth'?'width':'height']:(name==='getWidth'?o.canvasWidth:o.canvasHeight)??0;}   // Canvas.nGetWidth: the bitmap's size, 0 without one
+    if(name==='checkRange'){const[length,offset,count]=args;if((offset|count)<0||offset+count>length)vm.throwJava('Ljava/lang/ArrayIndexOutOfBoundsException;',null);return;}   // BaseCanvas.checkRange (static)
     if(name==='throwIfCannotDraw'){if(state(args[1]).recycled)vm.throwJava('Ljava/lang/RuntimeException;','Canvas: trying to use a recycled bitmap');return;}
     if(name==='setBitmap'){   // Canvas.setBitmap: later draws go to the bitmap (null detaches the canvas: draws land on a scratch device); the bitmap's recorded command list is shared with every Canvas bound to it
      const object=vm.object(args[0]);let handle;

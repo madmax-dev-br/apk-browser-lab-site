@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=2e0bd04dc9d5") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=2e0bd04dc9d5">
-  <link rel="stylesheet" href="./lab-theme.css?v=2e0bd04dc9d5">
-  <meta name="apk-browser-build" content="2e0bd04dc9d5">
+  <style>@import url("./styles.css?v=803d82a8b127") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=803d82a8b127">
+  <link rel="stylesheet" href="./lab-theme.css?v=803d82a8b127">
+  <meta name="apk-browser-build" content="803d82a8b127">
 </head>
 <body>
   <header class="topbar">
@@ -228,6 +228,7 @@
                 <p id="vm-memory-note" class="cp-note">This number is the Java heap budget (VM objects and arrays; the other budgets grow with it). The browser uses more than that: DEX tables, CanvasKit, rasters and one JavaScript object per Java object. A tab above ~2–4 GiB may be killed by the browser. The engine limit is 2,097,152 objects (4 GiB is capped to it).</p>
                 <p id="vm-memory-device" class="cp-note"></p>
                 <details class="cp-advanced"><summary>Advanced</summary>
+                  <label class="cp-check" for="vm-hardware-window"><input id="vm-hardware-window" type="checkbox" role="switch" checked><span>Hardware-accelerated windows<small>On by default, as on a device: Views and Compose layers record into RenderNodes, and a frame that only moves a layer does not draw its content again. Off, they draw through the software Canvas, as the lab did before. Applies to the next APK opened.</small></span></label>
                   <label class="cp-check" for="vm-load-image"><input id="vm-load-image" type="checkbox" role="switch"><span>Load image<small>Off by default. Keeps, in this browser's private storage, the expanded DEX files and compiled XML of an APK after its launch (of an APK set: of the base and its splits together), so the next open of the same APK reads them instead of expanding them (a few tens of ms on a large APK, for about the APK's DEX size in storage). The APK is not changed; the image is checked (content hash, lab build, checksums) before each use, and the diagnostics summary says whether it was used, written or refused. Applies when the APK is opened again</small></span></label>
                 </details>
               </section>
@@ -374,7 +375,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=2e0bd04dc9d5"></script>
+  <script type="module" src="./app.js?v=803d82a8b127"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
