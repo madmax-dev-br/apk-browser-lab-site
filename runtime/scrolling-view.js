@@ -7,7 +7,7 @@
 // The page sends such a View the user's pointer as real MotionEvents (a drag: ACTION_DOWN / MOVE / UP through the window, src/pointer-input-host.js) and the wheel as
 // ACTION_SCROLL generic motion events, and shows its children moved by its scroll position (mScrollX / mScrollY). A Compose owner has its own input path and is not one.
 // DOM-free, no process.*.
-import { isComposeOwner } from './compose-owner.js?v=8411deb8def1';
+import { isComposeOwner } from './compose-owner.js?v=746332660dea';
 
 const VIEW = 'Landroid/view/View;', MOTION = 'Landroid/view/MotionEvent;';
 const TOUCH = [`onTouchEvent(${MOTION})Z`, `onInterceptTouchEvent(${MOTION})Z`];

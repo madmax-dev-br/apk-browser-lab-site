@@ -7,16 +7,20 @@
 // is still there); "Update on navigation" (off by default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
 // "Full tree" is on by default: every LayoutNode of the inspection. Off, the elements are the boxes of lab.layoutBounds() (Views and Compose semantics nodes; the overlay of
 // src/layout-bounds.js also outlines the LayoutNodes and layout modifiers without semantics), each crop outlined and named from the inspected LayoutNode with the same semanticsId.
-// "Count recompositions" (src/compose-recompositions.js, only while the panel is open): each Compose row and the details show how many times the element was recomposed and skipped,
-// the box of an element that recomposes blinks once on the device screen, the bar shows the total and "Reset recomposition counts" sets it all back to 0. The counts belong to the
+// "Count recompositions" (src/compose-recompositions.js, off by default, only while the panel is open; the choice is kept per viewer): each Compose row and the details show the
+// composable and how many times the element was recomposed and skipped, the box of an element that recomposes blinks once on the device screen and its row once in the tree, a table
+// lists the composables (with or without an element of their own) with what their recompositions were for and which ones need review, a click on one selects and highlights its elements,
+// the bar shows the total and "Reset recomposition counts" sets it all back to 0. The counts belong to the
 // element's key (owner View and semanticsId, never reused), so an element that leaves the screen takes its count with it; a capture reads them again from the Worker.
 // The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=8411deb8def1';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=746332660dea';
 
 const NO_RASTER = 'the displayed frame has no content raster for this element';
 const DETAIL_W = 360, DETAIL_H = 260;
+const COUNT_KEY = 'apkweb.layout.countRecompositions';   // the viewer's choice: '1' = count when the panel opens
+export const MAX_COMPOSABLE_ROWS = 300;   // rows of the table in the DOM (the status says how many there are)
 export const BLINK_MS = 700, MAX_BLINKS = 48;   // how long a recomposed element's box stays on the device screen (the fade of .ci-blink), and how many at once
 const NAME_SOURCES = { composable: 'composable name (source information from the slot table)', semantics: 'semantics (Role, text or action of the node)', layout: 'measure policy class and modifiers (no composable name in the APK)', view: 'View class' };
 
@@ -93,15 +97,27 @@ export function recompositionBadge(recomposition) {
 export function recompositionTotal(status, on = true) {
   if (!on) return 'not counting'; if (!status) return 'counting…';
   if (!status.counting) return `not available: ${status.reason ?? 'counting is off'}`;
-  return `Total: ${plural(status.total, 'recomposition')} · ${plural(status.skips, 'skip')}${status.unjoined ? ` · ${status.unjoined} in composables with no element of their own on the screen` : ''}${status.note ? ` · ${status.note}` : ''}`;
+  return `Total: ${plural(status.total, 'recomposition')} · ${plural(status.skips, 'skip')}${status.unjoined ? ` · ${status.unjoined} in composables with no element of their own on the screen` : ''}${status.review ? ` · ${plural(status.review, 'composable')} to review` : ''}${status.note ? ` · ${status.note}` : ''}${status.evidence ? ` · ${status.evidence}` : ''}`;
 }
 const recompositionRows = recomposition => {
   if (!recomposition) return [];
   if (!recomposition.available) return [['Recompositions', `not available: ${recomposition.reason}`]];
-  const rows = [['Recompositions', `${recomposition.recompositions}${recomposition.shared ? ' (of the restart group above it: this element has none of its own)' : ''}`], ['Skips', String(recomposition.skips)]];
-  if (recomposition.groups?.length > 1) rows.push(['Restart groups', `${recomposition.groups.length}, outermost first: ${recomposition.groups.map(group => `${group.recompositions}${group.skips ? ` (skip ${group.skips})` : ''}`).join(' › ')}`]);
+  const rows = [['Composable', recomposition.label ? `${recomposition.label}${recomposition.composable?.obfuscated ? ' (obfuscated name)' : ''}` : 'not known yet: it is named when it is composed while counting'], ['Recompositions', `${recomposition.recompositions}${recomposition.shared ? ' (of the restart group above it: this element has none of its own)' : ''}`], ['Skips', String(recomposition.skips)]];
+  if (recomposition.groups?.length > 1) rows.push(['Restart groups', `${recomposition.groups.length}, outermost first: ${recomposition.groups.map(group => `${group.composable ? `${group.composable.name} ` : ''}${group.recompositions}${group.skips ? ` (skip ${group.skips})` : ''}`).join(' › ')}`]);
   return rows;
 };
+
+/** What a row of the composables table says about its recompositions: only what was measured. */
+export const causeText = row => [['needed', row.needed], ['likely avoidable', row.avoidable], ['unnecessary', row.unnecessary], ['unknown', row.unknown]].filter(([, n]) => n > 0).map(([label, n]) => `${label} ${n}`).join(' · ') || '—';
+const SORTS = { name: (a, b) => a.name.localeCompare(b.name), recompositions: (a, b) => b.recompositions - a.recompositions, skips: (a, b) => b.skips - a.skips, instances: (a, b) => b.instances - a.instances, review: (a, b) => (b.review.length > 0) - (a.review.length > 0) || (b.unnecessary + b.avoidable) - (a.unnecessary + a.avoidable) };
+/** The rows of the table in the order of `sort`, equal ones by recompositions, skips and name; the ones whose name, class or reasons have every word of `filter`. */
+export function sortComposables(rows, sort = 'recompositions', filter = '') {
+  const words = String(filter).toLowerCase().split(/\s+/).filter(Boolean), text = row => [row.name, row.declaredIn, row.detail, ...row.reasons.map(item => item.reason)].join('\n').toLowerCase();
+  return rows.filter(row => words.every(word => text(row).includes(word))).sort((a, b) => SORTS[sort](a, b) || SORTS.recompositions(a, b) || SORTS.skips(a, b) || (a.key < b.key ? -1 : 1));
+}
+/** Whether an element is one of a composable's: it is emitted by it, or the composable is one of the restart groups between its parent element and it. */
+export const elementOfComposable = (element, key) => element.kind === 'compose' && !!element.recomposition?.available && (element.recomposition.composable?.key === key || (element.recomposition.groups ?? []).some(group => group.composable?.key === key));
+export const REVIEW_NOTE = 'An indication of what to analyse, not a verdict: "unnecessary" ran with the same inputs and nothing it reads changed, "likely avoidable" ran because an input is a new instance with the same content, "unknown" lacks evidence. Needs review: 3 or more of those two, at least half of the ones with a known cause. Frequent: 10 in one second, or 2 in one frame, of one instance.';
 
 const viewElements = (views, viewById, density) => views.map(view => {
   const label = view.text || view.contentDescription;
@@ -181,7 +197,7 @@ export const fit = (w, h, maxW, maxH) => { const k = Math.min(1, maxW / w, maxH 
 export function matchesElement(element, text) {
   const words = String(text ?? '').toLowerCase().split(/\s+/).filter(Boolean); if (!words.length) return true;
   const s = element.semantics, hay = [element.name, element.measurePolicy, element.type, element.text, element.contentDescription, element.kind, ...(element.modifiers ?? []).flatMap(m => [m.label, m.className]),
-    ...(s ? [...(s.texts ?? []), s.editableText, s.testTag, s.role, ...(s.contentDescriptions ?? []), ...(s.actions ?? [])] : []), ...(element.calls ?? [])].filter(Boolean).join('\n').toLowerCase();
+    ...(s ? [...(s.texts ?? []), s.editableText, s.testTag, s.role, ...(s.contentDescriptions ?? []), ...(s.actions ?? [])] : []), ...(element.calls ?? []), element.recomposition?.label].filter(Boolean).join('\n').toLowerCase();
   return words.every(word => hay.includes(word));
 }
 
@@ -236,7 +252,7 @@ export function detailRows(element) {
  * recompositions: { sync(on): Promise of the counting status or null, reset(): the same } (APKWorkerClient.syncRecompositions / resetRecompositions); without it nothing is counted.
  * Returns { rendered(snapshot), recomposed(update), reset(), capture(), state }.
  */
-export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000, domImage = null, resourceNames = null, recompositions = null, blinkMs = BLINK_MS } = {}) {
+export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000, domImage = null, resourceNames = null, recompositions = null, blinkMs = BLINK_MS, storage = (() => { try { return globalThis.localStorage ?? null; } catch { return null; } })() } = {}) {
   const q = selector => root.querySelector(selector), body = q('.ci-body'), count = q('.ci-count'), captureButton = q('.ci-capture'), follow = q('.ci-follow'), filterInput = q('.ci-filter'), copyButton = q('.ci-copy');
   const el = (tag, className = '', text = null) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== null) node.textContent = text; return node; };
   // "Full tree" (on by default): every LayoutNode of the inspection instead of the boxes "Show layout bounds" draws
@@ -245,8 +261,9 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
   if (treeToggle) treeToggle.checked = true;
   if (follow) follow.checked = true;   // automatic: a new screen is captured again (only while the panel is open)
   const mode = () => treeToggle && !treeToggle.checked ? 'layout' : 'tree';
-  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false, recomposition: null, blinks: new Map() };
+  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false, recomposition: null, blinks: new Map(), rowBlinks: new Map(), composables: new Map(), composable: null, marks: [], sort: 'recompositions', orderedAt: 0, table: null };
   const countToggle = q('.ci-recompose'), totalLine = q('.ci-recompose-total'), resetCounts = q('.ci-recompose-reset');
+  if (countToggle) { try { countToggle.checked = storage?.getItem(COUNT_KEY) === '1'; } catch { countToggle.checked = false; } }   // off unless this viewer turned it on
   const counting = () => !!recompositions && root.open && !!countToggle?.checked;
   const setCount = text => { count.textContent = text; };
   setCount('closed');
@@ -256,16 +273,24 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     return `${snapshot.activityName ?? ''}|${JSON.stringify(snapshot.navigation ?? null).slice(0, 400)}|${(owner?.nodes ?? []).slice(0, 24).map(node => node.nodeId).join(',')}`;
   };
   // recomposition counts
+  /** "Copy JSON" has the status and the table as they are now. */
+  const syncJSON = () => { if (S.capture?.inspection?.recompositions?.counting) S.capture.inspection.recompositions = { ...S.recomposition, composables: sortComposables([...S.composables.values()]) }; };
   const showTotal = () => { const text = counting() ? recompositionTotal(S.recomposition) : 'not counting'; if (totalLine && totalLine.textContent !== text) totalLine.textContent = text; if (resetCounts) resetCounts.disabled = !(counting() && S.recomposition?.counting); };
   /** Counting on or off in the Worker, as the panel and its toggle are now (a message only when that changes). */
   const syncCounting = async () => {
     if (!recompositions) return;
     const on = counting(), status = await recompositions.sync(on);
     if (on !== counting()) return;
-    if (!on) { S.recomposition = null; clearBlinks(); } else if (status) S.recomposition = status;
+    if (!on) { S.recomposition = null; S.composables.clear(); clearBlinks(); } else if (status) S.recomposition = status;
     showTotal();
   };
-  const clearBlinks = () => { for (const { mark, timer } of S.blinks.values()) { clearTimeout(timer); mark.remove(); } S.blinks.clear(); };
+  const clearBlinks = () => { for (const { mark, timer } of S.blinks.values()) { clearTimeout(timer); mark.remove(); } S.blinks.clear(); for (const { row, timer } of S.rowBlinks.values()) { clearTimeout(timer); row.classList.remove('ci-row-blink'); } S.rowBlinks.clear(); };
+  /** The same blink on the element's row of the tree, when it has one: no scroll, no focus, the colour and the time of the box on the screen. */
+  const blinkRow = (key, row) => {
+    const old = S.rowBlinks.get(key); if (old) { clearTimeout(old.timer); old.row.classList.remove('ci-row-blink'); void row.offsetWidth; }   // the reflow restarts the animation
+    row.style.setProperty?.('--ci-blink-ms', `${blinkMs}ms`); row.classList.add('ci-row-blink');
+    const entry = { row, timer: setTimeout(() => { row.classList.remove('ci-row-blink'); if (S.rowBlinks.get(key) === entry) S.rowBlinks.delete(key); }, blinkMs) }; entry.timer?.unref?.(); S.rowBlinks.set(key, entry);
+  };
   /** One short highlight over the element's box; a second recomposition restarts it. The box never takes pointer input (.ci-blink) and is removed when it ends. */
   const blink = (key, box) => {
     const old = S.blinks.get(key); if (old) { clearTimeout(old.timer); old.mark.remove(); S.blinks.delete(key); }
@@ -275,6 +300,8 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     S.blinks.set(key, entry); getScreen()?.append(mark);
   };
   const setBadge = (row, element) => {
+    const label = element.recomposition?.label ?? null, chip = row.querySelector('.ci-composable');
+    if (!label) chip?.remove(); else { const node = chip ?? el('span', 'ci-composable'), text = element.recomposition.shared ? `in ${label}` : label; if (node.textContent !== text) node.textContent = text; node.classList.toggle('shared', !!element.recomposition.shared); node.title = `${text}${element.recomposition.composable?.obfuscated ? ' (obfuscated name)' : ''}: the composable this element belongs to`; if (!chip) row.prepend(node); }
     const badge = recompositionBadge(element.recomposition), at = row.querySelector('.ci-recount');
     if (!badge) { at?.remove(); return; }
     const node = at ?? el('span', 'ci-recount'); node.textContent = badge.text; node.title = badge.title; node.setAttribute('aria-label', badge.title); node.setAttribute('aria-live', 'off'); node.classList.toggle('zero', badge.zero);
@@ -289,8 +316,66 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       if (key === S.selected) { const list = body.querySelector('.ci-props'); if (list) { list.setAttribute('aria-live', 'off'); fillProps(list, element); } }   // a running count is not read out
     }
   };
+  // ---- the composables table
+  const COLUMNS = [['name', 'Composable'], ['recompositions', '↻', 'Recompositions'], ['skips', 'Skips'], ['instances', 'Inst.', 'Instances: the restart groups of it seen while counting'], ['review', 'Why', 'What the recompositions were for; sorts the ones to review first']];
+  const tableRow = row => {
+    const tr = el('tr', 'ci-crow'); tr._key = row.key; tr.tabIndex = -1;
+    const name = el('td', 'ci-cname'), why = el('td', 'ci-cwhy'); tr.append(name, el('td', 'ci-cnum'), el('td', 'ci-cnum'), el('td', 'ci-cnum'), why);
+    const choose = () => selectComposable(row.key); tr.addEventListener('click', choose);
+    tr.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); choose(); return; }
+      const rows = [...S.table.body.children], to = event.key === 'ArrowDown' ? rows.indexOf(tr) + 1 : event.key === 'ArrowUp' ? rows.indexOf(tr) - 1 : -1; if (!rows[to]) return; event.preventDefault(); for (const item of rows) item.tabIndex = item === rows[to] ? 0 : -1; rows[to].focus();
+    });
+    return tr;
+  };
+  const fillRow = (tr, row) => {
+    const [name, recomposed, skipped, instances, why] = tr.children;
+    name.replaceChildren(el('b', '', row.name), el('small', '', `${row.declaredIn}${row.obfuscated ? ' · obfuscated name' : ''}${row.library ? ' · library' : ''}`)); name.title = row.detail;
+    recomposed.textContent = String(row.recompositions); skipped.textContent = String(row.skips); instances.textContent = String(row.instances);
+    why.replaceChildren(); if (row.review.length) { const flag = el('span', 'ci-review', 'needs review'); flag.title = row.review.map(item => `${item.count}× ${item.reason}`).join('\n'); why.append(flag); }
+    if (row.frequent.length) { const flag = el('span', 'ci-frequent', 'frequent'); flag.title = row.frequent.join(', '); why.append(flag); }
+    why.append(el('span', 'ci-causes', causeText(row)));
+    if (row.key === S.composable) { const reasons = el('ul', 'ci-reasons'); for (const item of row.reasons) reasons.append(el('li', '', `${item.count}× ${item.reason}`)); for (const text of row.frequent) reasons.append(el('li', '', `frequent: ${text}`)); if (!reasons.children.length) reasons.append(el('li', '', 'only skipped')); reasons.append(el('li', '', elementsText(row.key)), el('li', '', `${row.source}: ${row.detail}`)); why.append(reasons); }
+    tr.classList.toggle('selected', row.key === S.composable); tr.setAttribute('aria-selected', String(row.key === S.composable)); tr.classList.toggle('flagged', row.review.length > 0);
+  };
+  const elementsText = key => { const n = S.elements.filter(element => elementOfComposable(element, key)).length; return n ? `${plural(n, 'element')} on this capture` : 'no element of its own on this capture'; };
+  /** Builds or updates the table in place: a row keeps its DOM element, and the order is not changed under the pointer. */
+  const renderComposables = ({ order = true } = {}) => {
+    const t = S.table; if (!t) return;
+    const all = [...S.composables.values()], rows = sortComposables(all, S.sort, filterInput.value), shown = rows.slice(0, MAX_COMPOSABLE_ROWS), review = all.filter(row => row.review.length).length;
+    t.title.textContent = `Composables: ${all.length}${rows.length !== all.length ? ` · ${rows.length} match the filter` : ''}${rows.length > shown.length ? ` · the first ${shown.length}` : ''}${review ? ` · ${review} to review` : ''}`;
+    const keys = new Set(shown.map(row => row.key)); for (const [key, tr] of t.rows) if (!keys.has(key)) { tr.remove(); t.rows.delete(key); }
+    const hovered = !order && !!t.body.matches?.(':hover');
+    for (const row of shown) { let tr = t.rows.get(row.key); if (!tr) { t.rows.set(row.key, tr = tableRow(row)); t.body.append(tr); } const selected = row.key === S.composable; if (tr._row !== row || tr._selected !== selected || selected) { tr._row = row; tr._selected = selected; fillRow(tr, row); } }
+    if (!hovered && (order || Date.now() - S.orderedAt > 1000)) { S.orderedAt = Date.now(); const now = [...t.body.children]; if (shown.some((row, i) => now[i]?._key !== row.key)) { const focus = document.activeElement; for (const row of shown) t.body.append(t.rows.get(row.key)); if (focus?.isConnected && t.body.contains?.(focus)) focus.focus({ preventScroll: true }); } }
+    const first = t.body.children[0]; if (first && ![...t.body.children].some(tr => tr.tabIndex === 0)) first.tabIndex = 0;
+    for (const th of t.heads) { const on = th._sort === S.sort; th.setAttribute('aria-sort', on ? (S.sort === 'name' ? 'ascending' : 'descending') : 'none'); th.classList.toggle('sorted', on); }
+    t.empty.hidden = all.length > 0;
+  };
+  const composablesTable = () => {
+    if (!counting() || !S.recomposition?.counting) { S.table = null; return null; }
+    const box = el('details', 'ci-composables'); box.open = S.table?.box.open ?? true; const title = el('summary'), scroll = el('div', 'ci-ctable'), table = el('table'), head = el('thead'), tr = el('tr'), tbody = el('tbody'), heads = [];
+    for (const [sort, text, hint] of COLUMNS) { const th = el('th'), button = el('button', '', text); th._sort = sort; button.type = 'button'; button.title = hint ?? `Sort by ${text.toLowerCase()}`; button.addEventListener('click', () => { S.sort = sort; renderComposables(); }); th.append(button); heads.push(th); tr.append(th); }
+    table.setAttribute('aria-label', 'Composables and their recompositions'); scroll.setAttribute('aria-live', 'off'); head.append(tr); table.append(head, tbody);
+    const empty = el('p', 'logcat-empty', 'Nothing recomposed since counting started or was reset. Use the app.'); scroll.append(table, empty); box.append(title, el('p', 'ci-cnote', REVIEW_NOTE), scroll);
+    S.table = { box, title, body: tbody, rows: new Map(), heads, empty }; renderComposables(); return box;
+  };
+  const clearMarks = () => { for (const mark of S.marks) mark.remove(); S.marks = []; };
+  /** The elements of the selected composable, outlined on the screen (as many as MAX_BLINKS) and marked in the tree. */
+  const markComposable = () => {
+    clearMarks(); const hits = S.composable ? S.elements.filter(element => elementOfComposable(element, S.composable)) : [], keys = new Set(hits.map(element => element.key));
+    for (const row of treeRows()) row.classList.toggle('of-composable', keys.has(row._key));
+    for (const element of hits.slice(0, MAX_BLINKS)) { const box = element.placed ? boxOf(element) : null; if (!box) continue; const mark = el('div', 'ci-highlight ci-highlight-composable'); mark.setAttribute('aria-hidden', 'true'); mark.style.cssText = `left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`; getScreen().append(mark); S.marks.push(mark); }
+    return hits;
+  };
+  /** A click on a composable: its elements are outlined and marked, the first one is selected (its details, its row in view); clicked again, nothing is. */
+  const selectComposable = key => {
+    S.composable = S.composable === key ? null : key; renderComposables({ order: false });
+    const hits = markComposable(), row = hits.length ? treeRows().find(item => item._key === hits[0].key) : null;
+    if (row) { select(row._key); row.scrollIntoView?.({ block: 'nearest' }); }
+  };
   const release = () => {
-    clearBlinks(); S.recomposition = null;
+    clearBlinks(); clearMarks(); S.recomposition = null; S.composables.clear(); S.composable = null; S.table = null;
     S.token++; clearTimeout(S.followTimer); S.followTimer = null;
     for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
     for (const frame of S.frames.values()) { if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } } S.frames.clear();
@@ -394,11 +479,12 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     tree.setAttribute('role', 'tree'); tree.setAttribute('aria-label', 'Screen elements');
     if (S.visible.length) tree.append(...S.visible.map(treeRow)); else tree.append(el('p', 'logcat-empty', S.elements.length ? 'No element matches the filter.' : 'No element on the screen.'));
     details.append(emptyDetails()); split.append(tree, details);
-    body.replaceChildren(status, split);
+    const table = composablesTable(); body.replaceChildren(...[status, table, split].filter(Boolean));
     setCount(kind === 'xml' ? `XML · ${views} Views` : kind === 'compose' ? `Compose · ${compose} nodes` : `XML + Compose · ${views} Views · ${compose} nodes`);
     if (S.selected && !S.visible.some(element => element.key === S.selected)) S.selected = null;
     const rows = treeRows(); if (rows[0]) rows[0].tabIndex = 0;
     if (S.selected) select(S.selected); else highlight(null);
+    markComposable();
   };
 
   const capture = async () => {
@@ -409,7 +495,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
       if (!snapshot) { body.replaceChildren(el('p', 'logcat-empty', 'No app is running. Run an APK and capture again.')); setCount('no screen'); return; }
       await syncCounting(); if (token !== S.token || !root.open) return;   // counting first, so this capture already carries the counts
       const inspection = await inspect(); if (token !== S.token || !root.open) return;
-      if (counting() && inspection?.recompositions && inspection.recompositions.available !== null) { S.recomposition = inspection.recompositions; showTotal(); }
+      if (counting() && inspection?.recompositions && inspection.recompositions.available !== null) { const { composables = [], ...status } = inspection.recompositions; S.recomposition = status; S.composables = new Map(composables.map(row => [row.key, row])); showTotal(); }
       const shownNow = getSnapshot() ?? snapshot;
       if (resourceNames) {   // "@id/name" of the Views that have an id (the app's resources), as uiautomator shows resource-id
         const ids = []; (function walk(view) { if (!view) return; if (Number.isInteger(view.androidId) && view.androidId > 0) ids.push(view.androidId); for (const child of view.children ?? []) walk(child); })({ children: shownNow.views ?? [] });
@@ -429,8 +515,10 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
 
   root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('closed'); syncCounting(); } });
   countToggle?.addEventListener('change', async () => {
+    try { storage?.setItem(COUNT_KEY, countToggle.checked ? '1' : '0'); } catch { /* storage may be blocked: the choice lasts until the page is closed */ }
     if (!root.open) return;
-    if (!countToggle.checked) {   // the Worker drops the counts: none is left on a row or in the JSON
+    if (!countToggle.checked) {
+      S.composables.clear(); S.composable = null; clearMarks();   // the Worker drops the counts: none is left on a row or in the JSON
       for (const element of S.elements) delete element.recomposition;
       if (S.capture?.inspection) { S.capture.inspection.recompositions = null; for (const owner of S.capture.inspection.owners ?? []) for (const node of owner.nodes ?? []) delete node.recomposition; }
     }
@@ -439,8 +527,9 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
   });
   resetCounts?.addEventListener('click', async () => {
     const status = await recompositions?.reset(); if (!status || !counting()) return;
-    S.recomposition = status; clearBlinks(); showTotal();
-    setCounts(S.elements.filter(element => element.recomposition?.available).map(element => [element.key, { recompositions: 0, skips: 0, groups: (element.recomposition.groups ?? []).map(() => ({ recompositions: 0, skips: 0 })) }]));
+    S.recomposition = status; S.composables.clear(); S.composable = null; clearMarks(); clearBlinks(); showTotal(); renderComposables(); markComposable();
+    setCounts(S.elements.filter(element => element.recomposition?.available).map(element => [element.key, { recompositions: 0, skips: 0, groups: (element.recomposition.groups ?? []).map(group => ({ ...group, recompositions: 0, skips: 0 })) }]));
+    syncJSON();
   });
   captureButton.addEventListener('click', () => capture());
   filterInput.addEventListener('input', () => { if (S.capture) renderList(); });
@@ -465,10 +554,16 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     /** An update of src/compose-recompositions.js: the total, the counts of the elements that changed, and one blink per element that recomposed. */
     recomposed(update) {
       if (!counting() || !update) return;
-      S.recomposition = update; showTotal();
+      const { changed = [], composables = [], ...status } = update; S.recomposition = status; showTotal();
+      for (const row of composables) if (row.recompositions > 0 || row.skips > 0) S.composables.set(row.key, row); else S.composables.delete(row.key);
       const keyOf = item => `c:${item.ownerViewId}:${item.semanticsId}`;
-      setCounts((update.changed ?? []).map(item => [keyOf(item), { available: item.available, recompositions: item.recompositions, skips: item.skips, shared: item.shared, groups: item.groups }]));
-      for (const item of update.changed ?? []) if (item.recomposed > 0 && item.bounds) { const box = boxOf({ kind: 'compose', hostId: item.ownerViewId, visibleBounds: item.bounds }); if (box) blink(keyOf(item), box); }
+      setCounts(changed.map(item => [keyOf(item), { available: item.available, recompositions: item.recompositions, skips: item.skips, shared: item.shared, groups: item.groups, composable: item.composable ?? null, label: item.label ?? null }]));
+      renderComposables({ order: false }); if (S.composable) markComposable(); syncJSON();
+      const shown = new Map(treeRows().map(row => [row._key, row]));
+      for (const item of changed) if (item.recomposed > 0) {
+        const key = keyOf(item), row = shown.get(key); if (row) blinkRow(key, row);
+        const box = item.bounds ? boxOf({ kind: 'compose', hostId: item.ownerViewId, visibleBounds: item.bounds }) : null; if (box) blink(key, box);
+      }
     },
     /** A new run: what the panel shows belongs to the previous one. */
     reset() { const open = root.open; release(); setCount(open ? 'no capture' : 'closed'); showTotal(); if (open) body.replaceChildren(el('p', 'logcat-empty', 'Run the APK and use Capture.')); },

@@ -7,8 +7,8 @@
 //  - a handler runs on the receiving thread with (signo, siginfo, ucontext): at once on the thread that is running, at the start of its next slice on another one;
 //    SIG_IGN drops the signal; SIG_DFL ignores SIGCHLD, SIGCONT, SIGURG and SIGWINCH and ends the process for the rest (the named error the run reports).
 // bionic's LP64 layouts: sigset_t is 64 bits (bit n-1 is signal n); struct sigaction is { int sa_flags; handler at 8; sa_mask at 16; sa_restorer at 24 }.
-import { APKError } from '../apk-error.js?v=8411deb8def1';
-import { BLOCKED as BLOCKED_CALL } from './cpu.js?v=8411deb8def1';
+import { APKError } from '../apk-error.js?v=746332660dea';
+import { BLOCKED as BLOCKED_CALL } from './cpu.js?v=746332660dea';
 
 const SIG_DFL = 0, SIG_IGN = 1, SA_SIGINFO = 4, SIG_BLOCK = 0, SIG_UNBLOCK = 1, SIG_SETMASK = 2, EINVAL = 22, ESRCH = 3, EINTR = 4;
 const SIGQUIT = 3, SIGUSR1 = 10, SIGPIPE = 13, SIGKILL = 9, SIGSTOP = 19, SI_USER = 0, SI_TKILL = -6, SI_TIMER = -2, SI_KERNEL = 0x80;

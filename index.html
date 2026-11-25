@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=8411deb8def1") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=8411deb8def1">
-  <link rel="stylesheet" href="./lab-theme.css?v=8411deb8def1">
-  <meta name="apk-browser-build" content="8411deb8def1">
+  <style>@import url("./styles.css?v=746332660dea") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=746332660dea">
+  <link rel="stylesheet" href="./lab-theme.css?v=746332660dea">
+  <meta name="apk-browser-build" content="746332660dea">
 </head>
 <body>
   <header class="topbar">
@@ -356,7 +356,7 @@
           <input class="adb-file" type="file" hidden></details>
         <details id="compose-inspector" class="trace logcat compose-inspector"><summary><span>Layout</span><span class="ci-count">closed</span><span class="trace-chevron">⌄</span></summary>
           <div class="logcat-bar"><button class="ci-capture" type="button" title="Inspects the screen now: its layout tree (XML Views and Compose, detected), and an image of the element you choose">Capture</button><label class="logcat-auto" title="Captures again when the screen navigates (another Activity or destination)"><input class="ci-follow" type="checkbox" checked> Update on navigation</label><label class="logcat-auto" title="Shows every LayoutNode of the Compose tree; off, shows the boxes of &quot;Show layout bounds&quot;"><input class="ci-tree" type="checkbox"> Full tree</label><input class="ci-filter" type="search" placeholder="Filter by name, id, text, tag or modifier" aria-label="Filter elements by name, text, testTag or modifier"><button class="ci-copy" type="button" title="Copies the inspection data (without images) as JSON">Copy JSON</button></div>
-          <div class="logcat-bar ci-recompositions"><label class="logcat-auto" title="Counts how many times each Compose element is recomposed and skipped, as Android Studio's Layout Inspector does, and blinks the element's box on the device screen each time it recomposes. The app is only observed. Closing the panel stops counting and drops the counts."><input class="ci-recompose" type="checkbox" checked> Count recompositions</label><span class="ci-recompose-total">not counting</span><button class="ci-recompose-reset" type="button" title="Sets every recomposition and skip count, and the total, back to 0; counting goes on" disabled>Reset recomposition counts</button></div>
+          <div class="logcat-bar ci-recompositions"><label class="logcat-auto" title="Counts how many times each Compose element is recomposed and skipped, as Android Studio's Layout Inspector does, lists the composables with what their recompositions were for, and blinks the element's box on the device screen and its row in the tree each time it recomposes. Off by default. The app is only observed. Closing the panel stops counting and drops the counts."><input class="ci-recompose" type="checkbox"> Count recompositions</label><span class="ci-recompose-total">not counting</span><button class="ci-recompose-reset" type="button" title="Sets every recomposition and skip count, the total and the composables table back to 0; counting goes on" disabled>Reset recomposition counts</button></div>
           <div class="ci-body" aria-live="polite"></div></details>
         <details id="code-browser" class="trace logcat code-browser"><summary><span>Code</span><span class="cb-count">no app</span><span class="trace-chevron">⌄</span></summary>
           <div class="cb-body"></div></details>
@@ -374,7 +374,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=8411deb8def1"></script>
+  <script type="module" src="./app.js?v=746332660dea"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

@@ -9,9 +9,9 @@
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
 //
 // With recomposition counting on (src/compose-recompositions.js) each node also carries `recomposition`: the counts of the restart group that emits it. Off, nothing is read for it.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=8411deb8def1';
-import { composableName, composeOwnerViews, reachableRoots, rootComposition, walkComposition } from './compose-compositions.js?v=8411deb8def1';
-import { nodeRecomposition, recompositionStatus } from './compose-recompositions.js?v=8411deb8def1';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=746332660dea';
+import { composableName, composeOwnerViews, reachableRoots, rootComposition, walkComposition } from './compose-compositions.js?v=746332660dea';
+import { composableRows, nodeRecomposition, recompositionStatus } from './compose-recompositions.js?v=746332660dea';
 export { composableName };
 
 const VIEW = 'Landroid/view/View;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
@@ -206,5 +206,5 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
   }
   if (failedReads.size) notes.push(`reads unavailable in this build (the minifier may have renamed internal Compose members): ${[...failedReads.keys()].join(', ')}`);
   if (truncated) notes.push(`limit of ${maxNodes} elements (or depth ${maxDepth}) reached: the list is incomplete`);
-  return { schemaVersion: 1, source: 'original-Compose-DEX/LayoutNode', density, owners, totalNodes, truncated, notes, recompositions: counting };
+  return { schemaVersion: 1, source: 'original-Compose-DEX/LayoutNode', density, owners, totalNodes, truncated, notes, recompositions: counting.counting ? { ...counting, composables: composableRows(runtime) } : counting };
 }

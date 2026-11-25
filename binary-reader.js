@@ -1,6 +1,6 @@
 // Bounded little-endian reader over the bytes of a DEX file or a ZIP archive. It imports nothing but APKError, so the page can read an archive (src/apk-archive.js)
 // without loading the VM.
-import { APKError } from './apk-error.js?v=8411deb8def1';
+import { APKError } from './apk-error.js?v=746332660dea';
 
 const fail = message => { throw new APKError(message); };
 

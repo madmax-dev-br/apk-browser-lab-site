@@ -10,7 +10,7 @@
 // callers, frameless getters and shapes) are reset by `updateHooks` for the methods whose change was added or removed, so their next call goes through dispatchCore too; a call
 // that dispatchCore answers through a hook never fills a cache. The WebAssembly core routes every hooked method's calls to dispatchCore (vmcore/js/host-bridge.js syncRouting).
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { PendingCall, BodyInvoke } from './interpreter.js?v=8411deb8def1';
+import { PendingCall, BodyInvoke } from './interpreter.js?v=746332660dea';
 
 const PRIMITIVES = { Z: 'boolean', B: 'byte', S: 'short', C: 'char', I: 'int', J: 'long', F: 'float', D: 'double', V: 'void' };
 const JAVA_PRIMITIVES = Object.fromEntries(Object.entries(PRIMITIVES).map(([smali, name]) => [name, smali]));
@@ -213,6 +213,13 @@ export function setMethodInterceptor(rt, key, fn) {
   if (fn) map.set(key, fn); else map.delete(key);
   rt.methodInterceptors = map.size ? map : null;
   resetCachedSites(rt, new Set([key])); rt.onMethodHooksChanged?.();
+}
+/** One interceptor on many methods at once (fn = null removes it): one reset of the call sites and one routing of the core for all of them. */
+export function setMethodInterceptors(runtime, keys, fn) {
+  const map = runtime.methodInterceptors ?? new Map(), changed = new Set(keys); if (!changed.size) return;
+  for (const key of changed) if (fn) map.set(key, fn); else map.delete(key);
+  runtime.methodInterceptors = map.size ? map : null;
+  resetCachedSites(runtime, changed); runtime.onMethodHooksChanged?.();
 }
 /** The keys whose calls the WebAssembly core must route through the host's dispatch: every active method change and every interceptor. */
 export function hookedMethodKeys(rt) {
