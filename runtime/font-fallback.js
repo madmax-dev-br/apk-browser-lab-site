@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=6e6d833f3663';
-import {DIGESTS} from './crypto-host.js?v=6e6d833f3663';
+import {APKError} from './apk-runtime.js?v=a737601fbbdf';
+import {sha256Hex} from './font-shelf.js?v=a737601fbbdf';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -19,7 +19,6 @@ const STICKY = new Set([0x21, 0x2c, 0x2d, 0x2e, 0x3a, 0x3b, 0x3f, 0xa0, 0x2010, 
 const NO_SUPPORT_NEEDED = c => c === 0xad || c === 0x34f || c === 0x61c || (c >= 0x200c && c <= 0x200f) || (c >= 0x202a && c <= 0x202e) || (c >= 0x2066 && c <= 0x2069) || c === 0xfeff || (c >= 0xfe00 && c <= 0xfe0f) || (c >= 0xe0100 && c <= 0xe01ef);
 const SEQUENCE = /\p{Regional_Indicator}{2}|[0-9#*]️?⃣|\u{1F3F4}[\u{E0020}-\u{E007E}]+\u{E007F}|\p{Extended_Pictographic}[︎️]?\p{Emoji_Modifier}?(?:‍\p{Extended_Pictographic}[︎️]?\p{Emoji_Modifier}?)*/uy;
 const MARK = /^\p{M}$/u;
-const hex = digest => [...digest].map(value => value.toString(16).padStart(2, '0')).join('');
 const inRanges = (ranges, cp) => { let lo = 0, hi = ranges.length - 1; while (lo <= hi) { const mid = (lo + hi) >> 1, r = ranges[mid]; if (cp < r[0]) hi = mid - 1; else if (cp > r[1]) lo = mid + 1; else return true; } return false; };
 /** Code points that no glyph can be missing for: layout controls handled by the line breaker/shaper, never drawn. */
 const LAYOUT_CONTROL = c => c === 0x0a || c === 0x0d || c === 0x09 || c === 0x85 || c === 0x2028 || c === 0x2029;
@@ -54,11 +53,23 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
   };
   /** Reads, verifies and registers one fallback font file the first time a run needs it. */
   const systemFontBytes = new Map();   // system font file -> its checked bytes (read-only: every reader copies them into its own memory)
+  /** Reads a vendored file and checks it against its pin. A copy that came from memory or the browser's storage (readSync.refused: src/font-shelf.js) and does not match is read once more, from the server. */
+  const readChecked = (path, expected, what, keep = true) => {
+    const url = new URL(path, baseURL), good = bytes => bytes.length === expected.bytes && sha256Hex(bytes) === expected.sha256;
+    let bytes = readSync(url, MAX_FONT); if (!good(bytes) && readSync.refused?.(url)) bytes = readSync(url, MAX_FONT);
+    if (!good(bytes)) fail(`${what} integrity mismatch: ${path.replace(/^system\//, '')}`);
+    readSync.verified?.(url, bytes, keep);
+    return bytes;
+  };
+  // Skia (ensureLoaded) and Minikin (readFallbackFont) each take a copy of a fallback file, one right after the other: the second takes the bytes the first read, then they are let go.
+  const shared = new Map(), readFallbackFile = entry => {
+    const known = shared.get(entry.file); if (known) { shared.delete(entry.file); return known; }
+    const bytes = readChecked(entry.file, entry, 'Fallback font'); shared.set(entry.file, bytes); return bytes;
+  };
   const ensureLoaded = stem => {
     if (loaded.has(stem)) return;
     const entry = lookup.get(stem); if (!entry) fail('Unknown fallback font ' + stem);
-    const bytes = readSync(new URL(entry.file, baseURL), MAX_FONT);
-    if (bytes.length !== entry.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== entry.sha256) fail('Fallback font integrity mismatch: ' + entry.file);
+    const bytes = readFallbackFile(entry);
     getProvider().registerFont(bytes, stem); generation++;
     loaded.add(stem); stats.loadedFiles.push(entry.file); stats.loadedBytes += bytes.length;
   };
@@ -162,30 +173,25 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
       return true;
     },
     /** The bytes of a system family font file (vendor/android-fonts/<tag>/system/, src/system-fonts.js), read synchronously the first time a family asks for it and checked against its pinned size and SHA-256. */
-    readSystemFont(file, expected) {
+    readSystemFont(file, expected, keep = true) {
       if (typeof readSync !== 'function') fail('Android system font families need a synchronous font reader (Worker XMLHttpRequest or Node fs)');
       if (!/^[A-Za-z0-9_.-]+\.(ttf|otf)$/.test(file) || !expected) fail('Unknown system font file ' + file);
       const known = systemFontBytes.get(file); if (known) return known;   // the system-font store (Skia) and Minikin ask for the same file: one read, one SHA-256 (~45 ms for Roboto's 2.3 MB)
-      const bytes = readSync(new URL('system/' + file, baseURL), MAX_FONT);
-      if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + file);
+      const bytes = readChecked('system/' + file, expected, 'System font', keep);
       stats.loadedFiles.push('system/' + file); stats.loadedBytes += bytes.length;
       systemFontBytes.set(file, bytes);
       return bytes;
     },
     /** The bytes of a file of the vendored font directory (`path` under vendor/android-fonts/<tag>/), read synchronously and checked against its pinned size and SHA-256 (src/system-font-image.js). */
     readPinned(path, expected) {
-      if (path.startsWith('system/')) return this.readSystemFont(path.slice('system/'.length), expected);   // one read per system font, shared with the Typeface and Minikin readers
+      if (path.startsWith('system/')) return this.readSystemFont(path.slice('system/'.length), expected, false);   // one read per system font, shared with the Typeface and Minikin readers
       if (typeof readSync !== 'function') fail('Android system fonts need a synchronous font reader (Worker XMLHttpRequest or Node fs)');
-      const bytes = readSync(new URL(path, baseURL), MAX_FONT);
-      if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + path);
-      return bytes;
+      return readChecked(path, expected, 'System font', false);   // a native engine opens them all at start: they are fetched ahead as a set (prefetchSystemFonts), not kept
     },
     /** The bytes of fallback file `stem`, read and checked against the manifest (Minikin's collections, src/minikin-text.js, keep their own copy in its memory). */
     readFallbackFont(stem) {
       load(); const entry = lookup.get(stem); if (!entry) fail('Unknown fallback font ' + stem);
-      const bytes = readSync(new URL(entry.file, baseURL), MAX_FONT);
-      if (bytes.length !== entry.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== entry.sha256) fail('Fallback font integrity mismatch: ' + entry.file);
-      return bytes;
+      return readFallbackFile(entry);
     },
     /** Registers app font bytes with the paragraph font provider under `name` (a content-derived family name), so a text style can list it ahead of Roboto. */
     registerCustom(name, bytes) { getProvider().registerFont(bytes, name); generation++; },

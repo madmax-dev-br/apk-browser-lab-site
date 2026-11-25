@@ -1,13 +1,14 @@
-import {APKError} from './apk-runtime.js?v=6e6d833f3663';
-import {PathApproxProvider} from './path-approx-provider.js?v=6e6d833f3663';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=6e6d833f3663';
-import {createFontFallback} from './font-fallback.js?v=6e6d833f3663';
-import {SYSTEM_FONT_IMAGE,FONTS_XML} from './system-font-image-data.js?v=6e6d833f3663';
-import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=6e6d833f3663';
-import {loadMinikin} from './minikin-provider.js?v=6e6d833f3663';
-import {createMinikinText} from './minikin-text.js?v=6e6d833f3663';
-import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=6e6d833f3663';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=6e6d833f3663';
+import {APKError} from './apk-runtime.js?v=a737601fbbdf';
+import {PathApproxProvider} from './path-approx-provider.js?v=a737601fbbdf';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=a737601fbbdf';
+import {createFontFallback} from './font-fallback.js?v=a737601fbbdf';
+import {SYSTEM_FONT_IMAGE,FONTS_XML} from './system-font-image-data.js?v=a737601fbbdf';
+import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=a737601fbbdf';
+import {FontShelf,digestAhead} from './font-shelf.js?v=a737601fbbdf';
+import {loadMinikin} from './minikin-provider.js?v=a737601fbbdf';
+import {createMinikinText} from './minikin-text.js?v=a737601fbbdf';
+import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=a737601fbbdf';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=a737601fbbdf';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -46,7 +47,14 @@ export class SkiaProvider{
   read(this.fetch,manifest,2*1024*1024).then(bytes=>{this.prefetched.sync.set(manifest.href,bytes);},()=>{});
   // the text layout module (src/minikin-provider.js), which the launch of nearly every app reads with synchronous requests
   const minikin=new URL('../../minikin/android-13.0.0_r1/',this.baseURL);
-  for(const name of['provenance.json','minikin.wasm','icudt70l-minikin.dat']){const url=new URL(name,minikin);read(this.fetch,url,8*1024*1024).then(bytes=>{this.prefetched.sync.set(url.href,bytes);},()=>{});}
+  for(const name of['provenance.json','minikin.wasm','icudt70l-minikin.dat']){const url=new URL(name,minikin);read(this.fetch,url,8*1024*1024).then(async bytes=>{await digestAhead(bytes);this.prefetched.sync.set(url.href,bytes);},()=>{});}
+  // the fonts earlier visits used (src/font-shelf.js), and the variable Roboto behind sans-serif-medium and the other system families, which the first Material screen asks for inside a tap
+  this.shelf??=new FontShelf();
+  const roboto=new URL('system/Roboto-Regular.ttf',this.fallbackBaseURL());
+  this.shelf.load(this.prefetched.sync,this.fallbackBaseURL()).then(async()=>{
+   if(this.prefetched.sync.has(roboto.href)||this.shelf.kept.has(roboto.href))return;
+   const bytes=await read((url,options)=>this.fetch(url,{...options,priority:'low'}),roboto,16*1024*1024);await digestAhead(bytes);if(!this.prefetched.sync.has(roboto.href))this.prefetched.sync.set(roboto.href,bytes);
+  }).catch(()=>{});
   return this.prefetched;
  }
  /** The files of /system/fonts (src/system-font-image.js) fetched ahead, for an app whose native code opens them all at start: its reads are synchronous and inside the launch. A file that failed is read again by its reader. */
@@ -54,7 +62,7 @@ export class SkiaProvider{
   if(typeof this.fetch!=='function'||this.fontReader||(typeof globalThis.process==='object'&&!!globalThis.process.versions?.node))return;
   const sync=(this.prefetched??={bytes:new Map(),sync:new Map()}).sync,paths=new Set([FONTS_XML.path,...SYSTEM_FONT_IMAGE.map(([,path])=>path)]);
   if(this.systemFontsFetched)return;this.systemFontsFetched=true;
-  await Promise.allSettled([...paths].map(async path=>{const url=new URL(path,this.fallbackBaseURL());sync.set(url.href,await read(this.fetch,url,16*1024*1024));}));
+  await Promise.allSettled([...paths].map(async path=>{const url=new URL(path,this.fallbackBaseURL()),bytes=await read(this.fetch,url,16*1024*1024);await digestAhead(bytes);sync.set(url.href,bytes);}));
  }
  codecBaseURL(){return new URL('../../lab-codecs/'+LAB_CODECS_VERSION+'/',this.baseURL);}
  fallbackBaseURL(){return new URL('../../android-fonts/android-13.0.0_r1/',this.baseURL);}
@@ -96,7 +104,12 @@ export class SkiaProvider{
   const selectTypeface=(weight=400,italic=false)=>{if(!Number.isInteger(weight)||weight<0||weight>1000)throw new APKError('Roboto font weight must be0..1000',{kind:'font-unavailable'});const key=weight+':'+italic;if(!selectedFaces.has(key)){const face=fontManager.matchFamilyStyle('Roboto',{weight,width:5,slant:italic?1:0});if(!face)throw new APKError('Skia FontMgr did not find an installed Roboto face');selectedFaces.set(key,face);}return selectedFaces.get(key);};
   let readSync=this.fontReader??browserSyncReader;
   if(!this.fontReader&&node){const fs=await import('node:fs'),{fileURLToPath}=await import('node:url');readSync=(url,limit)=>{const bytes=new Uint8Array(fs.readFileSync(fileURLToPath(url)));if(bytes.length>limit)throw new APKError('Skia fallback font exceeds VM limit');return bytes;};}
-  if(!this.fontReader&&!node){const direct=readSync;readSync=(url,limit)=>{const key=String(url),hit=this.prefetched?.sync.get(key);if(hit){this.prefetched.sync.delete(key);if(hit.length<=limit)return hit;}return direct(url,limit);};}   // a prefetched manifest instead of a synchronous request
+  if(!this.fontReader&&!node){
+   const direct=readSync,ahead=new Set();   // ahead: the URLs whose last bytes came from memory (a prefetch, or the browser's storage) and not from the server
+   readSync=(url,limit)=>{const key=String(url),hit=this.prefetched?.sync.get(key);ahead.delete(key);if(hit){this.prefetched.sync.delete(key);if(hit.length<=limit){ahead.add(key);return hit;}}return direct(url,limit);};
+   readSync.refused=url=>{const key=String(url);if(!ahead.delete(key))return false;this.shelf?.drop(key);return true;};
+   readSync.verified=(url,bytes,keep)=>{ahead.delete(String(url));if(keep)this.shelf?.keep(url,bytes);};
+  }   // a prefetched manifest instead of a synchronous request
   const fallback=createFontFallback({CK,baseURL:this.fallbackBaseURL(),readSync,robotoFiles:fonts.map(f=>({file:f.file,bytes:assets[f.file]})),selectTypeface});
   const fontBoxes=new WeakMap();   // Skia typeface -> the font's head bounding box, for the faces whose metrics CanvasKit gives without bounds (variable fonts)
   const systemFonts=createSystemFontStore({CK,fallback,fontBoxes});   // the named families of Android's fonts.xml; a font file is read when a family is first asked for
