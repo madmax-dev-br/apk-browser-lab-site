@@ -1,41 +1,42 @@
-import { procFdFile } from './libcore-io-native.js?v=c542646b3fce';
-import STATIC_SHIMS from './shim-static-methods.js?v=c542646b3fce';
-import { VMClock } from './vm-clock.js?v=c542646b3fce';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=c542646b3fce';
-import { OperationMonitor } from './operation-monitor.js?v=c542646b3fce';
-import { ExecutionProfile } from './execution-profile.js?v=c542646b3fce';
-import { SamplingProfiler } from './sampling-profiler.js?v=c542646b3fce';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=c542646b3fce';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=c542646b3fce';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=c542646b3fce';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=c542646b3fce';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=c542646b3fce';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=c542646b3fce';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=c542646b3fce';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=c542646b3fce';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=c542646b3fce';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=c542646b3fce';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=c542646b3fce';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=c542646b3fce';
-import { APKError } from './apk-error.js?v=c542646b3fce';
-import { invokePolymorphic } from './method-handles.js?v=c542646b3fce';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=c542646b3fce';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=c542646b3fce';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=c542646b3fce';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=c542646b3fce';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=c542646b3fce';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=c542646b3fce';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=c542646b3fce';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=c542646b3fce';
+import { procFdFile } from './libcore-io-native.js?v=8411deb8def1';
+import STATIC_SHIMS from './shim-static-methods.js?v=8411deb8def1';
+import { VMClock } from './vm-clock.js?v=8411deb8def1';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=8411deb8def1';
+import { OperationMonitor } from './operation-monitor.js?v=8411deb8def1';
+import { ExecutionProfile } from './execution-profile.js?v=8411deb8def1';
+import { SamplingProfiler } from './sampling-profiler.js?v=8411deb8def1';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=8411deb8def1';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=8411deb8def1';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=8411deb8def1';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=8411deb8def1';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=8411deb8def1';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=8411deb8def1';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=8411deb8def1';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=8411deb8def1';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=8411deb8def1';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=8411deb8def1';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=8411deb8def1';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=8411deb8def1';
+import { APKError } from './apk-error.js?v=8411deb8def1';
+import { invokePolymorphic } from './method-handles.js?v=8411deb8def1';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=8411deb8def1';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=8411deb8def1';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=8411deb8def1';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=8411deb8def1';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=8411deb8def1';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=8411deb8def1';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=8411deb8def1';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=8411deb8def1';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=c542646b3fce';
-import { ProcessStartPending } from './package-registry.js?v=c542646b3fce';
-import { bootClassLacksMember } from './boot-class-members.js?v=c542646b3fce';
-export { APKError } from './apk-error.js?v=c542646b3fce';
-import { BinaryReader } from './binary-reader.js?v=c542646b3fce';
-import { recordCollection } from './runtime-stats.js?v=c542646b3fce';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=c542646b3fce';
-import { scrollsItself } from './scrolling-view.js?v=c542646b3fce';
+import { Scheduler, Blocked } from './scheduler.js?v=8411deb8def1';
+import { ProcessStartPending } from './package-registry.js?v=8411deb8def1';
+import { bootClassLacksMember } from './boot-class-members.js?v=8411deb8def1';
+export { APKError } from './apk-error.js?v=8411deb8def1';
+import { BinaryReader } from './binary-reader.js?v=8411deb8def1';
+import { recordCollection } from './runtime-stats.js?v=8411deb8def1';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=8411deb8def1';
+import { scrollsItself } from './scrolling-view.js?v=8411deb8def1';
+import { drawsItself } from './pointer-input-host.js?v=8411deb8def1';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1956,7 +1957,7 @@ export class APKRuntime {
       if (!kind) fail(`Unsupported renderer view: ${v.type}`);
       if (['text', 'button', 'input', 'check'].includes(kind)) texts.push(v.text);
       return { id: v.id, type: v.type, kind, text: v.text, orientation: v.orientation === 1 ? 'vertical' : 'horizontal',
-        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(scrollsItself(this, v.type) ? { touchInput: true, selfScroll: true } : (this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;')) || (isComposeOwner(this, v.type) && !this.isSubtype(v.type, COMPOSE_OWNER_NAME)) ? { touchInput: true } : {}) /* a View that scrolls itself (src/scrolling-view.js: its drag and wheel reach it as MotionEvents, its children are shown moved by its scroll), an original list, or a Compose owner renamed by R8 (its semantics tree is unreadable, so the page binds its pointer here): the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
+        textSize: v.textSize, alpha: v.alpha ?? 1, renderAlpha: v.renderAlpha ?? 1, defaultFocusHighlightEnabled: v.defaultFocusHighlightEnabled !== false, readOnly: !!v.keyListenerInitialized && !v.keyListener, clickable: v.clickable ?? !!v.listener, hasClickListener: !!v.listener, ...(scrollsItself(this, v.type) ? { touchInput: true, selfScroll: true } : (this.classes.has('Landroid/widget/AbsListView;') && this.isSubtype(v.type, 'Landroid/widget/AbsListView;')) || (isComposeOwner(this, v.type) && !this.isSubtype(v.type, COMPOSE_OWNER_NAME)) || drawsItself(this, v) ? { touchInput: true } : {}) /* a View that scrolls itself (src/scrolling-view.js: its drag and wheel reach it as MotionEvents, its children are shown moved by its scroll), an original list, a SurfaceView an EGL window surface draws into, or a Compose owner renamed by R8 (its semantics tree is unreadable, so the page binds its pointer here): the page sends it real pointer input (src/pointer-input-host.js) */, androidId: v.androidId ?? null, enabled: v.enabled !== false,
         padding: v.padding ?? { top: 0, right: 0, bottom: 0, left: 0 }, layoutWidth: v.layoutWidth ?? null,
         clipChildren: v.clipChildren !== false, clipToPadding: v.clipToPadding !== false,
         layoutHeight: v.layoutHeight ?? null, textColor: v.textColor ?? (['text', 'button', 'input', 'check'].includes(kind) && this.isSubtype(v.type, 'Landroid/widget/TextView;') ? this.platform?.textViewApi?.currentTextColor?.(this, value) ?? null : null),

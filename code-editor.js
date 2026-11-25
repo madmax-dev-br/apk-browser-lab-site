@@ -9,8 +9,8 @@
 //     it in memory, shows its first PREVIEW_CHARS read-only and says so; Paste replaces it, Format / Minify / Clear / Download work on the whole text in slices.
 // Markup (index.html), for an editor with id X: textarea#X.ce-input inside .ce-main next to pre.ce-hl > code#X-hl, a gutter #X-gutter, and optional #X-status (role=status),
 // #X-pos (caret line and column) and #X-large (the banner of a large text, with #X-large-text).
-import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=c542646b3fce';
-import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=c542646b3fce';
+import { tokenizeJsonLine, createJsonScanner, createJsonFormatter, runSteps, matchBracketJson } from './json-tools.js?v=8411deb8def1';
+import { tokenizeJsLine, lineStates, jsBrackets, createJsCheck } from './js-tools.js?v=8411deb8def1';
 
 export const LARGE_CHARS = 512 * 1024, PREVIEW_CHARS = 64 * 1024, LONG_LINE = 2000, CHECK_DELAY_MS = 300, SLICE_CHARS = 131072;
 const INDENT = '  ', OPENERS = '{[(', CLOSERS = '}])';

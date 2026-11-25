@@ -313,6 +313,15 @@ function shiftImmediate(cpu, word, scalar) {
       const wide = esize * 2, rightN = 2 * esize - immhb, src = lanes(cpu, rn, wide, 128 / wide).map(x => (x >> BigInt(rightN)) & mask), base = bit(word, 30) ? lanes(cpu, rd, esize, 64 / esize) : [];
       setLanes(cpu, rd, esize, [...base, ...src]); return true;
     }
+    case '028': case '128': {   // SCVTF / UCVTF (vector and scalar, fixed-point): integer / 2^fbits
+      if (esize < 32) return false;   // half precision
+      setFlanes(cpu, rd, esize, a.map(x => { const v = Number(u ? x : S(x)) / 2 ** right; return esize === 32 ? Math.fround(v) : v; })); return true;
+    }
+    case '031': case '131': {   // FCVTZS / FCVTZU (vector and scalar, fixed-point): value * 2^fbits truncated toward zero and saturated; NaN is 0
+      if (esize < 32) return false;
+      const min = u ? 0n : -(1n << BigInt(esize - 1)), max = u ? mask : (1n << BigInt(esize - 1)) - 1n;
+      out = flanes(cpu, rn, esize, count).map(x => { const t = Math.trunc(x * 2 ** right); return ux(Number.isNaN(t) ? 0n : t <= Number(min) ? min : t >= Number(max) ? max : BigInt(t), esize); }); break;
+    }
     default: return false;
   }
   setLanes(cpu, rd, esize, out); return true;

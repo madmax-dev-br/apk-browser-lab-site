@@ -3,16 +3,16 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=c542646b3fce';
-import { addProcesses } from './processes.js?v=c542646b3fce';
-import { APKError } from '../apk-error.js?v=c542646b3fce';
-import { BLOCKED } from './cpu.js?v=c542646b3fce';
-import { extendLibc } from './libc-extra.js?v=c542646b3fce';
-import { addGles } from './gles.js?v=c542646b3fce';
-import { utf8 } from './text.js?v=c542646b3fce';
-import { createProcfs } from './procfs.js?v=c542646b3fce';
-import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=c542646b3fce';
-import { release } from '../libcore-io-native.js?v=c542646b3fce';
+import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=8411deb8def1';
+import { addProcesses } from './processes.js?v=8411deb8def1';
+import { APKError } from '../apk-error.js?v=8411deb8def1';
+import { BLOCKED } from './cpu.js?v=8411deb8def1';
+import { extendLibc } from './libc-extra.js?v=8411deb8def1';
+import { addGles } from './gles.js?v=8411deb8def1';
+import { utf8 } from './text.js?v=8411deb8def1';
+import { createProcfs } from './procfs.js?v=8411deb8def1';
+import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=8411deb8def1';
+import { release } from '../libcore-io-native.js?v=8411deb8def1';
 
 const EISDIR = 21, ENOTDIR = 20, EACCES = 13, EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -355,6 +355,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
     { const proc = procOf(p, path); if (proc) { if (proc.missing) return setErrno(p, ENOENT); if (proc.link) { const fd = nextFd++; fds.set(fd, { path: proc.link, data: proc.bytes() ?? new Uint8Array(0), offset: 0 }); return fd; } if (proc.mem) { const fd = nextFd++; fds.set(fd, { path, mem: true, offset: 0 }); return fd; } if (flags & 3) return setErrno(p, EACCES); if (proc.names) { const fd = nextFd++; fds.set(fd, { path, dir: true, names: proc.names, index: 0, offset: 0 }); return fd; } if (flags & 0o40000) return setErrno(p, ENOTDIR); const fd = nextFd++; fds.set(fd, { path, data: proc.data, offset: 0, proc: true }); return fd; } }
     if (fs()?.stat(path)?.type === 'dir') { if (flags & 3) return setErrno(p, EISDIR); const fd = nextFd++; fds.set(fd, { path, dir: true, names: dirNames(p, path), index: 0, offset: 0 }); return fd; }   // a directory opens read-only (O_DIRECTORY or not)
     if (flags & 0o40000) return setErrno(p, fs()?.stat(path) ? ENOTDIR : ENOENT);
+    if (flags & 3 && fs()?.isReadOnly(path)) return setErrno(p, fs().stat(path) || flags & 0o100 ? EACCES : ENOENT);   // /system, the installed package: nothing there is the app's to write (src/libcore-io-native.js open)
     const files = vfs(); const exists = files.stat(path)?.type === 'file'; if (!exists && !(flags & 0o100)) return setErrno(p, ENOENT); if (exists && files.denied?.(path)) return setErrno(p, EACCES); if (!exists) files.setBytes(path, new Uint8Array(0)); if (flags & 0o1000) files.setBytes(path, new Uint8Array(0)); const fd = nextFd++; fds.set(fd, { path, offset: 0, append: !!(flags & 0o2000) }); return fd; };
   lib.openat = (p, c) => { c.x[0] = c.x[1]; c.x[1] = c.x[2]; c.x[2] = c.x[3]; return lib.open(p, c); };
   lib.close = (p, c) => { if (!fds.delete(n(c, 0))) return setErrno(p, EBADF); return 0; };
@@ -434,7 +435,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   const st = vfs().stat(path); if (!st) return setErrno(p, ENOENT); p.memory.fill(out, 0, 128); p.memory.writeU32(out + 16, st.type === 'dir' ? 0o40755 : 0o100644); p.memory.write64(out + 48, BigInt(st.type === 'file' ? fileBytes(path).length : 4096)); return 0; };
   lib.stat = lib.stat64 = lib.lstat = lib.lstat64 = (p, c) => statInto(p, str(p, x(c, 0)), n(c, 1));
   lib.fstat = lib.fstat64 = (p, c) => { const f = fds.get(n(c, 0)); if (!f) return setErrno(p, EBADF); if (f.device) { const out = n(c, 1); p.memory.fill(out, 0, 128); p.memory.writeU32(out + 16, 0o20666); return 0; } return statInto(p, f.path, n(c, 1)); };
-  lib.access = (p, c) => { const path = linked(p, str(p, x(c, 0))), proc = procOf(p, path); if (proc) return proc.missing ? setErrno(p, ENOENT) : 0; return deviceOf(path) || vfs().stat(path) ? 0 : setErrno(p, ENOENT); };
+  lib.access = (p, c) => { const path = linked(p, str(p, x(c, 0))), proc = procOf(p, path); if (proc) return proc.missing ? setErrno(p, ENOENT) : 0; if (deviceOf(path)) return 0; if (!vfs().stat(path)) return setErrno(p, ENOENT); return n(c, 1) & 2 && vfs().isReadOnly(path) ? setErrno(p, EACCES) : 0; };
   lib.unlink = lib.remove = (p, c) => { const path = str(p, x(c, 0)); if (!vfs().stat(path)) return setErrno(p, ENOENT); vfs().delete(path); return 0; };
   lib.mkdir = (p, c) => { vfs().mkdirs?.(str(p, x(c, 0))); return 0; };
   lib.fsync = lib.fdatasync = () => 0;
@@ -471,7 +472,7 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   const streams = new Map();
   const stream = (p, ptr) => streams.get(Number(ptr)) ?? (() => { throw new APKError(`ARM64 native code used FILE* 0x${Number(ptr).toString(16)} that fopen/funopen did not return`, { kind: 'arm64-files' }); })();
   const newStream = (p, record) => { const ptr = p.malloc(152); streams.set(ptr, { eof: false, error: false, ...record }); return ptr; };
-  lib.fopen = lib.fopen64 = (p, c) => { const path = linked(p, str(p, x(c, 0))), mode = str(p, x(c, 1)); { const dev = deviceOf(path); if (dev) return newStream(p, { ...dev, offset: 0 }); } { const proc = procOf(p, path); if (proc) { if (proc.missing) return setErrno(p, ENOENT) && 0; if (proc.link) return newStream(p, { path: proc.link, data: proc.bytes() ?? new Uint8Array(0), offset: 0 }); if (proc.mem) return newStream(p, { path, mem: true, offset: 0 }); if (!mode.startsWith('r') || proc.names) return setErrno(p, proc.names ? EISDIR : EACCES) && 0; return newStream(p, { path, data: proc.data, offset: 0 }); } } const files = vfs(), exists = files.stat(path)?.type === 'file'; if (!exists && mode.startsWith('r')) return setErrno(p, ENOENT) && 0; if (exists && files.denied?.(path)) return setErrno(p, EACCES) && 0; if (mode.startsWith('w') || !exists) files.setBytes(path, new Uint8Array(0)); return newStream(p, { path, offset: mode.startsWith('a') ? fileBytes(path).length : 0, append: mode.startsWith('a') }); };
+  lib.fopen = lib.fopen64 = (p, c) => { const path = linked(p, str(p, x(c, 0))), mode = str(p, x(c, 1)); { const dev = deviceOf(path); if (dev) return newStream(p, { ...dev, offset: 0 }); } { const proc = procOf(p, path); if (proc) { if (proc.missing) return setErrno(p, ENOENT) && 0; if (proc.link) return newStream(p, { path: proc.link, data: proc.bytes() ?? new Uint8Array(0), offset: 0 }); if (proc.mem) return newStream(p, { path, mem: true, offset: 0 }); if (!mode.startsWith('r') || proc.names) return setErrno(p, proc.names ? EISDIR : EACCES) && 0; return newStream(p, { path, data: proc.data, offset: 0 }); } } const files = vfs(), exists = files.stat(path)?.type === 'file'; if (!exists && mode.startsWith('r')) return setErrno(p, ENOENT) && 0; if (exists && files.denied?.(path) || /^[wa]|\+/.test(mode) && files.isReadOnly(path)) return setErrno(p, EACCES) && 0; if (mode.startsWith('w') || !exists) files.setBytes(path, new Uint8Array(0)); return newStream(p, { path, offset: mode.startsWith('a') ? fileBytes(path).length : 0, append: mode.startsWith('a') }); };
   // a stream over a pipe or socket descriptor (fdopen, popen): reads fill a buffer kept with the stream, so a read that has to wait (BLOCKED, the call is retried) loses nothing
   const viaCpu = (p, c, fn, values) => { const saved = [c.x[0], c.x[1], c.x[2]]; values.forEach((v, i) => { c.x[i] = BigInt(v); }); try { return fn(p, c); } finally { [c.x[0], c.x[1], c.x[2]] = saved; } };
   const fillPipe = (p, c, s, enough) => {

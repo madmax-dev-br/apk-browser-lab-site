@@ -1,7 +1,7 @@
-import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=c542646b3fce';
-import { gcRoot } from './heap-gc.js?v=c542646b3fce';
-import { sfntStyle, tagToInt } from './sfnt.js?v=c542646b3fce';
-import { hasSystemFamily } from './system-fonts.js?v=c542646b3fce';
+import { createHostRegistry, floatBits, bitsFloat } from './host-contract.js?v=8411deb8def1';
+import { gcRoot } from './heap-gc.js?v=8411deb8def1';
+import { sfntStyle, tagToInt } from './sfnt.js?v=8411deb8def1';
+import { hasSystemFamily } from './system-fonts.js?v=8411deb8def1';
 
 export { sfntStyle };
 

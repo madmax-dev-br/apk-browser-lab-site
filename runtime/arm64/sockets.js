@@ -10,13 +10,13 @@
 // netlink.js); AF_PACKET and raw IP sockets need CAP_NET_RAW, which an app does not have (EPERM). The same functions serve the raw system calls (src/arm64/syscalls.js):
 // socket, socketpair, bind, listen, accept/accept4, connect, getsockname, getpeername, sendto, recvfrom, setsockopt, getsockopt, shutdown, sendmsg, recvmsg, sendmmsg,
 // recvmmsg, with the kernel's flags (MSG_DONTWAIT, MSG_PEEK, MSG_TRUNC, SOCK_NONBLOCK) and errno values.
-import { APKError } from '../apk-error.js?v=c542646b3fce';
-import { createRouteSocket, restrictedNetlink } from './netlink.js?v=c542646b3fce';
-import { createJavaSockets } from './java-sockets.js?v=c542646b3fce';
-import { deviceInterfaces, allocateFd, release } from '../libcore-io-native.js?v=c542646b3fce';
-import { BLOCKED } from './cpu.js?v=c542646b3fce';
-import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=c542646b3fce';
-import { utf8 } from './text.js?v=c542646b3fce';
+import { APKError } from '../apk-error.js?v=8411deb8def1';
+import { createRouteSocket, restrictedNetlink } from './netlink.js?v=8411deb8def1';
+import { createJavaSockets } from './java-sockets.js?v=8411deb8def1';
+import { deviceInterfaces, allocateFd, release } from '../libcore-io-native.js?v=8411deb8def1';
+import { BLOCKED } from './cpu.js?v=8411deb8def1';
+import { tunnelEndpoint, openTunnelSession } from '../tcp-tunnel.js?v=8411deb8def1';
+import { utf8 } from './text.js?v=8411deb8def1';
 
 const ENETUNREACH = 101, ENOENT = 2, EADDRINUSE = 98, EOPNOTSUPP = 95, EAGAIN = 11, EBADF = 9, EINPROGRESS = 115, ECONNREFUSED = 111, ENOTCONN = 107, EPIPE = 32, EINVAL = 22, EISCONN = 106;
 const POLLIN = 1, POLLOUT = 4, POLLERR = 8, POLLHUP = 16, O_NONBLOCK = 0o4000;
@@ -505,12 +505,14 @@ export function addSockets(lib, { runtime } = {}) {
   lib.ALooper_pollOnce = (p, c) => pollOnce(p, c, false);
   lib.ALooper_pollAll = (p, c) => pollOnce(p, c, true);
   // the main looper: dispatched from the VM's event loop when one of its descriptors can be ready (a write to a pipe/eventfd, a timer, a wake, or network data)
-  let mainQueued = false;
+  // A sooner request replaces a later queued one (a timer rearmed for now while the pump waits for one that expires in seconds).
+  let mainAt = Infinity, mainToken = 0;
   function pumpMain(p, delay = 0) {
-    const looper = byThread.get('main'); if (!looper || mainQueued || !T(p).queueTask) return;
-    mainQueued = true;
+    const looper = byThread.get('main'), at = T(p).now() + delay; if (!looper || at >= mainAt || !T(p).queueTask) return;
+    mainAt = at; const token = ++mainToken;
     T(p).queueTask(() => {
-      mainQueued = false; looper.woken = false;
+      if (token !== mainToken) return;
+      mainAt = Infinity; looper.woken = false;
       for (const [fd, w, got] of readyWatches(looper)) if (w.callback) runCallback(p, looper, fd, w, got);
       let next = Infinity, network = false;
       for (const fd of looper.watches.keys()) { const o = objects.get(fd); if (o?.kind === 'timerfd') next = Math.min(next, o.next); if (o?.kind === 'tcp') network = true; }

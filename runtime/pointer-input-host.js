@@ -3,8 +3,8 @@
 // family takes the same input (takesPointerInput): its rows are chosen by the list's own touch handling.
 // The page sends coordinates relative to the Compose owner View it touched; one pointer, one gesture at a time (DOWN ... MOVE* ... UP/CANCEL). Each sample enters the
 // owner's window at its root View in window coordinates, as Android's input dispatcher delivers it (so parents intercept and clickable parents get unconsumed touches).
-import { isComposeOwner } from './compose-owner.js?v=c542646b3fce';
-import { scrollsItself } from './scrolling-view.js?v=c542646b3fce';
+import { isComposeOwner } from './compose-owner.js?v=8411deb8def1';
+import { scrollsItself } from './scrolling-view.js?v=8411deb8def1';
 export const ACTION_DOWN = 0, ACTION_UP = 1, ACTION_MOVE = 2, ACTION_CANCEL = 3, ACTION_SCROLL = 8;
 const MOTION = 'Landroid/view/MotionEvent;', P = ['J', 'J', 'I', 'F', 'F', 'I'];
 const VIEW = 'Landroid/view/View;', LIST = 'Landroid/widget/AbsListView;';
@@ -14,6 +14,12 @@ const VIEW = 'Landroid/view/View;', LIST = 'Landroid/widget/AbsListView;';
  * every View that scrolls itself (src/scrolling-view.js: a RecyclerView, a NestedScrollView, a ViewPager, ScrollView, HorizontalScrollView and their subclasses).
  */
 export const takesPointerInput = (runtime, type) => isComposeOwner(runtime, type) || runtime.classes.has(LIST) && runtime.isSubtype(type, LIST) || scrollsItself(runtime, type);
+/**
+ * Whether a View's pixels are the app's own drawing: a SurfaceView with a live EGL window surface (src/gles-native.js). The page has no control for anything in them, so the
+ * pointer enters the window as MotionEvents there too and the view tree decides (the surface itself, or the parent that handles touch for what is drawn in it).
+ */
+export const drawsItself = (runtime, object) => !!object?.surfaceView?.gl && !object.surfaceView.gl.destroyed;
+const takesPointer = (runtime, id) => { const object = runtime.object({ ref: id }); return takesPointerInput(runtime, object.type) || drawsItself(runtime, object); };
 /** The root View of the owner's window (View.getRootView: the DecorView of an Activity or Dialog window), or null when the owner is not attached to a window. */
 function rootOf(runtime, ownerViewId) {
   const dispatch = (name, signature, result) => runtime.dispatch({ owner: VIEW, name, parameters: [], result, signature }, [{ ref: ownerViewId }], 'virtual');
@@ -56,7 +62,7 @@ export function dispatchPointer(runtime, { ownerViewId, action, x, y, t = 0, dx 
     // coordinates outside the root's bounds (`x`, `y` are relative to the window). PopupWindow's decor and Compose's PopupLayout dismiss on such an ACTION_DOWN when they are meant to.
     const record = runtime.heap.has(ownerViewId) ? runtime.platform?.dialogWindowHost?.recordFor?.(runtime, { ref: ownerViewId }) : null;
     if (!record || record.kind !== 'popup' || record.root.ref !== ownerViewId || !record.attached) { if (action === ACTION_UP || action === ACTION_CANCEL) runtime.pointerGesture = null; return { handled: false, dropped: 'no-popup-window' }; }
-  } else if (!runtime.heap.has(ownerViewId) || !takesPointerInput(runtime, runtime.object({ ref: ownerViewId }).type)) return { handled: false, dropped: 'not-a-compose-view' };
+  } else if (!runtime.heap.has(ownerViewId) || !takesPointer(runtime, ownerViewId)) return { handled: false, dropped: 'not-a-compose-view' };
   let gesture = runtime.pointerGesture;
   // Event times are uptime milliseconds and strictly increase across gestures (the VM clock only moves when the VM is idle, so two quick taps could share a time).
   if (action === ACTION_DOWN) gesture = runtime.pointerGesture = { owner: ownerViewId, downTime: BigInt(Math.max(Math.floor(runtime.platform.clock.now()), (runtime.lastPointerTime ?? -1) + 1)), pageStart: t, last: null };

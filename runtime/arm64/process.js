@@ -3,13 +3,13 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=c542646b3fce';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=c542646b3fce';
-import { Arm64Memory } from './memory.js?v=c542646b3fce';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=c542646b3fce';
-import { NativeThreads } from './threads.js?v=c542646b3fce';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=c542646b3fce';
-import { APP_PID } from '../virtual-pids.js?v=c542646b3fce';
+import { APKError } from '../apk-error.js?v=8411deb8def1';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=8411deb8def1';
+import { Arm64Memory } from './memory.js?v=8411deb8def1';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=8411deb8def1';
+import { NativeThreads } from './threads.js?v=8411deb8def1';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=8411deb8def1';
+import { APP_PID } from '../virtual-pids.js?v=8411deb8def1';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);
 const HOST_STUBS = 65536, STUB_BYTES = 32;   // lab functions with a code stub (2 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)
@@ -173,6 +173,7 @@ export class Arm64Process {
   dispatchHost(cpu, index) {
     this.recentHost[this.recentAt++ & 7] = index;   // the last lab functions native code called, for fault reports
     const fn = index === 'svc' ? this.hostLibrary.__svc : this.hostFns[index]; if (!fn) throw new APKError(`ARM64 native code branched to an unknown host entry ${index}`, { kind: 'arm64-host' });
+    if (this.threads?.driving && index !== 'svc' && this.threads.leaveToJava(this.hostNames[index])) return BLOCKED;   // src/arm64/threads.js driveJava
     // A call that waits is retried with the registers it was made with: a lab function that moves its arguments (syscall(3) shifts them down one register, openat and
     // __fgets_chk drop one) before it blocks must not leave them moved, or the retry reads its number or pointers from the wrong registers.
     const x = cpu.x, a0 = x[0], a1 = x[1], a2 = x[2], a3 = x[3], a4 = x[4], a5 = x[5], a6 = x[6], a7 = x[7];

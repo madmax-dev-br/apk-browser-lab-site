@@ -1,9 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=c542646b3fce';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=c542646b3fce';
-import { isTrustedRasterURL } from './raster-cache.js?v=c542646b3fce';
-import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=c542646b3fce';
+import { updateWebViewSlot } from './webview-slot.js?v=8411deb8def1';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=8411deb8def1';
+import { isTrustedRasterURL } from './raster-cache.js?v=8411deb8def1';
+import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=8411deb8def1';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -315,7 +315,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (kind === 'button' || kind === 'text') { const shown = String(view.ellipsizedText ?? view.displayText ?? view.text ?? ''), source = String(view.text ?? ''), cased = String(view.displayText ?? view.text ?? ''); if (source !== shown && (source.toLowerCase() === cased.toLowerCase())) element.dataset.sourceText = source; else delete element.dataset.sourceText; }
   if (view.textInContent) element.dataset.textInContent = 'true'; else delete element.dataset.textInContent;   // the glyphs are in the content raster: the element keeps its text for accessibility and typing, transparent (styles.css)
   if (kind === 'button') element.disabled = view.clickable === false || view.enabled === false;
-  if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
+  if (kind === 'text' || kind === 'image' || kind === 'view') { element.dataset.clickable = String(!!view.clickable && !view.touchInput && view.enabled !== false); element.tabIndex = view.clickable && view.enabled !== false ? 0 : -1; if (view.clickable) element.setAttribute('role', 'button'); else element.removeAttribute('role'); }
   if (kind === 'button' || view.clickable && ['text','view'].includes(kind)) element.setAttribute('aria-label', view.contentDescription || view.displayText || view.text || `Action ${view.androidId || view.id}`);
   if (kind === 'image') { element.setAttribute('role', view.clickable ? 'button' : 'img'); element.setAttribute('aria-label', view.contentDescription || 'APK image'); }
   if (kind === 'input') { if (!(focused && (state.pendingInputs.has(view.id) || state.inputInFlight === view.id)) && element.value !== (view.text ?? '')) element.value = view.text ?? ''; element.readOnly = !!view.readOnly; element.placeholder = view.hint || ''; element.setAttribute('aria-label', view.contentDescription || view.hint || `Field ${view.androidId || view.id}`); element.disabled = view.enabled === false; element.inputMode = (view.inputType & 15) === 2 ? 'decimal' : 'text'; }
@@ -423,6 +423,7 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   if (view.glSurface || element._glInfo) hooks.glSurface?.(element, view.glSurface ?? null);   // a SurfaceView with an EGL window surface: the page draws its frames (src/gl-surfaces.js)   // a TextureView / SurfaceView: the page draws the camera stream in its box (src/camera-lab.js); after the styles above, which it completes
   element._signature = signature;
   }
+  if (kind === 'view' && view.touchInput && view.bounds) bindPointerInput(element, { ownerViewId: view.id, width: view.bounds.right - view.bounds.left, height: view.bounds.bottom - view.bounds.top }, { skipControls: true });   // a SurfaceView an app draws into (OpenGL): its content has no controls on the page
   if (['linear', 'frame', 'scroll', 'group'].includes(kind)) {
     // An original list (ListView, a menu popup's list, an AlertDialog's list) is "clickable" for its own touch handling, not for an OnClickListener: the page sends it the pointer
     // as real MotionEvents and the list decides which row was tapped; controls inside a row keep their own click.

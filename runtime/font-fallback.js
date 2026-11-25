@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=c542646b3fce';
-import {DIGESTS} from './crypto-host.js?v=c542646b3fce';
+import {APKError} from './apk-runtime.js?v=8411deb8def1';
+import {DIGESTS} from './crypto-host.js?v=8411deb8def1';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *
@@ -170,6 +170,14 @@ export function createFontFallback({CK, baseURL, readSync, robotoFiles, selectTy
       if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + file);
       stats.loadedFiles.push('system/' + file); stats.loadedBytes += bytes.length;
       systemFontBytes.set(file, bytes);
+      return bytes;
+    },
+    /** The bytes of a file of the vendored font directory (`path` under vendor/android-fonts/<tag>/), read synchronously and checked against its pinned size and SHA-256 (src/system-font-image.js). */
+    readPinned(path, expected) {
+      if (path.startsWith('system/')) return this.readSystemFont(path.slice('system/'.length), expected);   // one read per system font, shared with the Typeface and Minikin readers
+      if (typeof readSync !== 'function') fail('Android system fonts need a synchronous font reader (Worker XMLHttpRequest or Node fs)');
+      const bytes = readSync(new URL(path, baseURL), MAX_FONT);
+      if (bytes.length !== expected.bytes || hex(DIGESTS['SHA-256'].fn(bytes)) !== expected.sha256) fail('System font integrity mismatch: ' + path);
       return bytes;
     },
     /** The bytes of fallback file `stem`, read and checked against the manifest (Minikin's collections, src/minikin-text.js, keep their own copy in its memory). */

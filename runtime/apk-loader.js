@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=c542646b3fce';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=c542646b3fce';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=c542646b3fce';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=c542646b3fce';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=c542646b3fce';
-import { inspectELF } from './native-inspector.js?v=c542646b3fce';
-import { elfBuildId } from './elf-build-id.js?v=c542646b3fce';
-import { crc32 } from './zip-entry.js?v=c542646b3fce';
-import { resolveDevice } from './device-profile.js?v=c542646b3fce';
-import { resourceProfileFor } from './device-configuration.js?v=c542646b3fce';
-import { JniBridge } from './jni-host.js?v=c542646b3fce';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=c542646b3fce';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=c542646b3fce';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=c542646b3fce';
-import { AndroidResources } from './android-resources.js?v=c542646b3fce';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=c542646b3fce';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=c542646b3fce';
-import { FrameworkProvider } from './framework-provider.js?v=c542646b3fce';
-import { APKArchive } from './apk-archive.js?v=c542646b3fce';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=c542646b3fce';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=c542646b3fce';
+import { usesProcesses } from './system-programs.js?v=8411deb8def1';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=8411deb8def1';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=8411deb8def1';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=8411deb8def1';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=8411deb8def1';
+import { inspectELF } from './native-inspector.js?v=8411deb8def1';
+import { elfBuildId } from './elf-build-id.js?v=8411deb8def1';
+import { crc32 } from './zip-entry.js?v=8411deb8def1';
+import { resolveDevice } from './device-profile.js?v=8411deb8def1';
+import { resourceProfileFor } from './device-configuration.js?v=8411deb8def1';
+import { JniBridge } from './jni-host.js?v=8411deb8def1';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=8411deb8def1';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=8411deb8def1';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=8411deb8def1';
+import { AndroidResources } from './android-resources.js?v=8411deb8def1';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=8411deb8def1';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=8411deb8def1';
+import { FrameworkProvider } from './framework-provider.js?v=8411deb8def1';
+import { APKArchive } from './apk-archive.js?v=8411deb8def1';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=8411deb8def1';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=8411deb8def1';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -497,6 +497,12 @@ export function apkSetParts(archive) {
   if (!base) return null;   // no installable base inside: loadAPK's error names the bundle
   return { base: archive.extractSync(base, 1 << 30), splits: inner.filter(name => name !== base).map(name => archive.extractSync(name, 1 << 30)) };
 }
+/** Whether `bytes` contain the ASCII text. */
+function containsAscii(bytes, text) {
+  const first = text.charCodeAt(0);
+  for (let at = bytes.indexOf(first); at >= 0 && at <= bytes.length - text.length; at = bytes.indexOf(first, at + 1)) { let k = 1; while (k < text.length && bytes[at + k] === text.charCodeAt(k)) k++; if (k === text.length) return true; }
+  return false;
+}
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   let archive = new APKArchive(arrayBuffer);
@@ -795,6 +801,10 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
   const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;'||type==='Landroid/media/ImageReader;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
   if(skia&&usesImageCodecs&&typeof skia.prepareCodecs==='function')await skia.prepareCodecs();
+  // A native text engine reads the system fonts itself (the path of fonts.xml is in its library): they are fetched now, all at once, instead of one synchronous read after another in the launch.
+  if(skia&&options.arm64Native&&typeof skia.prepareSystemFonts==='function'&&[...archive.entries.keys()].some(name=>/^lib\/arm64-v8a\/[^/]+\.so$/.test(name)&&containsAscii(archive.extractSync(name,256*1024*1024),'/system/etc/fonts.xml'))){
+    await options.onProgress?.({phase:'skia',completed:3,total:3,message:'Loading the system fonts'}); await skia.prepareSystemFonts();
+  }
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
   // the resources prepared since the manifest was read (above): their progress reports and warnings take their place here, in their order, and so do their errors
   const { frameworkResources, resourceConfiguration, resources } = await resourcesReady.release();

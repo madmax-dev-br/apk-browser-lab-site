@@ -110,6 +110,9 @@
 .ci-props dt{color:#8d93a3}.ci-props dd{margin:0;word-break:break-word;color:#4a5060}
 .ci-row{cursor:pointer}.ci-row:hover,.ci-row:focus-visible{background:#eef1f7;outline:none}.ci-row.selected{background:#e9e7fd}
 .ci-highlight{position:absolute;z-index:40;pointer-events:none;outline:2px solid #ff3d7f;outline-offset:0;background:rgba(255,61,127,.14);box-shadow:0 0 0 1px rgba(255,255,255,.8)}
+.ci-blink{position:absolute;z-index:39;pointer-events:none;outline:2px solid #00a651;outline-offset:-1px;background:rgba(0,166,81,.28);animation:ci-blink .7s ease-out forwards}
+@keyframes ci-blink{from{opacity:1}to{opacity:0}}
+@media (prefers-reduced-motion:reduce){.ci-blink{animation:none;background:rgba(0,166,81,.14)}}
 :root[data-theme=dark] .ci-body{background:#15181e;border-top:1px solid #333740;color:#b6b9c2}
 :root[data-theme=dark] .ci-details{background:#1b1d22;border-color:#333740;color:#b6b9c2}
 :root[data-theme=dark] .ci-details h4{color:#e2e4ea}

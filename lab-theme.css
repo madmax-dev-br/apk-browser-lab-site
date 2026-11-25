@@ -419,6 +419,9 @@ div.ci-tree{min-width:0;max-height:480px;overflow:auto;border:1px solid var(--li
 .ci-row{display:flex;align-items:baseline;gap:8px;min-width:0;padding:3px 10px 3px calc(10px + var(--ci-depth,0) * 14px);cursor:pointer;background-image:repeating-linear-gradient(90deg,var(--line) 0 1px,transparent 1px 14px);background-size:calc(var(--ci-depth,0) * 14px) 100%;background-repeat:no-repeat;background-position:10px 0}
 .ci-row .ci-name{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:400 12px/1.4 var(--mono);color:var(--ink)}
 .ci-row .ci-kind{flex:0 0 auto;margin-left:auto;font-size:11px;color:var(--muted);white-space:nowrap}
+.ci-recompose-total{min-width:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;color:var(--ink)}
+.ci-row .ci-recount{flex:0 0 auto;padding:0 6px;border-radius:var(--r-pill);background-color:var(--ok-soft);font:500 11px/16px var(--mono);font-variant-numeric:tabular-nums;color:var(--ok);white-space:nowrap}
+.ci-row .ci-recount.zero{background-color:transparent;font-weight:400;color:var(--muted)}
 .ci-row:hover,.ci-row:focus-visible{background-color:var(--surface-2);outline:none}
 .ci-row.selected{background-color:var(--accent-soft)}
 .ci-row:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}

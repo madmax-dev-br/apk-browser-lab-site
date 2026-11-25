@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How APK Browser Lab runs an Android APK in the browser: from the file to the screen, threads and time, memory, rendering, network, native code, tools and limitations.">
-  <link rel="stylesheet" href="./site-pages.css?v=c542646b3fce">
-  <link rel="stylesheet" href="./lab-tokens.css?v=c542646b3fce">
+  <link rel="stylesheet" href="./site-pages.css?v=8411deb8def1">
+  <link rel="stylesheet" href="./lab-tokens.css?v=8411deb8def1">
 </head>
 <body>
   <header class="topbar">
@@ -301,7 +301,7 @@ Vary: Origin</code></pre></div>
           <li><b>Debugging</b><span>Layout bounds and frame rate. <b>Method returns</b> makes a chosen method return a value without running its body; <b>Ignored activities</b> drops the app's requests to open certain Activities.</span></li>
           <li><b>Extensions</b><span>Plugins: JavaScript snippets of your own that watch the app, crop the screen, reload the screen, create mocks and open windows with their own layouts (<a href="./plugins.html">how to set up</a>). MCP connects an agent.</span></li>
           <li><b>Logcat and Network</b><span>The <code>android.util.Log</code> lines and every request, refusal and mock. Right-click a request: create a mock of it (already filled with method, URL, status, headers and the response body) or redirect the host.</span></li>
-          <li><b>Compose</b><span>The screen elements cropped from the frame by the layout bounds, with details and the full tree.</span></li>
+          <li><b>Layout</b><span>The screen elements (XML Views and Compose) cropped from the frame by the layout bounds, with details and the full tree. <b>Count recompositions</b> shows how many times each Compose element was recomposed and skipped, blinks its box on the device screen each time it recomposes and shows the total; <b>Reset recomposition counts</b> sets them back to 0.</span></li>
           <li><b>Summary and diagnostics</b><span>Memory, who retains it, exceptions, main thread and busiest methods; “Copy diagnostics” takes the whole report.</span></li>
           <li><b>Player</b><span>The <code>&lt;apk-player&gt;</code> element to embed an APK in another page (<code>docs/EMBED.md</code>).</span></li>
         </ul>
@@ -337,6 +337,6 @@ Vary: Origin</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=c542646b3fce"></script>
+  <script type="module" src="./site-pages.js?v=8411deb8def1"></script>
 </body>
 </html>

@@ -1,8 +1,9 @@
-import { createHostRegistry } from './host-contract.js?v=c542646b3fce';
-import { APKError } from './apk-error.js?v=c542646b3fce';
-import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=c542646b3fce';
-import { installProcfs } from './procfs.js?v=c542646b3fce';
-import { installSystemImage } from './system-image.js?v=c542646b3fce';
+import { createHostRegistry } from './host-contract.js?v=8411deb8def1';
+import { APKError } from './apk-error.js?v=8411deb8def1';
+import { VirtualFileSystem, normalizePath } from './virtual-fs.js?v=8411deb8def1';
+import { installProcfs } from './procfs.js?v=8411deb8def1';
+import { installSystemImage, IMAGE_TIME_MS } from './system-image.js?v=8411deb8def1';
+import { installSystemFonts } from './system-font-image.js?v=8411deb8def1';
 
 // The app's virtual filesystem owner and the little java.io glue the platform still needs. java.io itself (File, the byte/char streams, FileDescriptor, RandomAccessFile,
 // UnixFileSystem) is the original Android 13 libcore in framework.dex; its syscalls land in src/libcore-io-native.js over the VirtualFileSystem created here.
@@ -21,6 +22,7 @@ export function createJavaIoHost(platform) {
     if (platform.apkBytes) vfs.mount(`${vfs.codePath}/base.apk`, platform.apkBytes); // the installed package, as PackageManager's sourceDir
     installProcfs(vfs, platform);   // /dev, selinuxfs and the app's own /proc entries (src/procfs.js)
     installSystemImage(vfs);        // /system/bin's programs and links, the image's partitions (src/system-image.js)
+    installSystemFonts(vfs, () => platform.vmRuntime?.skia?.fallback ?? null, IMAGE_TIME_MS);   // /system/etc/fonts.xml and /system/fonts (src/system-font-image.js)
     return vfs;
   };
   const text = (runtime, value) => { if (value === null || value === 0) runtime.throwJava('Ljava/lang/NullPointerException;', null); return runtime.stringCharacters(value); };

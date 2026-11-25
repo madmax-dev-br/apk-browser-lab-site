@@ -13,12 +13,12 @@
 // eglGetProcAddress answers the EGL and GL entry points listed here, NULL for any other name (as Android does for an unknown name). Not provided, failing by name: GLES 1.x,
 // pixmap surfaces and client-buffer pbuffers, a SurfaceTexture / ImageReader Surface as a native window, ANativeWindow_lock (CPU rendering), EGL extension functions
 // (EGLImage, sync objects, presentation time, damage regions). No process.*.
-import { APKError } from '../apk-error.js?v=c542646b3fce';
-import { BLOCKED } from './cpu.js?v=c542646b3fce';
-import { Blocked } from '../scheduler.js?v=c542646b3fce';
-import { floatBits } from '../host-contract.js?v=c542646b3fce';
-import { createGlesNativeBindings, createEglCore, EGL_CONSTANTS as EGL, glAccess, NativeRegion, configAttribute, EGL_CONFIGS, windowSize } from '../gles-native.js?v=c542646b3fce';
-import { utf8 } from './text.js?v=c542646b3fce';
+import { APKError } from '../apk-error.js?v=8411deb8def1';
+import { BLOCKED } from './cpu.js?v=8411deb8def1';
+import { Blocked } from '../scheduler.js?v=8411deb8def1';
+import { floatBits } from '../host-contract.js?v=8411deb8def1';
+import { createGlesNativeBindings, createEglCore, EGL_CONSTANTS as EGL, glAccess, NativeRegion, configAttribute, EGL_CONFIGS, windowSize } from '../gles-native.js?v=8411deb8def1';
+import { utf8 } from './text.js?v=8411deb8def1';
 
 const GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', STRING = 'Ljava/lang/String;', BUFFER = 'Ljava/nio/Buffer;', INT_BUFFER = 'Ljava/nio/IntBuffer;';
 const GL = { INVALID_ENUM: 0x500, INVALID_VALUE: 0x501, INVALID_OPERATION: 0x502, ARRAY_BUFFER_BINDING: 0x8894, ELEMENT_ARRAY_BUFFER_BINDING: 0x8895, PIXEL_PACK_BUFFER_BINDING: 0x88ED,
@@ -47,7 +47,7 @@ const params = signature => signature.slice(1, signature.indexOf(')')).match(/\[
 
 export function addGles(lib, { runtime: r } = {}) {
   const bindings = createGlesNativeBindings(), core = createEglCore(), provided = new Set();
-  const { glFor, lookup, raise, setEglError } = glAccess;
+  const { glFor, lookup, raise, setEglError, bufferSubData, primaryBuffer } = glAccess;
   const java = (name, signature) => { const fn = bindings.get(`${GLES20}->${name}${signature}`) ?? bindings.get(`${GLES30}->${name}${signature}`); if (!fn) throw new Error(`internal: no binding ${name}${signature}`); return args => fn(r, args); };
   const str = (p, ptr) => ptr ? utf8.decode(p.memory.cString(Number(ptr))) : null;
   const cString = (p, text) => { if (text === null || text === undefined) return 0; const cache = (p.glStrings ??= new Map()); let ptr = cache.get(text); if (ptr === undefined) { ptr = p.allocString(text); cache.set(text, ptr); } return ptr; };   // kept for the process's life, as a driver's strings are
@@ -194,7 +194,7 @@ export function addGles(lib, { runtime: r } = {}) {
   // mapped buffer ranges (ES 3.0 2.10.3): the range is a block of the process memory, filled from the buffer (getBufferSubData) unless invalidated, written back on unmap
   const BINDING = { 0x8892: 0x8894, 0x8893: 0x8895, 0x8F36: 0x8F36, 0x8F37: 0x8F37, 0x88EB: 0x88ED, 0x88EC: 0x88EF, 0x8C8E: 0x8C8F, 0x8A11: 0x8A28 };
   const MAP = { READ: 1, WRITE: 2, INVALIDATE_RANGE: 4, INVALIDATE_BUFFER: 8, FLUSH_EXPLICIT: 0x10, UNSYNCHRONIZED: 0x20 };
-  const mappedOf = (c, target) => { const pname = BINDING[target]; if (!pname) { raise(c, GL.INVALID_ENUM); return null; } const buffer = c.gl.getParameter(pname); if (!buffer) { raise(c, GL.INVALID_OPERATION); return null; } c.group.mapped ??= new Map(); return { buffer, mapping: c.group.mapped.get(buffer) ?? null }; };
+  const mappedOf = (c, target) => { const pname = BINDING[target]; if (!pname) { raise(c, GL.INVALID_ENUM); return null; } const bound = c.gl.getParameter(pname); if (!bound) { raise(c, GL.INVALID_OPERATION); return null; } const buffer = primaryBuffer(c, bound); c.group.mapped ??= new Map(); return { buffer, mapping: c.group.mapped.get(buffer) ?? null }; };
   entry('glMapBufferRange', (p, cpu) => {
     const [target, offset, length, access] = args(p, cpu, ['I', 'L', 'L', 'I']), c = glFor(r, 'glMapBufferRange'); if (!c) return 0;
     const at = mappedOf(c, target); if (!at) return 0; const gl = c.gl, start = Number(BigInt.asIntN(64, offset)), size = Number(BigInt.asIntN(64, length)), total = Number(gl.getBufferParameter(target, GL.BUFFER_SIZE) ?? 0);
@@ -213,7 +213,7 @@ export function addGles(lib, { runtime: r } = {}) {
   entry('glUnmapBuffer', (p, cpu) => {
     const [target] = args(p, cpu, ['I']), c = glFor(r, 'glUnmapBuffer'); if (!c) return 0; const at = mappedOf(c, target); if (!at) return 0; const m = at.mapping;
     if (!m) { raise(c, GL.INVALID_OPERATION); return 0; }
-    if (m.access & MAP.WRITE) for (const [start, size] of m.access & MAP.FLUSH_EXPLICIT ? m.flushed : [[0, m.length]]) if (size) c.gl.bufferSubData(target, m.offset + start, p.memory.bytes(m.ptr + start, size).slice());
+    if (m.access & MAP.WRITE) for (const [start, size] of m.access & MAP.FLUSH_EXPLICIT ? m.flushed : [[0, m.length]]) if (size) bufferSubData(c, target, m.offset + start, p.memory.bytes(m.ptr + start, size).slice());
     p.free(m.ptr); c.group.mapped.delete(at.buffer); return 1;
   });
   entry('glGetBufferPointerv', (p, cpu) => {

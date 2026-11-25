@@ -1,12 +1,13 @@
-import {APKError} from './apk-runtime.js?v=c542646b3fce';
-import {PathApproxProvider} from './path-approx-provider.js?v=c542646b3fce';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=c542646b3fce';
-import {createFontFallback} from './font-fallback.js?v=c542646b3fce';
-import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=c542646b3fce';
-import {loadMinikin} from './minikin-provider.js?v=c542646b3fce';
-import {createMinikinText} from './minikin-text.js?v=c542646b3fce';
-import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=c542646b3fce';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=c542646b3fce';
+import {APKError} from './apk-runtime.js?v=8411deb8def1';
+import {PathApproxProvider} from './path-approx-provider.js?v=8411deb8def1';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=8411deb8def1';
+import {createFontFallback} from './font-fallback.js?v=8411deb8def1';
+import {SYSTEM_FONT_IMAGE,FONTS_XML} from './system-font-image-data.js?v=8411deb8def1';
+import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=8411deb8def1';
+import {loadMinikin} from './minikin-provider.js?v=8411deb8def1';
+import {createMinikinText} from './minikin-text.js?v=8411deb8def1';
+import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=8411deb8def1';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=8411deb8def1';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -44,6 +45,13 @@ export class SkiaProvider{
   const manifest=new URL('manifest.json',this.fallbackBaseURL());
   read(this.fetch,manifest,2*1024*1024).then(bytes=>{this.prefetched.sync.set(manifest.href,bytes);},()=>{});
   return this.prefetched;
+ }
+ /** The files of /system/fonts (src/system-font-image.js) fetched ahead, for an app whose native code opens them all at start: its reads are synchronous and inside the launch. A file that failed is read again by its reader. */
+ async prefetchSystemFonts(){
+  if(typeof this.fetch!=='function'||this.fontReader||(typeof globalThis.process==='object'&&!!globalThis.process.versions?.node))return;
+  const sync=(this.prefetched??={bytes:new Map(),sync:new Map()}).sync,paths=new Set([FONTS_XML.path,...SYSTEM_FONT_IMAGE.map(([,path])=>path)]);
+  if(this.systemFontsFetched)return;this.systemFontsFetched=true;
+  await Promise.allSettled([...paths].map(async path=>{const url=new URL(path,this.fallbackBaseURL());sync.set(url.href,await read(this.fetch,url,16*1024*1024));}));
  }
  codecBaseURL(){return new URL('../../lab-codecs/'+LAB_CODECS_VERSION+'/',this.baseURL);}
  fallbackBaseURL(){return new URL('../../android-fonts/android-13.0.0_r1/',this.baseURL);}
@@ -104,6 +112,7 @@ export class SkiaProvider{
   };
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) are not part of Skia's own load: apk-loader prepares them when the APK can decode or encode images. The load is bounded; a failure is recorded in codecsError
   // (the hosts that need a codec then fail with that message) instead of blocking the run.
+  result.prepareSystemFonts=()=>this.prefetchSystemFonts();
   result.prepareCodecs=()=>this.codecsPending??=loadLabCodecs({baseURL:this.codecBaseURL(),readBytes:this.codecReadBytes??((url,limit)=>this.readCodecBytes(url,limit)),timeoutMs:this.codecTimeoutMs}).then(codecs=>{result.codecs=codecs;return codecs;},error=>{result.codecsError=error;return null;});
   await onProgress?.({phase:'skia',completed:3,total:3,message:'Skia CPU rasterizer ready'});return result;
  }

@@ -1,8 +1,9 @@
-import { Blocked } from './scheduler.js?v=c542646b3fce';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=c542646b3fce';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=c542646b3fce';
-import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=c542646b3fce';
-import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=c542646b3fce';
+import { Blocked } from './scheduler.js?v=8411deb8def1';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=8411deb8def1';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=8411deb8def1';
+import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=8411deb8def1';
+import * as external from './gl-external-textures.js?v=8411deb8def1';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=8411deb8def1';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md), or over the lab's CPU implementation of OpenGL ES 3.0 (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md) when the Worker has no
@@ -25,7 +26,8 @@ import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL
 //   Strings  GL_VERSION "OpenGL ES 3.0 (WebGL2 lab)" / "OpenGL ES 3.0 (CPU lab)", GL_SHADING_LANGUAGE_VERSION "OpenGL ES GLSL ES 3.00", GL_RENDERER the browser's (WEBGL_debug_renderer_info) when
 //            exposed, or the CPU rasterizer's name; EGL_VERSION "1.4 WebGL2" / "1.4 CPU". Which implementation runs is decided at the first eglInitialize and recorded in the trace.
 // Not available, failing explicitly with UnsupportedOperationException naming the call: ES 1.x contexts and the GL10 fixed-function calls of GLImpl, glMapBufferRange /
-// glGetBufferPointerv / glUnmapBuffer (no mapped memory), program and shader binaries, pixmap surfaces, EGLImage and external textures. No process.*.
+// glGetBufferPointerv / glUnmapBuffer (no mapped memory), program and shader binaries, pixmap surfaces, EGLImage. External textures (src/gl-external-textures.js) compile, bind
+// and draw as textures without an image: nothing in the lab fills them. A buffer object used for vertices and indices is two WebGL buffers (see "buffer objects of both kinds"). No process.*.
 const GLES10 = 'Landroid/opengl/GLES10;', GLES20 = 'Landroid/opengl/GLES20;', GLES30 = 'Landroid/opengl/GLES30;', EGL14 = 'Landroid/opengl/EGL14;', EGLIMPL = 'Lcom/google/android/gles_jni/EGLImpl;', GLIMPL = 'Lcom/google/android/gles_jni/GLImpl;';
 const H = 'Landroid/opengl/EGLObjectHandle;->mHandle:J';
 const E14 = { display: 'Landroid/opengl/EGLDisplay;', config: 'Landroid/opengl/EGLConfig;', context: 'Landroid/opengl/EGLContext;', surface: 'Landroid/opengl/EGLSurface;' };
@@ -392,6 +394,7 @@ function parameterValues(context, pname) {
     case GL.FRAMEBUFFER_BINDING: return [context.appDraw]; case GL.READ_FRAMEBUFFER_BINDING: return [context.appRead];
     case GL.VERTEX_ARRAY_BINDING: { const object = gl.getParameter(pname); for (const [name, vao] of context.vertexArrays) if (vao === object) return [name]; return [0]; }
     case GL.CURRENT_PROGRAM: return [context.program];
+    case external.EXTERNAL_BINDING: return [nameOf(context, 'texture', external.boundExternal(context))];
   }
   const value = gl.getParameter(pname);
   if (value === null || value === undefined) return OBJECT_PNAMES.has(pname) ? [0] : null;
@@ -431,6 +434,58 @@ function drawClientElements(r, context, mode, count, type, indices, draw) {
   uploadClientArrays(r, context, maxIndex(bytes, type) + 1); draw(0); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, previous);
 }
 
+// ---- buffer objects of both kinds ------------------------------------------------------------------------------------------------------------------------------------------
+// OpenGL ES lets one buffer object hold vertices and indices (ES 3.0 2.9: a buffer object has no type). WebGL fixes a buffer's kind at its first binding -- indices
+// (ELEMENT_ARRAY_BUFFER) or anything else -- and refuses the other kind with INVALID_OPERATION, which leaves the binding at 0 (WebGL 1.0 6.1, WebGL 2.0 5.1). A buffer the app
+// binds as both is two WebGL buffers of one GL name: the one it was first bound as and its twin of the other kind, made when it is first needed and written with the same data
+// from then on. The lab's CPU implementation has no such rule and needs no twin.
+const ACTIVE_UNIFORM_BLOCKS = 0x8A36, UNIFORM_NAME_LENGTH = 0x8A39, UNIFORM_BLOCK_NAME_LENGTH = 0x8A41, SAMPLES = 0x80A9, NUM_SAMPLE_COUNTS = 0x9380;   // ES 3.0 queries WebGL2 leaves out: a name's length (with the NUL) and the number of sample counts, strings and arrays there
+const COPY_READ_BUFFER = 0x8F36, COPY_WRITE_BUFFER = 0x8F37, BUFFER_SIZE = 0x8764, BUFFER_USAGE = 0x8765;
+const BUFFER_BINDING = { 0x8892: 0x8894, 0x8893: 0x8895, 0x8F36: 0x8F36, 0x8F37: 0x8F37, 0x88EB: 0x88ED, 0x88EC: 0x88EF, 0x8C8E: 0x8C8F, 0x8A11: 0x8A28 };
+const bufferKind = target => target === COPY_READ_BUFFER || target === COPY_WRITE_BUFFER ? null : target === GL.ELEMENT_ARRAY_BUFFER ? 'element' : 'data';   // a copy target takes a buffer of either kind and fixes none
+const boundBuffer = (context, target) => BUFFER_BINDING[target] ? context.gl.getParameter(BUFFER_BINDING[target]) : null;
+const twinOf = (context, object) => object ? context.group.twins?.get(object) ?? null : null;
+/** The object of a buffer that stands for it in per-buffer tables (the mapped ranges): the one it was first bound as, whichever of the two is bound. */
+const primaryBuffer = (context, object) => context.group.twinPrimary?.get(object) ?? object;
+/** Runs `body` with `object` at the COPY_WRITE_BUFFER binding, restoring the app's. */
+function withCopyWrite(gl, object, body) { const previous = gl.getParameter(COPY_WRITE_BUFFER); gl.bindBuffer(COPY_WRITE_BUFFER, object); try { return body(); } finally { gl.bindBuffer(COPY_WRITE_BUFFER, previous); } }
+function bufferContents(gl, object) {
+  return withCopyWrite(gl, object, () => { const bytes = new Uint8Array(Number(gl.getBufferParameter(COPY_WRITE_BUFFER, BUFFER_SIZE) ?? 0)); if (bytes.length) gl.getBufferSubData(COPY_WRITE_BUFFER, 0, bytes); return { bytes, usage: gl.getBufferParameter(COPY_WRITE_BUFFER, BUFFER_USAGE) }; });
+}
+/** The WebGL buffer of `object` (the GL name's buffer) to bind at `target`. */
+function bufferFor(r, context, target, name, object) {
+  const kind = bufferKind(target), { group, gl } = context; if (!object || !kind || group.path === 'cpu') return object;
+  const kinds = group.bufferKinds ??= new WeakMap(), own = kinds.get(object);
+  if (!own) { kinds.set(object, kind); return object; }
+  if (own === kind) return object;
+  const known = twinOf(context, object); if (known) return known;
+  const { bytes, usage } = bufferContents(gl, object), twin = gl.createBuffer();
+  const previous = boundBuffer(context, target); gl.bindBuffer(target, twin); if (bytes.length) gl.bufferData(target, bytes, usage ?? GL.STREAM_DRAW); gl.bindBuffer(target, previous);   // the first binding fixes the twin's kind
+  (group.twins ??= new Map()).set(object, twin); group.twins.set(twin, object); (group.twinPrimary ??= new WeakMap()).set(twin, object); group.reverse.set(twin, name);
+  if (!group.twinNoted) { group.twinNoted = true; r.record?.('GL: a buffer object holds both vertices and indices; WebGL separates them, so the lab keeps two buffers for it'); }
+  return twin;
+}
+/** Deletes the twin of a buffer the app deletes. */
+function dropTwin(context, object) { const twin = twinOf(context, object); if (!twin) return; context.group.twins.delete(object); context.group.twins.delete(twin); context.gl.deleteBuffer(twin); }
+/** What was just written to the buffer at `target` goes to its twin too. */
+function mirror(context, target, write) { if (!context.group.twins?.size) return; const twin = twinOf(context, boundBuffer(context, target)); if (twin) withCopyWrite(context.gl, twin, () => write(COPY_WRITE_BUFFER)); }
+function bufferData(context, target, data, usage) { context.gl.bufferData(target, data, usage); mirror(context, target, at => context.gl.bufferData(at, data, usage)); }
+function bufferSubData(context, target, offset, bytes) { context.gl.bufferSubData(target, offset, bytes); mirror(context, target, at => context.gl.bufferSubData(at, offset, bytes)); }
+/** After a write the GPU made into `object` (a pixel pack, transform feedback), its twin is read back from it. */
+function refreshTwin(context, object) { const twin = twinOf(context, object); if (!twin) return; const { bytes, usage } = bufferContents(context.gl, object); withCopyWrite(context.gl, twin, () => context.gl.bufferData(COPY_WRITE_BUFFER, bytes, usage)); }
+function copyBufferSubData(context, readTarget, writeTarget, readOffset, writeOffset, size) {
+  const { gl, group } = context, from = boundBuffer(context, readTarget), to = boundBuffer(context, writeTarget);
+  // native when the two are of one kind and neither has a twin; else through memory: WebGL refuses a copy between kinds
+  const kindOf = object => group.twinPrimary?.has(object) ? (group.bufferKinds.get(primaryBuffer(context, object)) === 'element' ? 'data' : 'element') : group.bufferKinds?.get(object);
+  if (!from || !to || size <= 0 || readOffset < 0 || writeOffset < 0 || (kindOf(from) === kindOf(to) && !twinOf(context, to))) return gl.copyBufferSubData(readTarget, writeTarget, readOffset, writeOffset, size);
+  const limit = target => Number(gl.getBufferParameter(target, BUFFER_SIZE));
+  if (readOffset + size > limit(readTarget) || writeOffset + size > limit(writeTarget)) return raise(context, GL.INVALID_VALUE);
+  if (primaryBuffer(context, from) === primaryBuffer(context, to) && Math.abs(readOffset - writeOffset) < size) return raise(context, GL.INVALID_VALUE);
+  const bytes = new Uint8Array(size); gl.getBufferSubData(readTarget, readOffset, bytes); bufferSubData(context, writeTarget, writeOffset, bytes);
+}
+
+const drawing = (context, body) => external.draw(context, objectOf(context, 'object', context.program), body);
+
 /** Bindings of the GLES20 / GLES30 natives: Map 'owner->name(signature)' -> (runtime, args). */
 function glesBindings(add) {
   // add(owner, 'name', 'signature', (r, context, gl, args) => value, default) -- runs only with a current context; without one answers `fallback`
@@ -450,32 +505,34 @@ function glesBindings(add) {
     ['glFinish', 'finish', '()V'], ['glFlush', 'flush', '()V'], ['glFrontFace', 'frontFace', '(I)V'], ['glGenerateMipmap', 'generateMipmap', '(I)V'], ['glHint', 'hint', '(II)V'], ['glPixelStorei', 'pixelStorei', '(II)V'],
     ['glScissor', 'scissor', '(IIII)V'], ['glStencilFunc', 'stencilFunc', '(III)V'], ['glStencilFuncSeparate', 'stencilFuncSeparate', '(IIII)V'], ['glStencilMask', 'stencilMask', '(I)V'],
     ['glStencilMaskSeparate', 'stencilMaskSeparate', '(II)V'], ['glStencilOp', 'stencilOp', '(III)V'], ['glStencilOpSeparate', 'stencilOpSeparate', '(IIII)V'], ['glViewport', 'viewport', '(IIII)V'],
-    ['glCopyTexImage2D', 'copyTexImage2D', '(IIIIIIII)V'], ['glCopyTexSubImage2D', 'copyTexSubImage2D', '(IIIIIIII)V'], ['glRenderbufferStorage', 'renderbufferStorage', '(IIII)V'], ['glTexParameteri', 'texParameteri', '(III)V'],
+    ['glCopyTexImage2D', 'copyTexImage2D', '(IIIIIIII)V'], ['glCopyTexSubImage2D', 'copyTexSubImage2D', '(IIIIIIII)V'], ['glRenderbufferStorage', 'renderbufferStorage', '(IIII)V'],
     ['glDrawArrays', null, '(III)V']]) {
     if (!method) continue; S20(name, sig, (r, c, gl, args) => { gl[method](...args); });
   }
   for (const [name, method, sig] of [['glBlendColor', 'blendColor', '(FFFF)V'], ['glClearColor', 'clearColor', '(FFFF)V'], ['glClearDepthf', 'clearDepth', '(F)V'], ['glDepthRangef', 'depthRange', '(FF)V'],
     ['glLineWidth', 'lineWidth', '(F)V'], ['glPolygonOffset', 'polygonOffset', '(FF)V'], ['glVertexAttrib1f', 'vertexAttrib1f', '(IF)V'], ['glVertexAttrib2f', 'vertexAttrib2f', '(IFF)V'], ['glVertexAttrib3f', 'vertexAttrib3f', '(IFFF)V'],
-    ['glVertexAttrib4f', 'vertexAttrib4f', '(IFFFF)V'], ['glTexParameterf', 'texParameterf', '(IIF)V']]) {
+    ['glVertexAttrib4f', 'vertexAttrib4f', '(IFFFF)V']]) {
     const params = sig.slice(1, sig.indexOf(')')); S20(name, sig, (r, c, gl, args) => { gl[method](...args.map((v, i) => params[i] === 'F' ? f(v) : v)); });
   }
+  S20('glTexParameteri', '(III)V', (r, c, gl, [target, pname, value]) => { external.texParameter(c, 'texParameteri', target, pname, value, raise); });
+  S20('glTexParameterf', '(IIF)V', (r, c, gl, [target, pname, value]) => { external.texParameter(c, 'texParameterf', target, pname, f(value), raise); });
   S20('glColorMask', '(ZZZZ)V', (r, c, gl, args) => { gl.colorMask(...args.map(v => !!v)); });
   S20('glDepthMask', '(Z)V', (r, c, gl, [flag]) => { gl.depthMask(!!flag); });
   S20('glSampleCoverage', '(FZ)V', (r, c, gl, [value, invert]) => { gl.sampleCoverage(f(value), !!invert); });
   S20('glIsEnabled', '(I)Z', (r, c, gl, [cap]) => gl.isEnabled(cap) ? 1 : 0);
   S20('glReleaseShaderCompiler', '()V', () => {});
   S20('glGetError', '()I', (r, c, gl) => { const own = c.error; if (own !== GL.NO_ERROR) { c.error = GL.NO_ERROR; return own; } return gl.getError(); });
-  S20('glDrawArrays', '(III)V', (r, c, gl, [mode, first, count]) => { uploadClientArrays(r, c, first + count); gl.drawArrays(mode, first, count); });
-  S20('glDrawElements', '(IIII)V', (r, c, gl, [mode, count, type, offset]) => { if (c.clientAttribs.size) r.throwJava(UOE, 'glDrawElements: client-side vertex arrays with an element buffer object are not supported'); gl.drawElements(mode, count, type, offset); });
-  S20('glDrawElements', `(III${BUFFER})V`, (r, c, gl, [mode, count, type, indices]) => drawClientElements(r, c, mode, count, type, indices, offset => gl.drawElements(mode, count, type, offset)));
+  S20('glDrawArrays', '(III)V', (r, c, gl, [mode, first, count]) => { uploadClientArrays(r, c, first + count); drawing(c, () => gl.drawArrays(mode, first, count)); });
+  S20('glDrawElements', '(IIII)V', (r, c, gl, [mode, count, type, offset]) => { if (c.clientAttribs.size) r.throwJava(UOE, 'glDrawElements: client-side vertex arrays with an element buffer object are not supported'); drawing(c, () => gl.drawElements(mode, count, type, offset)); });
+  S20('glDrawElements', `(III${BUFFER})V`, (r, c, gl, [mode, count, type, indices]) => drawClientElements(r, c, mode, count, type, indices, offset => drawing(c, () => gl.drawElements(mode, count, type, offset))));
   for (const [sig, kind] of [[`(II${STRING})V`, null]]) S20('glBindAttribLocation', sig, (r, c, gl, [program, index, name]) => { const p = lookup(c, 'object', program); if (p) gl.bindAttribLocation(p, index, name); });
   // ---- objects ----
   const genDelete = (S, noun, kind, create, destroy, extra = {}) => {
     both(S, `glGen${noun}`, ['(I[II)V', `(I${INT_BUFFER})V`], (r, c, gl, args) => { const [n] = args; if (n < 0) return raise(c, GL.INVALID_VALUE); writeVec(r, args, 1, 'I', genNames(c, kind, n, () => create(gl))); });
     both(S, `glDelete${noun}`, ['(I[II)V', `(I${INT_BUFFER})V`], (r, c, gl, args) => { const [n] = args; if (n < 0) return raise(c, GL.INVALID_VALUE); for (const name of readInts(r, args, 1, n)) if (name) { extra.before?.(c, name); deleteName(c, kind, name, object => destroy(gl, object)); } });
   };
-  genDelete(S20, 'Buffers', 'buffer', gl => gl.createBuffer(), (gl, o) => gl.deleteBuffer(o));
-  genDelete(S20, 'Textures', 'texture', gl => gl.createTexture(), (gl, o) => gl.deleteTexture(o));
+  genDelete(S20, 'Buffers', 'buffer', gl => gl.createBuffer(), (gl, o) => gl.deleteBuffer(o), { before: (c, name) => dropTwin(c, objectOf(c, 'buffer', name)) });
+  genDelete(S20, 'Textures', 'texture', gl => gl.createTexture(), (gl, o) => gl.deleteTexture(o), { before: (c, name) => external.deleted(c, objectOf(c, 'texture', name)) });
   genDelete(S20, 'Framebuffers', 'framebuffer', gl => gl.createFramebuffer(), (gl, o) => gl.deleteFramebuffer(o), { before: (c, name) => { if (c.appDraw === name) c.appDraw = 0; if (c.appRead === name) c.appRead = 0; } });
   genDelete(S20, 'Renderbuffers', 'renderbuffer', gl => gl.createRenderbuffer(), (gl, o) => gl.deleteRenderbuffer(o));
   genDelete(S30, 'Samplers', 'sampler', gl => gl.createSampler(), (gl, o) => gl.deleteSampler(o));
@@ -493,8 +550,9 @@ function glesBindings(add) {
   isA(S20, 'glIsShader', 'object', (gl, o) => gl.isShader(o)); isA(S20, 'glIsProgram', 'object', (gl, o) => gl.isProgram(o));
   // binding a name that was never generated creates it (ES 2.0/3.0 for buffers, textures, framebuffers, renderbuffers)
   const bindCreate = (c, gl, kind, name, create) => { if (!name) return null; let o = c.group.names[kind].get(name); if (!o) { o = create(gl); c.group.names[kind].set(name, o); c.group.reverse.set(o, name); c.group.next[kind] = Math.max(c.group.next[kind], name + 1); } return o; };
-  S20('glBindBuffer', '(II)V', (r, c, gl, [target, name]) => { gl.bindBuffer(target, bindCreate(c, gl, 'buffer', name, g => g.createBuffer())); });
-  S20('glBindTexture', '(II)V', (r, c, gl, [target, name]) => { gl.bindTexture(target, bindCreate(c, gl, 'texture', name, g => g.createTexture())); });
+  const buffer = (r, c, gl, target, name) => bufferFor(r, c, target, name, bindCreate(c, gl, 'buffer', name, g => g.createBuffer()));
+  S20('glBindBuffer', '(II)V', (r, c, gl, [target, name]) => { gl.bindBuffer(target, buffer(r, c, gl, target, name)); });
+  S20('glBindTexture', '(II)V', (r, c, gl, [target, name]) => { const o = bindCreate(c, gl, 'texture', name, g => g.createTexture()); if (!external.bindTexture(c, target, o, raise)) gl.bindTexture(target, o); });
   S20('glBindRenderbuffer', '(II)V', (r, c, gl, [target, name]) => { gl.bindRenderbuffer(target, bindCreate(c, gl, 'renderbuffer', name, g => g.createRenderbuffer())); });
   S20('glBindFramebuffer', '(II)V', (r, c, gl, [target, name]) => {
     if (name) bindCreate(c, gl, 'framebuffer', name, g => g.createFramebuffer());
@@ -504,20 +562,20 @@ function glesBindings(add) {
   });
   S30('glBindSampler', '(II)V', (r, c, gl, [unit, name]) => { const o = lookup(c, 'sampler', name); if (o !== undefined) gl.bindSampler(unit, o); });
   S30('glBindTransformFeedback', '(II)V', (r, c, gl, [target, name]) => { const o = lookup(c, 'transformFeedback', name); if (o !== undefined) gl.bindTransformFeedback(target, o); });
-  S30('glBindBufferBase', '(III)V', (r, c, gl, [target, index, name]) => { gl.bindBufferBase(target, index, bindCreate(c, gl, 'buffer', name, g => g.createBuffer())); });
-  S30('glBindBufferRange', '(IIIII)V', (r, c, gl, [target, index, name, offset, size]) => { gl.bindBufferRange(target, index, bindCreate(c, gl, 'buffer', name, g => g.createBuffer()), offset, size); });
+  S30('glBindBufferBase', '(III)V', (r, c, gl, [target, index, name]) => { gl.bindBufferBase(target, index, buffer(r, c, gl, target, name)); });
+  S30('glBindBufferRange', '(IIIII)V', (r, c, gl, [target, index, name, offset, size]) => { gl.bindBufferRange(target, index, buffer(r, c, gl, target, name), offset, size); });
   S20('glFramebufferTexture2D', '(IIIII)V', (r, c, gl, [target, attachment, textarget, name, level]) => { if (framebufferIsDefault(c, target)) return raise(c, GL.INVALID_OPERATION); const o = lookup(c, 'texture', name); if (o !== undefined) gl.framebufferTexture2D(target, attachment, textarget, o, level); });
   S30('glFramebufferTextureLayer', '(IIIII)V', (r, c, gl, [target, attachment, name, level, layer]) => { if (framebufferIsDefault(c, target)) return raise(c, GL.INVALID_OPERATION); const o = lookup(c, 'texture', name); if (o !== undefined) gl.framebufferTextureLayer(target, attachment, o, level, layer); });
   S20('glFramebufferRenderbuffer', '(IIII)V', (r, c, gl, [target, attachment, rbTarget, name]) => { if (framebufferIsDefault(c, target)) return raise(c, GL.INVALID_OPERATION); const o = lookup(c, 'renderbuffer', name); if (o !== undefined) gl.framebufferRenderbuffer(target, attachment, rbTarget, o); });
   S20('glCheckFramebufferStatus', '(I)I', (r, c, gl, [target]) => gl.checkFramebufferStatus(target));
   // ---- buffers ----
   S20('glBufferData', `(II${BUFFER}I)V`, (r, c, gl, [target, size, data, usage]) => {
-    if (data === null) return void gl.bufferData(target, size, usage);
+    if (data === null) return bufferData(c, target, size, usage);
     const region = nioRegion(r, data); if (region.bytes < size) r.throwJava(IAE, 'remaining() < size < needed');
-    gl.bufferData(target, readRegion(r, region, size), usage);
+    bufferData(c, target, readRegion(r, region, size), usage);
   });
-  S20('glBufferSubData', `(III${BUFFER})V`, (r, c, gl, [target, offset, size, data]) => { const region = nioRegion(r, data); if (region.bytes < size) r.throwJava(IAE, 'remaining() < size < needed'); gl.bufferSubData(target, offset, readRegion(r, region, size)); });
-  S30('glCopyBufferSubData', '(IIIII)V', (r, c, gl, args) => { gl.copyBufferSubData(...args); });
+  S20('glBufferSubData', `(III${BUFFER})V`, (r, c, gl, [target, offset, size, data]) => { const region = nioRegion(r, data); if (region.bytes < size) r.throwJava(IAE, 'remaining() < size < needed'); bufferSubData(c, target, offset, readRegion(r, region, size)); });
+  S30('glCopyBufferSubData', '(IIIII)V', (r, c, gl, args) => { copyBufferSubData(c, ...args); });
   unsupported(S30, 'glMapBufferRange', ['(IIII)Ljava/nio/Buffer;'], 'mapped buffer memory is not available on WebGL2 (glBufferSubData writes a range)');
   unsupported(S30, 'glGetBufferPointerv', ['(II)Ljava/nio/Buffer;'], 'mapped buffer memory is not available on WebGL2');
   unsupported(S30, 'glFlushMappedBufferRange', ['(III)V'], 'mapped buffer memory is not available on WebGL2');
@@ -530,11 +588,11 @@ function glesBindings(add) {
   const genNamesOf = (c, object) => { const name = c.group.next.object++; c.group.names.object.set(name, object); c.group.reverse.set(object, name); return name; };
   S20('glDeleteShader', '(I)V', (r, c, gl, [name]) => { if (name) deleteName(c, 'object', name, o => gl.deleteShader(o)); });
   S20('glDeleteProgram', '(I)V', (r, c, gl, [name]) => { if (name) deleteName(c, 'object', name, o => gl.deleteProgram(o)); });
-  S20('glShaderSource', `(I${STRING})V`, (r, c, gl, [name, source]) => { const o = lookup(c, 'object', name); if (o) gl.shaderSource(o, source ?? ''); });
+  S20('glShaderSource', `(I${STRING})V`, (r, c, gl, [name, source]) => { const o = lookup(c, 'object', name); if (o) external.shaderSource(r, c, o, source ?? ''); });
   S20('glCompileShader', '(I)V', (r, c, gl, [name]) => { const o = lookup(c, 'object', name); if (o) gl.compileShader(o); });
   S20('glAttachShader', '(II)V', (r, c, gl, [p, s]) => { const program = lookup(c, 'object', p), shader = lookup(c, 'object', s); if (program && shader) gl.attachShader(program, shader); });
   S20('glDetachShader', '(II)V', (r, c, gl, [p, s]) => { const program = lookup(c, 'object', p), shader = lookup(c, 'object', s); if (program && shader) gl.detachShader(program, shader); });
-  S20('glLinkProgram', '(I)V', (r, c, gl, [p]) => { const o = lookup(c, 'object', p); if (!o) return; gl.linkProgram(o); c.group.uniforms.delete(p); });
+  S20('glLinkProgram', '(I)V', (r, c, gl, [p]) => { const o = lookup(c, 'object', p); if (!o) return; gl.linkProgram(o); c.group.uniforms.delete(p); external.linked(c, o); });
   S20('glValidateProgram', '(I)V', (r, c, gl, [p]) => { const o = lookup(c, 'object', p); if (o) gl.validateProgram(o); });
   S20('glUseProgram', '(I)V', (r, c, gl, [p]) => {
     const o = lookup(c, 'object', p); if (o === undefined) return;
@@ -547,7 +605,7 @@ function glesBindings(add) {
   unsupported(S20, 'glShaderBinary', [`(I${INT_BUFFER}I${BUFFER}I)V`, `(I[III${BUFFER}I)V`], 'shader binaries are not available (GL_NUM_SHADER_BINARY_FORMATS is 0)');
   const shaderParam = (c, gl, o, pname) => {
     if (pname === GL.INFO_LOG_LENGTH) { const log = gl.getShaderInfoLog(o) ?? ''; return log ? log.length + 1 : 0; }
-    if (pname === GL.SHADER_SOURCE_LENGTH) { const s = gl.getShaderSource(o) ?? ''; return s ? s.length + 1 : 0; }
+    if (pname === GL.SHADER_SOURCE_LENGTH) { const s = external.originalSource(c, o); return s ? s.length + 1 : 0; }
     const v = gl.getShaderParameter(o, pname); if (v === null) { raise(c, GL.INVALID_ENUM); return null; } return typeof v === 'boolean' ? (v ? 1 : 0) : v;
   };
   both(S20, 'glGetShaderiv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const o = lookup(c, 'object', args[0]); if (!o) return; const v = shaderParam(c, gl, o, args[1]); if (v !== null) writeVec(r, args, 2, 'I', [v]); });
@@ -565,7 +623,7 @@ function glesBindings(add) {
   both(S20, 'glGetProgramiv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const o = lookup(c, 'object', args[0]); if (!o) return; const v = programParam(c, gl, o, args[1]); if (v !== null) writeVec(r, args, 2, 'I', [v]); });
   S20('glGetShaderInfoLog', `(I)${STRING}`, (r, c, gl, [name]) => { const o = lookup(c, 'object', name); return o ? gl.getShaderInfoLog(o) ?? '' : ''; }, '');
   S20('glGetProgramInfoLog', `(I)${STRING}`, (r, c, gl, [name]) => { const o = lookup(c, 'object', name); return o ? gl.getProgramInfoLog(o) ?? '' : ''; }, '');
-  S20('glGetShaderSource', `(I)${STRING}`, (r, c, gl, [name]) => { const o = lookup(c, 'object', name); return o ? gl.getShaderSource(o) ?? '' : ''; }, '');
+  S20('glGetShaderSource', `(I)${STRING}`, (r, c, gl, [name]) => { const o = lookup(c, 'object', name); return o ? external.originalSource(c, o) : ''; }, '');
   both(S20, 'glGetShaderPrecisionFormat', ['(II[II[II)V', `(II${INT_BUFFER}${INT_BUFFER})V`], (r, c, gl, args) => {
     const format = gl.getShaderPrecisionFormat(args[0], args[1]); if (!format) return raise(c, GL.INVALID_ENUM);
     const second = typeof args[3] === 'number' ? 4 : 3;
@@ -586,7 +644,7 @@ function glesBindings(add) {
   }, -1);
   // glGetActiveAttrib / glGetActiveUniform: the String-returning overloads and the byte[] / ByteBuffer ones
   for (const [which, method] of [['Attrib', 'getActiveAttrib'], ['Uniform', 'getActiveUniform']]) {
-    const info = (c, gl, p, index) => { const o = lookup(c, 'object', p); if (!o) return null; const value = gl[method](o, index); if (!value) raise(c, GL.INVALID_VALUE); return value; };
+    const info = (c, gl, p, index) => { const o = lookup(c, 'object', p); if (!o) return null; const value = gl[method](o, index); if (!value) { raise(c, GL.INVALID_VALUE); return value; } return which === 'Uniform' ? { name: value.name, size: value.size, type: external.uniformType(c, o, value) } : value; };
     S20(`glGetActive${which}`, `(II[II[II)${STRING}`, (r, c, gl, args) => { const v = info(c, gl, args[0], args[1]); if (!v) return null; writeVec(r, args, 2, 'I', [v.size]); writeVec(r, args, 4, 'I', [v.type]); return v.name; }, null);
     S20(`glGetActive${which}`, `(II${INT_BUFFER}${INT_BUFFER})${STRING}`, (r, c, gl, args) => { const v = info(c, gl, args[0], args[1]); if (!v) return null; writeVec(r, args, 2, 'I', [v.size]); writeVec(r, args, 3, 'I', [v.type]); return v.name; }, null);
     S20(`glGetActive${which}`, '(III[II[II[II[BI)V', (r, c, gl, args) => {
@@ -667,10 +725,10 @@ function glesBindings(add) {
   S30('glCompressedTexImage3D', '(IIIIIIIII)V', (r, c, gl, [target, level, internal, width, height, depth, border, size, offset]) => { gl.compressedTexImage3D(target, level, internal, width, height, depth, border, size, offset); });
   S30('glCompressedTexSubImage3D', `(IIIIIIIIII${BUFFER})V`, (r, c, gl, [target, level, x, y, z, width, height, depth, format, size, data]) => { gl.compressedTexSubImage3D(target, level, x, y, z, width, height, depth, format, readRegion(r, nioRegion(r, data), size)); });
   S30('glCompressedTexSubImage3D', '(IIIIIIIIIII)V', (r, c, gl, [target, level, x, y, z, width, height, depth, format, size, offset]) => { gl.compressedTexSubImage3D(target, level, x, y, z, width, height, depth, format, size, offset); });
-  both(S20, 'glTexParameterfv', ['(II[FI)V', `(II${FLOAT_BUFFER})V`], (r, c, gl, args) => { gl.texParameterf(args[0], args[1], floats(readRegion(r, vec(r, args, 2, 'F'), 4))[0]); });
-  both(S20, 'glTexParameteriv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { gl.texParameteri(args[0], args[1], ints(readRegion(r, vec(r, args, 2, 'I'), 4))[0]); });
+  both(S20, 'glTexParameterfv', ['(II[FI)V', `(II${FLOAT_BUFFER})V`], (r, c, gl, args) => { external.texParameter(c, 'texParameterf', args[0], args[1], floats(readRegion(r, vec(r, args, 2, 'F'), 4))[0], raise); });
+  both(S20, 'glTexParameteriv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { external.texParameter(c, 'texParameteri', args[0], args[1], ints(readRegion(r, vec(r, args, 2, 'I'), 4))[0], raise); });
   for (const [name, kind, convert] of [['glGetTexParameterfv', 'F', 'float'], ['glGetTexParameteriv', 'I', 'int']]) both(S20, name, [`(II[${kind}I)V`, `(II${kind === 'F' ? FLOAT_BUFFER : INT_BUFFER})V`], (r, c, gl, args) => {
-    const v = gl.getTexParameter(args[0], args[1]); if (v === null) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, kind, [typeof v === 'boolean' ? (v ? 1 : 0) : Number(v)], convert);
+    const v = external.getTexParameter(c, args[0], args[1]); if (v === null) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, kind, [typeof v === 'boolean' ? (v ? 1 : 0) : Number(v)], convert);
   });
   // ---- samplers ----
   S30('glSamplerParameteri', '(III)V', (r, c, gl, [name, pname, value]) => { const o = lookup(c, 'sampler', name); if (o) gl.samplerParameteri(o, pname, value); });
@@ -696,7 +754,7 @@ function glesBindings(add) {
     writeVec(r, args, 3, 'I', [value]);
   });
   both(S20, 'glGetRenderbufferParameteriv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const v = gl.getRenderbufferParameter(args[0], args[1]); if (v === null) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 2, 'I', [Number(v)]); });
-  both(S30, 'glGetInternalformativ', ['(IIII[II)V', `(IIII${INT_BUFFER})V`], (r, c, gl, args) => { const v = gl.getInternalformatParameter(args[0], args[1], args[2]); if (!v) return raise(c, GL.INVALID_ENUM); writeVec(r, args, 4, 'I', Array.from(v).slice(0, args[3])); });
+  both(S30, 'glGetInternalformativ', ['(IIII[II)V', `(IIII${INT_BUFFER})V`], (r, c, gl, args) => { const count = args[2] === NUM_SAMPLE_COUNTS, v = gl.getInternalformatParameter(args[0], args[1], count ? SAMPLES : args[2]); if (!v) return raise(c, GL.INVALID_ENUM); const values = count ? [v.length] : Array.from(v); writeVec(r, args, 4, 'I', values.slice(0, args[3])); });
   for (const [name, S, kind, method] of [['glClearBufferfv', S30, 'F', 'clearBufferfv'], ['glClearBufferiv', S30, 'I', 'clearBufferiv'], ['glClearBufferuiv', S30, 'I', 'clearBufferuiv']]) {
     both(S, name, [`(II[${kind}I)V`, `(II${kind === 'F' ? FLOAT_BUFFER : INT_BUFFER})V`], (r, c, gl, args) => { const bytes = readRegion(r, vec(r, args, 2, kind), 16); gl[method](args[0], args[1], kind === 'F' ? floats(bytes) : method.endsWith('uiv') ? uints(bytes) : ints(bytes)); });
   }
@@ -706,7 +764,7 @@ function glesBindings(add) {
     const region = nioRegion(r, pixels), bytes = new Uint8Array(region.bytes); if (!bytes.length) return;
     gl.readPixels(x, y, width, height, format, type, pixelArray(bytes, type)); writeRegion(r, region, bytes);
   });
-  S30('glReadPixels', '(IIIIIII)V', (r, c, gl, args) => { gl.readPixels(...args); });   // into a bound PIXEL_PACK_BUFFER at an offset
+  S30('glReadPixels', '(IIIIIII)V', (r, c, gl, args) => { gl.readPixels(...args); refreshTwin(c, boundBuffer(c, 0x88EB)); });   // into a bound PIXEL_PACK_BUFFER at an offset
   // ---- getters ----
   const S10 = (name, signature, body, fallback = 0) => add(GLES10, name, signature, body, fallback);
   for (const [name, kind, convert, S] of [['glGetIntegerv', 'I', 'int', S10], ['glGetIntegerv', 'I', 'int', S20], ['glGetFloatv', 'F', 'float', S20], ['glGetBooleanv', 'Z', 'int', S20], ['glGetInteger64v', 'J', 'long', S30]]) {
@@ -725,15 +783,15 @@ function glesBindings(add) {
   add(GLES10, 'glGetString', `(I)${STRING}`, (r, c, gl, [name]) => { switch (name) { case GL.VERSION: return versionString(c); case GL.VENDOR: return 'APK Web Lab'; case GL.RENDERER: return rendererString(c); case GL.EXTENSIONS: return c.group.extensions.join(' '); default: raise(c, GL.INVALID_ENUM); return null; } }, null);
   S30('glGetStringi', `(II)${STRING}`, (r, c, gl, [name, index]) => { if (name !== GL.EXTENSIONS) { raise(c, GL.INVALID_ENUM); return null; } if (index < 0 || index >= c.group.extensions.length) { raise(c, GL.INVALID_VALUE); return null; } return c.group.extensions[index]; }, null);
   // ---- ES 3.0 draws, queries, transform feedback, uniform blocks, syncs ----
-  S30('glDrawArraysInstanced', '(IIII)V', (r, c, gl, [mode, first, count, instances]) => { uploadClientArrays(r, c, first + count); gl.drawArraysInstanced(mode, first, count, instances); });
-  S30('glDrawElementsInstanced', '(IIIII)V', (r, c, gl, args) => { gl.drawElementsInstanced(...args); });
-  S30('glDrawElementsInstanced', `(III${BUFFER}I)V`, (r, c, gl, [mode, count, type, indices, instances]) => drawClientElements(r, c, mode, count, type, indices, offset => gl.drawElementsInstanced(mode, count, type, offset, instances)));
-  S30('glDrawRangeElements', '(IIIIII)V', (r, c, gl, args) => { gl.drawRangeElements(...args); });
-  S30('glDrawRangeElements', `(IIIII${BUFFER})V`, (r, c, gl, [mode, start, end, count, type, indices]) => drawClientElements(r, c, mode, count, type, indices, offset => gl.drawRangeElements(mode, start, end, count, type, offset)));
+  S30('glDrawArraysInstanced', '(IIII)V', (r, c, gl, [mode, first, count, instances]) => { uploadClientArrays(r, c, first + count); drawing(c, () => gl.drawArraysInstanced(mode, first, count, instances)); });
+  S30('glDrawElementsInstanced', '(IIIII)V', (r, c, gl, args) => { drawing(c, () => gl.drawElementsInstanced(...args)); });
+  S30('glDrawElementsInstanced', `(III${BUFFER}I)V`, (r, c, gl, [mode, count, type, indices, instances]) => drawClientElements(r, c, mode, count, type, indices, offset => drawing(c, () => gl.drawElementsInstanced(mode, count, type, offset, instances))));
+  S30('glDrawRangeElements', '(IIIIII)V', (r, c, gl, args) => { drawing(c, () => gl.drawRangeElements(...args)); });
+  S30('glDrawRangeElements', `(IIIII${BUFFER})V`, (r, c, gl, [mode, start, end, count, type, indices]) => drawClientElements(r, c, mode, count, type, indices, offset => drawing(c, () => gl.drawRangeElements(mode, start, end, count, type, offset))));
   S30('glBeginQuery', '(II)V', (r, c, gl, [target, name]) => { const o = lookup(c, 'query', name); if (o) gl.beginQuery(target, o); }); S30('glEndQuery', '(I)V', (r, c, gl, [target]) => { gl.endQuery(target); });
   both(S30, 'glGetQueryiv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const v = gl.getQuery(args[0], args[1]); writeVec(r, args, 2, 'I', [v && typeof v === 'object' ? nameOf(c, 'query', v) : Number(v ?? 0)]); });
   both(S30, 'glGetQueryObjectuiv', ['(II[II)V', `(II${INT_BUFFER})V`], (r, c, gl, args) => { const o = lookup(c, 'query', args[0]); if (!o) return; const v = gl.getQueryParameter(o, args[1]); writeVec(r, args, 2, 'I', [typeof v === 'boolean' ? (v ? 1 : 0) : Number(v ?? 0)]); });
-  S30('glBeginTransformFeedback', '(I)V', (r, c, gl, [mode]) => { gl.beginTransformFeedback(mode); }); S30('glEndTransformFeedback', '()V', (r, c, gl) => { gl.endTransformFeedback(); });
+  S30('glBeginTransformFeedback', '(I)V', (r, c, gl, [mode]) => { gl.beginTransformFeedback(mode); }); S30('glEndTransformFeedback', '()V', (r, c, gl) => { gl.endTransformFeedback(); if (c.group.twins?.size) for (let i = 0; i < 4; i++) refreshTwin(c, gl.getIndexedParameter(GL.TRANSFORM_FEEDBACK_BUFFER_BINDING, i)); });
   S30('glPauseTransformFeedback', '()V', (r, c, gl) => { gl.pauseTransformFeedback(); }); S30('glResumeTransformFeedback', '()V', (r, c, gl) => { gl.resumeTransformFeedback(); });
   S30('glTransformFeedbackVaryings', `(I[${STRING}I)V`, (r, c, gl, [p, varyings, mode]) => { const o = lookup(c, 'object', p); if (!o) return; if (varyings === null) r.throwJava(IAE, 'varyings == null'); gl.transformFeedbackVaryings(o, Array.from(r.array(varyings).elements, s => r.stringCharacters(s)), mode); });
   for (const sig of [`(II[II[II)${STRING}`, `(II${INT_BUFFER}${INT_BUFFER})${STRING}`]) S30('glGetTransformFeedbackVarying', sig, (r, c, gl, args) => {
@@ -746,12 +804,15 @@ function glesBindings(add) {
   S30('glGetActiveUniformBlockName', `(II)${STRING}`, (r, c, gl, [p, index]) => { const o = lookup(c, 'object', p); return o ? gl.getActiveUniformBlockName(o, index) : null; }, null);
   unsupported(S30, 'glGetActiveUniformBlockName', ['(III[II[BI)V', `(II${BUFFER}${BUFFER})V`], 'use the String-returning glGetActiveUniformBlockName(program, index)');
   both(S30, 'glGetActiveUniformBlockiv', ['(III[II)V', `(III${INT_BUFFER})V`], (r, c, gl, args) => {
-    const o = lookup(c, 'object', args[0]); if (!o) return; const v = gl.getActiveUniformBlockParameter(o, args[1], args[2]); if (v === null) return raise(c, GL.INVALID_ENUM);
+    const o = lookup(c, 'object', args[0]); if (!o) return; const [, index, pname] = args;
+    if (pname === UNIFORM_BLOCK_NAME_LENGTH) { const name = index >= 0 && index < gl.getProgramParameter(o, ACTIVE_UNIFORM_BLOCKS) ? gl.getActiveUniformBlockName(o, index) : null; return name === null ? raise(c, GL.INVALID_VALUE) : writeVec(r, args, 3, 'I', [name.length + 1]); }
+    const v = gl.getActiveUniformBlockParameter(o, index, pname); if (v === null) return raise(c, GL.INVALID_ENUM);
     writeVec(r, args, 3, 'I', ArrayBuffer.isView(v) ? Array.from(v, Number) : [typeof v === 'boolean' ? (v ? 1 : 0) : Number(v)]);
   });
   for (const sig of ['(II[III[II)V', `(II${INT_BUFFER}I${INT_BUFFER})V`]) S30('glGetActiveUniformsiv', sig, (r, c, gl, args) => {
     const o = lookup(c, 'object', args[0]); if (!o) return; const array = typeof args[3] === 'number' && sig.startsWith('(II[');
-    const indices = readInts(r, args, 2, args[1]), pname = array ? args[4] : args[3], v = gl.getActiveUniforms(o, indices, pname); if (!v) return raise(c, GL.INVALID_ENUM);
+    const indices = readInts(r, args, 2, args[1]), pname = array ? args[4] : args[3];
+    const v = pname === UNIFORM_NAME_LENGTH ? (indices.every(i => i >= 0 && i < gl.getProgramParameter(o, GL.ACTIVE_UNIFORMS)) ? indices.map(i => gl.getActiveUniform(o, i).name.length + 1) : null) : gl.getActiveUniforms(o, indices, pname); if (!v) return raise(c, GL.INVALID_ENUM);
     writeVec(r, args, array ? 5 : 4, 'I', Array.from(v, x => typeof x === 'boolean' ? (x ? 1 : 0) : Number(x)));
   });
   for (const sig of [`(I[${STRING}[II)V`, `(I[${STRING}${INT_BUFFER})V`]) S30('glGetUniformIndices', sig, (r, c, gl, args) => {
@@ -1024,4 +1085,4 @@ export function glSurfaceNodeState(runtime, object) { return platforms.get(runti
  */
 export function createEglCore() { return eglCore(); }
 export const EGL_CONSTANTS = EGL, GL_CONSTANTS = GL;
-export const glAccess = { glFor, lookup, raise, nameOf, stateOf, currentOf, setEglError };
+export const glAccess = { glFor, lookup, raise, nameOf, stateOf, currentOf, setEglError, bufferSubData, primaryBuffer };

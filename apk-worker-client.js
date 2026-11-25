@@ -1,9 +1,9 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=c542646b3fce';
-import { createRasterReceiver } from './raster-cache.js?v=c542646b3fce';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=c542646b3fce';
-import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=c542646b3fce';
+import { createWebAudioPlayer } from './web-audio-player.js?v=8411deb8def1';
+import { createRasterReceiver } from './raster-cache.js?v=8411deb8def1';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=8411deb8def1';
+import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=8411deb8def1';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=c542646b3fce', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=8411deb8def1', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -41,6 +41,7 @@ export class APKWorkerClient {
       if (data?.type === 'microg-account') { this.onMicrogAccount?.(data.outcome); return; }   // the answer of "Add Google account (microG)": { ok, accountName, accountType, error }   // the stored microG (device) data, per package (src/app-data-store.js attachDeviceData)
       if (data?.type === 'logcat') { this.onLogcat?.(data); return; }   // a batch of the app's logcat lines (src/logcat.js), never part of a request
       if (data?.type === 'netlog') { this.onNetlog?.(data); return; }   // a batch of the app's network requests (src/netlog.js), never part of a request
+      if (data?.type === 'recompositions') { this.onRecompositions?.(data.update); return; }   // src/compose-recompositions.js, only while the Layout panel counts
       if (data?.type === 'method-hook-calls') { this.onMethodHookCalls?.(data); return; }
       if (data?.type === 'net-route') { this.onNetRoute?.(data); return; }   // a request a plugin's route holds, or the outcome of its decision (src/network-routes.js)
       if (data?.type === 'debug-event' || data?.type === 'debug-held' || data?.type === 'debug-reply') { this.debugMessage(data); return; }   // the Java debugger (src/debugger.js, docs/DEBUGGER.md)   // calls of the methods plugins observe (lab.hook { observe }, src/method-hooks.js), one batch per message, never part of a request
@@ -224,6 +225,15 @@ export class APKWorkerClient {
   /** One inspection of the Compose layout tree on the screen (src/compose-inspector.js), answered between two VM events; null when no APK is loaded. */
 
   async inspectCompose({ maxNodes = 2000 } = {}) { if (!this.worker) return null; return (await this.sideCall('compose-inspect', { maxNodes }, 15000)).inspection ?? null; }
+  /** "Count recompositions" of the Layout panel (src/compose-recompositions.js): sent only when it changes for the current Worker (a new Worker starts with it off); resolves the
+   * counting status, or null when nothing was sent. The counts then arrive through onRecompositions. */
+  syncRecompositions(on) {
+    const worker = this.worker, wanted = !!on; if (!worker || (this.recompositionsWorker === worker) === wanted) return Promise.resolve(null);
+    this.recompositionsWorker = wanted ? worker : null;
+    return this.sideCall('compose-recompositions', { on: wanted }).then(reply => reply.recompositions ?? null, () => { if (this.recompositionsWorker === worker) this.recompositionsWorker = null; return null; });
+  }
+  /** The counters go back to 0; resolves the status. */
+  async resetRecompositions() { if (!this.worker) return null; return (await this.sideCall('compose-recompositions', { reset: true })).recompositions ?? null; }
   /** A page plugin's read-only query (src/plugin-queries.js; queued and served at low priority by the Worker). Rejects with `code` 'no-apk' when no APK is loaded. */
   async pluginQuery(query, args = {}) { if (!this.worker) throw Object.assign(new Error('No APK is running.'), { code: 'no-apk' }); const reply = await this.sideCall('plugin-query', { query, args, power: this.pluginPower }, 10000); return { value: reply.value, ms: reply.ms }; }
   /** "Plugin power" (src/plugin-power.js): the level every later plugin query carries, and, with a Worker, the level applied at once. Resolves with { level, stats } (the Worker's serving stats), or null without a Worker. */

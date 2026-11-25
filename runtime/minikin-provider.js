@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=c542646b3fce';
-import { DIGESTS } from './crypto-host.js?v=c542646b3fce';
-import { knownDigest, noteDigest } from './shared-asset-bytes.js?v=c542646b3fce';
+import { APKError } from './apk-error.js?v=8411deb8def1';
+import { DIGESTS } from './crypto-host.js?v=8411deb8def1';
+import { knownDigest, noteDigest } from './shared-asset-bytes.js?v=8411deb8def1';
 
 // AOSP Minikin (android-13.0.0_r1 frameworks/minikin) with HarfBuzz 3.1.1 and ICU 70.1 in one wasm32 module (vendor/minikin/android-13.0.0_r1/minikin.wasm,
 // scripts/wasm/build-minikin.sh). The module is loaded synchronously the first time a text native needs it (a Worker's synchronous read, Node's fs), so an app

@@ -7,12 +7,16 @@
 // asked for it (Layout Inspector's inspection tables, ComposerImpl.collectParameterInformation). The root composition's slot table is read through its public tooling API
 // (CompositionData / CompositionGroup.getSourceInfo / getNode); when it carries "C(Name)" markers the LayoutNode gets that name (source 'composable'). Otherwise the name is
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=c542646b3fce';
+//
+// With recomposition counting on (src/compose-recompositions.js) each node also carries `recomposition`: the counts of the restart group that emits it. Off, nothing is read for it.
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=8411deb8def1';
+import { composableName, composeOwnerViews, reachableRoots, rootComposition, walkComposition } from './compose-compositions.js?v=8411deb8def1';
+import { nodeRecomposition, recompositionStatus } from './compose-recompositions.js?v=8411deb8def1';
+export { composableName };
 
-const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
+const VIEW = 'Landroid/view/View;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';
 const COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
 const MODIFIER_INFO = 'Landroidx/compose/ui/layout/ModifierInfo;', DENSITY = 'Landroidx/compose/ui/unit/Density;';
-const COMPOSITION_GROUP = 'Landroidx/compose/runtime/tooling/CompositionGroup;', COMPOSITION_DATA = 'Landroidx/compose/runtime/tooling/CompositionData;';
 export const MAX_NODES = 2000, MAX_DEPTH = 256, MAX_GROUPS = 60000, MAX_MODIFIERS = 48;
 // Compose's own layout primitives: a composable chain ends in one of them before the LayoutNode is emitted; the name shown is the nearest call that is not one of these.
 const PRIMITIVES = new Set(['Layout', 'ReusableComposeNode', 'ComposeNode', 'SubcomposeLayout', 'MultiMeasureLayout', 'LayoutNode']);
@@ -25,11 +29,6 @@ const round = value => Math.round(value * 100) / 100;
 export const simpleName = type => { const name = String(type ?? '').replace(/^L|;$/g, '').replaceAll('/', '.'); return name.slice(name.lastIndexOf('.') + 1) || name; };
 /** A modifier element class -> the modifier it is written as: 'PaddingElement' -> 'padding', 'BackgroundElement' -> 'background'; other names are returned unchanged. */
 export const modifierLabel = name => { const m = /^([A-Z][A-Za-z0-9]*?)(?:Node)?Element$/.exec(name); return m ? m[1][0].toLowerCase() + m[1].slice(1) : name; };
-/** "C(Button)P(...)…", "CC(Column)…" -> 'Button' / 'Column'; null for lambdas ("C") and groups without a name. */
-export function composableName(sourceInfo) {
-  const m = /^C{1,2}\(([^)]+)\)/.exec(String(sourceInfo ?? '')); return m ? m[1] : null;
-}
-
 /** The best honest name for one element: { name, source, kind }. `semantics` is the unmerged semantics node of the LayoutNode (or null); `innerText` is the first text of its
  * subtree, used for a node with a role or a click action that has no text of its own (a Button's label is a child Text, as the merged semantics tree reports it). */
 export function elementName({ calls = [], semantics = null, measurePolicy = null, modifiers = [], innerText = null } = {}) {
@@ -55,7 +54,6 @@ const ownText = semantics => semantics ? (semantics.editableText || semantics.te
  */
 export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_DEPTH, maxGroups = MAX_GROUPS, childReads = null } = {}) {   // childReads: the names tried for a LayoutNode's children (tests pass none to exercise the discovery below)
   const call = (receiver, owner, name, signature, values = [], mode = 'virtual') => runtime.dispatch({ owner, name, signature, parameters: params(signature), result: signature.slice(signature.indexOf(')') + 1) }, mode === 'static' ? values : [receiver, ...values], mode);
-  const string = value => value == null ? null : runtime.javaString(value, 'Ljava/lang/String;');
   const typeOf = ref => ref ? runtime.object(ref).type : null;
   const list = (value, limit) => {
     if (!value) return []; const count = call(value, 'Ljava/util/List;', 'size', '()I');
@@ -67,19 +65,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
   const notes = [];
 
   // AndroidComposeViews of the reachable windows (the topmost modal window and the ones above it, as src/compose-semantics.js), bottom to top.
-  const all = runtime.platform?.viewRoots?.(runtime) ?? (runtime.root ? [{ root: runtime.root, window: null }] : []);
-  let floor = 0; all.forEach((value, index) => { if (value.window && value.window.visible !== false && value.window.modal) floor = index; });
-  const ownerViews = [];
-  for (const entry of all.slice(floor)) {
-    const seen = new Set();
-    const visit = (ref, depth) => {
-      if (!ref || depth > 64 || seen.size >= 4096 || seen.has(ref.ref)) return; seen.add(ref.ref);
-      const type = typeOf(ref);
-      if (runtime.isSubtype(type, OWNER_VIEW)) ownerViews.push({ view: ref, window: entry.window });
-      if (runtime.isSubtype(type, GROUP)) { const count = call(ref, GROUP, 'getChildCount', '()I'); for (let i = 0; i < Math.min(count, 4096); i++) visit(call(ref, GROUP, 'getChildAt', '(I)Landroid/view/View;', [i]), depth + 1); }
-    };
-    visit(entry.root, 0);
-  }
+  const roots = reachableRoots(runtime), ownerViews = composeOwnerViews(runtime, roots), counting = recompositionStatus(runtime);
 
   // Semantics (text, role, testTag, actions...) from the unmerged tree, read by a driver of its own so the page driver's node references and mode stay as they are.
   const semanticsById = new Map(), semanticsByOwner = new Map();
@@ -114,7 +100,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
   if (ownerViews.length) {
     const driver = createComposeSemanticsDriver(runtime);
     try {
-      const tree = driver.snapshot({ roots: all.slice(floor).map(value => value.root), merged: false, maxNodes: 4096 });
+      const tree = driver.snapshot({ roots: roots.map(value => value.root), merged: false, maxNodes: 4096 });
       for (const owner of tree.owners) { semanticsByOwner.set(owner.ownerViewId, owner.nodes); for (const node of owner.nodes) semanticsById.set(`${owner.ownerViewId}:${node.nodeId}`, node); }
     } catch (error) { notes.push(`semantics unavailable: ${String(error?.message ?? error).slice(0, 160)}`); }
     finally { runtime.gcExtraRoots?.delete(driver); }
@@ -160,32 +146,18 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
     try { const location = runtime.newArray('[I', 2); call(view, VIEW, 'getLocationInWindow', '([I)V', [location]); const at = runtime.array(location).elements; locationInWindow = { x: at[0], y: at[1] }; } catch { locationInWindow = null; }
 
     // Composable names from the root composition's slot table, when it holds source information (a LayoutNode -> the composable calls that emitted it, outermost first).
-    const callsByNode = new Map(), names = { source: 'none', groups: 0, named: 0, note: null };
+    const callsByNode = new Map(), groupsByNode = new Map(), names = { source: 'none', groups: 0, named: 0, note: null };
+    let joinNote = 'composition of the AndroidComposeView not found';   // counting: why a node has no recomposition count
     try {
-      const tagId = runtime.resources?.table?.findId?.('id/wrapped_composition_tag');
-      const wrapped = tagId ? call(view, VIEW, 'getTag', '(I)Ljava/lang/Object;', [tagId]) : null;
-      const original = wrapped && runtime.isSubtype(typeOf(wrapped), 'Landroidx/compose/ui/platform/WrappedComposition;') ? call(wrapped, 'Landroidx/compose/ui/platform/WrappedComposition;', 'getOriginal', '()Landroidx/compose/runtime/Composition;') : null;
-      const table = original && runtime.isSubtype(typeOf(original), 'Landroidx/compose/runtime/CompositionImpl;') ? call(original, 'Landroidx/compose/runtime/CompositionImpl;', 'getSlotTable$runtime_release', '()Landroidx/compose/runtime/SlotTable;') : null;
+      const table = rootComposition(runtime, view);
       if (table) {
-        const walk = (iterable, chain, depth) => {
-          if (depth > 512) return;
-          const iterator = call(iterable, 'Ljava/lang/Iterable;', 'iterator', '()Ljava/util/Iterator;');
-          while (names.groups < maxGroups && call(iterator, 'Ljava/util/Iterator;', 'hasNext', '()Z')) {
-            const group = call(iterator, 'Ljava/util/Iterator;', 'next', '()Ljava/lang/Object;'); names.groups++;
-            const name = composableName(string(call(group, COMPOSITION_GROUP, 'getSourceInfo', '()Ljava/lang/String;')));
-            if (name) names.named++;
-            let next = name ? [...chain, name] : chain;
-            const node = call(group, COMPOSITION_GROUP, 'getNode', '()Ljava/lang/Object;');
-            if (node && runtime.isSubtype(typeOf(node), NODE)) { callsByNode.set(node.ref, next); next = []; }   // calls after a node belong to its children
-            walk(call(group, COMPOSITION_DATA, 'getCompositionGroups', '()Ljava/lang/Iterable;'), next, depth + 1);
-          }
-        };
-        walk(table, [], 0);
+        const { stats } = walkComposition(runtime, table, { scopes: counting.counting, maxGroups, callsByNode, groupsByNode }); names.groups = stats.groups; names.named = stats.named;
+        joinNote = stats.limited ? `limit of ${maxGroups} slot table groups reached` : 'no restart group of the slot table emits this node';
         names.source = names.named ? 'slot-table' : 'none';
         if (names.groups >= maxGroups) names.note = `limit of ${maxGroups} slot table groups reached`;
         else if (!names.named) names.note = 'the composition recorded no source information (Compose only records it while inspection tools are active): names derived from the semantics and the layout';
       } else names.note = 'composition of the AndroidComposeView not found';
-    } catch (error) { names.note = `slot table unreadable: ${String(error?.message ?? error).slice(0, 160)}`; callsByNode.clear(); }
+    } catch (error) { names.note = joinNote = `slot table unreadable: ${String(error?.message ?? error).slice(0, 160)}`; callsByNode.clear(); groupsByNode.clear(); }
 
     const nodes = [], raw = new Map();
     const visit = (ref, parentId, depth, index) => {
@@ -217,6 +189,7 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
         semantics: semantics ? { texts: semantics.texts, editableText: semantics.editableText, contentDescriptions: semantics.contentDescriptions, testTag: semantics.testTag, role: semantics.role,
           actions: semantics.actions.map(action => action.name), focused: semantics.focused, enabled: !semantics.disabled, selected: semantics.selected, toggleState: semantics.toggleState,
           textSelection: semantics.textSelection, invisibleToUser: semantics.invisibleToUser, properties: semantics.propertyNames } : null };
+      if (counting.counting) node.recomposition = nodeRecomposition(runtime, groupsByNode.get(ref.ref) ?? null, joinNote);
       nodes.push(node); raw.set(id, semantics); totalNodes++;
       children.forEach((child, i) => visit(child, id, depth + 1, i));
     };
@@ -233,5 +206,5 @@ export function inspectCompose(runtime, { maxNodes = MAX_NODES, maxDepth = MAX_D
   }
   if (failedReads.size) notes.push(`reads unavailable in this build (the minifier may have renamed internal Compose members): ${[...failedReads.keys()].join(', ')}`);
   if (truncated) notes.push(`limit of ${maxNodes} elements (or depth ${maxDepth}) reached: the list is incomplete`);
-  return { schemaVersion: 1, source: 'original-Compose-DEX/LayoutNode', density, owners, totalNodes, truncated, notes };
+  return { schemaVersion: 1, source: 'original-Compose-DEX/LayoutNode', density, owners, totalNodes, truncated, notes, recompositions: counting };
 }

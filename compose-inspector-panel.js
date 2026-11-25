@@ -7,13 +7,17 @@
 // is still there); "Update on navigation" (off by default) captures again after the screen navigates. Closing drops the DOM, the frozen frame and every crop.
 // "Full tree" is on by default: every LayoutNode of the inspection. Off, the elements are the boxes of lab.layoutBounds() (Views and Compose semantics nodes; the overlay of
 // src/layout-bounds.js also outlines the LayoutNodes and layout modifiers without semantics), each crop outlined and named from the inspected LayoutNode with the same semanticsId.
+// "Count recompositions" (src/compose-recompositions.js, only while the panel is open): each Compose row and the details show how many times the element was recomposed and skipped,
+// the box of an element that recomposes blinks once on the device screen, the bar shows the total and "Reset recomposition counts" sets it all back to 0. The counts belong to the
+// element's key (owner View and semanticsId, never reused), so an element that leaves the screen takes its count with it; a capture reads them again from the Worker.
 // The tree is a role="tree" of role="treeitem" rows (aria-level = depth + 1): ArrowUp / ArrowDown move the selection, Home / End jump, Enter / Space select.
 // The pure functions (element list, crop rectangles, bounds text, filter, JSON) are exported and tested without a DOM; createComposeInspectorPanel() wires them to the page.
 
-import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=c542646b3fce';
+import { LAYOUT_BOUNDS_COLORS } from './layout-bounds.js?v=8411deb8def1';
 
 const NO_RASTER = 'the displayed frame has no content raster for this element';
 const DETAIL_W = 360, DETAIL_H = 260;
+export const BLINK_MS = 700, MAX_BLINKS = 48;   // how long a recomposed element's box stays on the device screen (the fade of .ci-blink), and how many at once
 const NAME_SOURCES = { composable: 'composable name (source information from the slot table)', semantics: 'semantics (Role, text or action of the node)', layout: 'measure policy class and modifiers (no composable name in the APK)', view: 'View class' };
 
 const round = value => Math.round(value * 100) / 100;
@@ -70,12 +74,34 @@ export function buildLayoutBoundsElements(inspection, snapshot) {
       const name = named ? match.name : bare && match ? match.name : fromSemantics, nameSource = named ? match.nameSource : bare && match ? match.nameSource : 'semantics';   // a node with no semantics text takes its LayoutNode's description
       list.push({ key: `c:${owner.ownerViewId}:${node.nodeId}`, kind: 'compose', name, nameSource, id: node.nodeId, ownerViewId: owner.ownerViewId,
         parentName: null, depth: match?.depth ?? 0, childCount: match?.childCount ?? 0, hostId: owner.ownerViewId, hostSize, cropBounds: r, bounds: match?.bounds ?? r, visibleBounds: r, windowBounds: shift(r, ownerView.bounds),
-        placed: true, attached: true, zIndex: match?.zIndex ?? null, measurePolicy: match?.measurePolicy ?? null, modifiers: match?.modifiers ?? [], semantics, calls: match?.calls ?? [], window: match?.window ?? ownerView.window, density, layoutBounds: true });
+        placed: true, attached: true, zIndex: match?.zIndex ?? null, measurePolicy: match?.measurePolicy ?? null, modifiers: match?.modifiers ?? [], semantics, calls: match?.calls ?? [], window: match?.window ?? ownerView.window, density, layoutBounds: true, ...recompositionOf(inspection, match) });
     }
   }
   for (const element of viewElements(views, viewById, density)) if (element.bounds && element.placed) list.push({ ...element, layoutBounds: true });
   return list;
 }
+
+/** The counts of an element, only in an inspection taken while counting: a node without any says why (never a made-up 0). */
+const recompositionOf = (inspection, node) => inspection?.recompositions?.counting ? { recomposition: node?.recomposition ?? { available: false, reason: 'this element has no LayoutNode in the inspection' } } : {};
+const plural = (n, one, many = one + 's') => `${n} ${n === 1 ? one : many}`;
+/** The row badge of an element: { text, title, zero }, or null when it has no count. */
+export function recompositionBadge(recomposition) {
+  if (!recomposition?.available) return null; const { recompositions: n, skips } = recomposition;
+  return { text: `↻ ${n}${skips ? ` · skip ${skips}` : ''}`, title: `${plural(n, 'recomposition')}, ${plural(skips, 'skip')}${recomposition.shared ? ' (of the restart group above it, which emits this element)' : ''}`, zero: n === 0 };
+}
+/** The total line of the panel: the counting status in words. */
+export function recompositionTotal(status, on = true) {
+  if (!on) return 'not counting'; if (!status) return 'counting…';
+  if (!status.counting) return `not available: ${status.reason ?? 'counting is off'}`;
+  return `Total: ${plural(status.total, 'recomposition')} · ${plural(status.skips, 'skip')}${status.unjoined ? ` · ${status.unjoined} in composables with no element of their own on the screen` : ''}${status.note ? ` · ${status.note}` : ''}`;
+}
+const recompositionRows = recomposition => {
+  if (!recomposition) return [];
+  if (!recomposition.available) return [['Recompositions', `not available: ${recomposition.reason}`]];
+  const rows = [['Recompositions', `${recomposition.recompositions}${recomposition.shared ? ' (of the restart group above it: this element has none of its own)' : ''}`], ['Skips', String(recomposition.skips)]];
+  if (recomposition.groups?.length > 1) rows.push(['Restart groups', `${recomposition.groups.length}, outermost first: ${recomposition.groups.map(group => `${group.recompositions}${group.skips ? ` (skip ${group.skips})` : ''}`).join(' › ')}`]);
+  return rows;
+};
 
 const viewElements = (views, viewById, density) => views.map(view => {
   const label = view.text || view.contentDescription;
@@ -96,7 +122,7 @@ export function buildElements(inspection, snapshot, { mode = 'tree' } = {}) {
       list.push({ key: `c:${node.id}`, kind: 'compose', name: node.name, nameSource: node.nameSource, id: node.semanticsId, ownerViewId: owner.ownerViewId, parentName: node.parentId ? names.get(node.parentId) ?? null : null,
         depth: base + node.depth, childCount: node.childCount, hostId: owner.ownerViewId, hostSize: { width: owner.width, height: owner.height }, cropBounds: node.visibleBounds, bounds: node.bounds, visibleBounds: node.visibleBounds,
         windowBounds: node.boundsInWindow ?? (ownerView?.bounds && node.visibleBounds ? shift(node.visibleBounds, ownerView.bounds) : null), placed: node.placed, attached: node.attached, zIndex: node.zIndex,
-        measurePolicy: node.measurePolicy, modifiers: node.modifiers ?? [], semantics: node.semantics, calls: node.calls ?? [], window: owner.window, density });
+        measurePolicy: node.measurePolicy, modifiers: node.modifiers ?? [], semantics: node.semantics, calls: node.calls ?? [], window: owner.window, density, ...recompositionOf(inspection, node) });
     }
   };
   for (const element of viewElements(views, viewById, density)) {
@@ -170,6 +196,7 @@ export function detailRows(element) {
   const rows = [['Name', element.name], ['Name source', NAME_SOURCES[element.nameSource] ?? element.nameSource]];
   if (element.calls?.length) rows.push(['Calls', element.calls.join(' › ')]);
   rows.push([element.kind === 'compose' ? 'Id (semanticsId)' : 'View id', String(element.id)], ['Depth', `${element.depth}${element.parentName ? ` · parent: ${element.parentName}` : ''}`]);
+  rows.push(...recompositionRows(element.recomposition));
   if (element.kind === 'compose') {
     rows.push(['In the window (visible)', formatBounds(element.windowBounds, element.density)], ['In the AndroidComposeView', formatBounds(element.bounds, element.density)]);
     if (element.visibleBounds && element.bounds && JSON.stringify(element.visibleBounds) !== JSON.stringify(element.bounds)) rows.push(['Clipped by parents', formatBounds(element.visibleBounds, element.density)]);
@@ -206,9 +233,10 @@ export function detailRows(element) {
  * root: the <details id="compose-inspector"> element (see index.html).
  * inspect(): Promise of the Worker's inspection (APKWorkerClient.inspectCompose). getSnapshot(): the snapshot the device shows. getHost(viewId): the element of a View on the
  * device (its _contentLayer is the raster to cut). getScreen(): the #android-screen element (the highlight's parent). copyText(text): Promise (clipboard).
- * Returns { rendered(snapshot), reset(), capture(), state }.
+ * recompositions: { sync(on): Promise of the counting status or null, reset(): the same } (APKWorkerClient.syncRecompositions / resetRecompositions); without it nothing is counted.
+ * Returns { rendered(snapshot), recomposed(update), reset(), capture(), state }.
  */
-export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000, domImage = null, resourceNames = null } = {}) {
+export function createComposeInspectorPanel({ root, inspect, getSnapshot = () => null, getHost = () => null, getScreen = () => null, copyText = text => navigator.clipboard.writeText(text), fullDensityWaitMs = 2000, domImage = null, resourceNames = null, recompositions = null, blinkMs = BLINK_MS } = {}) {
   const q = selector => root.querySelector(selector), body = q('.ci-body'), count = q('.ci-count'), captureButton = q('.ci-capture'), follow = q('.ci-follow'), filterInput = q('.ci-filter'), copyButton = q('.ci-copy');
   const el = (tag, className = '', text = null) => { const node = document.createElement(tag); if (className) node.className = className; if (text !== null) node.textContent = text; return node; };
   // "Full tree" (on by default): every LayoutNode of the inspection instead of the boxes "Show layout bounds" draws
@@ -217,7 +245,9 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
   if (treeToggle) treeToggle.checked = true;
   if (follow) follow.checked = true;   // automatic: a new screen is captured again (only while the panel is open)
   const mode = () => treeToggle && !treeToggle.checked ? 'layout' : 'tree';
-  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false };
+  const S = { capture: null, elements: [], visible: [], selected: null, frames: new Map(), thumbs: [], highlight: null, token: 0, waiters: [], followKey: null, followTimer: null, busy: false, recomposition: null, blinks: new Map() };
+  const countToggle = q('.ci-recompose'), totalLine = q('.ci-recompose-total'), resetCounts = q('.ci-recompose-reset');
+  const counting = () => !!recompositions && root.open && !!countToggle?.checked;
   const setCount = text => { count.textContent = text; };
   setCount('closed');
 
@@ -225,7 +255,42 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     if (!snapshot) return null; const owner = snapshot.composeSemantics?.owners?.[0];
     return `${snapshot.activityName ?? ''}|${JSON.stringify(snapshot.navigation ?? null).slice(0, 400)}|${(owner?.nodes ?? []).slice(0, 24).map(node => node.nodeId).join(',')}`;
   };
+  // recomposition counts
+  const showTotal = () => { const text = counting() ? recompositionTotal(S.recomposition) : 'not counting'; if (totalLine && totalLine.textContent !== text) totalLine.textContent = text; if (resetCounts) resetCounts.disabled = !(counting() && S.recomposition?.counting); };
+  /** Counting on or off in the Worker, as the panel and its toggle are now (a message only when that changes). */
+  const syncCounting = async () => {
+    if (!recompositions) return;
+    const on = counting(), status = await recompositions.sync(on);
+    if (on !== counting()) return;
+    if (!on) { S.recomposition = null; clearBlinks(); } else if (status) S.recomposition = status;
+    showTotal();
+  };
+  const clearBlinks = () => { for (const { mark, timer } of S.blinks.values()) { clearTimeout(timer); mark.remove(); } S.blinks.clear(); };
+  /** One short highlight over the element's box; a second recomposition restarts it. The box never takes pointer input (.ci-blink) and is removed when it ends. */
+  const blink = (key, box) => {
+    const old = S.blinks.get(key); if (old) { clearTimeout(old.timer); old.mark.remove(); S.blinks.delete(key); }
+    if (S.blinks.size >= MAX_BLINKS) { const [first, entry] = S.blinks.entries().next().value; clearTimeout(entry.timer); entry.mark.remove(); S.blinks.delete(first); }
+    const mark = el('div', 'ci-blink'); mark.setAttribute('aria-hidden', 'true'); mark.style.cssText = `left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`; mark.style.animationDuration = `${blinkMs}ms`;
+    const entry = { mark, timer: setTimeout(() => { mark.remove(); if (S.blinks.get(key) === entry) S.blinks.delete(key); }, blinkMs) }; entry.timer?.unref?.();
+    S.blinks.set(key, entry); getScreen()?.append(mark);
+  };
+  const setBadge = (row, element) => {
+    const badge = recompositionBadge(element.recomposition), at = row.querySelector('.ci-recount');
+    if (!badge) { at?.remove(); return; }
+    const node = at ?? el('span', 'ci-recount'); node.textContent = badge.text; node.title = badge.title; node.setAttribute('aria-label', badge.title); node.setAttribute('aria-live', 'off'); node.classList.toggle('zero', badge.zero);
+    if (!at) row.append(node);
+  };
+  /** The counts of these elements changed (key -> recomposition): their rows and the details of the selected one. */
+  const setCounts = changed => {
+    const byKey = new Map(S.elements.map(element => [element.key, element])), shown = new Map(treeRows().map(row => [row._key, row]));
+    for (const [key, recomposition] of changed) {
+      const element = byKey.get(key); if (!element?.recomposition) continue;   // not in this capture: the next one lists it with its counts
+      Object.assign(element.recomposition, recomposition); const row = shown.get(key); if (row) setBadge(row, element);   // the node of the capture shares the object: "Copy JSON" has the counts too
+      if (key === S.selected) { const list = body.querySelector('.ci-props'); if (list) { list.setAttribute('aria-live', 'off'); fillProps(list, element); } }   // a running count is not read out
+    }
+  };
   const release = () => {
+    clearBlinks(); S.recomposition = null;
     S.token++; clearTimeout(S.followTimer); S.followTimer = null;
     for (const canvas of S.thumbs) { canvas.width = 0; canvas.height = 0; } S.thumbs = [];
     for (const frame of S.frames.values()) { if (frame.canvas) { frame.canvas.width = 0; frame.canvas.height = 0; } } S.frames.clear();
@@ -261,16 +326,20 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     return null;
   };
 
-  const highlight = element => {
-    S.highlight?.remove(); S.highlight = null; if (!element || !element.placed) return;   // nothing on the screen to point at
-    const screen = getScreen(), host = getHost(element.kind === 'compose' ? element.hostId : element.id); if (!screen || !host?.getBoundingClientRect || !screen.getBoundingClientRect) return;
+  /** Where an element is in the #android-screen, in its own px, or null. */
+  const boxOf = element => {
+    const screen = getScreen(), host = getHost(element.kind === 'compose' ? element.hostId : element.id); if (!screen || !host?.getBoundingClientRect || !screen.getBoundingClientRect) return null;
     const sr = screen.getBoundingClientRect(), hr = host.getBoundingClientRect(), scale = screen.offsetWidth > 0 ? sr.width / screen.offsetWidth : 1;
     let box;
-    if (element.kind === 'compose') { const b = element.visibleBounds; if (!b || !(b.right > b.left && b.bottom > b.top)) return; const k = host.offsetWidth > 0 ? hr.width / host.offsetWidth : scale; box = { left: (hr.left - sr.left) / scale + b.left * k / scale, top: (hr.top - sr.top) / scale + b.top * k / scale, width: (b.right - b.left) * k / scale, height: (b.bottom - b.top) * k / scale }; }
+    if (element.kind === 'compose') { const b = element.visibleBounds; if (!b || !(b.right > b.left && b.bottom > b.top)) return null; const k = host.offsetWidth > 0 ? hr.width / host.offsetWidth : scale; box = { left: (hr.left - sr.left) / scale + b.left * k / scale, top: (hr.top - sr.top) / scale + b.top * k / scale, width: (b.right - b.left) * k / scale, height: (b.bottom - b.top) * k / scale }; }
     else box = { left: (hr.left - sr.left) / scale, top: (hr.top - sr.top) / scale, width: hr.width / scale, height: hr.height / scale };
-    if (!(box.width > 0 && box.height > 0)) return;
+    return box.width > 0 && box.height > 0 ? box : null;
+  };
+  const highlight = element => {
+    S.highlight?.remove(); S.highlight = null; if (!element || !element.placed) return;   // nothing on the screen to point at
+    const box = boxOf(element); if (!box) return;
     const mark = el('div', 'ci-highlight'); mark.setAttribute('aria-hidden', 'true'); mark.style.cssText = `left:${box.left}px;top:${box.top}px;width:${box.width}px;height:${box.height}px`;
-    screen.append(mark); S.highlight = mark;
+    getScreen().append(mark); S.highlight = mark;
   };
 
   const treeRows = () => [...body.querySelectorAll('.ci-row')];
@@ -291,9 +360,10 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
         const css = fit(canvas.width, canvas.height, DETAIL_W, DETAIL_H); canvas.style.width = `${css.width}px`; canvas.style.height = 'auto'; canvas.hidden = false; note.hidden = true; if (!S.thumbs.includes(canvas)) S.thumbs.push(canvas);
       }, error => { if (token === S.token && canvas.isConnected && problem) note.textContent = `no crop: ${String(error?.message ?? error).slice(0, 200)}`; });
     }
-    const list = el('dl', 'ci-props'); for (const [label, value] of detailRows(element)) list.append(el('dt', '', label), el('dd', '', String(value ?? '—')));
+    const list = el('dl', 'ci-props'); fillProps(list, element);
     pane.replaceChildren(el('h4', '', element.name), canvas, note, list);
   };
+  const fillProps = (list, element) => { list.replaceChildren(); for (const [label, value] of detailRows(element)) list.append(el('dt', '', label), el('dd', '', String(value ?? '—'))); };
   const emptyDetails = () => el('p', 'logcat-empty', 'Click an element in the tree to see its crop and details.');
 
   const treeRow = (element, index) => {
@@ -301,6 +371,7 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     row.style.setProperty?.('--ci-depth', String(Math.min(element.depth ?? 0, 24)));
     const { width, height } = sizeOf(element.windowBounds ?? element.bounds);
     row.append(el('span', 'ci-name', element.name), el('small', 'ci-kind', `${element.kind === 'compose' ? 'Compose' : 'View'} · ${width}×${height}`));
+    setBadge(row, element);
     row.addEventListener('click', () => select(element.key, { focus: true }));
     row.addEventListener('keydown', event => {
       const rows = treeRows(), at = rows.indexOf(row), to = event.key === 'ArrowDown' ? at + 1 : event.key === 'ArrowUp' ? at - 1 : event.key === 'Home' ? 0 : event.key === 'End' ? rows.length - 1 : null;
@@ -336,7 +407,9 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     try {
       const snapshot = await fullDensity(); if (token !== S.token || !root.open) return;
       if (!snapshot) { body.replaceChildren(el('p', 'logcat-empty', 'No app is running. Run an APK and capture again.')); setCount('no screen'); return; }
+      await syncCounting(); if (token !== S.token || !root.open) return;   // counting first, so this capture already carries the counts
       const inspection = await inspect(); if (token !== S.token || !root.open) return;
+      if (counting() && inspection?.recompositions && inspection.recompositions.available !== null) { S.recomposition = inspection.recompositions; showTotal(); }
       const shownNow = getSnapshot() ?? snapshot;
       if (resourceNames) {   // "@id/name" of the Views that have an id (the app's resources), as uiautomator shows resource-id
         const ids = []; (function walk(view) { if (!view) return; if (Number.isInteger(view.androidId) && view.androidId > 0) ids.push(view.androidId); for (const child of view.children ?? []) walk(child); })({ children: shownNow.views ?? [] });
@@ -354,7 +427,21 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     } finally { if (token === S.token) { S.busy = false; captureButton.disabled = false; } else S.busy = false; }
   };
 
-  root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('closed'); } });
+  root.addEventListener('toggle', () => { if (root.open) capture(); else { release(); setCount('closed'); syncCounting(); } });
+  countToggle?.addEventListener('change', async () => {
+    if (!root.open) return;
+    if (!countToggle.checked) {   // the Worker drops the counts: none is left on a row or in the JSON
+      for (const element of S.elements) delete element.recomposition;
+      if (S.capture?.inspection) { S.capture.inspection.recompositions = null; for (const owner of S.capture.inspection.owners ?? []) for (const node of owner.nodes ?? []) delete node.recomposition; }
+    }
+    showTotal(); await syncCounting();
+    if (countToggle.checked) { if (S.capture) capture(); } else if (S.capture) renderList();
+  });
+  resetCounts?.addEventListener('click', async () => {
+    const status = await recompositions?.reset(); if (!status || !counting()) return;
+    S.recomposition = status; clearBlinks(); showTotal();
+    setCounts(S.elements.filter(element => element.recomposition?.available).map(element => [element.key, { recompositions: 0, skips: 0, groups: (element.recomposition.groups ?? []).map(() => ({ recompositions: 0, skips: 0 })) }]));
+  });
   captureButton.addEventListener('click', () => capture());
   filterInput.addEventListener('input', () => { if (S.capture) renderList(); });
   treeToggle?.addEventListener('change', () => { if (S.capture) { S.elements = buildElements(S.capture.inspection, S.capture.snapshot, { mode: mode() }); S.selected = null; renderList(); } });
@@ -369,12 +456,21 @@ export function createComposeInspectorPanel({ root, inspect, getSnapshot = () =>
     /** Every snapshot the device draws: free while closed; open, it resolves a full-density wait, keeps the highlight on its element and follows navigation when asked. */
     rendered(snapshot) {
       if (!root.open) return;
+      if (counting()) syncCounting();   // a new Worker (another run) starts with counting off; the same one gets no message
       if (!snapshot?.rasterReduced && S.waiters.length) for (const resolve of S.waiters.splice(0)) resolve(snapshot);
       if (S.selected) highlight(S.elements.find(element => element.key === S.selected));
       { const pane = body.querySelector('.ci-details'), chosen = S.elements.find(element => element.key === S.selected); if (pane && chosen && pane.querySelector('.ci-noimage')?.textContent.includes(NO_RASTER)) renderDetails(pane, chosen); }   // the app drew: cut what was waiting
       if (follow?.checked && S.capture && !S.busy && navigationKey(snapshot) !== S.followKey) { clearTimeout(S.followTimer); S.followTimer = setTimeout(() => { S.followTimer = null; capture(); }, 600); }
     },
+    /** An update of src/compose-recompositions.js: the total, the counts of the elements that changed, and one blink per element that recomposed. */
+    recomposed(update) {
+      if (!counting() || !update) return;
+      S.recomposition = update; showTotal();
+      const keyOf = item => `c:${item.ownerViewId}:${item.semanticsId}`;
+      setCounts((update.changed ?? []).map(item => [keyOf(item), { available: item.available, recompositions: item.recompositions, skips: item.skips, shared: item.shared, groups: item.groups }]));
+      for (const item of update.changed ?? []) if (item.recomposed > 0 && item.bounds) { const box = boxOf({ kind: 'compose', hostId: item.ownerViewId, visibleBounds: item.bounds }); if (box) blink(keyOf(item), box); }
+    },
     /** A new run: what the panel shows belongs to the previous one. */
-    reset() { const open = root.open; release(); setCount(open ? 'no capture' : 'closed'); if (open) body.replaceChildren(el('p', 'logcat-empty', 'Run the APK and use Capture.')); },
+    reset() { const open = root.open; release(); setCount(open ? 'no capture' : 'closed'); showTotal(); if (open) body.replaceChildren(el('p', 'logcat-empty', 'Run the APK and use Capture.')); },
   };
 }

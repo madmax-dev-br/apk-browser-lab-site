@@ -4,12 +4,13 @@
 // A thread at the top of its own run is suspended (its pc stays on the waiting call, retried later); code called synchronously from Java (a native method, a
 // JNI_OnLoad) cannot suspend the Java thread, so its wait runs the other native threads itself until the condition holds. When every thread waits and nothing
 // can wake one, the run fails naming the wait (a deadlock or a missing waker), never silently.
-import { APKError } from '../apk-error.js?v=c542646b3fce';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=c542646b3fce';
-import { ART_BLOCKED } from './signals.js?v=c542646b3fce';
+import { APKError } from '../apk-error.js?v=8411deb8def1';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=8411deb8def1';
+import { ART_BLOCKED } from './signals.js?v=8411deb8def1';
 
 const SLICE = 20000;   // instructions a thread runs before the next one is given a turn
 const PUMP_MS = 4;   // the delay of the next background pump while native threads can run
+const NEEDS_JAVA_THREAD = /^(?:jni:|egl[A-Z]|gl[A-Z]|A[A-Z])/;   // JNI functions, EGL / GL (bound to the Java thread's EGL thread) and the NDK's Android functions (ALooper, AAsset, ANativeWindow, ...)
 export const JAVA_NATIVE_QUANTUM = 1 << 18;   // instructions a Java thread's parkable native call runs before the thread is preempted (continueFromJava)
 // bionic's pthread_internal_t (android-13.0.0_r1 bionic/libc/bionic/pthread_internal.h, arm64): pthread_t is the address of this record, and TLS_SLOT_THREAD_ID (tp + 8) holds it.
 // The fields the lab fills: tid, the cached pid, pthread_attr_t (flags, stack_base, stack_size, guard_size, sched_policy, sched_priority), start_routine and its argument, and
@@ -84,7 +85,8 @@ export class NativeThreads {
   continueFromJava(javaThread, record, saved, options, park) {
     const cpu = record.cpu; let outcome;
     record.inCall = true; record.parkable = true; record.state = 'running'; cpu.parked = false;
-    try { outcome = cpu.run(RETURN_SENTINEL, JAVA_NATIVE_QUANTUM); } catch (error) { record.inCall = false; throw error; } finally { record.parkable = false; }
+    try { outcome = record.returned ? 'done' : cpu.run(RETURN_SENTINEL, JAVA_NATIVE_QUANTUM); } catch (error) { record.inCall = false; throw error; } finally { record.parkable = false; }   // returned: driveJava ran it to its end meanwhile
+    record.returned = false;
     if (outcome === 'done') { record.inCall = false; record.state = 'running'; return cpu.endCall(saved, options.returns); }
     cpu.parked = true;   // preempted or waiting: a call made on this CPU before it resumes keeps its context (src/arm64/cpu.js call)
     if (outcome === 'yield') {
@@ -94,7 +96,9 @@ export class NativeThreads {
     }
     if (outcome !== 'blocked') { record.inCall = false; throw new APKError(`ARM64 interpreter: a native call of Java thread "${record.name ?? '?'}" ended as '${outcome}' (pc 0x${cpu.pc.toString(16)})`, { kind: 'arm64-threads' }); }
     const until = Math.min(record.deadline ?? Infinity, record.wakeAt?.() ?? Infinity);
-    return park({ ready: () => record.ready?.() === true || this.now() >= until, delayMs: until - this.now(), what: record.what ?? 'a native wait',
+    // driveJava may have carried the call past this wait meanwhile: it then runs, returned, or waits for something else
+    const ready = () => record.returned === true || record.state !== 'waiting' || record.ready?.() === true || this.now() >= Math.min(record.deadline ?? Infinity, record.wakeAt?.() ?? Infinity);
+    return park({ ready, delayMs: until - this.now(), what: record.what ?? 'a native wait',
       resume: () => this.asJavaThread(javaThread, () => this.continueFromJava(javaThread, record, saved, options, park)) });
   }
   create(start, arg) {
@@ -119,11 +123,12 @@ export class NativeThreads {
     // work, as an outermost native call does (src/arm64/cpu.js beginCall); the budget still ends a thread that computes without ever waiting
     if (this.canSuspend(cpu)) { Object.assign(this.current, { state: 'waiting', ready, deadline, what, wakeAt }); return BLOCKED; }   // a suspended thread is preemptible: no instruction budget counts it (src/arm64/cpu.js runaway)
     const caller = this.current;
-    for (;;) {
+    this.syncWaits = (this.syncWaits ?? 0) + 1;   // how many waits are driving the other threads now
+    try { for (;;) {
       if (ready()) return true;
       if (this.now() >= deadline) return false;
       if (this.signalFor(caller)) { this.process.signals.deliver(this.process, caller); if (ready()) return true; }   // a timer or a signal for the waiting thread: its handler runs inside the wait, as a signal interrupts a blocking call
-      const progressed = this.runOthers(caller);
+      const native = this.runOthers(caller), progressed = this.driveJava(caller) || native;
       if (ready()) return true;
       if (!progressed) {
         const timer = Math.min(wakeAt?.() ?? Infinity, this.nextTimer(caller));
@@ -131,7 +136,7 @@ export class NativeThreads {
         if (deadline !== Infinity) return false;
         throw new APKError(`ARM64 native code waits on ${what} and no other native thread can make progress (deadlock, or a waker the lab does not run)`, { kind: 'arm64-threads', wait: what });
       }
-    }
+    } } finally { this.syncWaits--; }
   }
   /** The earliest time a waiting thread other than `caller` is woken by time alone (its deadline or timer). */
   nextTimer(caller) { let at = Math.min(this.process.kernelNextTimer?.() ?? Infinity, this.process.timerDeadline?.() ?? Infinity); for (const t of this.threads.values()) if (t !== caller && !t.main && t.state === 'waiting') at = Math.min(at, t.deadline, t.wakeAt?.() ?? Infinity); return at; }
@@ -144,6 +149,33 @@ export class NativeThreads {
       progressed = this.slice(thread) || progressed;
     }
     return progressed;
+  }
+  /**
+   * A thread whose native call cannot be suspended waits, and what it waits for may be held by a Java thread whose own native call was parked (preempted at the end of its quantum,
+   * or in a wait that is over now): the Java scheduler cannot resume that call before this one returns, so its native code gets a quantum here, on its own CPU and as its own thread.
+   * It stops at a call that needs the Java thread itself (JNI, EGL and GL, the NDK's Android functions): dispatchHost leaves that call for the scheduler (`driving`).
+   */
+  driveJava(caller) {
+    if (!this.javaByTid || this.driving) return false;
+    let progressed = false;
+    for (const record of [...this.javaByTid.values()]) {
+      const cpu = record.cpu; if (record === caller || !record.inCall || !cpu.parked || record.returned) continue;
+      if (record.state === 'waiting' && !(record.ready?.() === true || this.now() >= Math.min(record.deadline ?? Infinity, record.wakeAt?.() ?? Infinity))) continue;
+      const previous = this.current, p = this.process, previousCpu = p.activeCpu; let outcome;
+      this.current = record; p.activeCpu = cpu; this.driving = record; record.parkable = true; record.state = 'running'; cpu.parked = false;
+      try { outcome = cpu.run(RETURN_SENTINEL, JAVA_NATIVE_QUANTUM); }
+      catch (error) { record.inCall = false; throw error; }
+      finally { this.current = previous; p.activeCpu = previousCpu; this.driving = null; record.parkable = false; cpu.parked = true; }
+      if (outcome === 'done') record.returned = true;
+      if (outcome !== 'blocked' || record.needsJava !== true) progressed = true;
+      record.needsJava = false;
+    }
+    return progressed;
+  }
+  /** The host call `name` of a driven Java thread needs that Java thread: it waits until the Java scheduler resumes the call. */
+  leaveToJava(name) {
+    const record = this.driving; if (!record || this.current !== record || !NEEDS_JAVA_THREAD.test(name)) return false;
+    Object.assign(record, { state: 'waiting', ready: () => this.driving === null && !this.syncWaits, deadline: Infinity, wakeAt: null, what: `${name} on its Java thread`, needsJava: true }); return true;
   }
   /** A timer of the process is due, or a signal waits that this thread takes (src/arm64/timers.js, src/arm64/signals.js): it runs for the handler. */
   signalFor(thread) { const p = this.process; return this.now() >= (p.timerDeadline?.() ?? Infinity) || p.signals?.deliverable?.(p, thread) === true; }
