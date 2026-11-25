@@ -1,5 +1,5 @@
-import { APKError } from './apk-error.js?v=746332660dea';
-import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=746332660dea';
+import { APKError } from './apk-error.js?v=2e0bd04dc9d5';
+import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=2e0bd04dc9d5';
 
 // The virtual device's side of Minikin (src/minikin-provider.js): font collections built from the lab's Typeface state, the Paint state as hwui hands it to Minikin, and the
 // MeasuredText / LineBreaker / Paint measurement calls of hwui's JNI (libs/hwui/jni/text/MeasuredText.cpp, LineBreaker.cpp, jni/Paint.cpp). Handles are wasm32 pointers kept
@@ -16,6 +16,7 @@ import { systemFamilyFonts, DEFAULT_SYSTEM_FAMILY } from './system-fonts.js?v=74
 const fail = message => { throw new APKError(message, { kind: 'text-layout-backend-unsupported', backend: 'AOSP-Minikin-android-13.0.0_r1/Wasm' }); };
 const tag = s => ((s.charCodeAt(0) << 24) | (s.charCodeAt(1) << 16) | (s.charCodeAt(2) << 8) | s.charCodeAt(3)) >>> 0;
 const inRanges = (ranges, cp) => { let lo = 0, hi = ranges.length - 1; while (lo <= hi) { const mid = (lo + hi) >> 1, r = ranges[mid]; if (cp < r[0]) hi = mid - 1; else if (cp > r[1]) lo = mid + 1; else return true; } return false; };
+const DEFAULT_IGNORABLE = /^\p{Default_Ignorable_Code_Point}$/u;
 const isVariationSelector = cp => (cp >= 0xfe00 && cp <= 0xfe0f) || (cp >= 0xe0100 && cp <= 0xe01ef);
 /**
  * The code points a font maps to a glyph, from its cmap as Minikin's CmapCoverage reads it (the subtable of the best priority among (3,10) (0,6) (0,4) (3,1) (0,3) (0,2)
@@ -173,6 +174,14 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
     return covers(cp);
   };
   /**
+   * A default-ignorable code point (U+200B ZERO WIDTH SPACE, which Compose measures for every empty text) some face of `family` maps although the face Minikin asks does not: the
+   * Roboto Regular of the Skia backend is a subset, and the family the device has maps the character in every face. It stays with the family, as on a device: Minikin gives a
+   * character no family of the collection has to the first one, and HarfBuzz shapes a default-ignorable without a glyph as an invisible zero advance.
+   */
+  const ignorableOfFamily = (family, cp) => DEFAULT_IGNORABLE.test(String.fromCodePoint(cp)) && (familyFonts.get(family) ?? []).some(font => { const source = fontSource.get(font), bytes = source && dataBytes.get(source.data); return !!bytes && !!cmapCoverage(bytes, source.ttc)?.(cp); });
+  const keepsWithFirst = new Map();   // family -> Map(code point -> ignorableOfFamily)
+  const staysWith = (family, cp) => { let known = keepsWithFirst.get(family); if (!known) keepsWithFirst.set(family, known = new Map()); let verdict = known.get(cp); if (verdict === undefined) known.set(cp, verdict = ignorableOfFamily(family, cp)); return verdict; };
+  /**
    * The FontCollection for a Typeface and the code points of `text`. A code point the collection's first family maps never goes to a fallback family (FontCollection::
    * getFamilyForChar: "If the first font family supports the given character or variation sequence, always use it"; a sticky or combining character that continues
    * another run continues a family chosen for a code point the first family does not map, which is kept), so only the code points it does not map pick fallback families:
@@ -185,7 +194,7 @@ export function createMinikinText(minikin, fonts, { policy = 'drawing' } = {}) {
     for (const ch of text) {
       const cp = ch.codePointAt(0);
       if (isVariationSelector(cp)) { points.add(cp); if (previous >= 0) points.add(previous); }
-      else if ((cp > 0x7e || cp < 0x20) && !familyCovers(first, cp)) points.add(cp);
+      else if ((cp > 0x7e || cp < 0x20) && !familyCovers(first, cp) && !staysWith(first, cp)) points.add(cp);
       previous = cp;
     }
     const used = [];

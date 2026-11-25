@@ -1,13 +1,13 @@
-import {APKError} from './apk-runtime.js?v=746332660dea';
-import {PathApproxProvider} from './path-approx-provider.js?v=746332660dea';
-import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=746332660dea';
-import {createFontFallback} from './font-fallback.js?v=746332660dea';
-import {SYSTEM_FONT_IMAGE,FONTS_XML} from './system-font-image-data.js?v=746332660dea';
-import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=746332660dea';
-import {loadMinikin} from './minikin-provider.js?v=746332660dea';
-import {createMinikinText} from './minikin-text.js?v=746332660dea';
-import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=746332660dea';
-import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=746332660dea';
+import {APKError} from './apk-runtime.js?v=2e0bd04dc9d5';
+import {PathApproxProvider} from './path-approx-provider.js?v=2e0bd04dc9d5';
+import {createSkiaCanvasHost,rasterizeSkiaCanvas,measureSkiaText} from './skia-canvas-host.js?v=2e0bd04dc9d5';
+import {createFontFallback} from './font-fallback.js?v=2e0bd04dc9d5';
+import {SYSTEM_FONT_IMAGE,FONTS_XML} from './system-font-image-data.js?v=2e0bd04dc9d5';
+import {createSystemFontStore,systemFontFile} from './system-fonts.js?v=2e0bd04dc9d5';
+import {loadMinikin} from './minikin-provider.js?v=2e0bd04dc9d5';
+import {createMinikinText} from './minikin-text.js?v=2e0bd04dc9d5';
+import {sharedAssetBytesIfLoaded} from './shared-asset-bytes.js?v=2e0bd04dc9d5';
+import { loadLabCodecs, LAB_CODECS_VERSION } from './image-codecs.js?v=2e0bd04dc9d5';
 const MAX_WASM=16*1024*1024,MAX_FONT=4*1024*1024,MAX_MODULE=1024*1024;
 const hash=async bytes=>[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))].map(v=>v.toString(16).padStart(2,'0')).join('');
 async function read(fetchImpl,url,limit){
@@ -44,6 +44,9 @@ export class SkiaProvider{
   for(const[name,limit]of[['provenance.json',1<<20],['lab-codecs.mjs',1<<20],['lab-codecs.wasm',16<<20],['lab-avif.mjs',1<<20],['lab-avif.wasm',16<<20]]){const url=new URL(name,codecs);const job=read(this.fetch,url,limit);job.catch(()=>{});this.prefetched.bytes.set(url.href,job);}
   const manifest=new URL('manifest.json',this.fallbackBaseURL());
   read(this.fetch,manifest,2*1024*1024).then(bytes=>{this.prefetched.sync.set(manifest.href,bytes);},()=>{});
+  // the text layout module (src/minikin-provider.js), which the launch of nearly every app reads with synchronous requests
+  const minikin=new URL('../../minikin/android-13.0.0_r1/',this.baseURL);
+  for(const name of['provenance.json','minikin.wasm','icudt70l-minikin.dat']){const url=new URL(name,minikin);read(this.fetch,url,8*1024*1024).then(bytes=>{this.prefetched.sync.set(url.href,bytes);},()=>{});}
   return this.prefetched;
  }
  /** The files of /system/fonts (src/system-font-image.js) fetched ahead, for an app whose native code opens them all at start: its reads are synchronous and inside the launch. A file that failed is read again by its reader. */

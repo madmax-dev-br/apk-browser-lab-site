@@ -3,7 +3,7 @@
 // while an APK runs with microG, at once (vm.setMicrogServices): the device then flips microG's own switch the way microG's settings screen does. The status line shows microG's
 // switches as the device last saw them written (a change made in microG's own screens shows there too). No timer of its own.
 
-import { MICROG_SERVICES, sanitizeMicrogServices } from './microg-services.js?v=746332660dea';
+import { MICROG_SERVICES, sanitizeMicrogServices } from './microg-services.js?v=2e0bd04dc9d5';
 
 /** The plain-language line of one service: who it talks to and what for (pure). */
 export function microgServiceText(service) {

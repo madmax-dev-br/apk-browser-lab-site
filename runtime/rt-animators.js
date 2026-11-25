@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=746332660dea';
-import { getVectorGraphics } from './vector-native.js?v=746332660dea';
-import { gcRoot, GC_ROOTS } from './heap-gc.js?v=746332660dea';
+import { APKError } from './apk-error.js?v=2e0bd04dc9d5';
+import { getVectorGraphics } from './vector-native.js?v=2e0bd04dc9d5';
+import { gcRoot, GC_ROOTS } from './heap-gc.js?v=2e0bd04dc9d5';
 
 // The RenderThread animation system behind android.graphics.animation.RenderNodeAnimator (hwui BaseRenderNodeAnimator / CanvasPropertyPrimitiveAnimator /
 // CanvasPropertyPaintAnimator / RenderPropertyAnimator and the NativeInterpolatorFactory interpolators). The original Java (RenderNodeAnimator, FallbackLUTInterpolator,

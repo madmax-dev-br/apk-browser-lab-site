@@ -2,8 +2,8 @@
 // It maps the PT_LOAD segments at a page-aligned base, reads the dynamic section (DT_NEEDED, SONAME, symbol and string tables, init/fini arrays), and applies
 // the relocations in their three encodings: plain RELA (DT_RELA, DT_JMPREL), Android's packed APS2 (DT_ANDROID_RELA) and RELR (DT_RELR / DT_ANDROID_RELR).
 // Symbols are resolved by the process (other libraries first, then the lab's libc); a relocation type it does not know stops the load naming it.
-import { APKError } from '../apk-error.js?v=746332660dea';
-import { utf8 } from './text.js?v=746332660dea';
+import { APKError } from '../apk-error.js?v=2e0bd04dc9d5';
+import { utf8 } from './text.js?v=2e0bd04dc9d5';
 
 const fail = (message, details = {}) => { throw new APKError(message, { kind: 'arm64-elf', ...details }); };
 const PT_LOAD = 1, PT_DYNAMIC = 2, PT_TLS = 7, PT_GNU_RELRO = 0x6474e552;
