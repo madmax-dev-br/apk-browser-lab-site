@@ -23,16 +23,16 @@
 //             thread is suspended, as nothing else can run.
 //   snapshot  neither: the stop is reported with the thread's frames and values as they were (`held: false`) and the thread goes on; no step can start from it.
 // While every thread is suspended the VM clock stands still (VMClock.debugPause: the host time of the pause is not part of it) and no timer or event of the VM runs.
-import { APKError } from './apk-error.js?v=803d82a8b127';
-import { createHeapReader, handleOf, parseHandle, dotted, typeName, primitiveValue, PluginQueryError, classDescriptor, resolveStaticPath, runPluginQuery } from './plugin-queries.js?v=803d82a8b127';
-import { debugInfoOf, lineAt, pcsOfLine, isLineStart, localsAt, wordsOf } from './debug-info.js?v=803d82a8b127';
-import { Blocked } from './scheduler.js?v=803d82a8b127';
-import { debugCatchTarget } from './interpreter.js?v=803d82a8b127';
+import { APKError } from './apk-error.js?v=6e6d833f3663';
+import { createHeapReader, handleOf, parseHandle, dotted, typeName, primitiveValue, PluginQueryError, classDescriptor, resolveStaticPath, runPluginQuery } from './plugin-queries.js?v=6e6d833f3663';
+import { debugInfoOf, lineAt, pcsOfLine, isLineStart, localsAt, wordsOf } from './debug-info.js?v=6e6d833f3663';
+import { Blocked } from './scheduler.js?v=6e6d833f3663';
+import { debugCatchTarget } from './interpreter.js?v=6e6d833f3663';
 
 /** The Code browser's read-only operations (src/code-service.js) the `code` command serves while the Worker is held in place. */
 export const CODE_READS = new Set(['search', 'class-tree', 'class-info', 'disassemble', 'java-outline', 'decompile', 'decompile-drop', 'read-file', 'file-edits', 'files']);
-import { WIDE_HIGH } from './apk-runtime.js?v=803d82a8b127';
-import { invokeAppMethod } from './app-invoke.js?v=803d82a8b127';
+import { WIDE_HIGH } from './apk-runtime.js?v=6e6d833f3663';
+import { invokeAppMethod } from './app-invoke.js?v=6e6d833f3663';
 
 export const DEBUG_OPCODE = 0x73;
 export const DEBUG_LIMITS = Object.freeze({ breakpoints: 500, expression: 2000, log: 4000, frames: 256, events: 64, steps: 2_000_000 });

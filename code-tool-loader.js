@@ -16,11 +16,11 @@ export const BREAKPOINT_STORE_KEY = 'apkweb.debugger.breakpoints.v1';   // = src
 /** The page modules this loader keeps out of the page's start (tests/code-tool-lazy.test.mjs). */
 export const LAZY_CODE_MODULES = Object.freeze(['code-browser.js', 'code-browser-api.js', 'debugger-ui.js', 'debugger-controller.js', 'debugger-plugin-actions.js', 'smali-tools.js']);
 const DEFAULT_IMPORTS = {
-  browser: () => import('./code-browser.js?v=803d82a8b127'),
-  api: () => import('./code-browser-api.js?v=803d82a8b127'),
-  ui: () => import('./debugger-ui.js?v=803d82a8b127'),
-  controller: () => import('./debugger-controller.js?v=803d82a8b127'),
-  actions: () => import('./debugger-plugin-actions.js?v=803d82a8b127'),
+  browser: () => import('./code-browser.js?v=6e6d833f3663'),
+  api: () => import('./code-browser-api.js?v=6e6d833f3663'),
+  ui: () => import('./debugger-ui.js?v=6e6d833f3663'),
+  controller: () => import('./debugger-controller.js?v=6e6d833f3663'),
+  actions: () => import('./debugger-plugin-actions.js?v=6e6d833f3663'),
 };
 function defaultStorage() { try { return globalThis.localStorage ?? null; } catch { return null; } }
 

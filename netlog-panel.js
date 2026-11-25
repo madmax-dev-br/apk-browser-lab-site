@@ -1,10 +1,10 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { renderRequestDetails } from './netlog-details.js?v=803d82a8b127';
-import { MAX_ENTRIES } from './netlog.js?v=803d82a8b127';
-import { createReadingHold } from './reading-hold.js?v=803d82a8b127';
-import { sanitizeHosts } from './device-settings.js?v=803d82a8b127';
+import { renderRequestDetails } from './netlog-details.js?v=6e6d833f3663';
+import { MAX_ENTRIES } from './netlog.js?v=6e6d833f3663';
+import { createReadingHold } from './reading-hold.js?v=6e6d833f3663';
+import { sanitizeHosts } from './device-settings.js?v=6e6d833f3663';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
 export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
