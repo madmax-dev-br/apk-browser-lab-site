@@ -15,14 +15,14 @@
 // What an untrusted_app's processes may not do fails as it fails on a device: no write to the read-only partitions (EROFS), no listing of /data or another app's data
 // (EACCES), no other uid's processes in /proc (hidepid=invisible: ENOENT), no mount, module, reboot, time or hostname changes (EPERM), no relabeling (EACCES).
 // What the lab does not model fails naming it (ENOSYS and a trace line): sockets, inotify, timers.
-import { Blocked, VMThread } from './scheduler.js?v=858dc45125cc';
-import { APP_PID, ZYGOTE_PID, INIT_PID } from './virtual-pids.js?v=858dc45125cc';
-import { deviceProperty, devicePropertyNames } from './device-identity.js?v=858dc45125cc';
-import { ANDROID_IDS } from './android-ids-data.js?v=858dc45125cc';
-import { installSystemImage, SEARCH_ONLY, mountOf, mountTable, unameFields, appSecurityContext, IMAGE_TIME_MS } from './system-image.js?v=858dc45125cc';
-import { processComm } from './procfs.js?v=858dc45125cc';
-import { inode, state as libcoreState } from './libcore-io-native.js?v=858dc45125cc';
-import { runForkedChild } from './arm64/processes.js?v=858dc45125cc';
+import { Blocked, VMThread } from './scheduler.js?v=d8e66ba38ca4';
+import { APP_PID, ZYGOTE_PID, INIT_PID } from './virtual-pids.js?v=d8e66ba38ca4';
+import { deviceProperty, devicePropertyNames } from './device-identity.js?v=d8e66ba38ca4';
+import { ANDROID_IDS } from './android-ids-data.js?v=d8e66ba38ca4';
+import { installSystemImage, SEARCH_ONLY, mountOf, mountTable, unameFields, appSecurityContext, IMAGE_TIME_MS } from './system-image.js?v=d8e66ba38ca4';
+import { processComm } from './procfs.js?v=d8e66ba38ca4';
+import { inode, state as libcoreState } from './libcore-io-native.js?v=d8e66ba38ca4';
+import { runForkedChild } from './arm64/processes.js?v=d8e66ba38ca4';
 
 // errno as the programs' C library numbers them (Emscripten's libc uses WASI's numbering; strerror gives the usual text)
 export const E = { ACCES: 2, AFNOSUPPORT: 5, AGAIN: 6, BADF: 8, BUSY: 10, CHILD: 12, EXIST: 20, FAULT: 21, INTR: 27, INVAL: 28, IO: 29, ISDIR: 31, LOOP: 32, MFILE: 33, NAMETOOLONG: 37,

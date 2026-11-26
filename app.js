@@ -1,74 +1,74 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=858dc45125cc';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=858dc45125cc';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=858dc45125cc';
-import { drawFrameGraph } from './frame-graph.js?v=858dc45125cc';
-import { clientIdentityStatus } from './client-identity.js?v=858dc45125cc';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=858dc45125cc';
-import { initCollapsibleSections } from './panel-sections.js?v=858dc45125cc';
-import { warmupLabel } from './warmup.js?v=858dc45125cc';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=858dc45125cc';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=858dc45125cc';
-import { initHelpTips } from './help-tips.js?v=858dc45125cc';
-import { initControlPanelUI } from './control-panel-ui.js?v=858dc45125cc';
-import { createToolDock } from './tool-dock.js?v=858dc45125cc';
-import { createPermissionsPanel } from './permissions-panel.js?v=858dc45125cc';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=858dc45125cc';
-import { createAppDataPanel } from './app-data-panel.js?v=858dc45125cc';
-import { createCameraLab } from './camera-lab.js?v=858dc45125cc';
-import { createOverridesPanel } from './overrides-panel.js?v=858dc45125cc';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=858dc45125cc';
-import { createCodeTool } from './code-tool-loader.js?v=858dc45125cc';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=858dc45125cc';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=858dc45125cc';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=858dc45125cc';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=858dc45125cc';
-import { MICROG_SERVICES } from './microg-services.js?v=858dc45125cc';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=858dc45125cc';
-import { createOrientationLock } from './orientation-lock.js?v=858dc45125cc';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=858dc45125cc';
-import { createHostMapPanel } from './host-map-panel.js?v=858dc45125cc';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=858dc45125cc';
-import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=858dc45125cc';
-import { MAX_PLUGINS } from './plugin-store.js?v=858dc45125cc';
-import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=858dc45125cc';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=858dc45125cc';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=858dc45125cc';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=858dc45125cc';
-import { createDeviceView, createViewState } from './device-view.js?v=858dc45125cc';
-import { createTaskSwitcher } from './task-switcher.js?v=858dc45125cc';
-import { createDeviceZoom } from './device-zoom.js?v=858dc45125cc';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=858dc45125cc';
-import { formatApiGapReport } from './api-gap-scan.js?v=858dc45125cc';
-import { createLogcatPanel } from './logcat-panel.js?v=858dc45125cc';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=858dc45125cc';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=858dc45125cc';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=858dc45125cc';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=858dc45125cc';
-import { createAppPalette } from './app-palette.js?v=858dc45125cc';
-import { createScreenRecorder } from './screen-recorder.js?v=858dc45125cc';
-import { createDeviceMedia } from './device-media.js?v=858dc45125cc';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=858dc45125cc';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=858dc45125cc';
-import { createAdb } from './adb-commands.js?v=858dc45125cc';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=858dc45125cc';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=858dc45125cc';
-import { createAdbTerminal } from './adb-terminal.js?v=858dc45125cc';
-import { memorySummary } from './worker-memory.js?v=858dc45125cc';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=858dc45125cc';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=858dc45125cc';
-import { createPluginNetRoutes } from './plugin-net-routes.js?v=858dc45125cc';
-import { createModalHost } from './lab-modal.js?v=858dc45125cc';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=858dc45125cc';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=858dc45125cc';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=858dc45125cc';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=858dc45125cc';
-import { createDragLayer } from './lab-drag.js?v=858dc45125cc';
-import { createLabScroll } from './lab-scroll.js?v=858dc45125cc';
-import { createGlSurfaces } from './gl-surfaces.js?v=858dc45125cc';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=858dc45125cc';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=858dc45125cc';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=858dc45125cc';
-import { resolveIntentFields } from './intent-resolver.js?v=858dc45125cc';
+import { APKWorkerClient } from './apk-worker-client.js?v=d8e66ba38ca4';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=d8e66ba38ca4';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=d8e66ba38ca4';
+import { drawFrameGraph } from './frame-graph.js?v=d8e66ba38ca4';
+import { clientIdentityStatus } from './client-identity.js?v=d8e66ba38ca4';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=d8e66ba38ca4';
+import { initCollapsibleSections } from './panel-sections.js?v=d8e66ba38ca4';
+import { warmupLabel } from './warmup.js?v=d8e66ba38ca4';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=d8e66ba38ca4';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=d8e66ba38ca4';
+import { initHelpTips } from './help-tips.js?v=d8e66ba38ca4';
+import { initControlPanelUI } from './control-panel-ui.js?v=d8e66ba38ca4';
+import { createToolDock } from './tool-dock.js?v=d8e66ba38ca4';
+import { createPermissionsPanel } from './permissions-panel.js?v=d8e66ba38ca4';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=d8e66ba38ca4';
+import { createAppDataPanel } from './app-data-panel.js?v=d8e66ba38ca4';
+import { createCameraLab } from './camera-lab.js?v=d8e66ba38ca4';
+import { createOverridesPanel } from './overrides-panel.js?v=d8e66ba38ca4';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=d8e66ba38ca4';
+import { createCodeTool } from './code-tool-loader.js?v=d8e66ba38ca4';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=d8e66ba38ca4';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=d8e66ba38ca4';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=d8e66ba38ca4';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=d8e66ba38ca4';
+import { MICROG_SERVICES } from './microg-services.js?v=d8e66ba38ca4';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=d8e66ba38ca4';
+import { createOrientationLock } from './orientation-lock.js?v=d8e66ba38ca4';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=d8e66ba38ca4';
+import { createHostMapPanel } from './host-map-panel.js?v=d8e66ba38ca4';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=d8e66ba38ca4';
+import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=d8e66ba38ca4';
+import { MAX_PLUGINS } from './plugin-store.js?v=d8e66ba38ca4';
+import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=d8e66ba38ca4';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=d8e66ba38ca4';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=d8e66ba38ca4';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=d8e66ba38ca4';
+import { createDeviceView, createViewState } from './device-view.js?v=d8e66ba38ca4';
+import { createTaskSwitcher } from './task-switcher.js?v=d8e66ba38ca4';
+import { createDeviceZoom } from './device-zoom.js?v=d8e66ba38ca4';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=d8e66ba38ca4';
+import { formatApiGapReport } from './api-gap-scan.js?v=d8e66ba38ca4';
+import { createLogcatPanel } from './logcat-panel.js?v=d8e66ba38ca4';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=d8e66ba38ca4';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=d8e66ba38ca4';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=d8e66ba38ca4';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=d8e66ba38ca4';
+import { createAppPalette } from './app-palette.js?v=d8e66ba38ca4';
+import { createScreenRecorder } from './screen-recorder.js?v=d8e66ba38ca4';
+import { createDeviceMedia } from './device-media.js?v=d8e66ba38ca4';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=d8e66ba38ca4';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=d8e66ba38ca4';
+import { createAdb } from './adb-commands.js?v=d8e66ba38ca4';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=d8e66ba38ca4';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=d8e66ba38ca4';
+import { createAdbTerminal } from './adb-terminal.js?v=d8e66ba38ca4';
+import { memorySummary } from './worker-memory.js?v=d8e66ba38ca4';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=d8e66ba38ca4';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=d8e66ba38ca4';
+import { createPluginNetRoutes } from './plugin-net-routes.js?v=d8e66ba38ca4';
+import { createModalHost } from './lab-modal.js?v=d8e66ba38ca4';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=d8e66ba38ca4';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=d8e66ba38ca4';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=d8e66ba38ca4';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=d8e66ba38ca4';
+import { createDragLayer } from './lab-drag.js?v=d8e66ba38ca4';
+import { createLabScroll } from './lab-scroll.js?v=d8e66ba38ca4';
+import { createGlSurfaces } from './gl-surfaces.js?v=d8e66ba38ca4';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=d8e66ba38ca4';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=d8e66ba38ca4';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=d8e66ba38ca4';
+import { resolveIntentFields } from './intent-resolver.js?v=d8e66ba38ca4';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -783,7 +783,7 @@ async function importSource(source, autoRun = false) {
     await refreshRelay(); if (token !== state.operation) return;   // the relay found by itself is the device's proxy from the first request (src/relay-detect.js)
     state.runProxy = proxyInUse(); appendTrace(describeProxyForTrace(state.runProxy));
     state.runArm64 = deviceState.settings.arm64Native === true; state.runCustomIdentity = customIdentityForLoad(deviceState.settings); updateIdentityNote(); updateCustomIdentityHint();   // the ABI configuration of this run's device identity, and the custom identity the user typed (null: the lab's)
-    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: vmDevice(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), arm64Native: deviceState.settings.arm64Native === true, arm64Translate: deviceState.settings.arm64Translate !== false, glesCpu: deviceState.settings.glesCpu === true, hardwareWindow: deviceState.settings.hardwareWindow !== false, microg: deviceState.settings.microg === true, microgServices: deviceState.settings.microgServices, customIdentity: state.runCustomIdentity, loadImage: deviceState.settings.loadImage === true }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showMicrogData(result.microgData ?? null); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
+    const result = await apkVM.load(buffer, { onProgress: onWorkerProgress, device: vmDevice(deviceState.settings), tolerateMissing: $('tolerate-missing')?.value ?? 'off', nativeVersionMismatch: $('native-version-mismatch')?.checked === true, strictCrash: $('strict-crash')?.checked === true, keepData: $('keep-app-data')?.checked !== false, memoryMiB: deviceState.settings.memoryMiB, eventSeconds: deviceState.settings.eventSeconds, motionRaster: params.get('raster') !== 'full', rasterScale: deviceState.settings.raster?.motionScale ?? 1, rasterNavigation: deviceState.settings.raster?.navigation === true, rasterSettled: deviceState.settings.raster?.stillScale ?? 1, logcatStreaming: logcatPanel.streaming, renderer: deviceState.settings.renderer ?? 'cpu', engine: engineForLoad(), coreMemory: deviceState.settings.coreMemory, textScale: Math.min(4, Math.max(1, Math.ceil(globalThis.devicePixelRatio || 1))), arm64Native: deviceState.settings.arm64Native === true, arm64Translate: deviceState.settings.arm64Translate !== false, glesCpu: deviceState.settings.glesCpu === true, hardwareWindow: deviceState.settings.hardwareWindow !== false, schedulingOf25: deviceState.settings.schedulingOf25 === true, microg: deviceState.settings.microg === true, microgServices: deviceState.settings.microgServices, customIdentity: state.runCustomIdentity, loadImage: deviceState.settings.loadImage === true }); state.loadedEngine = engineForLoad(); state.loadedMicrog = deviceState.settings.microg === true; updateMicrogHint(); showMicrogData(result.microgData ?? null); showRendererStatus(result.renderer); state.loadedMemoryMiB = deviceState.settings.memoryMiB; state.loadedCoreMemory = { ...deviceState.settings.coreMemory }; updateVmMemoryHint(); // Ownership transfers to the Worker.
     if (token !== state.operation) return;
     state.runtime = apkVM; state.inventory = result.inventory; showAppData(result.appData);
     { const times = state.loadTimes, last = times.phases.at(-1); if (last && !last.ms) last.ms = Math.round(performance.now() - last.at); times.loadMs = Math.round(performance.now() - times.startedAt); times.done = true; times.prepared = !!result.inventory.prepared; if (Array.isArray(result.loadTiming?.phases)) times.workerPhases = result.loadTiming.phases;
@@ -816,7 +816,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js?v=858dc45125cc');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=d8e66ba38ca4');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -1250,7 +1250,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=858dc45125cc')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=d8e66ba38ca4')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
@@ -1531,12 +1531,13 @@ function writeDevicePanel(settings) {
   if ($('dev-gles-cpu')) $('dev-gles-cpu').checked = settings.glesCpu === true;
   if ($('dev-microg')) $('dev-microg').checked = settings.microg === true; updateMicrogHint(settings); customIdentityPanel().write(settings.customIdentity); updateCustomIdentityHint(settings); updateIdentityNote(settings); microgServicesPanel.write(settings);
   if ($('vm-hardware-window')) $('vm-hardware-window').checked = settings.hardwareWindow !== false;
+  if ($('vm-scheduling-25')) $('vm-scheduling-25').checked = settings.schedulingOf25 === true;
   if ($('vm-load-image')) $('vm-load-image').checked = settings.loadImage === true;
   const device = resolveDevice(settings); $('device-summary').textContent = `${device.widthDp} × ${device.heightDp} · ${settings.orientation === 'landscape' ? 'landscape' : 'portrait'}`;
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, customScreen: customScreenPanel.read(deviceState.settings.customScreen), orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: `${$('dev-locale').value}-${$('dev-region')?.value || 'US'}`, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, arm64Native: $('dev-arm64')?.checked === true, arm64Translate: $('dev-arm64-translate')?.checked !== false, glesCpu: $('dev-gles-cpu')?.checked === true, hardwareWindow: $('vm-hardware-window') ? $('vm-hardware-window').checked : true, microg: $('dev-microg')?.checked === true, microgServices: microgServicesPanel.read(), customIdentity: customIdentityPanel().read(), loadImage: $('vm-load-image')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, arm64Native: $('dev-arm64')?.checked === true, arm64Translate: $('dev-arm64-translate')?.checked !== false, glesCpu: $('dev-gles-cpu')?.checked === true, hardwareWindow: $('vm-hardware-window') ? $('vm-hardware-window').checked : true, schedulingOf25: $('vm-scheduling-25') ? $('vm-scheduling-25').checked : false, microg: $('dev-microg')?.checked === true, microgServices: microgServicesPanel.read(), customIdentity: customIdentityPanel().read(), loadImage: $('vm-load-image')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "VM memory": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('en-US')} objects`; };

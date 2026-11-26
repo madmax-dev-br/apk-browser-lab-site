@@ -1,5 +1,5 @@
-import { mixerOf } from './audio-native.js?v=858dc45125cc';
-import { bitsFloat } from './host-contract.js?v=858dc45125cc';
+import { mixerOf } from './audio-native.js?v=d8e66ba38ca4';
+import { bitsFloat } from './host-contract.js?v=d8e66ba38ca4';
 
 // android.media.SoundPool (android-13.0.0_r1 SoundPool.java over the native SoundPool service), for the lab's AudioTrack mixer (src/audio-native.js).
 //   * load(...) reads the sample (a raw resource, an asset descriptor, a file path or a file descriptor range) and decodes it; the result is reported later through

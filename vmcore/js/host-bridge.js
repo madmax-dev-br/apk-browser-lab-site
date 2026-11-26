@@ -64,24 +64,24 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=858dc45125cc';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=858dc45125cc';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=858dc45125cc';
-import { HandleTable } from './handles.js?v=858dc45125cc';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=858dc45125cc';
-import { coreImports } from './boundary-imports.js?v=858dc45125cc';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=858dc45125cc';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=858dc45125cc';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=858dc45125cc';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=858dc45125cc';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=858dc45125cc';
-import { timedExports, timedBridge } from './core-timing.js?v=858dc45125cc';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=858dc45125cc';
-import { Blocked } from '../../runtime/scheduler.js?v=858dc45125cc';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=858dc45125cc';
-import { CoreDebugAdapter } from './core-debug.js?v=858dc45125cc';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=858dc45125cc';
-import { PaintRecords } from './paint-record.js?v=858dc45125cc';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=d8e66ba38ca4';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=d8e66ba38ca4';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=d8e66ba38ca4';
+import { HandleTable } from './handles.js?v=d8e66ba38ca4';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=d8e66ba38ca4';
+import { coreImports } from './boundary-imports.js?v=d8e66ba38ca4';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=d8e66ba38ca4';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=d8e66ba38ca4';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=d8e66ba38ca4';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=d8e66ba38ca4';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=d8e66ba38ca4';
+import { timedExports, timedBridge } from './core-timing.js?v=d8e66ba38ca4';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=d8e66ba38ca4';
+import { Blocked } from '../../runtime/scheduler.js?v=d8e66ba38ca4';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=d8e66ba38ca4';
+import { CoreDebugAdapter } from './core-debug.js?v=d8e66ba38ca4';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=d8e66ba38ca4';
+import { PaintRecords } from './paint-record.js?v=d8e66ba38ca4';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -952,6 +952,7 @@ export class WasmEngine {
   bindNative(methodId, site, args, bridge) {
     let entry = bridge.vmNative; if (entry === undefined) entry = bridge.vmNative = BRIDGE_NATIVES.get(bridge.key) ?? 0;
     if (entry === 0) return;
+    if (this.runtime.atomicNatives === false && bridge.key.includes('java/util/concurrent/atomic/')) return;   // "Scheduling of 25/11" (src/apk-worker.js): the atomics stay host calls
     const mi = this.linker.methodList[methodId]; if (mi === undefined || mi.kind !== METHOD_KIND_UNBOUND || mi.def) return;
     if (site.isStatic) { if (mi.hostDispatch || !(mi.flags & 1)) return; }
     else {
