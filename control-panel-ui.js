@@ -27,12 +27,13 @@ export function matchesQuery(text, query) {
 }
 
 /** The Network section's line, from what its groups show: connectivity, the proxy or relay in use, redirects and mocks. Pure: tests call it with plain values. */
-export function networkSummary({ connectivity = 'online', proxyText = '', proxyState = '', redirects = 0, mocks = 0 } = {}) {
+export function networkSummary({ connectivity = 'online', proxyText = '', proxyState = '', redirects = 0, mocks = 0, blocked = 0 } = {}) {
   const parts = [{ online: 'Wi‑Fi', metered: 'mobile data', offline: 'offline' }[connectivity] ?? connectivity];
   if (proxyState === 'ok') parts.push(proxyText.trim() ? 'proxy ✓' : 'relay ✓');
   else if (proxyState === 'error') parts.push('proxy ✕');
   if (redirects) parts.push(plural(redirects, 'redirect'));
   if (mocks) parts.push(plural(mocks, 'mock'));
+  if (blocked) parts.push(plural(blocked, 'blocked rule'));   // calls the user chose not to make
   return parts.join(' · ');
 }
 
@@ -53,7 +54,7 @@ export function sectionSummaries($) {
   const proxyNote = $('dev-proxy-note');
   return {
     'cp-sum-device': { text: device.filter(Boolean).join(' · '), state: '' },
-    'cp-sum-network': { text: networkSummary({ connectivity: value('dev-network'), proxyText: value('dev-proxy'), proxyState: proxyNote?.dataset?.state ?? '', redirects: count(text('hm-summary')), mocks: count(text('em-summary')) }), state: count(text('em-summary')) ? 'warn' : '' },
+    'cp-sum-network': { text: networkSummary({ connectivity: value('dev-network'), proxyText: value('dev-proxy'), proxyState: proxyNote?.dataset?.state ?? '', redirects: count(text('hm-summary')), mocks: count(text('em-summary')), blocked: count(text('bc-summary')) }), state: count(text('em-summary')) || count(text('bc-summary')) ? 'warn' : '' },
     'cp-sum-app': { text: app.join(' · ') || (text('perms-summary') === 'no app' ? 'no app' : ''), state: '' },
     'cp-sum-data': { text: data.join(' · ') || 'no files', state: '' },
     'cp-sum-run': { text: run.join(' · '), state: '' },

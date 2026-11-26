@@ -8,8 +8,8 @@
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
   <meta name="description" content="How to set up plugins in APK Browser Lab: where they live, how to add them, the lab API, cost limits, what is not allowed, and ready-made examples to copy.">
-  <link rel="stylesheet" href="./site-pages.css?v=109fde337e64">
-  <link rel="stylesheet" href="./lab-tokens.css?v=109fde337e64">
+  <link rel="stylesheet" href="./site-pages.css?v=858dc45125cc">
+  <link rel="stylesheet" href="./lab-tokens.css?v=858dc45125cc">
 </head>
 <body>
   <header class="topbar">
@@ -164,15 +164,15 @@
 
       <section id="json" aria-labelledby="h-json">
         <h2 id="h-json">Export and import</h2>
-        <p><b>Export</b> downloads a <code>plugins-YYYYMMDD-hhmmss.json</code> file with the whole list. <b>Import</b> reads a file in that format (or just an array of plugins) and appends the plugins to the list.</p>
-        <div class="code" data-name="file format"><pre><code>{
-  "format": "apk-web-lab-plugins",
+        <p>Plugins have no Export or Import of their own: the Controls panel has <b>one</b> <b>Export</b> and <b>Import</b> for everything it keeps, and the plugins go in it as the <code>plugins</code> part of the document (code and settings: name, code, on or off, package filter, updates, height).</p>
+        <div class="code" data-name="file format (a part of the configuration document)"><pre><code>{
+  "format": "apkweb-lab-configuration",
   "version": 1,
   "plugins": [
     { "name": "Current screen", "code": "lab.on('screen', screen => lab.ui.text(screen.activity ?? '—'));", "enabled": true, "packageFilter": "" }
   ]
 }</code></pre></div>
-        <p class="note">Imported plugins arrive <b>turned off</b>: the code is someone else's, so read it before turning it on. Only the first 32 of the list are imported.</p>
+        <p class="note">An import that carries plugins is never silent: the page lists them (name, size of the code, whether one replaces a plugin you have) and applies the file, plugins and the other parts together, only when you confirm. Each plugin replaces the one with the same id or name, else it is added; a plugin the file does not state <code>enabled</code> for starts on, like one you add by hand. What a plugin produced or stored while it ran (output, console) is not exported. Over MCP, <code>import_config</code> refuses a file with plugins unless <code>allowPlugins: true</code> is passed. At most 32 plugins.</p>
       </section>
 
       <section id="api" aria-labelledby="h-api">
@@ -1253,6 +1253,16 @@ url = "http://127.0.0.1:8790/mcp"</code></pre></div>
           <p>Create or replace (same <code>id</code>) an endpoint mock (<code>url</code>, <code>method</code>, <code>status</code>, <code>body</code> text or object, <code>headers</code>, <code>delay_ms</code>), remove and list. The mocks live in <b>Controls › Network › Endpoint mocks</b> of the open package, like yours.</p>
         </div>
 
+        <div class="api" id="mcp-set-block">
+          <h4 class="api-sig names"><code>set_block</code><code>remove_block</code><code>list_blocks</code></h4>
+          <p>Create or replace (same <code>id</code>) a <b>blocked call</b> rule, remove and list: <code>scope</code> <code>"endpoint"</code> (<code>url</code>, <code>method</code>, <code>query</code>) or <code>"host"</code> (<code>host</code>). The app's calls that match are not made: they fail at once with what Android gives for a connection that cannot be made. The rules live in <b>Controls › Network › Blocked calls</b> of the open package, are counted, marked in the Network log and removable. The lab never adds one by itself.</p>
+        </div>
+
+        <div class="api" id="mcp-config">
+          <h4 class="api-sig names"><code>export_config</code><code>import_config</code></h4>
+          <p>The page's one <b>Export</b> and <b>Import</b> of the Controls: <code>export_config</code> answers a versioned JSON document (<code>parts</code> limits it) with the device settings and, for the open app, mocks, blocked calls, method returns, ignored Activities and permissions; <code>import_config</code> (<code>document</code>) validates it whole and then replaces those parts on the page, as if you had set them by hand. The plugins (their code and settings) are in it; importing them needs the user's confirmation in the page, or <code>allowPlugins: true</code> over MCP. App data, account sessions, cookies, credentials and what plugins stored while running are never in it.</p>
+        </div>
+
         <div class="api" id="mcp-reload">
           <h4 class="api-sig names"><code>reload</code></h4>
           <p>Reloads the screen (<code>recreate</code> or <code>reopen</code>), for example after a <code>set_mock</code>, so the app fetches again.</p>
@@ -2008,6 +2018,6 @@ await scan();</code></pre></div>
       </nav>
     </article>
   </div>
-  <script type="module" src="./site-pages.js?v=109fde337e64"></script>
+  <script type="module" src="./site-pages.js?v=858dc45125cc"></script>
 </body>
 </html>

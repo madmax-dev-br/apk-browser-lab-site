@@ -1,20 +1,20 @@
-import {APKError} from './apk-runtime.js?v=109fde337e64';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=109fde337e64';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=109fde337e64';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=109fde337e64';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=109fde337e64';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=109fde337e64';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=109fde337e64';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=109fde337e64';
-import {createBitmapHost} from './bitmap-host.js?v=109fde337e64';
-import { gcRoot } from './heap-gc.js?v=109fde337e64';
-import {sha256Hex} from './sha256-sync.js?v=109fde337e64';
-import {colorLongToArgb} from './color-long.js?v=109fde337e64';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=109fde337e64';
-import {GpuRasterError,bitmapRasterUsable} from './gpu-raster.js?v=109fde337e64';
-import {renderNodeByHandle} from './rendernode-native.js?v=109fde337e64';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=109fde337e64';
-import {BUCKET} from './time-breakdown.js?v=109fde337e64';
+import {APKError} from './apk-runtime.js?v=858dc45125cc';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=858dc45125cc';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=858dc45125cc';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=858dc45125cc';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=858dc45125cc';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=858dc45125cc';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=858dc45125cc';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=858dc45125cc';
+import {createBitmapHost} from './bitmap-host.js?v=858dc45125cc';
+import { gcRoot } from './heap-gc.js?v=858dc45125cc';
+import {sha256Hex} from './sha256-sync.js?v=858dc45125cc';
+import {colorLongToArgb} from './color-long.js?v=858dc45125cc';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=858dc45125cc';
+import {GpuRasterError,bitmapRasterUsable,SHARED_MAX} from './gpu-raster.js?v=858dc45125cc';
+import {renderNodeByHandle} from './rendernode-native.js?v=858dc45125cc';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=858dc45125cc';
+import {BUCKET} from './time-breakdown.js?v=858dc45125cc';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -380,7 +380,7 @@ export function rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,heig
  const previous=tb.enter(BUCKET.RASTER);try{return rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height,options);}finally{tb.leave(previous);}
 }
 function rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height,options={}){
- if(options?.transport==='gpu'||options?.transport==='gpu-png')return rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options);   // experimental GPU replay (src/gpu-raster.js); the CPU path below is unchanged
+ if(options?.transport==='gpu'||options?.transport==='gpu-png'||options?.transport==='gpu-rgba'||options?.transport==='gpu-bitmap')return rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options);   // experimental GPU replay (src/gpu-raster.js); the CPU path below is unchanged
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
  const t0=performance.now();
@@ -418,8 +418,10 @@ function rasterizeSkiaCanvasTimed(runtime,backend,graphics,receiver,width,height
 const KEY_MISS_STREAK=3,KEY_SKIPS=12,KEY_STREAKS=new WeakMap();
 const keyStreak=(runtime,slot)=>{let streaks=KEY_STREAKS.get(runtime);if(streaks===undefined)KEY_STREAKS.set(runtime,streaks=new Map());let streak=streaks.get(slot);if(streak===undefined){if(streaks.size>=256)streaks.clear();streaks.set(slot,streak={misses:0,skips:0});}return streak;};
 function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,options){
- const gpu=runtime.gpuRaster,png=options.transport==='gpu-png',cpuOptions=png?(({transport,...rest})=>Object.keys(rest).length?rest:undefined)(options):{...options,transport:'rgba'};   // the CPU request this one stands for (same key as on a CPU session)
+ const gpu=runtime.gpuRaster,png=options.transport!=='gpu'&&options.transport!=='gpu-bitmap',cpuOptions=options.transport==='gpu-png'?(({transport,...rest})=>Object.keys(rest).length?rest:undefined)(options):{...options,transport:'rgba'};   // the CPU request this one stands for (same key as on a CPU session); png: a raster read back on the Worker (a View layer: 'gpu-png' as a PNG, 'gpu-rgba' as raw pixels), not a frame transferred as an ImageBitmap
  if(gpu?.active!=='gpu'||!gpu.engine)return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,cpuOptions);
+ if(options.transport==='gpu-bitmap'&&(width>SHARED_MAX||height>SHARED_MAX)){return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,{...options,transport:'gpu-rgba'});}   // a layer larger than the shared layer buffer is read back as pixels
+ if(options.transport==='gpu-bitmap'&&!gpu.layerEngine()){gpu.apply(runtime);return rasterizeSkiaCanvas(runtime,backend,graphics,receiver,width,height,{...options,transport:'gpu-rgba'});}   // no second context for the layers: they are read back on the main one
  const stats=runtime.rasterStats??={calls:0,rasterized:0,hits:0,keyMs:0,replayMs:0,encodeMs:0};stats.calls++;
  const state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas');
  const streak=keyStreak(runtime,png?`p${width}x${height}`:`g${width}x${height}`),skip=streak.misses>=KEY_MISS_STREAK&&streak.skips<KEY_SKIPS;
@@ -442,6 +444,7 @@ function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,o
  }
  gpu.noteFrame(performance.now()-g0,runtime);
  if(result.kind==='bitmap-raster')result.rasterId='g'+(runtime.rasterUid=(runtime.rasterUid??0)+1);
+ else if(result.kind==='rgba-raster')result.rasterId='p'+(runtime.rasterUid=(runtime.rasterUid??0)+1);   // a View layer read back as raw pixels: named as on the CPU path
  else if(result.scale<1)result.rasterSerial='r'+(runtime.rasterUid=(runtime.rasterUid??0)+1);   // as the CPU path names a reduced PNG
  if(key!==null)cacheRaster(runtime,key,result);
  return result;
@@ -452,8 +455,8 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
  // setContentRaster); the page stretches the smaller bitmap over the View's box. Pixel read-backs (Bitmap.getPixel) and typed surfaces are never scaled: they are the bitmap's own memory.
  const scale=options?.scale??1;if(!(Number.isFinite(scale)&&scale>0&&scale<=1))fail('Skia raster scale must be in (0, 1]');if(scale!==1&&(options?.pixels||options?.surfaceType))fail('Skia raster scale applies to display rasters only');
  const pw=scale===1?width:Math.max(1,Math.round(width*scale)),ph=scale===1?height:Math.max(1,Math.round(height*scale));
- const gpuTransport=options?.transport==='gpu'||options?.transport==='gpu-png',gpu=gpuTransport?runtime.gpuRaster?.engine:null;if(gpuTransport&&(!gpu||options.pixels||options.surfaceType))fail('Skia GPU raster needs an active GPU engine and a display raster');
- const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?gpu.begin(pw,ph,options.transport==='gpu-png'):CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}let canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(scale!==1)canvas.scale(pw/width,ph/height);
+ const gpuTransport=options?.transport==='gpu'||options?.transport==='gpu-png'||options?.transport==='gpu-rgba'||options?.transport==='gpu-bitmap',gpu=gpuTransport?(options.transport==='gpu-bitmap'?runtime.gpuRaster?.layerEngine():runtime.gpuRaster?.engine):null;if(gpuTransport&&(!gpu||options.pixels||options.surfaceType))fail('Skia GPU raster needs an active GPU engine and a display raster');
+ const CK=backend.CanvasKit,state=graphics.get(runtime.object(receiver).nativeCanvasHandle,'canvas'),typed=options?.surfaceType?bitmapSurfaceSpec(CK,options.surfaceType):null,memory=typed?CK.Malloc(Uint8Array,width*height*typed.bytes):null,surface=typed?CK.MakeRasterDirectSurface({width,height,colorType:typed.colorType,alphaType:typed.alphaType,colorSpace:CK.ColorSpace.SRGB},memory,width*typed.bytes):gpu?(()=>{const b0=performance.now();try{return gpu.begin(pw,ph,options.transport==='gpu-bitmap'?'shared':options.transport==='gpu-png'||options.transport==='gpu-rgba');}finally{if(gpu&&runtime.rasterStats)runtime.rasterStats.gpuBeginMs=(runtime.rasterStats.gpuBeginMs??0)+performance.now()-b0;}})():CK.MakeSurface(pw,ph);if(!surface){if(memory)CK.Free(memory);fail('Skia CPU surface allocation failed');}let canvas=surface.getCanvas();canvas.clear(CK.TRANSPARENT);if(options?.transport==='gpu-bitmap')canvas.clipRect(CK.LTRBRect(0,0,pw,ph),CK.ClipOp.Intersect,false);if(scale!==1)canvas.scale(pw/width,ph/height);
  const activeNodes=new Set();let replayCount=0;   // a reduced replay (scale < 1) also scales the shadow light geometry, which Skia takes in device pixels (drawNodeShadow)
  // Force dark (src/force-dark.js; src/force-dark-host.js decides it per window and per View layer): options.forceDark is the colour transform of this canvas's own ops ('light' or
  // 'dark'; absent when the window has no force dark, or a View on the way allowed none). Each RenderNode replayed under it gets its own (RenderNode::handleForceDark: its usage hint,
@@ -621,7 +624,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
   flush();
  };
  const r0=performance.now();try{replay(state.draws);
-  if(gpu&&options.transport==='gpu'){const bitmap=gpu.finish(surface),stats=runtime.rasterStats;if(stats){const ms=performance.now()-r0;stats.replayMs+=ms;stats.gpu=(stats.gpu??0)+1;stats.gpuMs=(stats.gpuMs??0)+ms;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+ms;}}return {kind:'bitmap-raster',width:pw,height:ph,...(scale===1?{}:{scale}),bitmap,drawCalls:state.draws.length,source:'official-Skia-Wasm/WebGL'};}
+  if(gpu&&(options.transport==='gpu'||options.transport==='gpu-bitmap')){const f0=performance.now(),bitmap=gpu.finish(surface),stats=runtime.rasterStats;if(stats){const ms=performance.now()-r0;stats.replayMs+=ms;stats.gpu=(stats.gpu??0)+1;stats.gpuMs=(stats.gpuMs??0)+ms;stats.gpuFinishMs=(stats.gpuFinishMs??0)+performance.now()-f0;if(options.transport==='gpu-bitmap')stats.gpuLayers=(stats.gpuLayers??0)+1;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+ms;}}return {kind:'bitmap-raster',width:pw,height:ph,...(options.transport==='gpu-bitmap'?{bufferWidth:bitmap.width,bufferHeight:bitmap.height}:{}),...(scale===1?{}:{scale}),bitmap,drawCalls:state.draws.length,source:'official-Skia-Wasm/WebGL'};}
   surface.flush();const image=surface.makeImageSnapshot();
   // options.pixels: the canvas as straight (unpremultiplied) sRGB RGBA8 bytes, for Bitmap.getPixel / compress.
   // options.surfaceType (RGB_565 / RGBA_F16 / RGBA_1010102): the canvas was rasterized on a Skia surface of that color type; options.halfFloats also returns the unpremultiplied RGBA_F16 words (little-endian bytes) for Bitmap.getColor.
@@ -630,7 +633,7 @@ function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,hei
   const stats=runtime.rasterStats;const e0=performance.now();if(stats){stats.replayMs+=e0-r0;if(scale!==1){stats.reduced=(stats.reduced??0)+1;stats.reducedMs=(stats.reducedMs??0)+(e0-r0);}if(gpu){stats.gpuPng=(stats.gpuPng??0)+1;stats.gpuMs=(stats.gpuMs??0)+(e0-r0);}}
   const reduced=scale===1?{}:{scale};   // a full-density raster is byte-identical to one made without the option
   // options.transport 'rgba': straight (unpremultiplied) sRGB RGBA8 bytes for the page to put on a canvas (no PNG encode, no base64, no decode); the page keeps a PNG path for every other raster.
-  if(options?.transport==='rgba'){try{const pixels=image.readPixels(0,0,{width:pw,height:ph,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');if(stats)stats.encodeMs+=performance.now()-e0;return {kind:'rgba-raster',width:pw,height:ph,...reduced,pixels,drawCalls:state.draws.length,source:'official-Skia-Wasm/CPU'};}finally{image.delete();}}
+  if(options?.transport==='rgba'||options?.transport==='gpu-rgba'){try{const pixels=image.readPixels(0,0,{width:pw,height:ph,colorType:CK.ColorType.RGBA_8888,alphaType:CK.AlphaType.Unpremul,colorSpace:CK.ColorSpace.SRGB});if(!pixels)fail('Skia pixel read-back failed');if(stats)stats.encodeMs+=performance.now()-e0;return {kind:'rgba-raster',width:pw,height:ph,...reduced,pixels,drawCalls:state.draws.length,source:gpu?'official-Skia-Wasm/WebGL':'official-Skia-Wasm/CPU'};}finally{image.delete();}}
  try{const png=image.encodeToBytes(CK.ImageFormat.PNG);if(stats)stats.encodeMs+=performance.now()-e0;if(!png)fail('Skia PNG encoding failed');let binary='';for(let at=0;at<png.length;at+=32768)binary+=String.fromCharCode(...png.subarray(at,at+32768));return {kind:'raster',dataURL:'data:image/png;base64,'+btoa(binary),width:pw,height:ph,...reduced,drawCalls:state.draws.length,source:gpu?'official-Skia-Wasm/WebGL':'official-Skia-Wasm/CPU',pngBytes:png.length};}finally{image.delete();}
  }finally{if(gpu)gpu.release(surface);else surface.dispose();if(memory)CK.Free(memory);}
 }

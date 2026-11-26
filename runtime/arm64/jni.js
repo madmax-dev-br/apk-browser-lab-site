@@ -2,12 +2,12 @@
 // entries that run the JNI bridge's own handlers (src/jni-host.js JniBridge.handlersFor: the same JNI semantics as for the lab's WebAssembly libraries), and the
 // library objects the bridge binds native methods to (Java_ export names and RegisterNatives). Arguments follow AAPCS64: integers and pointers in X0-X7, float and
 // double in V0-V7, the rest on the stack; "..." arguments of Call<Type>Method continue in the same registers, a va_list is AAPCS64's structure.
-import { APKError } from '../apk-error.js?v=109fde337e64';
-import { Blocked } from '../scheduler.js?v=109fde337e64';
-import { JNI_FUNCTIONS } from '../jni-function-table.js?v=109fde337e64';
-import { variadic, vaList } from './libc.js?v=109fde337e64';
-import { registerArm64Memory } from '../unsafe-native.js?v=109fde337e64';
-import { utf8 } from './text.js?v=109fde337e64';
+import { APKError } from '../apk-error.js?v=858dc45125cc';
+import { Blocked } from '../scheduler.js?v=858dc45125cc';
+import { JNI_FUNCTIONS } from '../jni-function-table.js?v=858dc45125cc';
+import { variadic, vaList } from './libc.js?v=858dc45125cc';
+import { registerArm64Memory } from '../unsafe-native.js?v=858dc45125cc';
+import { utf8 } from './text.js?v=858dc45125cc';
 
 const JNI_OK = 0, JNI_EVERSION = -3, VERSIONS = new Set([0x10001, 0x10002, 0x10004, 0x10006, 0x10008]);
 // JNI parameters that are 32-bit integers (jint, jsize, jboolean, jbyte, jchar, jshort) rather than pointers or references: on AAPCS64 only their low 32 bits are defined

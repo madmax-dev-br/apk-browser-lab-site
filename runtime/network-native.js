@@ -1,20 +1,21 @@
-import { APKError } from './apk-error.js?v=109fde337e64';
-import { throwNew } from './java-throw.js?v=109fde337e64';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=109fde337e64';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=109fde337e64';
-import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=109fde337e64';
-import { Blocked } from './scheduler.js?v=109fde337e64';
-import { captureBody } from './network-capture.js?v=109fde337e64';
-import { OS_CONSTANTS } from './os-constants-data.js?v=109fde337e64';
-import { openExchange, describeFailure } from './network-transport.js?v=109fde337e64';
-import { WorkerExecutor } from './network-worker-executor.js?v=109fde337e64';
-import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=109fde337e64';
-import { TransportAuthority } from './transport-ca.js?v=109fde337e64';
-import { openWebSocketSession } from './websocket-bridge.js?v=109fde337e64';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=109fde337e64';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=109fde337e64';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=109fde337e64';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=858dc45125cc';
+import { throwNew } from './java-throw.js?v=858dc45125cc';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=858dc45125cc';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=858dc45125cc';
+import { matchBlockedCall, blockedHost, noteBlockHit } from './blocked-calls.js?v=858dc45125cc';
+import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=858dc45125cc';
+import { Blocked } from './scheduler.js?v=858dc45125cc';
+import { captureBody } from './network-capture.js?v=858dc45125cc';
+import { OS_CONSTANTS } from './os-constants-data.js?v=858dc45125cc';
+import { openExchange, describeFailure } from './network-transport.js?v=858dc45125cc';
+import { WorkerExecutor } from './network-worker-executor.js?v=858dc45125cc';
+import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=858dc45125cc';
+import { TransportAuthority } from './transport-ca.js?v=858dc45125cc';
+import { openWebSocketSession } from './websocket-bridge.js?v=858dc45125cc';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=858dc45125cc';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=858dc45125cc';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=858dc45125cc';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=858dc45125cc';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -163,11 +164,30 @@ export class NetworkBridge {
     const routes = this.platform.netRoutes; if (routes && mockServesHost(routes, host, port, options)) return true;
     const mocks = this.platform.endpointMocks; return mocks ? mockServesHost(mocks, host, port, options) : false;
   }
+  /** The active "Blocked calls" rule (src/blocked-calls.js) that stops `request` { method, url }, or null. Asked before everything else: a blocked call is never mocked, routed, refused or sent. */
+  matchBlock(request) { const rules = this.platform.blockedCalls; return rules ? matchBlockedCall(rules, request) : null; }
+  /** The host rule that stops `host`(:port) (a name lookup passes no port: only a rule without one applies), or null. */
+  hostBlock(host, port = null) { const rules = this.platform.blockedCalls; return rules ? blockedHost(rules, host, port) : null; }
+  /** Counts a call a rule stopped and writes it to the network log (outcome 'blocked-by-user', the rule, the failure the app gets) and the trace. The caller raises the failure. */
+  blockCall(block, info, failure) {
+    this.stats.blocked = (this.stats.blocked ?? 0) + 1; noteBlockHit(this.runtime, block, { method: info.method ?? 'GET', url: info.url });
+    this.log?.blocked({ ...info, rule: { id: block.id, label: block.label }, failure });
+  }
+  /** The failure of an HTTP exchange that cannot be made: what a refused connection gives (ConnectException, ENETUNREACH). */
+  blockedFailure(host, port) { return { type: 'Ljava/net/ConnectException;', message: `failed to connect to ${host} (port ${port}): ENETUNREACH (Network is unreachable)` }; }
+  /** An exchange a rule stopped: the operation fails at once (no executor, no fetch). */
+  failBlocked(op, block, request) {
+    const url = new URL(request.url), port = Number(url.port || (url.protocol === 'https:' ? 443 : 80)), failure = this.blockedFailure(url.hostname, port);
+    this.blockCall(block, { api: request.api, method: request.method, url: request.url, host: url.hostname, port, headers: request.headers, bytes: request.body?.length ?? 0 }, failure);
+    op.executor = 'blocked'; op.error = failure; op.ended = false; this.signal(); return op;
+  }
   /** request.mock: the caller's matchMock() answer (null = checked, none); when absent the request is matched here. */
   start(request, reserved = null) {
     const op = reserved ?? new Operation(this.nextHandle++, request); op.request = request; this.ops.set(op.handle, op);
     op.trace = new ExchangeTrace(request.api ?? 'java.net', request.url, this.runtime.thread?.name ?? null);
     this.stats.requests++; this.noteHost(new URL(request.url).hostname);
+    const block = request.block !== undefined ? request.block : this.matchBlock(request);   // "Blocked calls": first of all (the callers that already asked pass block: null)
+    if (block) return this.failBlocked(op, block, request);
     const mock = request.mock !== undefined ? request.mock : this.matchMock(request);
     if (this.requestObserver) this.requestObserver(request, mock);   // a background render lists the requests made while it runs (src/render-variant.js)
     if (mock?.route) return this.startRoute(op, mock);
@@ -175,6 +195,7 @@ export class NetworkBridge {
   }
   /** The exchange of `op` once nothing (or a plugin's route) holds it any more: a mock's answer, or the executor's real exchange. */
   proceed(op, request, mock) {
+    if (op.routed) { const block = this.matchBlock(request); if (block) return this.failBlocked(op, block, request); }   // what a plugin's route lets go out is checked again: it may have changed the URL
     if (mock) return this.startMock(op, mock);
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null, route: op.routed ?? null }) ?? null;
@@ -360,6 +381,8 @@ export class NetworkBridge {
     const { request } = continuedRequest(op.request, decision.request);
     state.phase = 'fetching'; clearTimeout(state.timer); state.timer = null;
     const deliver = message => { if (state.phase !== 'fetching' || op.closed) return; state.phase = 'asking'; state.timer = setTimeout(() => this.routeDecision(state.rid, { action: 'continue' }, `the plugin did not answer within ${ROUTE_TIMEOUT_MS / 1000} s after its fetch`), ROUTE_TIMEOUT_MS); state.timer?.unref?.(); this.routeReply(op, { phase: 'response', ...message }); };
+    const blockedFetch = this.matchBlock(request);
+    if (blockedFetch) { const u = new URL(request.url); this.blockCall(blockedFetch, { api: request.api, method: request.method, url: request.url, host: u.hostname, port: Number(u.port || (u.protocol === 'https:' ? 443 : 80)), headers: request.headers, bytes: request.body?.length ?? 0 }, this.blockedFailure(u.hostname, Number(u.port || (u.protocol === 'https:' ? 443 : 80)))); deliver({ error: `blocked by you (${blockedFetch.label}): the call was not made` }); return true; }
     const mock = this.platform.endpointMocks ? matchEndpointMock(this.platform.endpointMocks, request) : null;
     if (mock) { const r = mock.compiled.response; noteMockHit(this.runtime, mock, request); deliver({ response: { status: r.status, reason: r.reason, url: request.url, headers: r.headers.map(([n, v]) => [n, v]), body: request.method === 'HEAD' ? new Uint8Array(0) : r.body.slice(), mock: mock.label } }); return true; }
     const url = new URL(request.url), port = Number(url.port || (url.protocol === 'https:' ? 443 : 80));
@@ -582,6 +605,7 @@ export function createNetworkNativeBindings() {
       if (!bytes) gai('android_getaddrinfo', C.EAI_NONAME);
       return refArray(runtime, '[' + INET, [inetAddress(runtime, null, bytes)]);   // libcore leaves the host name unset here; Inet6AddressImpl names the results of a name lookup itself
     }
+    { const block = net.hostBlock(host); if (block) { net.blockCall(block, { api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }, { type: 'Ljava/net/UnknownHostException;', message: `Unable to resolve host "${host}": No address associated with hostname` }); gai('android_getaddrinfo', C.EAI_NODATA); } }   // "Blocked calls": a host the user stopped does not resolve
     if (!loopbackHost(host) && !net.allowed(host) && !net.mockServesHost(host) && !net.redirectServesHost(host)) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'DNS', kind: 'dns', method: 'LOOKUP', url: `dns://${host}`, host }); gai('android_getaddrinfo', C.EAI_NODATA); }
     const bytes = loopbackHost(host) ? [127, 0, 0, 1] : syntheticAddress(host); net.rememberResolved(bytes.join('.'), host);
     const addresses = [inetAddress(runtime, null, bytes)];
@@ -598,12 +622,14 @@ export function createNetworkNativeBindings() {
     const names = runtime.object(headerArray).elements, headers = [];
     for (let i = 0; i + 1 < names.length; i += 2) headers.push([text(runtime, names[i]), text(runtime, names[i + 1])]);
     const body = (bodyArray === null || bodyArray === 0) ? null : Uint8Array.from(runtime.object(bodyArray).elements, v => v & 255);
+    const blocked = net.matchBlock({ method: text(runtime, method), url });   // "Blocked calls": the call is not made; the app gets what a connection that cannot be made gives
+    if (blocked) { const message = `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`; net.blockCall(blocked, { method: text(runtime, method), url, host: parsed.hostname, port, headers: namedHeaders(), bytes: bodyArray ? runtime.object(bodyArray).elements.length : 0 }, { type: 'Ljava/net/ConnectException;', message }); throwNew(runtime, 'Ljava/net/ConnectException;', message); }
     const mock = net.matchMock({ method: text(runtime, method), url, body });   // "Mock de endpoints": answered by the lab, before the policy
     const refuse = () => { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ method: text(runtime, method), url, host: parsed.hostname, port, headers: namedHeaders(), bytes: bodyArray ? runtime.object(bodyArray).elements.length : 0 }); throwNew(runtime, 'Ljava/net/ConnectException;', `failed to connect to ${shown} (port ${port}) from /:: (port 0)${connectTimeout > 0 ? ` after ${connectTimeout}ms` : ''}: connect failed: ENETUNREACH (Network is unreachable)`); };
     if (!mock && !net.permits(url, parsed.hostname, port)) refuse();   // a request a "Redirecionar hosts" rule maps goes where the rule says, whatever the allow list
     const reserved = net.ops.get(ticket);
     if (!reserved || reserved.closed) throwNew(runtime, 'Ljava/net/SocketException;', 'Socket closed');
-    const op = net.start({ method: text(runtime, method), url, headers, body, redirect, connectTimeout, readTimeout, mock }, reserved);
+    const op = net.start({ method: text(runtime, method), url, headers, body, redirect, connectTimeout, readTimeout, mock, block: null }, reserved);
     const budget = connectTimeout > 0 && readTimeout > 0 ? connectTimeout + readTimeout : connectTimeout > 0 ? connectTimeout : readTimeout;
     op.trace?.park();
     return new Blocked({

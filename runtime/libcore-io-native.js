@@ -1,12 +1,12 @@
-import { APKError } from './apk-error.js?v=109fde337e64';
-import { throwNew } from './java-throw.js?v=109fde337e64';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=109fde337e64';
-import { networkOf, isIpLiteral } from './network-native.js?v=109fde337e64';
-import { Blocked } from './scheduler.js?v=109fde337e64';
-import { installUdp } from './udp-native.js?v=109fde337e64';
-import { createLoopback } from './loopback-socket.js?v=109fde337e64';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=109fde337e64';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=858dc45125cc';
+import { throwNew } from './java-throw.js?v=858dc45125cc';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=858dc45125cc';
+import { networkOf, isIpLiteral } from './network-native.js?v=858dc45125cc';
+import { Blocked } from './scheduler.js?v=858dc45125cc';
+import { installUdp } from './udp-native.js?v=858dc45125cc';
+import { createLoopback } from './loopback-socket.js?v=858dc45125cc';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=858dc45125cc';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=858dc45125cc';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -381,6 +381,7 @@ export function createLibcoreIoNativeBindings() {
     if (peerBytes && loopback.isLoopback(peerBytes) && (loopback.listening(runtime, peerBytes, port) || !((net.online && net.allowed(name, port)) || net.mockServesHost(name, port, { hostless: false }) || net.redirectServesHost(name, port)))) return connectLoopback(runtime, desc, peerBytes, port);   // a mock or a "Redirecionar hosts" rule naming this loopback host explicitly keeps the virtual HTTP socket
     net.noteHost(name);
     const target = { api: 'Socket', kind: 'socket', method: 'CONNECT', url: `tcp://${name.includes(':') ? `[${name}]` : name}:${port}`, host: name, port };
+    { const block = net.hostBlock(name, port); if (block) { net.blockCall(block, target, { type: 'Ljava/net/ConnectException;', message: `connect failed: ENETUNREACH (Network is unreachable)` }); err(runtime, 'connect', 'ENETUNREACH'); } }   // "Blocked calls" (src/blocked-calls.js): a host the user stopped cannot be connected to
     if ((!net.online || !net.allowed(name, port)) && !net.mockServesHost(name, port) && !net.redirectServesHost(name, port)) { net.stats.denied++;   // a host a mock serves (src/endpoint-mocks.js) connects: its requests are answered by the lab; a host a redirect rule serves (src/host-map.js) connects: its exchanges go to the rule's target
       if (!net.online) net.stats.offlineRejections++; net.logRefusal(target); err(runtime, 'connect', 'ENETUNREACH'); }
     const isLoopbackName = /^127\./.test(host) || host === '::1' || host === 'localhost';

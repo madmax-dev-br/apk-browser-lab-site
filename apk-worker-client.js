@@ -1,9 +1,9 @@
-import { createWebAudioPlayer } from './web-audio-player.js?v=109fde337e64';
-import { createRasterReceiver } from './raster-cache.js?v=109fde337e64';
-import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=109fde337e64';
-import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=109fde337e64';
+import { createWebAudioPlayer } from './web-audio-player.js?v=858dc45125cc';
+import { createRasterReceiver } from './raster-cache.js?v=858dc45125cc';
+import { sanitizePower, DEFAULT_POWER } from './plugin-power.js?v=858dc45125cc';
+import { createDebugChannelBuffer, sendDebugCommand } from './debug-channel.js?v=858dc45125cc';
 export class APKWorkerClient {
-  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=109fde337e64', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
+  constructor({ workerURL = new URL('./runtime/apk-worker.js?v=858dc45125cc', import.meta.url), workerFactory, loadTimeoutMs = 120000, eventTimeoutMs = 45000 } = {}) {
     this.workerURL = workerURL;
     this.workerFactory = workerFactory || ((url) => {
       if (typeof Worker === 'undefined') throw new Error('Web Workers are not available in this browser. Use a browser that supports module Workers; the APK will not be processed on the main thread.');
@@ -241,6 +241,10 @@ export class APKWorkerClient {
   /** The Worker's plugin serving stats { served, ms, deferred, rejected, maxMs, batches, batched, queued } and its level; null without a Worker. */
   async pluginPowerStatus() { if (!this.worker) return null; const reply = await this.sideCall('plugin-power', {}, 2000); return { level: reply.level, stats: reply.stats }; }
   async setEndpointMocks(mocks) { return (await this.sideCall('endpoint-mocks', { mocks })).statuses; }
+  /** "Blocked calls" (src/blocked-calls.js): replaces the VM's rules; one status per rule. */
+  /** An import of the Controls' configuration carried plugins: the VM keeps the note for its trace and the Resumo (src/config-import-note.js). */
+  async noteConfigImport(note) { return (await this.sideCall('config-import-note', { note })).count; }
+  async setBlockedCalls(rules) { return (await this.sideCall('blocked-calls', { rules })).statuses; }
   /** Plugin network routes (lab.route): replaces the VM's list ([{ id, owner, ownerName, name, filter }]); one status per route. */
   async setNetworkRoutes(routes) { return (await this.sideCall('net-routes', { routes })).statuses; }
   /** A plugin's decision for a held request (no reply: the outcome arrives at onNetRoute). */

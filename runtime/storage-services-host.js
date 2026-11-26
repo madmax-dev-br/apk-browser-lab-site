@@ -1,6 +1,6 @@
-import { floatBits } from './host-contract.js?v=109fde337e64';
-import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=109fde337e64';
-import { networkOf } from './network-native.js?v=109fde337e64';
+import { floatBits } from './host-contract.js?v=858dc45125cc';
+import { createServiceKit, OBJECT, STRING, LIST } from './service-kit.js?v=858dc45125cc';
+import { networkOf } from './network-native.js?v=858dc45125cc';
 
 // Storage-related system services over the app's virtual filesystem and the lab's network bridge (android-13.0.0_r1 StorageManager, StorageStatsManager, DownloadManager,
 // NetworkStatsManager). The device has one 8 GiB volume (the numbers StatFs reports); downloads are real HTTP(S) exchanges made through the network bridge under the device's
@@ -158,11 +158,13 @@ export function createStorageServicesHost(platform) {
   const begin = (r, job, url, hops = 0) => {
     if (hops > 5) return fail(r, job, ERROR_TOO_MANY_REDIRECTS);
     const net = networkOf(r), target = new URL(url), port = Number(target.port || (target.protocol === 'https:' ? 443 : 80));
+    const blocked = net.matchBlock({ method: 'GET', url });   // "Blocked calls" (src/blocked-calls.js): the download is not made; it fails like one whose connection cannot be made
+    if (blocked) { net.blockCall(blocked, { api: 'DownloadManager', method: 'GET', url, host: target.hostname, port, headers: job.request.headers }, net.blockedFailure(target.hostname, port)); return fail(r, job, ERROR_HTTP_DATA_ERROR); }
     const mock = net.matchMock({ method: 'GET', url, body: null });   // "Mock de endpoints" (src/endpoint-mocks.js): answered by the lab, before the policy
     if (!mock && !net.online) { job.status = STATUS.PAUSED; job.reason = PAUSED_WAITING_FOR_NETWORK; touch(r, job); return false; }
     if (!mock && !net.permits(url, target.hostname, port)) { net.stats.denied++; net.logRefusal({ api: 'DownloadManager', method: 'GET', url, host: target.hostname, port, headers: job.request.headers }); return fail(r, job, ERROR_HTTP_DATA_ERROR); }   // "Redirecionar hosts": a mapped download goes to the rule's target
     job.status = STATUS.RUNNING; job.reason = 0; job.hops = hops;
-    job.op = net.start({ api: 'DownloadManager', method: 'GET', url, headers: job.request.headers.map(([n, v]) => [n, v]), body: null, redirect: 1, connectTimeout: 20000, readTimeout: 20000, mock });
+    job.op = net.start({ api: 'DownloadManager', method: 'GET', url, headers: job.request.headers.map(([n, v]) => [n, v]), body: null, redirect: 1, connectTimeout: 20000, readTimeout: 20000, mock, block: null });
     return true;
   };
   const step = (r, job) => {

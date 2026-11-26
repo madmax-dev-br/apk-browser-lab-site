@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=109fde337e64';
-import { networkOf } from './network-native.js?v=109fde337e64';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=109fde337e64';
-import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=109fde337e64';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=109fde337e64';
-import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=109fde337e64';
-import { endpointHost } from './relay-mux.js?v=109fde337e64';
-import { siteOf } from './cookie-host.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=858dc45125cc';
+import { networkOf } from './network-native.js?v=858dc45125cc';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=858dc45125cc';
+import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=858dc45125cc';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=858dc45125cc';
+import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=858dc45125cc';
+import { endpointHost } from './relay-mux.js?v=858dc45125cc';
+import { siteOf } from './cookie-host.js?v=858dc45125cc';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and
@@ -313,6 +313,12 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
     }
     const top = main ? m.url : bridge?.documentUrl || state.url || m.url;
     const port = url.port ? Number(url.port) : url.protocol === 'https:' ? 443 : 80, mapped = net.redirectFor(m.url);
+    const byUser = net.matchBlock({ method: m.method, url: m.url });   // "Blocked calls" (src/blocked-calls.js): the request is not made; the document's main load fails like a connection that cannot be made
+    if (byUser) {
+      net.blockCall(byUser, { api: 'WebView', method: m.method, url: m.url, host: url.hostname, port }, net.blockedFailure(url.hostname, port)); deny({ reason: 'blocked-by-user' });
+      if (main) h.postMain(r, () => { if (!state.destroyed && bridge === state.bridge) fail(r, self, state, m.url, WEBVIEW_ERRORS.CONNECT, 'net::ERR_ADDRESS_UNREACHABLE', { started: bridge?.committed, shown: state.url }); }, [self, state.client, state.chrome]);
+      return;
+    }
     const blocked = !!values.get('BlockNetworkLoads') || (!main && m.dest === 'image' && (!!values.get('BlockNetworkImage') || !values.get('LoadsImagesAutomatically')));
     if (!net.online || blocked || (!net.allowed(url.hostname, port) && !mapped)) {
       if (!blocked) { net.stats.denied++; if (!net.online) net.stats.offlineRejections++; net.logRefusal({ api: 'WebView', method: m.method, url: m.url, host: url.hostname, port }); }
@@ -431,6 +437,9 @@ export function createWebViewBackend({ platform, post, labOrigin = '', timeoutMs
       let relayChannel = null;
       const record = (shown, original) => { if (!keep) h.pushHistory(state, { url: shown, originalUrl: original ?? shown, title: null, request: { ...request, history: undefined, reload: undefined } }); };
       if (request.kind === 'url' || request.kind === 'post') {
+        { const net = networkOf(r), absolute = (() => { try { return new URL(request.url, labOrigin || undefined); } catch { return null; } })(), method = request.kind === 'post' ? 'POST' : 'GET';
+          const byUser = absolute && /^https?:$/.test(absolute.protocol) ? net.matchBlock({ method, url: absolute.href }) : null;   // "Blocked calls" (src/blocked-calls.js): the main-frame load is not made
+          if (byUser) { net.blockCall(byUser, { api: 'WebView', method, url: absolute.href, host: absolute.hostname, port: Number(absolute.port || (absolute.protocol === 'https:' ? 443 : 80)) }, net.blockedFailure(absolute.hostname, Number(absolute.port || (absolute.protocol === 'https:' ? 443 : 80)))); record(display); fail(r, self, state, display, WEBVIEW_ERRORS.CONNECT, 'net::ERR_ADDRESS_UNREACHABLE'); return; } }
         const decision = decideNavigation(request.url, policyFor(r, state, (() => { try { return new URL(request.url, labOrigin || undefined).href; } catch { return null; } })()));
         if (!decision.ok) {
           if (decision.refusal) networkOf(r).logRefusal({ api: 'WebView', method: request.kind === 'post' ? 'POST' : 'GET', url: request.url, host: new URL(request.url, labOrigin || undefined).hostname });

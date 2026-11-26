@@ -26,6 +26,8 @@
 // over the payload a box record carries, AtomicInteger.get/compareAndSet, Object.getClass), the host record the call went through becomes that native, where no later call
 // through the record can be routed elsewhere. A native that cannot answer from memory defers to this trampoline (natives.h NATIVE_DEFER). Those calls are no longer host calls:
 // the time breakdown, the trace ring and the operation monitor do not see them, as they do not see the natives bound by key.
+// One exception: while a main-thread event runs, the java.util.concurrent.atomic natives send one call in 16384 through this trampoline as a sample for the operation monitor
+// (natives.h SPIN; OperationMonitor.spinSampled: the watchdog, the heartbeat and the busy-wait check), which the trace and the host-call counts then show as the host call it is.
 // A host that calls back into Java -- runtime.execute(method, code, args), which dispatch() calls for a DEX body -- runs the method in the core with run_nested: a base frame
 // above the caller's frames on the same Java stack, the same Thread and counters; an exception that leaves it becomes a JavaException in the host (and, if the host lets it
 // go, a HOST_THROW back into the core). The caller's Thread state (frame, pc, depth, stackTop, throwing, status, detail, result) is saved here and put back afterwards.
@@ -62,24 +64,24 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=109fde337e64';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=109fde337e64';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=109fde337e64';
-import { HandleTable } from './handles.js?v=109fde337e64';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=109fde337e64';
-import { coreImports } from './boundary-imports.js?v=109fde337e64';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=109fde337e64';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=109fde337e64';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=109fde337e64';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=109fde337e64';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=109fde337e64';
-import { timedExports, timedBridge } from './core-timing.js?v=109fde337e64';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=109fde337e64';
-import { Blocked } from '../../runtime/scheduler.js?v=109fde337e64';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=109fde337e64';
-import { CoreDebugAdapter } from './core-debug.js?v=109fde337e64';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=109fde337e64';
-import { PaintRecords } from './paint-record.js?v=109fde337e64';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=858dc45125cc';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=858dc45125cc';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=858dc45125cc';
+import { HandleTable } from './handles.js?v=858dc45125cc';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=858dc45125cc';
+import { coreImports } from './boundary-imports.js?v=858dc45125cc';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=858dc45125cc';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=858dc45125cc';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=858dc45125cc';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=858dc45125cc';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=858dc45125cc';
+import { timedExports, timedBridge } from './core-timing.js?v=858dc45125cc';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=858dc45125cc';
+import { Blocked } from '../../runtime/scheduler.js?v=858dc45125cc';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=858dc45125cc';
+import { CoreDebugAdapter } from './core-debug.js?v=858dc45125cc';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=858dc45125cc';
+import { PaintRecords } from './paint-record.js?v=858dc45125cc';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -97,7 +99,7 @@ export const LAYOUT = coreLayout({ ...CORE_MEMORY_DEFAULT, mode: 'fixed' });
 export const DEFAULT_PAGES = LAYOUT.pages;   // 2 GiB of memory (the most this module's memory may have): a collected heap of 512 MiB above LAYOUT.HEAP
 export const LINKER_LIMITS = Object.freeze({ maxMethods: 1 << 21, maxClasses: 1 << 18, maxStrings: 1 << 20 });
 export const THREAD = Object.freeze({ vm: 0, stackBase: 4, stackEnd: 8, status: 12, detail: 16, interrupt: 20, ringIndex: 24, quantumCut: 28, steps: 32, maxSteps: 40, result: 48, calls: 56, peakDepth: 64,
-  tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
+  tlabTop: 68, tlabEnd: 72, stackTop: 2128, frame: 2132, pc: 2136, depth: 2140, throwing: 2144, maxDepth: 2148, spinWatch: 2228, spinDue: 2232, args: 2304, javaStack: 4096, javaStackBytes: 2 * MiB });
 const GC = Object.freeze({ base: 4, end: 8, startBits: 12, threadCap: 44, rootCap: 56, roots: 52, rootCount: 60, reports: 76, reportCap: 80, reportCount: 84, reportOverflow: 88, freed: 92, freedCap: 96, freedCount: 100,
   allocated: 112, trigger: 116, collectRequested: 120, collections: 124, liveObjects: 128, liveBytes: 132, freedObjects: 136, freedBytes: 140, marked: 152, badRefs: 168, stress: 436, threadsState: 440, slowPaths: 444, grow: 196, SIZE: 448 });
 const GROW = Object.freeze({ limit: 0, holeBytes: 4, holeCount: 8, wanted: 16 });   // gc.h GcGrow
@@ -246,6 +248,8 @@ export class WasmEngine {
     // threads (vmcore/js/core-threads.js): ThreadsState, the main thread's record attached, the scheduler driving the core's threads
     this.threads = new CoreThreads(this, { main: this.mainRecord, guestBase: LAYOUT.GUESTS, guestSpan: LAYOUT.GUEST_SPAN, guestCount: LAYOUT.GUEST_COUNT, javaStack: THREAD.javaStack, take: this.dynamic ? () => this.takeGuestRecord() : null });
     this.threads.setup();
+    // the busy-wait check of the atomic natives (natives.h SPIN; OperationMonitor.spinSampled): they hand the host a sample only while a main-thread event runs
+    { const watch = (this.mainRecord + THREAD.spinWatch) >>> 2; this.runtime.monitor.nativeSpinWatch = on => { this.u32[watch] = on ? 1 : 0; }; }
     this.stackScratch = linker.alloc(8 * 1024);
     // handles: every record that gets an id is exported (the sweep reports its death); every handle made while host code runs is pinned (see the header)
     const engine = this, handles = this.handles = new HandleTable();
@@ -459,7 +463,14 @@ export class WasmEngine {
     // Boxes are records with a payload (natives.h): boxPrimitive goes through the core's own (vm_box), with the cache the box natives use. Boolean keeps the JavaScript VM's
     // path (its two constants are host-modelled statics).
     const boxPrimitive = proto.boxPrimitive;
-    rt.boxPrimitive = (type, value) => { const kind = type.length === 1 ? BOX_LETTERS.indexOf(type) : -1; return kind > 0 ? engine.box(kind, value) : boxPrimitive.call(rt, type, value); };
+    const booleans = linker.hostStateBooleans >>> 2;   // HostState.booleanBox: the records of Boolean.FALSE and Boolean.TRUE once boxPrimitive answered them (Boolean.valueOf(boolean) in C)
+    rt.boxPrimitive = (type, value) => {
+      const kind = type.length === 1 ? BOX_LETTERS.indexOf(type) : -1;
+      if (kind > 0) return engine.box(kind, value);
+      const boxed = boxPrimitive.call(rt, type, value);
+      if (kind === 0 && boxed !== null && typeof boxed === 'object') { const at = booleans + (value ? 1 : 0); if (engine.u32[at] === 0) engine.u32[at] = engine.refWord(boxed); }
+      return boxed;
+    };
     // The thread identity of natives.h HostState (Thread.currentThread / getId in C): cleared whenever the runtime's running thread, or the thread a host executor runs a task
     // for, changes; filled by the bridges' own answers (noteIdentity).
     const identity = linker.hostState + HOST_STATE_THREAD.valid;
@@ -796,11 +807,14 @@ export class WasmEngine {
     const u32 = this.u32, op = u32[(call + HOST_CALL.op) >> 2], caller = u32[(call + HOST_CALL.caller) >> 2], constant = u32[(call + HOST_CALL.constant) >> 2];
     const count = u32[(call + HOST_CALL.count) >> 2], at = u32[(call + HOST_CALL.args) >> 2];
     const mark = this.pins.length; this.hostDepth++; this.stats.bridged++;
+    // an atomic native deferred this call as a sample (natives.h SPIN): the monitor's next host call is that sample (OperationMonitor.spinSampled)
+    const spin = u32[(t + THREAD.spinDue) >>> 2] !== 0; if (spin) { u32[(t + THREAD.spinDue) >>> 2] = 0; this.runtime.monitor.nativeSpin = true; }
     try {
       const site = this.siteOf(caller, constant, op), args = this.decodeArguments(site, at, count);
       if (site.stringInit) return this.constructString(site, args, t);
       this.usedBridge = null;
       let outcome = this.call(site, args);
+      if (spin) this.runtime.monitor.nativeSpin = false;   // a call that reached no bridge
       if (this.usedBridge !== null) { const used = this.usedBridge; this.usedBridge = null; if (used.vmNative !== 0) this.bindNative(methodId, site, args, used); if (site.identity) this.noteIdentity(used, args, outcome); }
       if (outcome instanceof PendingCall) {
         const mi = this.bodyInfo(outcome.method);
@@ -1318,6 +1332,33 @@ function referenceFacade(property) {
   referenceFacades.set(property, facade); return facade;
 }
 
+/**
+ * The facade of a field updater record (atomics.c): `updaterField` -- the DEX field newUpdater resolved, which the JavaScript bridges read -- is also written to the record's
+ * payload as the field's byte offset in its owner's instances and the owner's Class record, so the updater natives answer from memory. An owner the linker has no layout for
+ * (not a class with DEX code, a type the linker cannot find, no such field) leaves the payload 0: the natives defer to the bridges, which have the field either way.
+ */
+function updaterFacade(engine) {
+  return class UpdaterFacade extends ObjectFacade {
+    #field = undefined;
+    static {
+      Object.defineProperty(this.prototype, 'updaterField', {
+        get() { return this.#field; },
+        set(field) {
+          this.#field = field;
+          const space = this.space, at = this.address >> 2; space.u32[at + 2] = 0; space.u32[at + 3] = 0;
+          if (field === undefined || field === null) return;
+          let owner; try { owner = engine.linker.classOf(field.owner); } catch { return; }
+          const entry = owner?.cls ? owner.fields.get(`${field.name}:${field.type}`) : undefined;
+          if (entry === undefined || entry.static) return;
+          space.u32[at + 2] = entry.offset; space.u32[at + 3] = owner.address;
+        },
+        configurable: true });
+    }
+  };
+}
+
+const VALUE_PAYLOADS = new Set(['atomicValue', 'atomicLong', 'atomicBoolean', 'atomicReference']);
+
 /** Class layouts for the record facades, made from the linker's records on first use (a Map whose get() lays the layout out). */
 export class LazyLayouts extends Map {
   constructor(engine) { super(); this.engine = engine; this.byAddress = new Map(); }
@@ -1328,9 +1369,16 @@ export class LazyLayouts extends Map {
     for (let c = info; c; c = c.superInfo) if (!c.isInterface) for (const field of c.fields.values()) fields.push({ key: field.key, offset: field.offset, type: field.type });
     const layout = this.engine.space.registerClass(address, { type: info.facadeType ?? info.type, fields });
     if (info.type === CLASS_TYPE) layout.onCreate = facade => { facade.classType = this.typeAt(this.engine.r32(facade.address + CLASS_OBJECT_CLASS)); };
+    // the atomics with a value payload (AtomicInteger, AtomicLong, AtomicBoolean, AtomicReference): a class with DEX code below one inherits the payload and its facade, so that the
+    // value of a subclass's instance is in memory too, where the natives answer for it (atomics.c instance_of)
+    let payload; for (let c = info; c && payload === undefined; c = c.superInfo) if (VALUE_PAYLOADS.has(c.memoryProperty)) payload = c.memoryProperty;
     if (info.boxKind !== undefined) layout.facadeClass = boxFacade(BOX_LETTERS[info.boxKind]);
-    else if (info.memoryProperty === 'atomicValue') layout.facadeClass = boxFacade('I', 'atomicValue');
-    else if (info.memoryProperty === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
+    else if (payload === 'atomicValue') layout.facadeClass = boxFacade('I', 'atomicValue');
+    else if (payload === 'atomicLong') layout.facadeClass = boxFacade('J', 'atomicValue');
+    else if (payload === 'atomicBoolean') layout.facadeClass = boxFacade('I', 'atomicValue');
+    else if (payload === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
+    else if (info.memoryProperty === 'atomicArray') layout.facadeClass = referenceFacade('atomicArray');
+    else if (info.memoryProperty === 'updater') layout.facadeClass = updaterFacade(this.engine);
     return layout;
   }
   /** The descriptor of the class whose Class record is at `address`. */

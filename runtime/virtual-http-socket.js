@@ -14,7 +14,7 @@
 // This module is VM-free: the network bridge (`net`) is passed in and the failures are plain JavaScript errors the natives (src/libcore-io-native.js) turn into Java exceptions.
 
 export const HIGH_WATER = 256 * 1024, CHUNK = 64 * 1024, MAX_HEAD = 64 * 1024, MAX_BODY = 128 * 1024 * 1024;
-import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=109fde337e64';
+import { websocketRequest, acceptKey, FrameDecoder, encodeFrame, closePayload, OPCODE } from './websocket-bridge.js?v=858dc45125cc';
 const TUNNEL_PREFIX = 64 * 1024;   // the bytes kept until the first request is recognised: a conversation that is not HTTP/1.1 starts the tunnel with them
 const encoder = new TextEncoder();
 const latin1 = bytes => { let text = ''; for (let i = 0; i < bytes.length; i += 8192) text += String.fromCharCode(...bytes.subarray(i, i + 8192)); return text; };
@@ -367,6 +367,11 @@ export class VirtualHttpSocket {
     const upgrade = websocketRequest(request);
     const port = Number(url.port || (url.protocol === 'https:' ? 443 : 80)), host = url.hostname;
     const headers = request.headers.filter(([name]) => name.toLowerCase() !== 'host');
+    const block = net.matchBlock?.({ method: request.method, url: url.href }) ?? null;   // "Blocked calls" (src/blocked-calls.js): the call is not made; the app gets the failure a refused send gives (WebSocket upgrades included: ws(s) is the http(s) URL here)
+    if (block) {
+      net.blockCall(block, { api: 'Socket', method: request.method, url: url.href, host, port, headers, bytes: request.body.length }, { type: 'Ljava/net/SocketException;', message: 'sendto failed: ENETUNREACH (Network is unreachable)' });
+      throw new SocketFailure('Ljava/net/SocketException;', 'sendto failed: ENETUNREACH (Network is unreachable)');
+    }
     const mock = net.matchMock?.({ method: request.method, url: url.href, body: request.body }) ?? null;   // "Mock de endpoints" (src/endpoint-mocks.js): answered by the lab, before the policy
     if (!mock && !(net.permits ? net.permits(url.href, host, port) : net.online && net.allowed(host, port))) {   // a request a "Redirecionar hosts" rule maps is not refused by the allow list
       net.stats.denied++; if (!net.online) net.stats.offlineRejections++;
@@ -382,7 +387,7 @@ export class VirtualHttpSocket {
     }
     net.noteHost(host);
     // redirect: 1 -- a Socket client applies its own redirect rules; where the transport can show 3xx responses (outside a browser) it does, and a browser follows them (it hides them).
-    const op = net.start({ method: request.method, url: url.href, headers, body: request.body.length || !['GET', 'HEAD'].includes(request.method) ? request.body : null, redirect: 1, connectTimeout: 0, readTimeout: 0, api: 'Socket', mock });
+    const op = net.start({ method: request.method, url: url.href, headers, body: request.body.length || !['GET', 'HEAD'].includes(request.method) ? request.body : null, redirect: 1, connectTimeout: 0, readTimeout: 0, api: 'Socket', mock, block: null });
     if (op.trace) { op.trace.socket = true; this.traces.push(op.trace); }   // its timeline ends when the app has read its bytes, not when the exchange is discarded
     this.exchange = { op, request, headSent: false, framing: 'none', declared: null, delivered: 0, noBody: false, closing: false };
   }

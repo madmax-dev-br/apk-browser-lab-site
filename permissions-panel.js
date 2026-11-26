@@ -1,7 +1,7 @@
 // The "Permissões" section of the Controles panel and the permission dialog shown over the phone screen. State per package lives in localStorage (key with the package name, every access
 // guarded); the simulated location lives in the device settings. The rules (what a request does, rationale, "don't ask again") are src/runtime-permissions.js, shared with the VM.
-import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=109fde337e64';
-export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=109fde337e64';
+import { answerDialog, computeGranted, emptyConfig, listRuntimePermissions, sanitizeConfig, setState } from './runtime-permissions.js?v=858dc45125cc';
+export { DEFAULT_LOCATION, sanitizeLocation } from './runtime-permissions.js?v=858dc45125cc';
 
 const KEY_PREFIX = 'apkweb-permissions-v1:';
 export const PERMISSION_ICONS = {
@@ -165,6 +165,10 @@ export function createPermissionsPanel({ $, vm, location }) {
     refreshLocation: writeLocation,
     /** The runtime permissions of the open APK as the panel shows them: { name, state: 'ask'|'allow'|'deny', granted, applicable } (MCP permissions). */
     list() { const granted = computeGranted(S.config, S.manifest); return S.list.map(entry => ({ name: entry.name, state: S.config.states[entry.name] ?? 'ask', granted: granted.has(entry.name), applicable: !!entry.applicable })); },
+    /** The choices as kept (the general export, src/config-bundle.js): { states }. The denial counters of the dialog are the app's history, not a setting. */
+    exportConfig() { return { states: { ...S.config.states } }; },
+    /** Replaces the choices (the general import: already validated); saved and sent to the VM like a change of the selects. */
+    replaceConfig(config) { S.config = sanitizeConfig({ states: config.states, denials: {}, once: [] }); S.revokedNote = ''; commit(); },
     /** What a change of the panel's select does, by name (a short name such as CAMERA is android.permission.CAMERA). */
     set(name, state) {
       if (!['ask', 'allow', 'deny'].includes(state)) throw new Error('state is ask, allow or deny');

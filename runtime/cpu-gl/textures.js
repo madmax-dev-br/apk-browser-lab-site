@@ -2,8 +2,8 @@
 // completeness (ES 3.0 3.8.13), and texture lookup (3.8.10-3.8.12): level of detail from the coordinate derivatives, nearest / linear filtering, mipmap selection, the wrap
 // modes, cube face selection (table 3.21), depth comparison (3.8.16), swizzles and texelFetch. A generated shader (src/cpu-gl/glsl-codegen.js) calls unit.sample(mode) with
 // its arguments in P and reads the result from R. No process.*.
-import { MODE } from './glsl-codegen.js?v=109fde337e64';
-import { srgbDecode } from './formats.js?v=109fde337e64';
+import { MODE } from './glsl-codegen.js?v=858dc45125cc';
+import { srgbDecode } from './formats.js?v=858dc45125cc';
 
 export const T = {
   TEXTURE_2D: 0x0DE1, TEXTURE_3D: 0x806F, TEXTURE_2D_ARRAY: 0x8C1A, TEXTURE_CUBE_MAP: 0x8513, CUBE_POSITIVE_X: 0x8515,
