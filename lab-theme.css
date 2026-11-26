@@ -385,6 +385,8 @@ main>footer a{color:var(--accent-ink);text-decoration:underline;text-underline-o
 .netlog-entry.cat-fail .netlog-status{color:var(--amber-ink)}
 .netlog-entry.cat-refused .netlog-line{border-left-color:var(--amber);background-color:var(--amber-soft)}
 .netlog-entry.cat-refused .netlog-status{color:var(--amber-ink)}
+.netlog-entry.cat-blocked .netlog-line{border-left-color:var(--warn);background-color:var(--warn-soft)}
+.netlog-entry.cat-blocked .netlog-status{color:var(--warn)}
 .netlog-entry.cat-error .netlog-line{border-left-color:var(--warn)}
 .netlog-entry.cat-error .netlog-status{color:var(--warn)}
 .netlog-entry.cat-pending .netlog-status{color:var(--muted)}
@@ -393,6 +395,8 @@ main>footer a{color:var(--accent-ink);text-decoration:underline;text-underline-o
 .netlog-timing,.netlog-block-title{color:var(--muted)}
 .netlog-body{padding:8px;border-radius:6px;background-color:var(--code-bg);color:var(--code-ink);font:400 12px/1.5 var(--mono)}
 .netlog-allow{margin:4px 0;font:500 12px/16px var(--sans);padding:5px 10px;color:var(--ink)}
+.netlog-blocked{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans);background-color:var(--warn-soft);color:var(--warn)}
+.netlog-note-blocked{color:var(--warn)}
 .netlog-mock,.netlog-redirected,.netlog-proxied,.netlog-channel{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans)}
 .netlog-channel{background-color:var(--accent-soft);color:var(--accent-ink)}
 .netlog-channel.is-fallback{background-color:var(--amber-soft);color:var(--amber-ink)}
@@ -1248,7 +1252,7 @@ body.cb-resizing{cursor:col-resize;user-select:none}
 .nld-summary{display:flex;align-items:baseline;gap:10px;padding:14px 20px 6px;min-width:0}
 .nld-method{font:600 12px/1 var(--mono);padding:4px 7px;border-radius:var(--r-control);background:var(--accent-soft);color:var(--accent-ink)}
 .nld-status{font:600 12px/1 var(--mono);padding:4px 7px;border-radius:var(--r-control);background:var(--ok-soft);color:var(--ok)}
-.nld-status.nld-cat-refused,.nld-status.nld-cat-error,.nld-status.nld-cat-fail{background:var(--warn-soft);color:var(--warn)}
+.nld-status.nld-cat-refused,.nld-status.nld-cat-blocked,.nld-status.nld-cat-error,.nld-status.nld-cat-fail{background:var(--warn-soft);color:var(--warn)}
 .nld-status.nld-cat-pending{background:var(--amber-soft);color:var(--amber-ink)}
 .nld-url{font:400 12px/1.5 var(--mono);color:var(--soft);word-break:break-all;min-width:0}
 .nld-actions{display:flex;flex-wrap:wrap;gap:6px;padding:6px 20px 12px;border-bottom:1px solid var(--line)}
@@ -1262,7 +1266,7 @@ body.cb-resizing{cursor:col-resize;user-select:none}
 .nld-kv dd{margin:0;font:400 12px/1.5 var(--mono);word-break:break-all}
 .nld-note{margin:0;padding:8px 12px;border-radius:var(--r-control);background:var(--code-bg);color:var(--soft)}
 .nld-note-mock{background:var(--accent-soft);color:var(--accent-ink)}
-.nld-note-error,.nld-note-refused,.nld-note-fail{background:var(--warn-soft);color:var(--warn)}
+.nld-note-error,.nld-note-refused,.nld-note-blocked,.nld-note-fail{background:var(--warn-soft);color:var(--warn)}
 .nld-section{display:flex;flex-direction:column;gap:8px;min-width:0}
 .nld-section-head{display:flex;align-items:center;gap:8px}
 .nld-section-head h3{margin:0 auto 0 0;font:600 13px/1.4 var(--sans)}
@@ -1283,3 +1287,12 @@ body.cb-resizing{cursor:col-resize;user-select:none}
 .dm-record.is-recording .dm-dot{border-radius:2px;animation:dm-blink 1s steps(2,start) infinite}
 @keyframes dm-blink{to{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.dm-record.is-recording .dm-dot{animation:none}}
+
+.cp-config{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:0 20px}
+.cp-config-title{font:600 13px/20px var(--sans);color:var(--muted);margin-right:auto}
+.cp-config-status{flex-basis:100%;margin:0}.cp-config-status:empty{display:none}
+.bc-scope{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans);background-color:var(--warn-soft);color:var(--warn)}
+.bc-row .hm-fields{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.bc-row .hm-field input,.bc-row .hm-field select{width:100%;box-sizing:border-box}
+.cfg-plugins{margin:8px 0;padding-left:18px;font:400 13px/20px var(--sans);color:var(--ink)}
+.cfg-plugins-actions{display:flex;gap:8px;margin-top:12px}

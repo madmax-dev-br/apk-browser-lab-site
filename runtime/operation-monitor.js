@@ -1,7 +1,7 @@
-import { TimeBreakdown } from './time-breakdown.js?v=109fde337e64';
-import { APKError } from './apk-error.js?v=109fde337e64';
-import { gcBlockReason } from './heap-gc.js?v=109fde337e64';
-import { Blocked } from './scheduler.js?v=109fde337e64';
+import { TimeBreakdown } from './time-breakdown.js?v=858dc45125cc';
+import { APKError } from './apk-error.js?v=858dc45125cc';
+import { gcBlockReason } from './heap-gc.js?v=858dc45125cc';
+import { Blocked } from './scheduler.js?v=858dc45125cc';
 
 // What the VM is doing during one page request (launch, click, back, ...) and during the scheduled pumps in between, seen from inside the Worker:
 //  - a heartbeat posted to the page every ~250 ms of wall time at the scheduler tick, and at the entry of the host calls that can run long (zip/inflate, class loading, regex/ICU, Skia, image decode,
@@ -18,7 +18,7 @@ const typeName = type => String(type ?? '?').replace(/^L/, '').replace(/;$/, '')
 
 export class OperationMonitor {
   constructor(runtime) {
-    this.rt = runtime; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.nativeSteps = 0; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.hostCount = 0; this.active = false;
+    this.rt = runtime; this.nativeSpinWatch = null; this.nativeSpin = false; this.spinNativeKey = null; this.spinNativeRun = 0; this.mainEvent = null; this.mainBusy = null; this.mainBusyReportMs = 10000; this.mainEventCapMs = 120000; this.hardCapMs = 180000; this.backgroundBudgetMs = 120000; this.nativeSteps = 0; this.sink = null; this.intervalMs = 250; this.budgetMs = 0; this.op = null; this.lastBeat = 0; this.beats = 0; this.hostCount = 0; this.active = false;
   }
   /** sink(message) posts a heartbeat; budgetMs = wall budget per operation (0 = none); intervalMs = heartbeat period. */
   configure({ sink = null, budgetMs = 0, intervalMs = 250 } = {}) { this.sink = sink; this.budgetMs = budgetMs; this.intervalMs = intervalMs; this.active = sink !== null || budgetMs > 0; return this; }
@@ -34,9 +34,9 @@ export class OperationMonitor {
 
   /** Cheap check at the scheduler tick, thread switches, idle rounds and event dispatch: heartbeat when due, operation budget. */
   /** A host event is about to run on the main thread (a Handler message, a posted task): the watchdog below measures how long it keeps the main thread without returning to the looper. */
-  mainEventBegin(what) { this.mainEvent = { start: performance.now(), what, captured: 0, capturedAt: 0, parent: this.mainEvent }; }
+  mainEventBegin(what) { this.mainEvent = { start: performance.now(), what, captured: 0, capturedAt: 0, parent: this.mainEvent }; if (this.nativeSpinWatch !== null) this.nativeSpinWatch(true); }
   mainEventEnd() {
-    const event = this.mainEvent; if (!event) return; this.mainEvent = event.parent ?? null;
+    const event = this.mainEvent; if (!event) return; this.mainEvent = event.parent ?? null; if (this.nativeSpinWatch !== null) this.nativeSpinWatch(this.mainEvent !== null);
     if (event?.captured && this.mainBusy) { this.mainBusy.endedAfterMs = Math.round(performance.now() - event.start); this.mainBusy.ended = true; }   // the report keeps the last long episode
   }
   /** Main thread busy for more than 10 s inside one event: remember its frames, hottest methods of the last seconds and the host call in progress (every 2 s), and end it with a named error at the hard cap. */
@@ -101,6 +101,7 @@ export class OperationMonitor {
   /** A host call is starting: remember it (the page sees it in the next heartbeat) and, for the calls known to run long, post a heartbeat right away so a hang inside names its culprit. */
   hostEnter(key, holder) {
     this.rt.hostCall = key;
+    if (this.nativeSpin === true) { this.nativeSpin = false; this.spinSampled(key); return; }
     if (this.sink === null) { if ((++this.hostCount & 255) === 0 && this.mainEvent !== null) this.spinCheck(key, performance.now()); return; }
     let slow = holder.slowHost;
     if (slow === undefined) slow = holder.slowHost = SLOW_HOST.test(key);
@@ -120,14 +121,37 @@ export class OperationMonitor {
    */
   spinCheck(key, now) {
     const rt = this.rt, scheduler = rt.scheduler, main = scheduler?.main;
-    if (!main || rt.thread !== main || !SPIN_SAFE.test(key)) { this.spinKey = null; this.spinRun = 0; return; }
+    if (!main || rt.thread !== main || !SPIN_SAFE.test(key)) { this.spinKey = null; this.spinRun = 0; this.spinNativeKey = null; this.spinNativeRun = 0; return; }
     if (key !== this.spinKey) { this.spinKey = key; this.spinRun = 1; return; }
-    if (++this.spinRun < SPIN_SAMPLES || now - this.mainEvent.start < SPIN_AFTER_MS || this.spinning) return;
+    if (++this.spinRun < SPIN_SAMPLES) return;
+    this.spinYield(key, now);
+  }
+  /** The main thread is busy-waiting on `key` (spinCheck, spinSampled): past SPIN_AFTER_MS of its event, the other threads that can run get their slice. */
+  spinYield(key, now) {
+    const rt = this.rt, scheduler = rt.scheduler, main = scheduler?.main;
+    if (!main || rt.thread !== main || this.mainEvent === null || now - this.mainEvent.start < SPIN_AFTER_MS || this.spinning) return;
     const others = () => scheduler.threads.some(thread => thread !== main && thread.state === 'runnable' && thread.nestedDepth === 0 && !scheduler.waitingNested.has(thread));
     scheduler.wake(); if (!others()) return;
     const until = now + SPIN_SLICE_MS; this.spinning = true; this.spinYields = (this.spinYields ?? 0) + 1;
     try { scheduler.resolveNested(new Blocked({ reason: `spin-wait (${short(key)})`, ready: () => performance.now() >= until || !others() })); }
     finally { this.spinning = false; }
+  }
+  /**
+   * The WebAssembly core answers the java.util.concurrent.atomic calls in memory (vmcore/atomics.c): they are not host calls, so a loop that re-reads an atomic never comes to
+   * hostEnter. The core counts those calls itself (vmcore/natives.h SPIN) and, while a main-thread event runs (nativeSpinWatch, set by the engine, turns that on and off), sends
+   * every SPIN_STRIDE-th one through the host as a sample (nativeSpin, set by the engine before the call): what every 256th host call gets -- the watchdog and the heartbeat with
+   * a sink, and spinCheck's rule over the samples of the core, counted apart from the host's own (a loop that reads an atomic in memory and the clock through the host has a
+   * steady run of each). A sample of either kind that is not a busy-wait call ends both runs.
+   */
+  spinSampled(key) {
+    const now = performance.now(), rt = this.rt, main = rt.scheduler?.main;
+    if (this.sink !== null) { if (this.mainEvent) this.watchMain(now); if (now - this.lastBeat >= this.intervalMs) this.beat(now, 'host'); }
+    if (this.mainEvent === null) return;
+    this.spinNativeSamples = (this.spinNativeSamples ?? 0) + 1;
+    if (!main || rt.thread !== main || !SPIN_SAFE.test(key)) { this.spinKey = null; this.spinRun = 0; this.spinNativeKey = null; this.spinNativeRun = 0; return; }
+    if (key !== this.spinNativeKey) { this.spinNativeKey = key; this.spinNativeRun = 1; return; }
+    if (++this.spinNativeRun < SPIN_SAMPLES) return;
+    this.spinYield(key, now);
   }
   /**
    * Native code reports progress (the ARM64 interpreter, every 2^20 instructions: it makes no host call while it computes): the main-thread watchdog, and a heartbeat when due whose

@@ -6,7 +6,7 @@
 // Everything goes through the page's debugger controller (src/debugger-controller.js), shared with plugins and MCP. Keyboard: F8 resume, F10 over, F11 into, Shift+F11 out,
 // F9 toggles a breakpoint on the selected line. DOM only through `root` (the Code tool's <details>) and its document; no work at all while nobody attached, and nothing
 // rendered or read while the tool is closed (it catches up when it opens; the page's paused indicators come from src/code-tool-loader.js then). Loaded on first use.
-import { pausedInfo, pauseReasonText } from './code-tool-loader.js?v=109fde337e64';
+import { pausedInfo, pauseReasonText } from './code-tool-loader.js?v=858dc45125cc';
 
 const shortClass = name => { const text = String(name ?? ''); return text.slice(text.lastIndexOf('.') + 1); };
 const dottedOf = descriptor => { const d = String(descriptor ?? ''); return d.startsWith('L') && d.endsWith(';') ? d.slice(1, -1).replaceAll('/', '.') : d; };

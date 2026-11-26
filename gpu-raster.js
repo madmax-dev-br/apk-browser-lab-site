@@ -14,16 +14,19 @@
 // past that, or a new context that cannot be created, switches the session to CPU. The context is counted in src/webgl-contexts.js (the browser keeps at most
 // 4 WebGL contexts per Worker and drops the oldest): that is what names the cause of a loss when an OpenGL ES context of the app pushed it out.
 //
-// View Drawable layers (background/foreground, the layers XML screens spend their raster time on) are replayed on the GPU as well (`{ transport: 'gpu-png' }`)
-// and read back as the same PNG the page already shows (a synchronous GPU read-back plus the CPU PNG encode: the replay moves, the encode does not).
+// View Drawable layers (background/foreground, the layers XML screens spend their raster time on) are replayed on the GPU as well. In the Worker (`runtime.layerPixels`) on a second
+// WebGL context with one shared, grow-only drawing buffer and leave as ImageBitmaps the page crops onto a canvas (`{ transport: 'gpu-bitmap' }`: no read-back, no PNG; docs/INTERACTION-PERFORMANCE.md
+// section 32); a layer over SHARED_MAX is read back as raw RGBA (`gpu-rgba`). Without a page (Node, the servers) they are read back and encoded as the PNG of before (`gpu-png`).
 // What stays on the CPU even with GPU selected: Bitmap pixel reads (Bitmap.getPixel/compress, typed surfaces) and the other PNG rasters (shadows, nine-patches, text).
-import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=109fde337e64';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=858dc45125cc';
 export const RENDERERS = Object.freeze(['cpu', 'gpu']);
 export const DEFAULT_RENDERER = 'cpu';   // what a caller that names no renderer gets (the Worker, Node, the servers): nothing of the GPU path is created
 /** The renderer of the device settings (the lab page and the player) when none was chosen: the GPU replay, which falls back to CPU by itself where WebGL is not available in the Worker. */
 export const DEFAULT_SETTING_RENDERER = 'gpu';
 export const sanitizeRendererSetting = value => (value === 'cpu' || value === 'gpu' ? value : DEFAULT_SETTING_RENDERER);
 export const sanitizeRenderer = value => (value === 'gpu' ? 'gpu' : DEFAULT_RENDERER);
+/** The shared layer buffer: at least SHARED_MIN square, grown to the largest layer asked for, at most SHARED_MAX (a larger layer is read back as pixels). */
+export const SHARED_MIN = 256, SHARED_MAX = 512;
 export const SLOW_FRAME_MS = 250, SLOW_FRAMES = 3, MAX_LOST_RECOVERIES = 2;
 
 /** A GPU raster failure that must switch the session to CPU (as opposed to a replay error the CPU path raises as well). */
@@ -75,7 +78,12 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
     begin(w, h, offscreen = false) {
       if (disposed) throw new GpuRasterError('the GPU context was disposed');
       if (this.isLost()) throw lostError();
-      if (offscreen) { const target = CK.MakeRenderTarget(gr, w, h); if (!target) throw new GpuRasterError(`Skia did not create the GPU texture (${w}×${h})`); return target; }
+      if (offscreen === 'shared') {   // the layer context: one drawing buffer that only grows (a layer is drawn in its top-left corner and the page crops the frame): no resize, no new Skia surface per layer
+        if (w > SHARED_MAX || h > SHARED_MAX) throw new GpuRasterError(`a layer of ${w}×${h} does not fit the shared layer buffer`);
+        const nw = Math.max(width, w, SHARED_MIN), nh = Math.max(height, h, SHARED_MIN);
+        if (nw !== width || nh !== height) { canvas.width = nw; canvas.height = nh; width = nw; height = nh; dropScreen(); }
+        w = width; h = height;
+      } else if (offscreen) { const target = CK.MakeRenderTarget(gr, w, h); if (!target) throw new GpuRasterError(`Skia did not create the GPU texture (${w}×${h})`); return target; }
       if (w !== width || h !== height) { canvas.width = w; canvas.height = h; width = w; height = h; dropScreen(); }
       // One Skia surface on the drawing buffer (a wrapper of the default framebuffer) while the size stays: making it again every frame queried the GL state
       // (getParameter, synchronous) each time. The replay draws inside a save of its own, so restoring to the base count gives the next frame the fresh surface's
@@ -92,6 +100,7 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
       screen.getCanvas().save();
       return screen;
     },
+    get bufferWidth() { return width; }, get bufferHeight() { return height; },
     release(target) { if (target === screen) { try { target.getCanvas().restoreToCount(screenBase); } catch { /* lost context */ } return; } try { target?.delete(); } catch { /* lost context */ } },
     finish(target) {
       target.flush();
@@ -119,16 +128,27 @@ export function createWebGLRasterEngine(CK, { createCanvas = null } = {}) {
  * so a stale entry is never served anyway; dropping them frees the memory). `onFallback(reason)` reports a switch to CPU.
  */
 export class GpuRasterController {
-  constructor({ CanvasKit, createEngine = CK => createWebGLRasterEngine(CK), onFallback = null, onRecover = null, slowFrameMs = SLOW_FRAME_MS, slowFrames = SLOW_FRAMES } = {}) {
+  constructor({ CanvasKit, createEngine = CK => createWebGLRasterEngine(CK), onFallback = null, onRecover = null, slowFrameMs = SLOW_FRAME_MS, slowFrames = SLOW_FRAMES, layerBitmaps = true } = {}) {
     this.CanvasKit = CanvasKit; this.createEngine = createEngine; this.onFallback = onFallback; this.onRecover = onRecover; this.slowFrameMs = slowFrameMs; this.slowFrames = slowFrames;
-    this.requested = 'cpu'; this.active = 'cpu'; this.reason = null; this.engine = null; this.slowRun = 0;
+    this.requested = 'cpu'; this.active = 'cpu'; this.reason = null; this.engine = null; this.slowRun = 0; this.layers = null; this.layerBitmaps = layerBitmaps;
     this.stats = { frames: 0, ms: 0, maxMs: 0, fallbacks: 0, switches: 0, recoveries: 0 }; this.lastLoss = null;
   }
   /** The content-raster options the replay asks for (src/compose-canvas-host.js reads runtime.contentRasterOptions at every replay). */
   get rasterOptions() { return this.active === 'gpu' ? { transport: 'gpu' } : { transport: 'rgba' }; }
-  /** View Drawable layers (src/drawable-view-host.js runtime.layerRasterOptions): replayed on the GPU and read back as the same PNG the page already shows; undefined = the CPU path. */
-  get layerOptions() { return this.active === 'gpu' ? { transport: 'gpu-png' } : undefined; }
-  apply(runtime) { runtime.contentRasterOptions = this.rasterOptions; runtime.layerRasterOptions = this.layerOptions; }
+  /** View Drawable layers (src/drawable-view-host.js runtime.layerRasterOptions). With a page behind the Worker (`runtime.layerPixels`, set by src/apk-worker.js) a layer reaches the page as raw
+   *  RGBA8 pixels it puts on a canvas, from the CPU replay (`rgba`) or from the GPU replay read back (`gpu-rgba`): no PNG encode, no base64, no Blob. Without it (Node, the servers, the tests)
+   *  the layer is the PNG raster of before: replayed on the GPU and read back as a PNG (`gpu-png`), or undefined = the CPU path's PNG. */
+  layerOptionsFor(runtime) { const pixels = runtime?.layerPixels === true; return this.active === 'gpu' ? { transport: pixels ? (this.layerBitmaps ? 'gpu-bitmap' : 'gpu-rgba') : 'gpu-png' } : pixels ? { transport: 'rgba' } : undefined; }
+  /** The second WebGL context the View layers are drawn on and transferred from as ImageBitmaps (the content canvas is never resized for them, and no read-back stalls the Worker); null when it cannot be made (the layers are then read back on the main context). */
+  layerEngine() {
+    if (this.active !== 'gpu') return null;
+    if (this.layers) return this.layers;
+    if (!this.layerBitmaps) return null;
+    try { this.layers = this.createEngine(this.CanvasKit); } catch { this.layerBitmaps = false; this.layers = null; }
+    return this.layers;
+  }
+  get layerOptions() { return this.layerOptionsFor(null); }
+  apply(runtime) { runtime.contentRasterOptions = this.rasterOptions; runtime.layerRasterOptions = this.layerOptionsFor(runtime); }
   select(mode, runtime = null) {
     const wanted = sanitizeRenderer(mode), before = this.active;
     this.requested = wanted; this.stats.switches++;
@@ -176,7 +196,7 @@ export class GpuRasterController {
     if (ms > this.slowFrameMs) { if (++this.slowRun >= this.slowFrames) this.fallback(`${this.slowFrames} consecutive frames above ${this.slowFrameMs} ms on the GPU`, runtime); }
     else this.slowRun = 0;
   }
-  dispose() { const engine = this.engine; this.engine = null; try { engine?.dispose(); } catch { /* lost context */ } }
+  dispose() { const engine = this.engine, layers = this.layers; this.engine = null; this.layers = null; try { engine?.dispose(); } catch { /* lost context */ } try { layers?.dispose(); } catch { /* lost context */ } }
   status() {
     const memory = this.engine?.memory?.() ?? null;
     return { requested: this.requested, active: this.active, reason: this.reason, api: this.active === 'gpu' ? this.engine?.info?.api ?? null : null, gpuRenderer: this.engine?.info?.renderer ?? null,
@@ -187,8 +207,8 @@ export class GpuRasterController {
 /** Drops the cached rasters of one backend (raster cache entries whose key carries its transport). */
 export function dropBackendRasters(runtime, backend) {
   const cache = runtime.rasterCache; if (!cache) return 0;
-  // GPU entries carry "transport":"gpu" or "gpu-png"; CPU content entries "rgba". CPU Drawable-layer PNG entries (no transport) are left: they are the CPU path's own cache.
-  const markers = backend === 'gpu' ? ['"transport":"gpu"', '"transport":"gpu-png"'] : ['"transport":"rgba"']; let dropped = 0;
+  // GPU entries carry "transport":"gpu", "gpu-png" or "gpu-rgba"; CPU content (and CPU layer pixel) entries "rgba". CPU Drawable-layer PNG entries (no transport) are left: they are the CPU path's own cache.
+  const markers = backend === 'gpu' ? ['"transport":"gpu"', '"transport":"gpu-png"', '"transport":"gpu-rgba"', '"transport":"gpu-bitmap"'] : ['"transport":"rgba"']; let dropped = 0;
   for (const [key, entry] of cache) {
     const prefixEnd = key.indexOf(']'); if (prefixEnd < 0) continue; const prefix = key.slice(0, prefixEnd);
     if (!markers.some(marker => prefix.includes(marker))) continue;

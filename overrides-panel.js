@@ -1,6 +1,6 @@
 // The "Retornos de métodos" section of the Controles panel: a debugging tool that replaces the return value of methods of the running VM (src/method-overrides.js). Rows are saved per package
 // in localStorage (key with the package name, every access guarded) and applied live to the Worker; hit counts come back with every snapshot.
-import { parseMethodSpec, parseReturnValue, smaliTypeToJava } from './method-overrides.js?v=109fde337e64';
+import { parseMethodSpec, parseReturnValue, smaliTypeToJava } from './method-overrides.js?v=858dc45125cc';
 
 const KEY_PREFIX = 'apkweb-overrides-v1:';
 const MAX_ROWS = 50;
@@ -128,6 +128,10 @@ export function createOverridesPanel({ $, vm }) {
       if (keep.every(Boolean)) return false;
       S.rows = S.rows.filter((_, index) => keep[index]); S.statuses = S.statuses.filter((_, index) => keep[index]); render(); changed(true); return true;
     },
+    /** The rows as kept (the general export, src/config-bundle.js). */
+    exportRows() { return S.rows.map(row => ({ method: row.method, value: row.value, enabled: row.enabled })); },
+    /** Replaces every row (the general import: already validated); saved and sent to the VM like rows typed by hand. */
+    replaceRows(rows) { S.rows = rows.slice(0, MAX_ROWS).map(row => ({ method: String(row.method ?? '').slice(0, 600), value: String(row.value ?? '').slice(0, 2000), enabled: row.enabled !== false })); S.statuses = []; render(); changed(true); },
     /** How many overrides the VM reports as active (for the report header). */
     activeCount() { return S.rows.filter((row, index) => row.enabled && S.statuses[index]?.state === 'active').length; },
     get state() { return S; },

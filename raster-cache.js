@@ -56,7 +56,7 @@ export function createRasterSender() {
         return;
       }
       if (value.kind === 'bitmap-raster') {   // a GPU frame (src/gpu-raster.js): the ImageBitmap travels once, transferred (no copy); repeats as the id only
-        const id = value.rasterId, bytes = value.width * value.height * 4;
+        const id = value.rasterId, bytes = (value.bufferWidth ?? value.width) * (value.bufferHeight ?? value.height) * 4;   // a View layer's frame is the shared layer buffer, cropped by the page: its memory is the buffer's
         if (typeof id !== 'string' || !(bytes > 0)) throw new Error('GPU raster without an identifier or dimensions.');
         value.rasterSize = bytes;
         if (lru.has(id)) { lru.touch(id); delete value.bitmap; stats.bitmapsDeduped = (stats.bitmapsDeduped ?? 0) + 1; stats.bytesSaved += bytes; }
@@ -97,8 +97,8 @@ export function createRasterReceiver({ toURL = defaultToURL, toImage = defaultTo
         if (!(Number.isInteger(width) && Number.isInteger(height) && width > 0 && height > 0 && width <= 4096 && height <= 4096 && width * height <= 4 * 1024 * 1024)) throw new Error('GPU raster with invalid dimensions received from the VM.');
         if (typeof id !== 'string') throw new Error('GPU raster without an identifier received from the VM.');
         if (value.bitmap !== undefined) {
-          if (!isBitmap(value.bitmap) || value.bitmap.width !== width || value.bitmap.height !== height) throw new Error('GPU raster with an invalid bitmap received from the VM.');
-          if (!lru.has(id)) { lru.touch(id, value.bitmap, width * height * 4); stats.decoded++; } else { lru.touch(id); stats.reused++; try { value.bitmap.close?.(); } catch { /* closed */ } }
+          if (!isBitmap(value.bitmap) || value.bitmap.width !== (value.bufferWidth ?? width) || value.bitmap.height !== (value.bufferHeight ?? height)) throw new Error('GPU raster with an invalid bitmap received from the VM.');
+          if (!lru.has(id)) { lru.touch(id, value.bitmap, (value.bufferWidth ?? width) * (value.bufferHeight ?? height) * 4); stats.decoded++; } else { lru.touch(id); stats.reused++; try { value.bitmap.close?.(); } catch { /* closed */ } }
         } else if (!lru.has(id)) throw new Error('Raster cache out of sync with the VM; reopen the APK.');
         else { lru.touch(id); stats.reused++; }
         delete value.bitmap; value.image = lru.get(id).value; return;

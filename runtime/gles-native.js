@@ -1,9 +1,9 @@
-import { Blocked } from './scheduler.js?v=109fde337e64';
-import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=109fde337e64';
-import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=109fde337e64';
-import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=109fde337e64';
-import * as external from './gl-external-textures.js?v=109fde337e64';
-import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=109fde337e64';
+import { Blocked } from './scheduler.js?v=858dc45125cc';
+import { bitsFloat, floatBits, createHostRegistry } from './host-contract.js?v=858dc45125cc';
+import { readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=858dc45125cc';
+import { createCpuWebGL2, CPU_RENDERER } from './cpu-gl/context.js?v=858dc45125cc';
+import * as external from './gl-external-textures.js?v=858dc45125cc';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=858dc45125cc';
 
 // OpenGL ES 2.0 / 3.0 and EGL 1.4 for the ORIGINAL android.opengl.GLES20, GLES30, EGL14 and com.google.android.gles_jni.EGLImpl / GLImpl (android-13.0.0_r1 Java in framework.dex),
 // over WebGL2 in the VM Worker (docs/OPENGL-ES-ON-WEBGL2.md), or over the lab's CPU implementation of OpenGL ES 3.0 (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md) when the Worker has no

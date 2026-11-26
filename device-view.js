@@ -1,9 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=109fde337e64';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=109fde337e64';
-import { isTrustedRasterURL } from './raster-cache.js?v=109fde337e64';
-import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=109fde337e64';
+import { updateWebViewSlot } from './webview-slot.js?v=858dc45125cc';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=858dc45125cc';
+import { isTrustedRasterURL } from './raster-cache.js?v=858dc45125cc';
+import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=858dc45125cc';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -68,6 +68,36 @@ export function paintBitmapContentLayer(element, drawing, counters) {
     layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-canvas-content'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0';
   }
 }
+/** A View layer that reached the page as raw pixels (a Drawable background/foreground, a group's overlay): the VM sends them as it sends a Canvas content raster, not as a PNG. */
+const isPixelLayer = drawing => drawing?.kind === 'rgba-raster' || drawing?.kind === 'bitmap-raster';
+/** A View layer's raw pixels on a canvas of the View (`element[slot]`), made the first time, kept after: the canvas holds the raster's own pixels, its CSS box (`css`) is the View's. */
+export function paintPixelLayer(element, slot, drawing, counters, className, css) {
+  if (!(drawing.image?.width === (drawing.bufferWidth ?? drawing.width) && drawing.image?.height === (drawing.bufferHeight ?? drawing.height) && drawing.width > 0 && drawing.height > 0)) throw new Error('Invalid View layer pixels received from the VM.');
+  if (drawing.scale !== undefined && !(drawing.scale > 0 && drawing.scale <= 1)) throw new Error('Invalid raster scale received from the VM.');
+  let layer = element[slot]; if (!layer || layer.tagName !== 'CANVAS') { layer = element[slot] = document.createElement('canvas'); layer._image = null; layer.setAttribute('aria-hidden', 'true'); }
+  if (layer._image !== drawing.image) {
+    if (layer.width !== drawing.width || layer.height !== drawing.height) { layer.width = drawing.width; layer.height = drawing.height; }
+    const started = globalThis.performance?.now?.() ?? Date.now(); { const context = layer.getContext('2d'); if (drawing.kind === 'bitmap-raster') { context.clearRect(0, 0, drawing.width, drawing.height); context.drawImage(drawing.image, 0, 0, drawing.width, drawing.height, 0, 0, drawing.width, drawing.height); counters.bitmapsDrawn = (counters.bitmapsDrawn ?? 0) + 1; } else context.putImageData(drawing.image, 0, 0); } counters.putMs += (globalThis.performance?.now?.() ?? Date.now()) - started;
+    layer._image = drawing.image; layer.dataset.rasterId = drawing.rasterId; layer.dataset.layer = slot;
+    if (drawing.scale !== undefined && drawing.scale < 1) layer.dataset.rasterScale = String(drawing.scale); else delete layer.dataset.rasterScale;
+  }
+  if (layer.className !== className) layer.className = className;
+  if (layer._css !== css) { layer.style.cssText = css; layer._css = css; }
+  return layer;
+}
+/** The layer's pixels as a PNG data URL, for a place that can show only an image URL (an <input> or <progress> cannot hold a canvas); kept per raster. */
+const LAYER_PNG = new WeakMap();
+function layerPngURL(drawing) {
+  let url = LAYER_PNG.get(drawing.image);
+  if (!url) { const canvas = document.createElement('canvas'); canvas.width = drawing.width; canvas.height = drawing.height; { const context = canvas.getContext('2d'); if (drawing.kind === 'bitmap-raster') context.drawImage(drawing.image, 0, 0, drawing.width, drawing.height, 0, 0, drawing.width, drawing.height); else context.putImageData(drawing.image, 0, 0); } url = canvas.toDataURL('image/png'); LAYER_PNG.set(drawing.image, url); }
+  return url;
+}
+/** Puts `layers` (lowest first) in front of the element's other children, in that order; the ones already there stay. */
+function placeLayersFirst(element, layers) {
+  let at = element.firstChild;
+  for (const layer of layers) { if (layer === at) at = at.nextSibling; else element.insertBefore(layer, at); }
+}
+const LAYER_CSS = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;';
 /**
  * ctx: { $ (id lookup), state, deviceState ({settings, bars, clockTimer}), hideError, appendTrace, updateTrace, reportAPKError, beginOperation, finishOperation, clickView, notifyParent, hooks }
  * hooks: navigationChanged(canGoBack), closed(snapshot), rendered(snapshot, composeReady).
@@ -390,12 +420,20 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   // a password field shows its PasswordTransformationMethod's dots (TextView.getText is still the typed text: the element keeps it for typing and for tools)
   if (kind === 'input') element.style.webkitTextSecurity = view.password ? 'disc' : '';
   if (view.background) element.style.background = cssColor(view.background);
-  if (view.drawableSVG) {
+  // A Drawable layer that is raw pixels is a canvas under the View's children (z-index -1 in a stacking context of the View: over its own background colour, under its text and children,
+  // where a CSS background is); an <input> or <progress> cannot hold one and shows the pixels as an image URL.
+  const pixelDrawable = isPixelLayer(view.drawableSVG) && kind !== 'input' && kind !== 'progress';
+  if (pixelDrawable) {
+    if (!element.style.position) element.style.position = 'relative'; element.style.isolation = 'isolate'; element._layerShown = undefined;
+    paintPixelLayer(element, '_drawableLayer', view.drawableSVG, runtimeFrames, 'android-drawable-layer', `${LAYER_CSS}z-index:-1`);
+  } else if (view.drawableSVG) {
     const drawing = view.drawableSVG; let url;
-    if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid or excessive PNG raster received from the VM.'); }
+    if (isPixelLayer(drawing)) url = layerPngURL(drawing);
+    else if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid or excessive PNG raster received from the VM.'); }
     else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Invalid or excessive vector drawing state.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
     element.style.backgroundImage = `url("${layerURLToShow(element, url)}")`; element.style.backgroundRepeat = 'no-repeat'; element.style.backgroundSize = '100% 100%';
   } else element._layerShown = undefined;
+  if (!pixelDrawable && element._drawableLayer) { element._drawableLayer.remove(); element._drawableLayer = null; }
   // The VM owns geometry: the page stylesheet's 48px minimums/web borders must not alter laid-out bounds, and a
   // VM-drawn background Drawable (original ripple/inset/9-patch DEX) replaces the web control's own decoration.
   if (view.laidOut && view.bounds) { element.style.minHeight = '0'; element.style.minWidth = '0'; }
@@ -404,11 +442,18 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
     const drawing = view.textRaster;
     if (!pngURLOk(drawing.dataURL) || !Number.isFinite(drawing.width) || !Number.isFinite(drawing.height)) throw new Error('Invalid paragraph PNG received from the VM.');
     const box = view.textPadding || view.compoundPadding || view.padding, image = `url("${drawing.dataURL}")`, size = `${drawing.width}px ${drawing.height}px`, position = `${box?.left || 0}px ${(box?.top || 0) + (view.textOffsetY || 0) + (view.textParagraph?.padTop || 0)}px`;
-    element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
-    element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
-    element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;
-    element.style.backgroundRepeat = 'no-repeat'; element.style.color = 'transparent'; element.style.textShadow = 'none';
+    if (pixelDrawable) {   // the text goes over the Drawable canvas: a layer of its own, painted as the CSS background it was (same box, same position)
+      const layer = element._textLayer ||= document.createElement('div'), css = `${LAYER_CSS}z-index:-1;background-image:${image};background-size:${size};background-position:${position};background-repeat:no-repeat`;
+      if (layer._css !== css) { layer.className = 'android-text-layer'; layer.setAttribute('aria-hidden', 'true'); layer.style.cssText = css; layer._css = css; }
+    } else {
+      element.style.backgroundImage = stackBackgroundImage(image, element.style.backgroundImage);
+      element.style.backgroundSize = view.drawableSVG ? `${size}, 100% 100%` : size;
+      element.style.backgroundPosition = view.drawableSVG ? `${position}, 0 0` : position;
+      element.style.backgroundRepeat = 'no-repeat';
+    }
+    element.style.color = 'transparent'; element.style.textShadow = 'none';
   }
+  if (element._textLayer && !(pixelDrawable && view.textRaster && ['text', 'button'].includes(kind))) { element._textLayer.remove(); element._textLayer = null; }
   const gravity = view.gravity > 0 ? view.gravity : 0;
   if ((gravity & 7) === 1) { element.style.textAlign = 'center'; if (kind === 'linear') element.style.alignItems = 'center'; }
   if ((gravity & 7) === 5) { element.style.textAlign = 'right'; if (kind === 'linear') element.style.alignItems = 'flex-end'; }
@@ -456,8 +501,8 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
       // dispatchDraw clips only children, preserving the parent's background.
       const layer = element._childLayer ||= document.createElement('div');
       layer.className = 'android-child-layer'; layer.style.cssText = `position:absolute;inset:0;clip-path:inset(${padding.top || 0}px ${padding.right || 0}px ${padding.bottom || 0}px ${padding.left || 0}px)`;
-      reconcileChildren(layer, childNodes); reconcileChildren(element, [element._contentLayer, layer, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
-    } else reconcileChildren(element, [element._contentLayer, ...childNodes, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+      reconcileChildren(layer, childNodes); reconcileChildren(element, [element._drawableLayer, element._textLayer, element._contentLayer, layer, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
+    } else reconcileChildren(element, [element._drawableLayer, element._textLayer, element._contentLayer, ...childNodes, element._overlayLayer, element._foregroundLayer, element._semanticsLayer, element._nativeOverlayLayer, !renderChildren ? element._nativeClip : null].filter(Boolean));
   }
   if (view.canvasChildrenCaptured && !view.contentRaster) throw new Error('The Canvas capture did not return a content image.');
   // The View's own Canvas content (its onDraw) goes under its children, as View.draw orders it (onDraw, then dispatchDraw, then the foreground): the content layer is the
@@ -490,22 +535,30 @@ function createView(view, parentKind = '', parentLaidOut = false, clipOwnBounds 
   } else { element._contentLayer?.remove(); element._contentLayer = null; if (kind === 'progress') element.classList.remove('android-progress-vm'); if (element._backgroundSource !== undefined) { element._backgroundSource = undefined; element.style.backgroundImage = ''; } }
   // What a group's draw(Canvas) override drew after its children (a TextInputLayout's floating hint): a layer over the children, under the foreground.
   if (view.overlaySVG && ['linear', 'frame', 'scroll', 'group'].includes(kind)) {
-    const drawing = view.overlaySVG, layer = element._overlayLayer ||= document.createElement('img');
+    const drawing = view.overlaySVG; let layer;
+    if (isPixelLayer(drawing)) layer = paintPixelLayer(element, '_overlayLayer', drawing, runtimeFrames, 'android-overlay-layer', `${LAYER_CSS}z-index:1`);
+    else {
+    layer = element._overlayLayer; if (!layer || layer.tagName !== 'IMG') layer = element._overlayLayer = document.createElement('img');
     if (drawing.kind !== 'raster' || !pngURLOk(drawing.dataURL)) throw new Error('Invalid overlay PNG received from the VM.');
     if (layer._url !== drawing.dataURL) { layer.src = drawing.dataURL; layer._url = drawing.dataURL; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-overlay-layer'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1'; }
+    }
     if (!element.style.position) element.style.position = 'relative';
     if (layer.parentNode !== element) element.append(layer);
   } else { element._overlayLayer?.remove(); element._overlayLayer = null; }
   if (view.foregroundSVG) {
     if (kind === 'input' || kind === 'progress') throw new Error('A foreground over this native HTML control requires a drawing container.');
-    const drawing = view.foregroundSVG, layer = element._foregroundLayer ||= document.createElement('img');
-    let url;
+    const drawing = view.foregroundSVG; let layer, url;
+    if (isPixelLayer(drawing)) layer = paintPixelLayer(element, '_foregroundLayer', drawing, runtimeFrames, 'android-foreground-layer', `${LAYER_CSS}z-index:1`);
+    else {
+    layer = element._foregroundLayer; if (!layer || layer.tagName !== 'IMG') layer = element._foregroundLayer = document.createElement('img');
     if (drawing.kind === 'raster') { url = drawing.dataURL; if (!pngURLOk(url)) throw new Error('Invalid foreground PNG received from the VM.'); }
     else { const svg = typeof drawing === 'string' ? drawing : drawing.svg; if (typeof svg !== 'string' || svg.length > 2 * 1024 * 1024 || !svg.trimStart().startsWith('<svg')) throw new Error('Invalid foreground SVG received from the VM.'); url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`; }
     if (layer._url !== url) { layer.src = url; layer._url = url; layer.alt = ''; layer.setAttribute('aria-hidden', 'true'); layer.className = 'android-foreground-layer'; layer.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:1'; }
+    }
     if (!element.style.position) element.style.position = 'relative';
     if (layer.parentNode !== element) element.append(layer);
   } else element._foregroundLayer?.remove();
+  if ((element._drawableLayer || element._textLayer) && !['linear', 'frame', 'scroll', 'group'].includes(kind)) placeLayersFirst(element, [element._drawableLayer, element._textLayer].filter(Boolean));   // a group's children are reconciled with them above
   return element;
 }
 // This layer exposes only the APK's public accessibility actions. All visible

@@ -3,8 +3,8 @@
 // fonts.xml names more than the lab has (historic scripts, the CJK collection), and a name without a file is skipped by readers, as on a device image that leaves fonts out.
 // A file's bytes are read the first time it is opened, through the Skia backend's font reader (src/font-fallback.js), and kept: `node.buf` is a getter, so stat and directory listings
 // cost nothing. Without a font reader in the VM the read fails by name. No process.*.
-import { APKError } from './apk-error.js?v=109fde337e64';
-import { FONTS_XML, SYSTEM_FONT_IMAGE } from './system-font-image-data.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=858dc45125cc';
+import { FONTS_XML, SYSTEM_FONT_IMAGE } from './system-font-image-data.js?v=858dc45125cc';
 
 /** Installs the files in `fs`; `fonts()` gives the font reader ({ readPinned }) of the running VM, or null. */
 export function installSystemFonts(fs, fonts, mtime) {
