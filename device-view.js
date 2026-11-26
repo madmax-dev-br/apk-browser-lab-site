@@ -1,9 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=d8e66ba38ca4';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=d8e66ba38ca4';
-import { isTrustedRasterURL } from './raster-cache.js?v=d8e66ba38ca4';
-import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=d8e66ba38ca4';
+import { updateWebViewSlot } from './webview-slot.js?v=4a7b2c308dd9';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=4a7b2c308dd9';
+import { isTrustedRasterURL } from './raster-cache.js?v=4a7b2c308dd9';
+import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=4a7b2c308dd9';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {
@@ -643,9 +643,17 @@ const POINTER_CLICKS_DEFAULT = true;   // taps reach the app as real MotionEvent
 function bindPointerInput(host, owner, { skipControls = false } = {}) {
   host._composeOwner = owner;   // refreshed on every render: width/height/ids may change
   if (host._pointerBound) return; host._pointerBound = true; host._pointerOptions = { skipControls }; host.dataset.pointerHost = 'true';
+  // A finger never leaves the glass: a pointer that goes past the device screen while pressed is reported at the screen's edge, as a touchscreen's coordinates stop at its
+  // borders. Points outside it reached the app with coordinates no device produces (gesture detectors take an out-of-bounds pointer as cancelled, so a drag froze where the
+  // pointer left the screen and its release was never handled).
+  const onGlass = event => {
+    const screen = host.ownerDocument?.getElementById?.('android-screen'), r = screen?.getBoundingClientRect?.();
+    if (!r || !(r.width > 0) || !(r.height > 0)) return { clientX: event.clientX, clientY: event.clientY };
+    return { clientX: Math.min(Math.max(event.clientX, r.left), r.right - 0.01), clientY: Math.min(Math.max(event.clientY, r.top), r.bottom - 0.01) };
+  };
   const session = state.viewSession, local = event => {
-    const rect = host.getBoundingClientRect(), width = host.offsetWidth || host._composeOwner.width || rect.width, scale = rect.width / width || 1;
-    return { x: (event.clientX - rect.left) / scale, y: (event.clientY - rect.top) / scale };
+    const rect = host.getBoundingClientRect(), width = host.offsetWidth || host._composeOwner.width || rect.width, scale = rect.width / width || 1, at = onGlass(event);
+    return { x: (at.clientX - rect.left) / scale, y: (at.clientY - rect.top) / scale };
   };
   const send = (action, event) => {
     if (session !== state.viewSession || !state.runtime || state.lastAPKError || !host._composeOwner) return;

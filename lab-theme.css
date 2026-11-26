@@ -1288,7 +1288,7 @@ body.cb-resizing{cursor:col-resize;user-select:none}
 @keyframes dm-blink{to{opacity:.25}}
 @media (prefers-reduced-motion:reduce){.dm-record.is-recording .dm-dot{animation:none}}
 
-.cp-config{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:0 20px}
+.cp-config{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 12px;padding:12px 20px 0}
 .cp-config-title{font:600 13px/20px var(--sans);color:var(--muted);margin-right:auto}
 .cp-config-status{flex-basis:100%;margin:0}.cp-config-status:empty{display:none}
 .bc-scope{margin-right:6px;padding:0 5px;border-radius:4px;font:600 12px/16px var(--sans);background-color:var(--warn-soft);color:var(--warn)}
