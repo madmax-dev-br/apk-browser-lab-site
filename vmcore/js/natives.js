@@ -35,24 +35,11 @@ export const NATIVE_KEYS = [
   // bound by bridge (BRIDGE_NATIVES): android.graphics.Paint's state in the record (vmcore/paint.h, PAINT_NATIVES below): slice 1, then slice 2
   null, null, null, null, null, null, null, null, null, null, null, null,
   ...new Array(34).fill(null),
-  null, null, null, null,   // bound by bridge (BRIDGE_NATIVES, UPDATER_FIRST): AtomicReferenceFieldUpdater get, set (and lazySet), getAndSet, compareAndSet (and weakCompareAndSet) over the updater payload (atomics.c)
-  ...new Array(20).fill(null),   // the same for AtomicIntegerFieldUpdater and AtomicLongFieldUpdater (UPDATER_OPERATIONS)
-  ...new Array(5).fill(null),    // AtomicReferenceArray: length, get, set (lazySet), getAndSet, compareAndSet (weakCompareAndSet) over the array payload (ARRAY_FIRST)
-  ...new Array(29).fill(null),   // AtomicInteger, AtomicLong, AtomicBoolean, AtomicReference over their payloads (ATOMICS_FIRST, ATOMIC_OPERATIONS)
-  null,   // bound by bridge: Boolean.valueOf(boolean) over HostState.booleanBox (BOOLEAN_VALUE_OF)
 ];
 const BRIDGE_FIRST = NATIVE_KEYS.indexOf(`${STRING}-><init>([CII)V`) + 1;   // natives.h NATIVE_BOX_VALUE_OF_B
 const IDENTITY_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->hashCode(I)I') + 1;   // natives.h NATIVE_THREAD_CURRENT
 const PAINT_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Double;->compare(DD)I') + 1;   // natives.h NATIVE_PAINT_GET_NATIVE_INSTANCE
 export const PAINT = 'Landroid/graphics/Paint;';
-export const ATOMIC_REFERENCE_ARRAY = 'Ljava/util/concurrent/atomic/AtomicReferenceArray;';
-export const ATOMIC_LONG = 'Ljava/util/concurrent/atomic/AtomicLong;', ATOMIC_BOOLEAN = 'Ljava/util/concurrent/atomic/AtomicBoolean;';
-export const ARFU = 'Ljava/util/concurrent/atomic/AtomicReferenceFieldUpdater;', AIFU = 'Ljava/util/concurrent/atomic/AtomicIntegerFieldUpdater;', ALFU = 'Ljava/util/concurrent/atomic/AtomicLongFieldUpdater;';
-/** The field updater classes laid out with the updater payload, by their index in natives.h HostState.updaterClass (UPD_REFERENCE, UPD_INTEGER, UPD_LONG). */
-export const UPDATER_CLASSES = new Map([[ARFU, 0], [AIFU, 1], [ALFU, 2]]);
-/** The operations of the int and long updaters in natives.h order (NATIVE_AIFU_GET ..): their bridge names (one native answers both of a pair), the parameters after the target and the result, T being the value type. */
-const UPDATER_OPERATIONS = [[['get'], '', 'T'], [['set', 'lazySet'], 'T', 'V'], [['getAndSet'], 'T', 'T'], [['compareAndSet', 'weakCompareAndSet'], 'TT', 'Z'], [['getAndIncrement'], '', 'T'],
-  [['getAndDecrement'], '', 'T'], [['incrementAndGet'], '', 'T'], [['decrementAndGet'], '', 'T'], [['getAndAdd'], 'T', 'T'], [['addAndGet'], 'T', 'T']];
 /**
  * The paint natives (vmcore/paint.h), in natives.h's order: the paint host's methods (name + signature) they answer from the Paint record. A DEX class below Paint gets the
  * record's Class flag only when neither it nor a superclass declares one of these (vmcore/js/host-linking.js), and the natives answer only for receivers with the flag.
@@ -67,24 +54,6 @@ export const PAINT_NATIVES = ['getNativeInstance()J', 'setColor(I)V', 'getColor(
   'setLetterSpacing(F)V', 'getWordSpacing()F', 'getStyle()Landroid/graphics/Paint$Style;', 'setStyle(Landroid/graphics/Paint$Style;)V', 'getStrokeCap()Landroid/graphics/Paint$Cap;',
   'getStrokeJoin()Landroid/graphics/Paint$Join;', 'getTextAlign()Landroid/graphics/Paint$Align;', 'getHinting()I', 'setHinting(I)V', 'isElegantTextHeight()Z',
   'isAntiAlias()Z', 'setAntiAlias(Z)V', 'setDither(Z)V', 'isUnderlineText()Z', 'setUnderlineText(Z)V', 'isStrikeThruText()Z', 'setStrikeThruText(Z)V'];
-const UPDATER_FIRST = PAINT_FIRST + PAINT_NATIVES.length;   // natives.h NATIVE_ARFU_GET
-const ARRAY_FIRST = UPDATER_FIRST + 24;   // natives.h NATIVE_ARRA_LENGTH
-const ATOMICS_FIRST = ARRAY_FIRST + 5;   // natives.h NATIVE_ATOMIC_INTEGER_SET
-
-/**
- * The operations of AtomicInteger, AtomicLong, AtomicBoolean and AtomicReference after the ones that had natives (get and compareAndSet of AtomicInteger, get of AtomicReference), in
- * natives.h order: [owner, value type, [bridge names of one native], parameters, result]; T is the value type. `weakCompareAndSet` and `lazySet` are answered by compareAndSet's and set's.
- */
-const ATOMIC_OPERATIONS = (() => {
-  const numeric = (owner, type) => [[['getAndIncrement'], '', 'T'], [['getAndDecrement'], '', 'T'], [['incrementAndGet'], '', 'T'], [['decrementAndGet'], '', 'T'], [['getAndAdd'], 'T', 'T'], [['addAndGet'], 'T', 'T'],
-    [['intValue'], '', 'I'], [['longValue'], '', 'J']].map(op => [owner, type, ...op]);
-  const basic = (owner, type, names) => names.map(name => [owner, type, ...({ get: [['get'], '', 'T'], set: [['set', 'lazySet'], 'T', 'V'], getAndSet: [['getAndSet'], 'T', 'T'], cas: [['compareAndSet', 'weakCompareAndSet'], 'TT', 'Z'] })[name]]);
-  return [...basic(ATOMIC_INTEGER, 'I', ['set', 'getAndSet']), ...numeric(ATOMIC_INTEGER, 'I'),
-    ...basic(ATOMIC_LONG, 'J', ['get', 'set', 'getAndSet', 'cas']), ...numeric(ATOMIC_LONG, 'J'),
-    ...basic(ATOMIC_BOOLEAN, 'Z', ['get', 'set', 'getAndSet', 'cas']),
-    ...basic(ATOMIC_REFERENCE, 'Ljava/lang/Object;', ['set', 'getAndSet', 'cas'])];
-})();
-const BOOLEAN_VALUE_OF = ATOMICS_FIRST + ATOMIC_OPERATIONS.length;   // natives.h NATIVE_BOOLEAN_VALUE_OF
 export const THREAD = 'Ljava/lang/Thread;', CURRENT_THREAD_KEY = `${THREAD}->currentThread()${THREAD}`, THREAD_GET_ID_KEY = `${THREAD}->getId()J`;
 /** The java.lang box classes by kind (natives.h BOX_*: Z B S C I J F D). */
 export const BOX_CLASSES = ['Ljava/lang/Boolean;', 'Ljava/lang/Byte;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Float;', 'Ljava/lang/Double;'];
@@ -110,25 +79,6 @@ export const BRIDGE_NATIVES = new Map([
   ['Ljava/lang/Class;->isInstance(Ljava/lang/Object;)Z', { id: IDENTITY_FIRST + 2, anyReceiver: true }], ['Ljava/lang/Class;->getComponentType()Ljava/lang/Class;', { id: IDENTITY_FIRST + 3, anyReceiver: true }],
   // the atomics bridge's AtomicReference.get over `atomicValue`, a reference payload (host-linking.js); the native checks the receiver's class itself
   [`${ATOMIC_REFERENCE}->get()Ljava/lang/Object;`, { id: IDENTITY_FIRST + 4, anyReceiver: true }],
-  // the field updaters' bridges (DIRECT_BRIDGES' get and compareAndSet, bridgeB's FieldUpdater branch) over the updater payload (host-linking.js, atomics.c); the natives check the receiver's class and the target themselves
-  [`${ARFU}->get(Ljava/lang/Object;)Ljava/lang/Object;`, { id: UPDATER_FIRST, anyReceiver: true }],
-  [`${ARFU}->set(Ljava/lang/Object;Ljava/lang/Object;)V`, { id: UPDATER_FIRST + 1, anyReceiver: true }], [`${ARFU}->lazySet(Ljava/lang/Object;Ljava/lang/Object;)V`, { id: UPDATER_FIRST + 1, anyReceiver: true }],
-  [`${ARFU}->getAndSet(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;`, { id: UPDATER_FIRST + 2, anyReceiver: true }],
-  [`${ARFU}->compareAndSet(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z`, { id: UPDATER_FIRST + 3, anyReceiver: true }],
-  [`${ARFU}->weakCompareAndSet(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Z`, { id: UPDATER_FIRST + 3, anyReceiver: true }],
-  ...[[AIFU, 'I'], [ALFU, 'J']].flatMap(([owner, type], kind) => UPDATER_OPERATIONS.flatMap(([names, params, result], op) => names.map(name =>
-    [`${owner}->${name}(Ljava/lang/Object;${params.replaceAll('T', type)})${result.replace('T', type)}`, { id: UPDATER_FIRST + 4 + 10 * kind + op, anyReceiver: true }]))),
-  // AtomicReferenceArray over `atomicArray`, a reference payload (host-linking.js, atomics.c)
-  [`${ATOMIC_REFERENCE_ARRAY}->length()I`, { id: ARRAY_FIRST, anyReceiver: true }], [`${ATOMIC_REFERENCE_ARRAY}->get(I)Ljava/lang/Object;`, { id: ARRAY_FIRST + 1, anyReceiver: true }],
-  [`${ATOMIC_REFERENCE_ARRAY}->set(ILjava/lang/Object;)V`, { id: ARRAY_FIRST + 2, anyReceiver: true }], [`${ATOMIC_REFERENCE_ARRAY}->lazySet(ILjava/lang/Object;)V`, { id: ARRAY_FIRST + 2, anyReceiver: true }],
-  [`${ATOMIC_REFERENCE_ARRAY}->getAndSet(ILjava/lang/Object;)Ljava/lang/Object;`, { id: ARRAY_FIRST + 3, anyReceiver: true }],
-  [`${ATOMIC_REFERENCE_ARRAY}->compareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z`, { id: ARRAY_FIRST + 4, anyReceiver: true }],
-  [`${ATOMIC_REFERENCE_ARRAY}->weakCompareAndSet(ILjava/lang/Object;Ljava/lang/Object;)Z`, { id: ARRAY_FIRST + 4, anyReceiver: true }],
-  // AtomicInteger (weakCompareAndSet too), AtomicLong, AtomicBoolean and AtomicReference over their payloads: the natives check the receiver's class and state themselves (atomics.c)
-  [`${ATOMIC_INTEGER}->weakCompareAndSet(II)Z`, { id: BRIDGE_FIRST + 11, anyReceiver: true }],
-  ...ATOMIC_OPERATIONS.flatMap(([owner, type, names, params, result], id) => names.map(name => [`${owner}->${name}(${params.replaceAll('T', type)})${result.replace('T', type)}`, { id: ATOMICS_FIRST + id, anyReceiver: true }])),
-  // Boolean.valueOf(boolean): the host's TRUE or FALSE record (host-bridge.js fills HostState.booleanBox when boxPrimitive('Z') answers it)
-  ['Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;', { id: BOOLEAN_VALUE_OF }],
   // the paint host's own bridges (src/paint-host.js) over the Paint record's payload; the natives check the receiver's class flag and the payload's state themselves (paint.h)
   // `superCalls`: also a super call's host-method record (TextPaint.set's super.set(Paint)): its target is Paint's own method whatever the receiver (paint.h)
   ...PAINT_NATIVES.map((method, i) => [`${PAINT}->${method}`, { id: PAINT_FIRST + i, anyReceiver: true, superCalls: true }]),

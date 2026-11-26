@@ -7,12 +7,11 @@
 // is still). A reduced raster that is read again at full density is replayed again from the same recording (`rasterStats.refined/refinedMs`), so a settled screen
 // ends at full density; a full raster is kept whatever the scale asked later (it is never worse). `r.displayRasterReducedServed` (an array, only while the Worker
 // takes a snapshot) collects the identity of the reduced rasters that went into it (the settle rule compares them between snapshots).
-import { bitmapRasterUsable } from './gpu-raster.js?v=858dc45125cc';
+import { bitmapRasterUsable } from './gpu-raster.js?v=109fde337e64';
 const reducedId = value => value.rasterId ?? value.rasterSerial ?? '?';
 // Only when the session ever selected the GPU renderer (r.gpuRaster exists): a content raster made by the other backend, or a GPU raster whose ImageBitmap left the
 // Worker and is no longer held by the page, is replayed again from the same recording. CPU-only sessions never reach this check.
-const LAYER_PROPS = new Set(['drawableSVG', 'foregroundSVG', 'buttonSVG', 'overlaySVG']);   // View layers: raw pixels whichever replay made them (a content raster of the other backend is stale; a layer is not)
-const staleBackend = (r, value, prop) => (LAYER_PROPS.has(prop) ? value.kind === 'bitmap-raster' && !bitmapRasterUsable(r, value) : value.kind === 'bitmap-raster' ? r.contentRasterOptions?.transport !== 'gpu' || !bitmapRasterUsable(r, value) : value.kind === 'rgba-raster' && r.contentRasterOptions?.transport === 'gpu');
+const staleBackend = (r, value) => (value.kind === 'bitmap-raster' ? r.contentRasterOptions?.transport !== 'gpu' || !bitmapRasterUsable(r, value) : value.kind === 'rgba-raster' && r.contentRasterOptions?.transport === 'gpu');
 /**
  * `make(scale)` replays the View's current recording at `scale` (1 = full density). The property keeps its plain-value behavior: assigning a value (or null) drops
  * the deferred replay. The deferred replay must read only what a record property of the View keeps alive (its own Canvas): no second root is kept here (a duplicate
@@ -29,7 +28,7 @@ export function deferRaster(r, view, prop, make) {
         if (slot.make) {
           const wanted = r.displayRasterScale ?? 1, held = slot.value;
           if (slot.pending) { slot.pending = false; slot.value = slot.make(wanted); }
-          else if (r.gpuRaster && held && staleBackend(r, held, prop)) { slot.value = slot.make(wanted); stats.rebackend = (stats.rebackend ?? 0) + 1; }   // renderer switched (src/gpu-raster.js) or a GPU bitmap the page no longer holds: the same recording again
+          else if (r.gpuRaster && held && staleBackend(r, held)) { slot.value = slot.make(wanted); stats.rebackend = (stats.rebackend ?? 0) + 1; }   // renderer switched (src/gpu-raster.js) or a GPU bitmap the page no longer holds: the same recording again
           else if (held && (held.scale ?? 1) < wanted) { const t0 = performance.now(); slot.value = slot.make(wanted); stats.refined = (stats.refined ?? 0) + 1; stats.refinedMs = (stats.refinedMs ?? 0) + (performance.now() - t0); }   // the settled screen: the same recording at full density
         }
         const value = slot.value ?? null; if (value && (value.scale ?? 1) < (r.displayRasterSettledScale ?? 1)) r.displayRasterReducedServed?.push(reducedId(value));   // below what the settled screen is drawn at: a refinement is owed

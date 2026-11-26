@@ -12,16 +12,16 @@
 // URL pattern: "http(s)://host[:port]/path[?query]" or a host-less "/path[?query]" (any scheme, host and port). A host label may be "*" (one label: "*.exemplo.com"); a path segment
 // "*" is exactly one segment, "*" inside a segment is any text without "/", and "**" is any number of segments. Without a port the pattern takes any port.
 // Query "exact": the request has exactly the pattern's parameters (any order; a value "*" takes any value); "ignore": the query is not looked at.
-import { inflateRaw } from './inflate.js?v=858dc45125cc';
-import { REASONS } from './virtual-http-socket.js?v=858dc45125cc';
-import { utf8Length } from './json-tools.js?v=858dc45125cc';
+import { inflateRaw } from './inflate.js?v=109fde337e64';
+import { REASONS } from './virtual-http-socket.js?v=109fde337e64';
+import { utf8Length } from './json-tools.js?v=109fde337e64';
 
 export const MOCK_METHODS = ['ANY', 'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 export const MAX_MOCKS = 50, MAX_BODY_BYTES = 32 * 1024 * 1024, MAX_DELAY_MS = 600000, MAX_HEADERS = 64;
 export const STORAGE_PREFIX = 'apkweb-endpoint-mocks-v1:';
 export const EXPORT_FORMAT = 'apkweb-endpoint-mocks';
 const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
-export const HOST_PATTERN = /^(\*|[a-z0-9]([a-z0-9-]*[a-z0-9])?)(\.(\*|[a-z0-9]([a-z0-9-]*[a-z0-9])?))*$/i; export const IPV6 = /^\[[0-9a-f:.]+\]$/i;
+const HOST_PATTERN = /^(\*|[a-z0-9]([a-z0-9-]*[a-z0-9])?)(\.(\*|[a-z0-9]([a-z0-9-]*[a-z0-9])?))*$/i, IPV6 = /^\[[0-9a-f:.]+\]$/i;
 const encoder = new TextEncoder();
 const decodeUtf8 = bytes => new TextDecoder('utf-8', { fatal: false }).decode(bytes);
 const safeDecode = text => { try { return decodeURIComponent(text); } catch { return text; } };
@@ -254,7 +254,7 @@ export function endpointMockSummaryLines(runtime) {
   return lines;
 }
 
-// ---- storage (page; the export and import of the configuration are src/config-bundle.js) ----------------------------------------------------------------------------------------------------------------------------------------------------
+// ---- storage and export (page) ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 /** The stored mocks of a package; [] when there are none or storage is unavailable. `storage` defaults to localStorage (every access guarded). */
 export function loadMocks(pkg, storage = undefined) {
@@ -267,4 +267,15 @@ export function loadMocks(pkg, storage = undefined) {
 /** Saves the mocks of a package; false when storage is unavailable or full (the list then lasts for this page only). */
 export function saveMocks(pkg, mocks, storage = undefined) {
   try { const store = storage === undefined ? globalThis.localStorage : storage; if (!store) return false; store.setItem(STORAGE_PREFIX + pkg, JSON.stringify(mocks.map(normalizeMock))); return true; } catch { return false; }
+}
+/** The JSON "Exportar" downloads. */
+export function exportMocks(mocks, packageName = '') {
+  return JSON.stringify({ format: EXPORT_FORMAT, version: 1, packageName, mocks: mocks.map(normalizeMock).map(({ bodyRef, ...mock }) => mock) }, null, 2);
+}
+/** Parses an exported file (or a bare array of mocks). Returns { mocks, error? }; imported mocks get fresh ids so they never collide with the current list. */
+export function importMocks(text) {
+  let data; try { data = JSON.parse(String(text)); } catch (e) { return { mocks: [], error: `The file is not valid JSON: ${String(e?.message ?? e).slice(0, 120)}` }; }
+  const list = Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray(data.mocks) ? data.mocks : null;
+  if (!list) return { mocks: [], error: `The file has no list of mocks (expected {"format":"${EXPORT_FORMAT}","mocks":[...]}).` };
+  return { mocks: list.slice(0, MAX_MOCKS).map(item => ({ ...normalizeMock(item), id: newMockId(), bodyRef: false })), ...(list.length > MAX_MOCKS ? { error: `Only the first ${MAX_MOCKS} mocks were imported.` } : {}) };
 }

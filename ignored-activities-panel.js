@@ -1,7 +1,7 @@
 // The "Activities ignoradas" section of the Controles panel (src/ignored-activities.js): a debugging tool that drops the starts of the Activities on the list. The section previews the
 // Activities the manifest declares (click one to add it), keeps N rows per package in localStorage (every access guarded) and applies them live to the Worker; counts come back with
 // every snapshot.
-import { activityDescriptor } from './ignored-activities.js?v=858dc45125cc';
+import { activityDescriptor } from './ignored-activities.js?v=109fde337e64';
 
 const KEY_PREFIX = 'apkweb-ignored-activities-v1:';
 const MAX_ROWS = 50;
@@ -96,10 +96,6 @@ export function createIgnoredActivitiesPanel({ $, vm }) {
     /** Live counts of the Worker's snapshot ([{ descriptor, hits, active }]). */
     hits(entries) { if (!Array.isArray(entries)) return; for (const entry of entries) S.hits.set(entry.descriptor, entry.hits); updateMeta(); },
     activeCount() { return S.rows.filter((row, index) => row.enabled && S.statuses[index]?.state === 'active').length; },
-    /** The rows as kept (the general export, src/config-bundle.js). */
-    exportRows() { return S.rows.map(row => ({ name: row.name, enabled: row.enabled })); },
-    /** Replaces every row (the general import: already validated); saved and sent to the VM like rows typed by hand. */
-    replaceRows(rows) { S.rows = rows.slice(0, MAX_ROWS).map(row => ({ name: String(row.name ?? '').slice(0, 300), enabled: row.enabled !== false })); S.statuses = []; render(); changed(true); },
     get state() { return S; },
   };
 }

@@ -8,18 +8,17 @@
 //     outcome, complete (the exchange has ended),
 //     status (null until a response head), reason, responseHeaders [[name, value]], contentType, responseBytes, finalUrl (a redirect the transport followed) or null, redirects (followed by the transport),
 //     closedEarly (the app closed the response before reading all of it), durationMs (null until it ends), failure { type, message } or null, refusedHost (host the allowlist refused) or null,
-//     blockId / blockLabel (stopped by a "Blocked calls" rule, never made),
 //     mappedUrl / mappedRule ("Redirecionar hosts"), mockId / mockLabel (answered by a "Mock de endpoints" entry, never sent),
 //     relayChannel: null (the setting is off) | 'pending' | 'mux' (carried by the relay's parallel channel) | 'fallback' (the setting is on, the channel was not there: a separate
 //     request), relayChannelNote (why it fell back) }
-//   outcome: 'pending' (no head yet) | 'response' (a status arrived) | 'refused-by-allowlist' | 'offline' | 'blocked-by-user' | 'unknown-host' | 'timeout' | 'aborted' | 'error' | 'unsupported'
+//   outcome: 'pending' (no head yet) | 'response' (a status arrived) | 'refused-by-allowlist' | 'offline' | 'unknown-host' | 'timeout' | 'aborted' | 'error' | 'unsupported'
 //            | 'connected' (a loopback connection; kind 'loopback': the device's own interface, never refused by policy; a loopback connect nobody listens for ends 'error' with ECONNREFUSED)
 // Wire format (Worker -> page):  { type: 'netlog', reset?: true, rows: [entry, ...] (new and changed entries, by seq), dropped, total }
 //   dropped = entries the Worker has discarded because its buffer was full; total = entries created since the reset.
 
 export const MAX_ENTRIES = 5000;
 export const FLUSH_MS = 100;
-export const OUTCOMES = ['pending', 'response', 'refused-by-allowlist', 'offline', 'unknown-host', 'timeout', 'aborted', 'error', 'unsupported', 'connected', 'blocked-by-user'];
+export const OUTCOMES = ['pending', 'response', 'refused-by-allowlist', 'offline', 'unknown-host', 'timeout', 'aborted', 'error', 'unsupported', 'connected'];
 
 const DEFAULT_PORTS = { 'http:': 80, 'https:': 443 };
 /** URL text -> { scheme, host, port, path } (path keeps the query); text that is not an absolute URL leaves the parts empty. */
@@ -68,7 +67,7 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
       method: String(fields.method ?? 'GET'), url, scheme: fields.scheme ?? parts.scheme, host: fields.host ?? parts.host, port: fields.port ?? parts.port, path: fields.path ?? parts.path,
       requestHeaders: pairs(fields.headers), requestBytes: fields.bytes ?? 0, outcome: 'pending', complete: false, status: null, reason: '', responseHeaders: [], contentType: null, responseBytes: 0,
       finalUrl: null, redirects: 0, closedEarly: false, durationMs: null, failure: null, refusedHost: null, mappedUrl: fields.mappedUrl ?? null, mappedRule: fields.mappedRule ?? null,   // mappedUrl: where "Redirecionar hosts" sent it (src/host-map.js)
-      mockId: fields.mockId ?? null, mockLabel: fields.mockLabel ?? null, blockId: fields.blockId ?? null, blockLabel: fields.blockLabel ?? null, routeId: fields.route?.id ?? null, routeLabel: fields.route?.label ?? null, routeChange: fields.route?.changed ?? null, proxiedVia: fields.proxiedVia ?? null, relayChannel: fields.relayChannel ?? null, relayChannelNote: null };   // proxiedVia: the host of the proxy (Dispositivo › Proxy) the browser's request went through   // the "Mock de endpoints" entry that answered it in the lab (src/endpoint-mocks.js); it never went to the network
+      mockId: fields.mockId ?? null, mockLabel: fields.mockLabel ?? null, routeId: fields.route?.id ?? null, routeLabel: fields.route?.label ?? null, routeChange: fields.route?.changed ?? null, proxiedVia: fields.proxiedVia ?? null, relayChannel: fields.relayChannel ?? null, relayChannelNote: null };   // proxiedVia: the host of the proxy (Dispositivo › Proxy) the browser's request went through   // the "Mock de endpoints" entry that answered it in the lab (src/endpoint-mocks.js); it never went to the network
     const sent = fields.body;   // the request body as text (the detail's Request tab): the first BODY_TEXT_BYTES of a body that decodes as UTF-8 without NULs; a binary one is only counted
     if (sent?.length) { try { const head = sent.subarray ? sent.subarray(0, BODY_TEXT_BYTES) : sent.slice(0, BODY_TEXT_BYTES), text = new TextDecoder('utf-8', { fatal: sent.length <= BODY_TEXT_BYTES }).decode(head); if (!text.includes('\0')) { entry.requestBody = text; entry.requestBodyTruncated = sent.length > BODY_TEXT_BYTES; } } catch { /* binary or cut inside a character: counted only */ } }
     buffer.push(entry); total++;
@@ -89,11 +88,6 @@ export function createNetlog({ post = () => {}, clock = { now: () => 0, wall: ()
     refuse({ api: via = 'java.net', kind = 'http', method = 'GET', url, host, port = null, headers = [], bytes = 0, offline = false }) {
       const entry = create({ api: via, kind, method, url, host, port, headers, bytes }); entry.refusedHost = offline ? null : (host ?? entry.host);
       return end(entry, offline ? 'offline' : 'refused-by-allowlist');
-    },
-    /** A call a "Blocked calls" rule (src/blocked-calls.js) stopped before anything was made: outcome 'blocked-by-user', the rule that matched, and the failure the app got. */
-    blocked({ api: via = 'java.net', kind = 'http', method = 'GET', url, host, port = null, headers = [], bytes = 0, rule, failure }) {
-      const entry = create({ api: via, kind, method, url, host, port, headers, bytes, blockId: rule?.id, blockLabel: rule?.label });
-      return end(entry, 'blocked-by-user', failure ? { type: String(failure.type ?? ''), message: String(failure.message ?? '') } : null);
     },
     /** A request that cannot be carried out here (a socket conversation that is not HTTP/1.1): the failure is explicit, never a faked success. */
     unsupported({ api: via = 'Socket', kind = 'socket', method = 'CONNECT', url, host, port = null, message }) {

@@ -1,20 +1,19 @@
 // The "Rede" panel of the lab page: the app's network requests (src/netlog.js batches from the Worker) as a table coloured by outcome, with a text filter, an outcome filter, a detail
 // view per row (full URL, headers, timing, failure), "Permitir <host>" for a request the allowlist refused, "Limpar" and "Salvar" (HAR 1.2 or plain text, bodies omitted).
 // The formatting, filter and export functions are pure (tested without a DOM); createNetlogPanel() wires them to the page. Nothing here is persisted: the entries live in memory.
-import { renderRequestDetails } from './netlog-details.js?v=858dc45125cc';
-import { MAX_ENTRIES } from './netlog.js?v=858dc45125cc';
-import { createReadingHold } from './reading-hold.js?v=858dc45125cc';
-import { sanitizeHosts } from './device-settings.js?v=858dc45125cc';
+import { renderRequestDetails } from './netlog-details.js?v=109fde337e64';
+import { MAX_ENTRIES } from './netlog.js?v=109fde337e64';
+import { createReadingHold } from './reading-hold.js?v=109fde337e64';
+import { sanitizeHosts } from './device-settings.js?v=109fde337e64';
 
 export const RENDER_MAX = 500;   // rows kept in the DOM; "Salvar" still writes the whole buffer
-export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'blocked', 'error', 'loopback'];
-export const CATEGORY_NAMES = { pending: 'In progress', ok: '2xx', redirect: '3xx', fail: '4xx / 5xx', refused: 'Refused', blocked: 'Blocked by you', error: 'Errors', loopback: 'Loopback' };
+export const CATEGORIES = ['pending', 'ok', 'redirect', 'fail', 'refused', 'error', 'loopback'];
+export const CATEGORY_NAMES = { pending: 'In progress', ok: '2xx', redirect: '3xx', fail: '4xx / 5xx', refused: 'Refused', error: 'Errors', loopback: 'Loopback' };
 const REFUSED = new Set(['refused-by-allowlist', 'offline']);
 
 /** The colour class of an entry: pending | ok (1xx/2xx) | redirect (3xx) | fail (4xx/5xx) | refused (allowlist or offline) | error (every other failure). */
 export function categoryOf(entry) {
   if (entry.kind === 'loopback' && entry.outcome === 'connected') return 'loopback';   // the device's own interface: never a refusal
-  if (entry.outcome === 'blocked-by-user') return 'blocked';   // a "Blocked calls" rule of the user stopped it (not the allow list)
   if (REFUSED.has(entry.outcome)) return 'refused';
   if (entry.outcome === 'pending') return 'pending';
   if (entry.status !== null && entry.status !== undefined && entry.outcome === 'response') return entry.status >= 400 ? 'fail' : entry.status >= 300 ? 'redirect' : 'ok';
@@ -28,7 +27,7 @@ export function matchesFilter(entry, { text = '', category = 'all' } = {}) {
   else if (category === 'proxied') { if (!entry.proxiedVia) return false; }   // "Via proxy": went through Device › Proxy
   else if (category !== 'all' && categoryOf(entry) !== category) return false;
   const needle = String(text).trim().toLowerCase(); if (!needle) return true;
-  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.blockId ? ` blocked ${entry.blockLabel ?? ''}` : ''}${entry.routeId ? ` route ${entry.routeLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}${entry.relayChannel === 'mux' ? ' channel' : entry.relayChannel === 'fallback' ? ' fallback' : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
+  return `${entry.method} ${entry.host}${entry.path} ${entry.status ?? ''} ${entry.outcome}${entry.mockId ? ` mock ${entry.mockLabel ?? ''}` : ''}${entry.routeId ? ` route ${entry.routeLabel ?? ''}` : ''}${entry.mappedUrl ? ` redirected ${entry.mappedUrl}` : ''}${entry.proxiedVia ? ` proxy ${entry.proxiedVia}` : ''}${entry.relayChannel === 'mux' ? ' channel' : entry.relayChannel === 'fallback' ? ' fallback' : ''}`.toLowerCase().includes(needle) || entry.url.toLowerCase().includes(needle);
 }
 
 const pad = (value, width = 2) => String(value).padStart(width, '0');
@@ -42,7 +41,6 @@ export function statusLabel(entry) {
     case 'pending': return 'in progress';
     case 'response': return `${entry.status}${entry.reason ? ` ${entry.reason}` : ''}`;
     case 'refused-by-allowlist': return 'refused: host not allowed';
-    case 'blocked-by-user': return 'blocked by you';
     case 'offline': return 'offline';
     case 'unknown-host': return 'unknown host';
     case 'timeout': return 'timeout';
@@ -58,7 +56,6 @@ export function describeOutcome(entry) {
   const failure = entry.failure?.message ? ` ${entry.failure.message}` : '';
   switch (entry.outcome) {
     case 'refused-by-allowlist': return `Refused by the allowed hosts list: ${entry.refusedHost || entry.host} is not in "Allowed network hosts" (Controls › Network). The app saw a network failure (UnknownHostException or ConnectException); nothing left the browser.`;
-    case 'blocked-by-user': return blockNote(entry);
     case 'offline': return 'Refused because the virtual device is offline (Controls › Network › Connectivity). The app saw the network as unavailable; nothing left the browser.';
     case 'unknown-host': return `The host name could not be resolved.${failure}`;
     case 'timeout': return `The request hit the app's timeout.${failure}`;
@@ -72,7 +69,7 @@ export function describeOutcome(entry) {
 }
 
 /** One table row's text, `HH:MM:SS.mmm METHOD host/path -> status  size  duration`. */
-export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.routeId ? ' [ROUTE]' : ''}${entry.mockId && !entry.routeId ? ' [MOCK]' : ''}${entry.blockId ? ' [BLOCKED]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}${entry.relayChannel === 'mux' ? ' [CHANNEL]' : entry.relayChannel === 'fallback' ? ' [CHANNEL FALLBACK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
+export const formatEntry = entry => `${formatTime(entry.wall)} ${entry.method} ${entry.host}${entry.path} -> ${statusLabel(entry)}${entry.routeId ? ' [ROUTE]' : ''}${entry.mockId && !entry.routeId ? ' [MOCK]' : ''}${entry.mappedUrl ? ' [REDIRECTED]' : ''}${entry.proxiedVia ? ` [PROXY ${entry.proxiedVia}]` : ''}${entry.relayChannel === 'mux' ? ' [CHANNEL]' : entry.relayChannel === 'fallback' ? ' [CHANNEL FALLBACK]' : ''}  ${formatSize(entry.responseBytes)}  ${formatDuration(entry.durationMs)}`;
 /** The note of an entry sent while the relay's parallel channel is on (Device › Parallel relay channel): carried by it, or sent as a separate request and why. */
 export const channelNote = entry => entry.relayChannel === 'mux' ? 'Carried by the relay\'s parallel channel (Device › Parallel relay channel): one WebSocket to the relay holds every exchange at once, with no preflight and no per-origin connection limit.'
   : entry.relayChannel === 'fallback' ? `Parallel relay channel on, but not used for this exchange: ${entry.relayChannelNote ?? 'the channel was not open'}. It went as a separate request, as without the setting.`
@@ -95,7 +92,6 @@ export function redirectFailureHint(entry) {
 /** The note of an entry a mock answered. */
 /** The note of an entry a plugin's network route held (lab.route, src/network-routes.js). */
 export const routeNote = entry => `Held by a plugin network route: ${entry.routeLabel}${entry.routeChange ? ` (${entry.routeChange})` : ' (unchanged)'}.`;
-export const blockNote = entry => `Blocked by you: rule "${entry.blockLabel}" (Blocked calls, Controls › Network). The lab did not make the call: the app saw ${entry.failure?.type ? entry.failure.type.slice(1, -1).replaceAll('/', '.') : 'a connection failure'}${entry.failure?.message ? ` (${entry.failure.message})` : ''}; nothing left the browser and nothing waited.`;
 export const mockNote = entry => `Answered by the lab: mock "${entry.mockLabel}" (Endpoint mocks, Controls); the request did not go to the network.`;
 
 const stamp = date => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
@@ -133,7 +129,6 @@ export function buildHar(entries, { dropped = 0, creator = { name: 'APK Web Lab'
           content: { size: entry.responseBytes, mimeType: (entry.contentType ?? '').split(';')[0].trim() || 'x-unknown' }, redirectURL: location, headersSize: -1, bodySize: entry.responseBytes },
         cache: {}, timings: { send: 0, wait: Math.max(time, 0), receive: 0 },
         ...(entry.mockId ? { _mock: { id: entry.mockId, label: entry.mockLabel }, comment: mockNote(entry) } : {}),
-        ...(entry.blockId ? { _blocked: { id: entry.blockId, label: entry.blockLabel }, comment: blockNote(entry) } : {}),
         ...(entry.routeId ? { _route: { id: entry.routeId, label: entry.routeLabel, change: entry.routeChange }, comment: routeNote(entry) } : {}),
         ...(entry.mappedUrl ? { _redirect: { from: entry.url, to: entry.mappedUrl, rule: entry.mappedRule }, comment: [redirectNote(entry), redirectFailureHint(entry)].filter(Boolean).join(' ') } : {}),
         _seq: entry.seq, _api: entry.api, _thread: entry.thread, _outcome: entry.outcome, _failure: entry.failure?.message ?? null, _refusedHost: entry.refusedHost, _finalUrl: entry.finalUrl, _uptimeMs: entry.uptime,
@@ -177,7 +172,7 @@ function download(name, text, type) {
 }
 
 /** root: the <details id="netlog"> element (see index.html). allowHost(host) puts the host in the Dispositivo field. Returns { push(message), reset(), store }. */
-export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download, createMock = null, redirectHost = null, blockCalls = null, openModal = null } = {}) {
+export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHosts = () => [], allowHost = () => {}, save = download, createMock = null, redirectHost = null, openModal = null } = {}) {
   const q = selector => root.querySelector(selector), out = q('.netlog-rows'), count = q('.netlog-count'), filterInput = q('.netlog-filter'), categorySelect = q('.netlog-category'), scopeSelect = q('.netlog-scope'), formatSelect = q('.netlog-format'), auto = q('.netlog-autoscroll');
   const store = createNetlogStore(), expanded = new Set(); let timer = null, visibleCount = 0;
   const filter = () => ({ text: filterInput.value, category: categorySelect.value });
@@ -197,7 +192,6 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
       const hint = redirectFailureHint(entry); if (hint) block.append(el('div', 'netlog-note netlog-note-error', hint));
       box.append(block);
     }
-    if (entry.blockId) box.append(el('div', 'netlog-note netlog-note-blocked', blockNote(entry)));
     if (entry.routeId) box.append(el('div', 'netlog-note netlog-note-mock', routeNote(entry))); else if (entry.mockId) box.append(el('div', 'netlog-note netlog-note-mock', mockNote(entry)));
     if (entry.proxiedVia) box.append(el('div', 'netlog-note', `Via proxy ${entry.proxiedVia} (Controls › Network › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`));
     if (entry.relayChannel) box.append(el('div', 'netlog-note', channelNote(entry)));
@@ -214,14 +208,13 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
       const block = el('div', 'netlog-block'); block.append(el('div', 'netlog-block-title', `Response body${entry.responseBodyTruncated ? ' (first 48 KB)' : ''}`));
       block.append(el('pre', 'netlog-body', entry.responseBody.length > 4000 ? entry.responseBody.slice(0, 4000) + '\n…' : entry.responseBody)); box.append(block);
     }
-    box.append(el('div', 'netlog-note', 'Right-click the request: create a mock of it, redirect the host, or ignore the endpoint or the host.'));
+    box.append(el('div', 'netlog-note', 'Right-click the request: create a mock of it or redirect the host.'));
     return box;
   };
   /** The notes of an entry ([className, text]): the large window's Overview (src/netlog-details.js). */
   const notesOf = entry => {
     const out = [], note = describeOutcome(entry);
     if (entry.mappedUrl) { out.push(['nld-note-redirect', `Redirected (Redirect hosts, Controls): sent to ${entry.mappedUrl} by the rule ${entry.mappedRule}. The app sees the original URL; only the browser request went to the target.`]); const hint = redirectFailureHint(entry); if (hint) out.push(['nld-note-error', hint]); }
-    if (entry.blockId) out.push(['nld-note-blocked', blockNote(entry)]);
     if (entry.routeId) out.push(['nld-note-mock', routeNote(entry)]); else if (entry.mockId) out.push(['nld-note-mock', mockNote(entry)]);
     if (entry.proxiedVia) out.push(['', `Via proxy ${entry.proxiedVia} (Controls › Network › Proxy): the browser asked the proxy for the URL, and the proxy fetched ${entry.mappedUrl ?? entry.url}.`]);
     if (entry.relayChannel) out.push(['', channelNote(entry)]);
@@ -250,7 +243,6 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
   const row = entry => {
     const wrap = el('div', `netlog-entry cat-${categoryOf(entry)}${entry.mockId || entry.routeId ? ' is-mocked' : ''}${entry.mappedUrl ? ' is-redirected' : ''}${entry.proxiedVia ? ' is-proxied' : ''}`), line = el('div', 'netlog-line');
     const target = el('span', 'netlog-target', `${entry.host}${entry.path}`); if (entry.mockId) target.prepend(el('b', 'netlog-mock', 'MOCK'));
-    if (entry.blockId) { const badge = el('b', 'netlog-blocked', 'BLOCKED'); badge.title = `Blocked by you: ${entry.blockLabel}`; target.prepend(badge); }
     if (entry.relayChannel === 'mux' || entry.relayChannel === 'fallback') { const badge = el('b', `netlog-channel${entry.relayChannel === 'fallback' ? ' is-fallback' : ''}`, entry.relayChannel === 'mux' ? 'CHANNEL' : 'NO CHANNEL'); badge.title = channelNote(entry); target.prepend(badge); }
     if (entry.proxiedVia) { const badge = el('b', 'netlog-proxied', 'PROXY'); badge.title = `Via proxy ${entry.proxiedVia}`; target.prepend(badge); }
     if (entry.mappedUrl) { const badge = el('b', 'netlog-redirected', 'REDIRECTED'); badge.title = `Sent to ${entry.mappedUrl}`; target.prepend(badge); }
@@ -261,7 +253,7 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
       if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggle(); }
       else if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) { event.preventDefault(); const r = line.getBoundingClientRect(); openMenu(entry, r.left + 24, r.bottom, line); }
     });
-    line.addEventListener('contextmenu', event => { if (!createMock && !redirectHost && !blockCalls) return; event.preventDefault(); openMenu(entry, event.clientX, event.clientY, line); });
+    line.addEventListener('contextmenu', event => { if (!createMock && !redirectHost) return; event.preventDefault(); openMenu(entry, event.clientX, event.clientY, line); });
     wrap.append(line); if (expanded.has(entry.seq)) wrap.append(detail(entry));
     return wrap;
   };
@@ -275,12 +267,6 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     const item = (label, run, enabled = true) => { const button = doc.createElement('button'); button.type = 'button'; button.className = 'netlog-menu-item'; button.setAttribute('role', 'menuitem'); button.textContent = label; button.disabled = !enabled; button.addEventListener('click', () => { closeMenu(false); run(); }); node.append(button); items.push(button); };
     if (createMock) item('Create a mock of this request…', () => createMock(entry));
     if (redirectHost) item(`Redirect ${entry.host}${entry.port && ![80, 443].includes(Number(entry.port)) ? ':' + entry.port : ''}…`, () => redirectHost(entry), !!entry.host);
-    if (blockCalls) {   // "Blocked calls" (src/blocked-calls.js): the user stops the endpoint or the whole host; a rule already there is taken off by the same entry
-      const http = entry.kind === 'http' && !!entry.host, hostOnly = !!entry.host;
-      const on = scope => blockCalls.has(scope, entry);
-      item(on('endpoint') ? 'Stop ignoring this endpoint' : 'Ignore this endpoint', () => blockCalls.toggle('endpoint', entry), http);
-      item(on('host') ? 'Stop ignoring this host' : 'Ignore this host', () => blockCalls.toggle('host', entry), hostOnly);
-    }
     item('Copy URL', () => { globalThis.navigator?.clipboard?.writeText?.(entry.url)?.catch?.(() => {}); });
     doc.body.append(node);
     const width = node.offsetWidth || 240, height = node.offsetHeight || 120, view = doc.defaultView ?? globalThis;
@@ -297,8 +283,8 @@ export function createNetlogPanel({ root, getPackage = () => 'app', getAllowedHo
     items.find(button => !button.disabled)?.focus();
   }
   const updateCount = () => {
-    const refused = store.entries.filter(entry => categoryOf(entry) === 'refused').length, blocked = store.entries.filter(entry => entry.blockId).length, mocked = store.entries.filter(entry => entry.mockId).length, redirected = store.entries.filter(entry => entry.mappedUrl).length;
-    count.textContent = `${store.entries.length} ${store.entries.length === 1 ? 'request' : 'requests'}${refused ? ` · ${refused} refused` : ''}${blocked ? ` · ${blocked} blocked` : ''}${mocked ? ` · ${mocked} mocked` : ''}${redirected ? ` · ${redirected} redirected` : ''}${visibleCount !== store.entries.length ? ` · ${visibleCount} shown` : ''}${store.dropped ? ` · ${store.dropped} dropped` : ''}`;
+    const refused = store.entries.filter(entry => categoryOf(entry) === 'refused').length, mocked = store.entries.filter(entry => entry.mockId).length, redirected = store.entries.filter(entry => entry.mappedUrl).length;
+    count.textContent = `${store.entries.length} ${store.entries.length === 1 ? 'request' : 'requests'}${refused ? ` · ${refused} refused` : ''}${mocked ? ` · ${mocked} mocked` : ''}${redirected ? ` · ${redirected} redirected` : ''}${visibleCount !== store.entries.length ? ` · ${visibleCount} shown` : ''}${store.dropped ? ` · ${store.dropped} dropped` : ''}`;
   };
   const renderAll = () => {
     timer = null;

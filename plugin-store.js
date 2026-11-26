@@ -1,7 +1,7 @@
 // The list of page plugins of the "Plugins" section (src/plugins-panel.js): global (not per package; each plugin has an optional package filter), kept in localStorage with every
-// access guarded (without storage the list lasts for the page), exported and imported with the Controls' general Export / Import (src/config-bundle.js). Pure functions: tested without a DOM.
+// access guarded (without storage the list lasts for the page), exported and imported as JSON. Pure functions: tested without a DOM.
 
-export const STORAGE_KEY = 'apkweb.plugins.v1', MAX_PLUGINS = 32, MAX_CODE_CHARS = 200000, MAX_NAME_CHARS = 120;
+export const STORAGE_KEY = 'apkweb.plugins.v1', EXPORT_FORMAT = 'apk-web-lab-plugins', MAX_PLUGINS = 32, MAX_CODE_CHARS = 200000, MAX_NAME_CHARS = 120;
 let counter = 0;
 export const newPluginId = () => `pl-${Date.now().toString(36)}-${(++counter).toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
 export function normalizePlugin(raw = {}) {
@@ -27,6 +27,14 @@ export function loadPlugins(storage = undefined) {
 }
 export function savePlugins(list, storage = undefined) {
   try { const store = storage === undefined ? globalThis.localStorage : storage; if (!store) return false; store.setItem(STORAGE_KEY, JSON.stringify(list.slice(0, MAX_PLUGINS).map(normalizePlugin))); return true; } catch { return false; }
+}
+export const exportPlugins = list => JSON.stringify({ format: EXPORT_FORMAT, version: 1, plugins: list.map(normalizePlugin).map(({ id, ...rest }) => rest) }, null, 2);
+/** An exported file (or a bare array) -> { plugins, error? }; imported plugins get fresh ids and start switched off (the code is someone's: look at it first). */
+export function importPlugins(text) {
+  let data; try { data = JSON.parse(String(text)); } catch (error) { return { plugins: [], error: `The file is not valid JSON: ${String(error?.message ?? error).slice(0, 120)}` }; }
+  const list = Array.isArray(data) ? data : data && typeof data === 'object' && Array.isArray(data.plugins) ? data.plugins : null;
+  if (!list) return { plugins: [], error: `The file has no list of plugins (expected {"format":"${EXPORT_FORMAT}","plugins":[...]}).` };
+  return { plugins: list.slice(0, MAX_PLUGINS).filter(item => item && typeof item === 'object').map(item => ({ ...normalizePlugin({ ...item, id: undefined }), enabled: false })), ...(list.length > MAX_PLUGINS ? { error: `Only the first ${MAX_PLUGINS} plugins were imported.` } : {}) };
 }
 export const BLANK_TEMPLATE = { id: 'blank', name: 'Blank', description: 'An empty plugin.', code: "// Write here. Ready-made examples: plugins.html#exemplos\nlab.on('screen', screen => lab.ui.text(screen.activity ?? '—', { id: 'screen' }));\n" };
 /** "+ Adicionar" always opens a blank plugin; the examples live in the documentation (plugins.html#exemplos). */

@@ -6,15 +6,6 @@
 // comes only through that event loop (this realm's fetch: NetworkBridge.pendingInRealm; the network worker's answers are in shared memory and need no turn), and is re-armed
 // at once. Never before the first frame (a launch drains as it did), never in a page request (input first has its own rule). DOM-free, no process.*.
 
-// Which page requests are answered with their first new frame (src/apk-worker.js drainReadyEvents { framePaced }; docs/INTERACTION-PERFORMANCE.md section 34). Input in motion
-// (a pointer sample, a wheel step, a semantics ScrollBy) always was. With `inputFrame` (on by default) so is every other input the app answers on the screen: a click, a press,
-// a focus, a text or check change, a semantics action, an action-bar item, a scroll position, the keyboard. A navigation the page asks for (launch, an Intent, back, home, a
-// task brought back, an Activity reloaded) settles as before: its reply is the screen it leads to.
-const FRAME_PACED_INPUT = new Set(['click', 'press', 'focus', 'input', 'check', 'compose-action', 'action-item', 'scroll', 'ime']);
-export function framePacedRequest(type, data = null, inputFrame = true) {
-  return type === 'pointer' || type === 'scrollby' || (type === 'compose-action' && data?.action === 'ScrollBy') || (inputFrame === true && FRAME_PACED_INPUT.has(type));
-}
-
 /** True when a scheduled pump should return to the event loop now so that answers in flight can reach the VM. */
 export function ioYieldDue({ input = false, ioYieldMs = 0, elapsedMs = 0, eventDelay = null, pendingInRealm = 0, framesRun = 0 }) {
   return !input && ioYieldMs > 0 && eventDelay !== 0 && elapsedMs >= ioYieldMs && pendingInRealm > 0 && framesRun > 0;

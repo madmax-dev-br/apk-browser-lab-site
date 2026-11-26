@@ -3,17 +3,18 @@
 // with colours and a syntax check, src/code-editor.js; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=858dc45125cc';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=858dc45125cc';
-import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=858dc45125cc';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, blankPlugin } from './plugin-store.js?v=858dc45125cc';
-import { createCodeEditor, editKey } from './code-editor.js?v=858dc45125cc';
-import { listRow, detailList } from './list-rows.js?v=858dc45125cc';
+import { RENDER_MS } from './plugin-host.js?v=109fde337e64';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=109fde337e64';
+import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=109fde337e64';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, exportPlugins, importPlugins, blankPlugin } from './plugin-store.js?v=109fde337e64';
+import { createCodeEditor, editKey } from './code-editor.js?v=109fde337e64';
+import { listRow, detailList } from './list-rows.js?v=109fde337e64';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };
 const pad = value => String(value).padStart(2, '0');
 const stamp = date => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+export const pluginsFileName = (date = new Date()) => `plugins-${stamp(date)}.json`;
 function download(name, text, type) {
   const url = URL.createObjectURL(new Blob([text], { type })), link = document.createElement('a');
   link.href = url; link.download = name; document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
@@ -99,6 +100,7 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     $('pl-status').textContent = !S.plugins.length ? 'No plugins yet. A plugin is a short script that watches the app and shows what it finds in the Plugins panel below the device.' : runningCount ? 'The output of the running plugins is in the Plugins panel below the device.' : '';
     $('pl-status').dataset.empty = String(!S.plugins.length);
     $('pl-list').hidden = !S.plugins.length;
+    $('pl-export').disabled = !S.plugins.length; $('pl-export').hidden = !S.plugins.length;
     if (outputRoot) { outputRoot.hidden = !S.plugins.length; const count = outputRoot.querySelector('.po-count'); if (count) count.textContent = `${runningCount} running`; }
   }
   function renderList() {
@@ -203,6 +205,15 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
   $('pl-add').addEventListener('click', event => {
     if (S.plugins.length >= MAX_PLUGINS) { $('pl-status').textContent = `At most ${MAX_PLUGINS} plugins.`; return; }
     openDialog(null, event.currentTarget, blankPlugin());   // always blank: the examples are in plugins.html#exemplos
+  });
+  $('pl-export').addEventListener('click', () => { if (S.plugins.length) save(pluginsFileName(), exportPlugins(S.plugins), 'application/json'); });
+  $('pl-import').addEventListener('click', () => $('pl-import-file').click());
+  $('pl-import-file').addEventListener('change', async () => {
+    const file = $('pl-import-file').files?.[0]; $('pl-import-file').value = ''; if (!file) return;
+    let text; try { text = await file.text(); } catch (error) { $('pl-status').textContent = `The file could not be read: ${error?.message ?? error}`; return; }
+    const { plugins, error } = importPlugins(text), room = MAX_PLUGINS - S.plugins.length, added = plugins.slice(0, Math.max(0, room));
+    S.plugins.push(...added); changed();
+    $('pl-status').textContent = `${added.length} ${added.length === 1 ? 'plugin' : 'plugins'} imported from ${file.name}, turned off: review the code and turn them on.${error ? ' ' + error : ''}${plugins.length > added.length ? ` The list reached the maximum of ${MAX_PLUGINS}.` : ''}`;
   });
 
   // ---- output cards ---------------------------------------------------------------------------------------------------------------------------------------------------
@@ -341,18 +352,6 @@ export function createPluginsPanel({ $, host, save = download, outputRoot = $('p
     refresh() { updateMeta(); schedule(); },
     open: openDialog,
     get state() { return S; },
-    /**
-     * The general import's plugins part (src/config-bundle.js, already validated and confirmed by the user): each plugin replaces the one with the same id, else the same name, else is
-     * added, exactly as if saved in the dialog (listed, removable, started when on; the host restarts a changed one). A plugin that does not state `enabled` is on, as a new one is.
-     */
-    upsert(items) {
-      for (const item of items) {
-        const at = S.plugins.findIndex(plugin => (item.id !== undefined && plugin.id === item.id) || plugin.name.trim().toLowerCase() === String(item.name).trim().toLowerCase());
-        const plugin = normalizePlugin({ ...item, id: at >= 0 ? S.plugins[at].id : item.id, enabled: item.enabled !== false });
-        if (at >= 0) S.plugins[at] = plugin; else S.plugins.push(plugin);
-      }
-      S.plugins = S.plugins.slice(0, MAX_PLUGINS); changed();
-    },
     /** The stored plugins, with their code (the MCP tools read them: src/mcp-tools.js). */
     list: () => S.plugins.map(plugin => ({ ...plugin })),
     /**

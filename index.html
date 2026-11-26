@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=858dc45125cc") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=858dc45125cc">
-  <link rel="stylesheet" href="./lab-theme.css?v=858dc45125cc">
-  <meta name="apk-browser-build" content="858dc45125cc">
+  <style>@import url("./styles.css?v=109fde337e64") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=109fde337e64">
+  <link rel="stylesheet" href="./lab-theme.css?v=109fde337e64">
+  <meta name="apk-browser-build" content="109fde337e64">
 </head>
 <body>
   <header class="topbar">
@@ -39,13 +39,6 @@
               <label for="cp-filter" class="visually-hidden">Find a control</label>
               <input id="cp-filter" type="search" spellcheck="false" autocomplete="off" placeholder="Find a control (proxy, memory, camera…)" aria-describedby="cp-filter-status" aria-controls="control-panel">
               <p id="cp-filter-status" class="cp-filter-status" role="status" aria-live="polite"></p>
-            </div>
-            <div class="cp-config" role="group" aria-label="Configuration of the controls">
-              <span class="cp-config-title">Configuration</span>
-              <button id="cfg-export" class="cp-button" type="button" title="Saves the device settings and what the Controls keep for the open app (mocks, blocked calls, method returns, ignored Activities, permissions) in one file">Export</button>
-              <button id="cfg-import" class="cp-button" type="button" title="Sets everything in a file saved with Export, as if you had set it by hand; a file with anything wrong changes nothing">Import</button>
-              <input id="cfg-import-file" type="file" accept="application/json,.json" hidden>
-              <p id="cfg-status" class="cp-note cp-config-status" role="status" aria-live="polite"></p>
             </div>
             <details class="cp-group" id="cp-sec-device" data-section="device">
               <summary><h3 id="cp-device-title">Device</h3><span id="cp-sum-device" class="cp-badge cp-sum" title="Screen, orientation and the device options that are on"></span><span class="trace-chevron" aria-hidden="true">⌄</span></summary><div class="cp-body">
@@ -160,13 +153,7 @@
                 <p class="cp-note ov-warning">Debugging tool: an app request that matches a mock in the list is <b>answered by the lab</b> with the configured response and does not go to the network. The first active mock that matches, in list order, answers, ahead of the allowed hosts list, offline mode, Redirect hosts and the Proxy. Applies to HttpURLConnection, OkHttp and other clients over java.net.Socket, and to DownloadManager; WebView pages are loaded by the browser and do not go through the mocks. Each response is counted, marked in the Network panel (and in the HAR), cited in the Summary, and the first one of each mock logs a warning in Logcat.</p>
                 <ul id="em-list" class="lr-list em-list" aria-label="Endpoint mocks, in priority order"></ul>
                 <p id="em-status" class="cp-note lr-status" role="status" aria-live="polite">No mocks.</p>
-                <div class="lr-foot"><button id="em-add" class="cp-button lr-add" type="button">Add mock</button></div>
-              </section>
-              <section class="cp-sub" id="cp-sub-blocked" aria-labelledby="cp-blocked-title" data-keywords="blocked calls ignore endpoint host block fail network save resources"><h4 class="cp-subtitle" id="cp-blocked-title">Blocked calls<span id="bc-summary" class="cp-badge">0 active</span></h4>
-                <p class="cp-note ov-warning">Debugging tool: an app call that matches a rule here <b>is not made</b>. The lab does not fetch it, does not use the relay and does not wait: the app gets at once the failure of a connection that cannot be made (ConnectException, or UnknownHostException for a host name). A rule is an endpoint (method and URL pattern, as in the endpoint mocks) or a whole host, and it comes before the mocks, the allowed hosts list, Redirect hosts and the Proxy. Applies to HttpURLConnection, OkHttp and other clients over java.net.Socket (WebSocket upgrades included), DownloadManager and WebView loads the lab can see; a page the browser loads straight into a WebView frame is not seen. Each call is counted, marked "blocked by you" in the Network panel, written to the trace and cited in the Summary. Nothing is blocked until you add a rule; you can also right-click a request in the Network panel.</p>
-                <ul id="bc-list" class="lr-list bc-list" aria-label="Blocked call rules"></ul>
-                <p id="bc-status" class="cp-note lr-status" role="status" aria-live="polite">No rules.</p>
-                <div class="lr-foot"><button id="bc-add-endpoint" class="cp-button lr-add" type="button">Block an endpoint</button><button id="bc-add-host" class="cp-button lr-add" type="button">Block a host</button></div>
+                <div class="lr-foot"><button id="em-add" class="cp-button lr-add" type="button">Add mock</button><span class="lr-quiet"><button id="em-import" class="lr-link" type="button">Import</button><button id="em-export" class="lr-link" type="button" disabled hidden>Export</button></span><input id="em-import-file" type="file" accept="application/json,.json" hidden></div>
               </section>
             </div></details>
             <details class="cp-group" id="cp-sec-app" data-section="app">
@@ -297,7 +284,7 @@
                 <p class="cp-note ov-warning">A plugin's code runs with this page's origin (it can use fetch like any script of the page). Use only code you wrote or reviewed.</p>
                 <ul id="pl-list" class="lr-list pl-list" aria-label="Plugins, in panel order"></ul>
                 <p id="pl-status" class="cp-note lr-status" role="status" aria-live="polite">No plugins.</p>
-                <div class="lr-foot"><button id="pl-add" class="cp-button lr-add" type="button">Add plugin</button></div>
+                <div class="lr-foot"><button id="pl-add" class="cp-button lr-add" type="button">Add plugin</button><span class="lr-quiet"><button id="pl-import" class="lr-link" type="button">Import</button><button id="pl-export" class="lr-link" type="button" disabled hidden>Export</button></span><input id="pl-import-file" type="file" accept="application/json,.json" hidden></div>
                 <details class="cp-advanced"><summary>Advanced</summary>
                   <div class="pl-power"><label for="pl-power">Plugin power</label><select id="pl-power" aria-describedby="pl-power-note"><option value="normal">Normal</option><option value="high">High</option><option value="max">Max</option></select></div>
                   <p id="pl-power-note" class="cp-note">Normal: about 4 % of the VM thread for plugin reads, one query at a time. Raise it for plugins that scan the heap, read many objects or watch a lot: reads get more time and shorter pauses; a tap still waits for at most one query.</p>
@@ -360,7 +347,7 @@
           <div class="logcat-bar"><input class="logcat-filter" type="search" placeholder="Filter by tag or text" aria-label="Filter logcat by tag or text"><select class="logcat-level" aria-label="Minimum level"><option value="V">V Verbose</option><option value="D">D Debug</option><option value="I">I Info</option><option value="W">W Warning</option><option value="E">E Error</option></select><label class="logcat-auto"><input class="logcat-autoscroll" type="checkbox" checked> Scroll</label><button class="logcat-clear" type="button">Clear</button><select class="logcat-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><button class="logcat-save" type="button">Save</button></div>
           <div class="logcat-lines" role="log" aria-live="off"></div></details>
         <details id="netlog" class="trace logcat netlog"><summary><span>Network</span><span class="netlog-count">0 requests</span><span class="trace-chevron">⌄</span></summary>
-          <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filter by host, path or method" aria-label="Filter requests by host, path or method"><select class="netlog-category" aria-label="Filter by result"><option value="all">All</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Refused</option><option value="blocked">Blocked by you</option><option value="error">Errors</option><option value="pending">In progress</option><option value="mocked">Mocked</option><option value="redirected">Redirected</option><option value="proxied">Via proxy</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Scroll</label><button class="netlog-clear" type="button">Clear</button><select class="netlog-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><select class="netlog-format" aria-label="Format"><option value="har">HAR 1.2</option><option value="text">Text</option></select><button class="netlog-save" type="button">Save</button></div>
+          <div class="logcat-bar"><input class="netlog-filter" type="search" placeholder="Filter by host, path or method" aria-label="Filter requests by host, path or method"><select class="netlog-category" aria-label="Filter by result"><option value="all">All</option><option value="ok">2xx</option><option value="redirect">3xx</option><option value="fail">4xx / 5xx</option><option value="refused">Refused</option><option value="error">Errors</option><option value="pending">In progress</option><option value="mocked">Mocked</option><option value="redirected">Redirected</option><option value="proxied">Via proxy</option></select><label class="logcat-auto"><input class="netlog-autoscroll" type="checkbox" checked> Scroll</label><button class="netlog-clear" type="button">Clear</button><select class="netlog-scope" aria-label="What to save"><option value="all">Save all</option><option value="filtered">Save filtered</option></select><select class="netlog-format" aria-label="Format"><option value="har">HAR 1.2</option><option value="text">Text</option></select><button class="netlog-save" type="button">Save</button></div>
           <div class="netlog-rows" role="log" aria-live="off"></div></details>
         <details id="adb-terminal" class="trace logcat adb-terminal"><summary><span>Terminal</span><span class="adb-count">adb</span><span class="trace-actions"><button class="adb-clear" type="button" title="Clears the terminal output">Clear</button></span><span class="trace-chevron">⌄</span></summary>
           <div class="adb-screen" tabindex="-1">
@@ -388,7 +375,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=858dc45125cc"></script>
+  <script type="module" src="./app.js?v=109fde337e64"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

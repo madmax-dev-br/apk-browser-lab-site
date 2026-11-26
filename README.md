@@ -8,7 +8,7 @@
 
 [![The lab opening a Compose app: the app starts, the filters respond to touch and the search filters the list](readme/demo.gif)](https://madmax-dev-br.github.io/apk-browser-lab-site/)
 
-<sub>A Jetpack Compose (Material 3) app running in the page: real touches, real keyboard, nothing pre-recorded by the app. The yellow dot marks the pointer.</sub>
+<sub>A Jetpack Compose (Material 3) app running in the page: real touches, real keyboard, nothing pre-recorded by the app.</sub>
 
 ## Why this is interesting
 
@@ -21,12 +21,12 @@
 ## Try it in one minute
 
 1. Open **<https://madmax-dev-br.github.io/apk-browser-lab-site/>** in a recent browser.
-2. Drag an `.apk` onto the page (up to 1 GiB; `.aab` bundles and `.apks` / `.xapk` / `.apkm` sets also open).
+2. Drag an `.apk` onto the page (up to 1 GiB).
 3. The app is installed on the virtual device's home screen and opens. Tap, type, scroll, go back.
 
 The site does not ship ready-made APKs: you use your own. The apps in the images on this page are the project's own sample apps, made to test the lab.
 
-![The lab page: on the left the drop zone and the Controls, grouped by topic; on the right the app running on the virtual device; at the bottom the dock with the tools](readme/lab.png)
+![The lab page: on the left the opened APK, the package and the device controls; on the right the app running on the virtual device](readme/lab.png)
 
 ## What already runs
 
@@ -58,24 +58,16 @@ The strip at the top of the screen belongs to the app: frames per second, droppe
 
 ### A device you control
 
-Screen size, orientation, light or dark theme, language and region, time zone, font scale, battery and network (online, mobile data, offline). The app's runtime permissions are yours to grant or deny. **Photo** and **Record** save a picture or a video of the screen. An **adb terminal** in the page itself accepts the commands you use with an emulator, and a deep link opened with `am start` goes to the installed app that handles it.
+Screen size, orientation, light or dark theme, language and region, time zone, font scale, battery and network (online, mobile data, offline). The app's runtime permissions are yours to grant or deny. An **adb terminal** in the page itself accepts the commands you use with an emulator, and a deep link opened with `am start` goes to the installed app that handles it.
 
 ### See the app from the inside
 
 - Live **Logcat** and **network log**, with every request the app makes.
 - **Endpoint mocks**: make `/v1/perfil` return whatever you want, without touching the server.
-- **Blocked calls**: stop an endpoint or a whole host. The call is not made at all, and the app gets at once the error of a connection that cannot be made. A block wins over a mock.
 - **Host redirects**: point the app's API at your `localhost`.
 - **App data**: SharedPreferences and SQLite databases, to read and edit.
 - **Layout bounds** and the **Compose tree**, with the CompositionLocals of each composable.
-- **Code**: the APK's classes as smali and as decompiled Java, with a Java debugger (breakpoints, stepping, variables).
 - **Diagnostics** when something stops: the cause, the Java stack and the APIs that were missing.
-
-![The Network panel with a request the user blocked and the right-click menu on it; on the left, the rule under Controls, Network, Blocked calls](readme/chamadas-bloqueadas.png)
-
-<sub>Right-click a request in the Network panel to ignore its endpoint or its host. The rule appears under Controls › Network › Blocked calls, and the next call fails at once, marked "blocked by you".</sub>
-
-Everything you set in the Controls (device, mocks, blocked calls, method returns, ignored Activities, permissions and plugins) is saved with one **Export** and brought back with one **Import**. Plugins in a file are applied only after you confirm them, and the file never carries app data, account sessions, cookies or credentials.
 
 ### Plugins
 
@@ -85,7 +77,7 @@ Small JavaScript scripts that run next to the app and read the screen, the Compo
 
 ### AI agents, over MCP
 
-A small Node.js bridge connects the open page to an MCP client. The agent takes screenshots, taps, types, reads Logcat and the network, sets mocks and blocked calls, exports and imports the configuration, reads the code and uses the debugger, installs and opens apps, records the screen to video, and accepts `adb` command lines:
+A small Node.js bridge connects the open page to an MCP client. The agent takes screenshots, taps, types, reads Logcat and the network, installs and opens apps, records the screen to video, and accepts `adb` command lines:
 
 ```sh
 adb install -r app-debug.apk
@@ -96,7 +88,7 @@ adb exec-out uiautomator dump /dev/tty
 adb logcat -d *:E | grep -i timeout
 ```
 
-It is not adb: it is an interpreter that does in the page what each command does on a device, and that refuses by name what the page cannot reach. The page shows the command to start the bridge and the address for the agent under **Controls › Extensions › MCP**, and connects to the bridge by itself while it runs (no token). Details in [MCP: the agent using the page](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
+It is not adb: it is an interpreter that does in the page what each command does on a device, and that refuses by name what the page cannot reach. The page shows the command to start the bridge and the address for the agent under **Controls › MCP**, and connects to the bridge by itself while it runs (no token). Details in [MCP: the agent using the page](https://madmax-dev-br.github.io/apk-browser-lab-site/plugins.html#mcp).
 
 ### Embed in another page
 
@@ -140,14 +132,14 @@ The full step-by-step explanation is on the [Architecture](https://madmax-dev-br
 This is not an Android emulator. There is no kernel, no hardware and no Play Store.
 
 - **Native libraries** (`.so`) only run when there is a WebAssembly version compiled from public source. The rest become an explicit failure. The app's protection libraries are never replaced or bypassed.
-- **Google services**: by default the device has none. A device option installs microG, the open-source reimplementation, built from its source. Its online features (device registration, account login, push, attestation) stay off until you turn each one on; they run microG's own code, and no result is ever made up by the lab.
+- **Google services**: by default the device has none. There is a device option with microG, without account login, without push and without Play Integrity.
 - **Large apps** exercise much more of Android than the examples. Each one reveals APIs that are still missing, and the lab shows which.
-- **Performance** is lower than a device's. It is worked on with measurements, not impressions. In the latest round (headless Chrome, default engine and GPU renderer, medians), 50 short coroutine delays started by a tap went from 456 to 276 ms, and the Views tab of the large example, while scrolling, from 52 to 58 frames per second, with the 95th percentile frame from 30 to 18 ms. Compose scrolling of the examples stayed where it was, at about 58 frames per second.
+- **Performance** is lower than a device's.
 - The badge at the top of the page is honest: **Experimental**.
 
 ## Privacy
 
-The APK is read and executed in your browser. Nothing is sent to a lab server, because there is none. The app's network traffic goes out through the browser itself, or through the optional relay you run on your own computer; you can limit it to a list of hosts, take the device offline or block single calls. The lab itself has no analytics, no crash reports and no update checks. The apps you open are stored in this browser (IndexedDB), to reopen from the icon, and you can remove them.
+The APK is read and executed in your browser. Nothing is sent to a lab server, because there is none. The app's network traffic goes out through the browser itself, only to the hosts you allow. The apps you open are stored in this browser (IndexedDB), to reopen from the icon, and you can remove them.
 
 ## Links
 

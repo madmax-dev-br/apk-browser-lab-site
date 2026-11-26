@@ -23,8 +23,7 @@
 //  7. The java.lang box classes get a payload (natives.h: the value and a state word; 16 bytes, 24 for Long and Double) and the HostState record (VM.hostState) names their
 //     Class records and the boxPrimitive caches, so the box natives (natives.c, bound by vmcore/js/host-bridge.js to the bridges the JavaScript VM selects) and the record
 //     facades' `boxed` (host-bridge.js) share one value. AtomicInteger gets the same payload for its `atomicValue` (its get/compareAndSet natives); AtomicReference a reference
-//     payload for its `atomicValue` (its get native); AtomicReferenceArray one for its `atomicArray`; the field updaters a payload of the field's offset and its owner's Class record (atomics.c), written by the facade's
-//     `updaterField` setter (host-bridge.js).
+//     payload for its `atomicValue` (its get native).
 //  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
 //     the nearest host superclass, selected by APKRuntime.dispatch.
 //  9. android.graphics.Paint (a host class) is laid out with the paint payload (vmcore/paint.h: its state, its references in the Class's reference map, and the field mBidiFlags
@@ -35,13 +34,13 @@
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES, UPDATER_CLASSES, ATOMIC_REFERENCE_ARRAY, ATOMIC_LONG, ATOMIC_BOOLEAN } from './natives.js?v=858dc45125cc';
-import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=858dc45125cc';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES } from './natives.js?v=109fde337e64';
+import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=109fde337e64';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
 export const HOST_STATE_THREAD = { valid: 72, object: 76, idValid: 80, id: 88 };
-const VM_HOST_STATE = 44, HOST_STATE_BYTES = 136, HOST_STATE_BOOLEANS = 128, HOST_STATE_ATOMIC_LONG = 120, HOST_STATE_ATOMIC_BOOLEAN = 124, HOST_STATE_ATOMIC_ARRAY = 116, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, HOST_STATE_UPDATERS = 104, UPDATER_BYTES = 16, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
+const VM_HOST_STATE = 44, HOST_STATE_BYTES = 104, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
 const CLASS_VTABLE = 24, CLASS_ITABLE = 32, METHOD_KIND = 12, METHOD_FLAGS = 20, METHOD_VTABLE_INDEX = 24;
 const METHOD_UNBOUND = 0x7fff0003, METHOD_THROWABLE_INIT = 0x7fff0004, METHOD_HOST_DISPATCH = 64, M_INTERFACE = 32, M_ABSTRACT = 16, NO_SLOT = 0xffffffff;
 const K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, RESOLVE_CODE = 0xffffffff, RESOLVE_WELL_KNOWN = 0xffffff00, UNRESOLVED = 34;
@@ -94,8 +93,6 @@ export function installHostLinking(linker, runtime, { staticValue }) {
   // (7) the host state: box classes and caches
   const hostState = linker.hostState = linker.alloc(HOST_STATE_BYTES); linker.w32(linker.vm + VM_HOST_STATE, hostState);
   for (const kind of CACHED_KINDS) { const cache = linker.alloc(4 * BOX_CACHE_SLOTS); linker.w32(hostState + 32 + 4 * kind, cache); linker.extraRoots.push([cache, BOX_CACHE_SLOTS]); }
-  // Boolean.FALSE / Boolean.TRUE (natives.h HostState.booleanBox): filled by the host when boxPrimitive answers them; a root range
-  linker.extraRoots.push([hostState + HOST_STATE_BOOLEANS, 2]); linker.hostStateBooleans = hostState + HOST_STATE_BOOLEANS;
   // (9) the Paint enum constants the paint natives answer (natives.h HostState.paintEnums, paint.h PAINT_ENUM_*): filled by the paint host as it reads them; a root range
   { const table = linker.alloc(4 * PAINT_ENUM_SLOTS); linker.w32(hostState + HOST_STATE_PAINT_ENUMS, table); linker.extraRoots.push([table, PAINT_ENUM_SLOTS]); }
 
@@ -108,18 +105,9 @@ export function installHostLinking(linker, runtime, { staticValue }) {
       this.w32(hostState + 4 * box, info.address); info.boxKind = box;
     } else if (type === ATOMIC_INTEGER) {   // (7): `atomicValue` as an Integer's payload
       info.instanceSize = 16; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(hostState + HOST_STATE_ATOMIC_INTEGER, info.address); info.memoryProperty = 'atomicValue';
-    } else if (type === ATOMIC_LONG && !info.isInterface) {   // (7): `atomicValue` as a Long's payload
-      info.instanceSize = 24; this.w32(info.address + CLASS_INSTANCE_SIZE, 24); this.w32(hostState + HOST_STATE_ATOMIC_LONG, info.address); info.memoryProperty = 'atomicLong';
-    } else if (type === ATOMIC_BOOLEAN && !info.isInterface) {   // (7): `atomicValue` as an Integer's payload (0 or 1)
-      info.instanceSize = 16; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(hostState + HOST_STATE_ATOMIC_BOOLEAN, info.address); info.memoryProperty = 'atomicBoolean';
     } else if (type === ATOMIC_REFERENCE) {   // (7): `atomicValue` as a reference at +8 (in the refMap: the collector traces it, subclasses inherit it) with a state word at +12
       info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
       this.w32(hostState + HOST_STATE_ATOMIC_REFERENCE, info.address); info.memoryProperty = 'atomicReference';
-    } else if (type === ATOMIC_REFERENCE_ARRAY && !info.isInterface) {   // (7): `atomicArray`, the Object[] its constructor made, as a reference at +8 (the collector traces it) with a state word at +12
-      info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
-      this.w32(hostState + HOST_STATE_ATOMIC_ARRAY, info.address); info.memoryProperty = 'atomicArray';
-    } else if (UPDATER_CLASSES.has(type) && !info.isInterface) {   // (7): the updaters' payload: the field's offset and the owner's Class record (atomics.c), written when newUpdater made the updater
-      info.instanceSize = UPDATER_BYTES; this.w32(info.address + CLASS_INSTANCE_SIZE, UPDATER_BYTES); this.w32(hostState + HOST_STATE_UPDATERS + 4 * UPDATER_CLASSES.get(type), info.address); info.memoryProperty = 'updater';
     } else if (type === PAINT && !info.isInterface && info.instanceSize === OBJECT_HEADER) {   // (9)
       info.instanceSize = PAINT_RECORD.end; this.w32(info.address + CLASS_INSTANCE_SIZE, info.instanceSize);
       this.w32(info.address + CLASS_FLAGS, this.r32(info.address + CLASS_FLAGS) | CLASS_PAINT_RECORD); info.paintRecord = true;

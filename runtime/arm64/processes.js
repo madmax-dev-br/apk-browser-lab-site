@@ -10,11 +10,11 @@
 // EACCES, ENOEXEC for an ELF the device cannot run here, named in the trace).
 // What a forked child cannot do in the lab fails by name: JNI and ART calls (the child has no Java runtime: on a device it has a copy of ART but no other thread), returning
 // from the native frames into the managed caller; ptrace, which a device's seccomp filter for apps and SELinux deny an untrusted_app's processes, fails with EPERM.
-import { APKError } from '../apk-error.js?v=858dc45125cc';
-import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=858dc45125cc';
-import { Arm64Memory } from './memory.js?v=858dc45125cc';
-import { NativeThreads } from './threads.js?v=858dc45125cc';
-import { processKernel, SIG } from '../process-kernel.js?v=858dc45125cc';
+import { APKError } from '../apk-error.js?v=109fde337e64';
+import { Arm64Cpu, BLOCKED, RETURN_SENTINEL } from './cpu.js?v=109fde337e64';
+import { Arm64Memory } from './memory.js?v=109fde337e64';
+import { NativeThreads } from './threads.js?v=109fde337e64';
+import { processKernel, SIG } from '../process-kernel.js?v=109fde337e64';
 
 const CLONE_VM = 0x100, CLONE_VFORK = 0x4000, CLONE_THREAD = 0x10000, CLONE_PARENT_SETTID = 0x100000, CLONE_CHILD_CLEARTID = 0x200000, CLONE_CHILD_SETTID = 0x1000000;
 const WNOHANG = 1, ECHILD = 10, EINVAL = 22, EPERM = 1, ENOSYS = 38, EAGAIN = 11;

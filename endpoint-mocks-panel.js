@@ -1,22 +1,24 @@
 // The "Endpoint mocks" section of the Controls panel (src/endpoint-mocks.js): the list of mocked endpoints of the open package, one line each (switch, method, URL pattern,
-// status, hits; details on expand; Edit / Duplicate / Move / Remove in the row's menu), the dialog that configures one mock, and, through the Controls panel's general Export / Import, its configuration. The list is kept per
+// status, hits; details on expand; Edit / Duplicate / Move / Remove in the row's menu), the dialog that configures one mock, and export / import as JSON. The list is kept per
 // package in localStorage, large bodies in IndexedDB (src/mock-body-store.js); every access guarded, a failed save is said. Applied live to the Worker; hit counts come back
 // with every snapshot.
 //
 // Responsiveness (a large pasted body froze the page, 2026-11-21): the body editor (src/code-editor.js) checks JSON in slices after a pause in typing and keeps a text of
 // many megabytes out of the textarea; the dialog's own validation never encodes or parses the body (validateMock checkBody false); the list caches each mock's validation
 // (a snapshot arrives many times a second); storage is written after a pause, and a large body only when it changed.
-import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=858dc45125cc';
-import { createCodeEditor, formatBytes } from './code-editor.js?v=858dc45125cc';
-import { createBodyStore, splitForStorage } from './mock-body-store.js?v=858dc45125cc';
-import { listRow, detailList } from './list-rows.js?v=858dc45125cc';
-import { checkJson } from './json-tools.js?v=858dc45125cc';
+import { MOCK_METHODS, MAX_MOCKS, MAX_BODY_BYTES, defaultMock, normalizeMock, validateMock, loadMocks, saveMocks, exportMocks, importMocks, bytesToBase64, mockLabel } from './endpoint-mocks.js?v=109fde337e64';
+import { createCodeEditor, formatBytes } from './code-editor.js?v=109fde337e64';
+import { createBodyStore, splitForStorage } from './mock-body-store.js?v=109fde337e64';
+import { listRow, detailList } from './list-rows.js?v=109fde337e64';
+import { checkJson } from './json-tools.js?v=109fde337e64';
 
 const FIELD_ERROR = { method: 'em-err-method', url: 'em-err-url', query: 'em-err-query', status: 'em-err-status', reason: 'em-err-status', headers: 'em-err-headers', body: 'em-err-body', delayMs: 'em-err-delay' };
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const SAVE_DELAY_MS = 300;
 const pad = value => String(value).padStart(2, '0');
 const stamp = date => `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+/** mocks-<package>-<timestamp>.json */
+export const mocksFileName = (packageName, date = new Date()) => `mocks-${String(packageName || 'app').replace(/[^A-Za-z0-9._-]+/g, '_')}-${stamp(date)}.json`;
 
 function download(name, text, type) {
   const url = URL.createObjectURL(new Blob([text], { type })), link = document.createElement('a');
@@ -116,6 +118,7 @@ export function createEndpointMocksPanel({ $, vm, save = download, bodyStore = c
       : active.length ? (hits ? `${hits} ${hits === 1 ? 'request' : 'requests'} answered by mocks.` : '') : 'No mock is on.');
     $('em-status').dataset.empty = String(!S.mocks.length);
     $('em-list').hidden = !S.mocks.length;
+    $('em-export').hidden = !S.mocks.length; $('em-export').disabled = !S.mocks.length;
   }
   function render() { $('em-list').replaceChildren(...S.mocks.map(row)); updateMeta(); }
   function move(index, by) {
@@ -149,12 +152,12 @@ export function createEndpointMocksPanel({ $, vm, save = download, bodyStore = c
     S.saveTimer = null; const pkg = S.pkg; if (!pkg) return;
     const { stored, large } = bodyStore ? splitForStorage(S.mocks) : { stored: S.mocks, large: [] };
     let note = '';
-    if (!saveMocks(pkg, stored)) note = 'The browser storage is full or unavailable: these mocks last until the page closes. Use Export in the Controls panel to keep them.';
+    if (!saveMocks(pkg, stored)) note = 'The browser storage is full or unavailable: these mocks last until the page closes. Export them to keep them.';
     if (bodyStore) {
       try {
         for (const item of large) { const key = item.bodyBase64 ?? item.body; if (S.savedBodies.get(item.id) === key) continue; await bodyStore.put(pkg, item.id, item); S.savedBodies.set(item.id, key); }
         await bodyStore.keep(pkg, large.map(item => item.id));
-      } catch (error) { note = `A large body could not be stored (${error?.message ?? error}): it lasts until the page closes. Use Export in the Controls panel to keep them.`; }
+      } catch (error) { note = `A large body could not be stored (${error?.message ?? error}): it lasts until the page closes. Export the mocks to keep them.`; }
     }
     if (pkg === S.pkg && note !== S.storageNote) { S.storageNote = note; updateMeta(); }
   }
@@ -329,6 +332,15 @@ export function createEndpointMocksPanel({ $, vm, save = download, bodyStore = c
     if (S.mocks.length >= MAX_MOCKS) { $('em-status').textContent = `At most ${MAX_MOCKS} mocks.`; return; }
     openDialog(null, event.currentTarget);
   });
+  $('em-export').addEventListener('click', () => { if (S.mocks.length) save(mocksFileName(S.pkg), exportMocks(S.mocks, S.pkg ?? ''), 'application/json'); });
+  $('em-import').addEventListener('click', () => $('em-import-file').click());
+  $('em-import-file').addEventListener('change', async () => {
+    const file = $('em-import-file').files?.[0]; $('em-import-file').value = ''; if (!file) return;
+    let text; try { text = await file.text(); } catch (error) { $('em-status').textContent = `The file could not be read: ${error?.message ?? error}`; return; }
+    const { mocks, error } = importMocks(text), room = MAX_MOCKS - S.mocks.length, added = mocks.slice(0, Math.max(0, room));
+    S.mocks.push(...added); render(); changed();
+    $('em-status').textContent = `${added.length} ${added.length === 1 ? 'mock' : 'mocks'} imported from ${file.name}.${error ? ' ' + error : ''}${mocks.length > added.length ? ` The list reached the maximum of ${MAX_MOCKS}.` : ''}`;
+  });
   field('em-method').replaceChildren(...MOCK_METHODS.map(method => Object.assign(document.createElement('option'), { value: method, textContent: method === 'ANY' ? 'Any (ANY)' : method })));
   render();
 
@@ -357,10 +369,6 @@ export function createEndpointMocksPanel({ $, vm, save = download, bodyStore = c
     },
     remove(id) { const at = S.mocks.findIndex(item => item.id === id); if (at < 0) return false; S.mocks.splice(at, 1); render(); changed(); return true; },
     list() { return S.mocks.map(mock => ({ id: mock.id, name: mock.name, enabled: mock.enabled, method: mock.method, url: mock.url, status: mock.status, hits: S.hits.get(mock.id) ?? 0 })); },
-    /** The mocks as kept, bodies included (the general export, src/config-bundle.js). */
-    exportMocks() { return S.mocks.map(normalizeMock); },
-    /** Replaces the whole list (the general import: already validated); saved and applied like mocks typed in the dialog. */
-    replaceMocks(list) { S.mocks = list.slice(0, MAX_MOCKS).map(item => normalizeMock({ ...item, bodyRef: false })); S.expanded.clear(); S.savedBodies = new Map(); render(); changed(); },
     /** Writes the list now (tests; the page writes after a pause). */
     flush: () => { clearTimeout(S.saveTimer); return persist(); },
     get editor() { return bodyEditor; },

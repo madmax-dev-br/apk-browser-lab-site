@@ -1,42 +1,42 @@
-import { procFdFile } from './libcore-io-native.js?v=858dc45125cc';
-import STATIC_SHIMS from './shim-static-methods.js?v=858dc45125cc';
-import { VMClock } from './vm-clock.js?v=858dc45125cc';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=858dc45125cc';
-import { OperationMonitor } from './operation-monitor.js?v=858dc45125cc';
-import { ExecutionProfile } from './execution-profile.js?v=858dc45125cc';
-import { SamplingProfiler } from './sampling-profiler.js?v=858dc45125cc';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=858dc45125cc';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=858dc45125cc';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=858dc45125cc';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=858dc45125cc';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=858dc45125cc';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=858dc45125cc';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=858dc45125cc';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=858dc45125cc';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=858dc45125cc';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=858dc45125cc';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=858dc45125cc';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=858dc45125cc';
-import { APKError } from './apk-error.js?v=858dc45125cc';
-import { invokePolymorphic } from './method-handles.js?v=858dc45125cc';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=858dc45125cc';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=858dc45125cc';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=858dc45125cc';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=858dc45125cc';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=858dc45125cc';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=858dc45125cc';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=858dc45125cc';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=858dc45125cc';
+import { procFdFile } from './libcore-io-native.js?v=109fde337e64';
+import STATIC_SHIMS from './shim-static-methods.js?v=109fde337e64';
+import { VMClock } from './vm-clock.js?v=109fde337e64';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=109fde337e64';
+import { OperationMonitor } from './operation-monitor.js?v=109fde337e64';
+import { ExecutionProfile } from './execution-profile.js?v=109fde337e64';
+import { SamplingProfiler } from './sampling-profiler.js?v=109fde337e64';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=109fde337e64';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=109fde337e64';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=109fde337e64';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=109fde337e64';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=109fde337e64';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=109fde337e64';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=109fde337e64';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=109fde337e64';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=109fde337e64';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=109fde337e64';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=109fde337e64';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=109fde337e64';
+import { invokePolymorphic } from './method-handles.js?v=109fde337e64';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=109fde337e64';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=109fde337e64';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=109fde337e64';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=109fde337e64';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=109fde337e64';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=109fde337e64';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=109fde337e64';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=109fde337e64';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=858dc45125cc';
-import { ProcessStartPending } from './package-registry.js?v=858dc45125cc';
-import { bootClassLacksMember } from './boot-class-members.js?v=858dc45125cc';
-export { APKError } from './apk-error.js?v=858dc45125cc';
-import { BinaryReader } from './binary-reader.js?v=858dc45125cc';
-import { recordCollection } from './runtime-stats.js?v=858dc45125cc';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=858dc45125cc';
-import { scrollsItself } from './scrolling-view.js?v=858dc45125cc';
-import { drawsItself } from './pointer-input-host.js?v=858dc45125cc';
+import { Scheduler, Blocked } from './scheduler.js?v=109fde337e64';
+import { ProcessStartPending } from './package-registry.js?v=109fde337e64';
+import { bootClassLacksMember } from './boot-class-members.js?v=109fde337e64';
+export { APKError } from './apk-error.js?v=109fde337e64';
+import { BinaryReader } from './binary-reader.js?v=109fde337e64';
+import { recordCollection } from './runtime-stats.js?v=109fde337e64';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=109fde337e64';
+import { scrollsItself } from './scrolling-view.js?v=109fde337e64';
+import { drawsItself } from './pointer-input-host.js?v=109fde337e64';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -62,8 +62,6 @@ function utf16String(units) {
 }
 /** A range of an array's storage: a view when the storage is typed (no copy), a copy otherwise (a reference array or a Proxy-backed view). */
 const cellRange = (cells, from, to) => ArrayBuffer.isView(cells) ? cells.subarray(from, to) : cells.slice(from, to);
-/** A View layer raster as the snapshot holds it: a raw-pixel or ImageBitmap one is copied (the transport, src/raster-cache.js, rewrites the raster object of the message, not the View's). */
-const layerCopy = raster => (raster?.kind === 'rgba-raster' || raster?.kind === 'bitmap-raster' ? { ...raster } : raster ?? null);
 const methodKey = m => `${m.owner}->${m.name}${m.signature}`;
 /** A dense array of `n` nulls: the "not decoded yet" cache of a lazy table. Built by pushing so it is a packed array; `new Array(n)` above a few
  *  thousand elements is dictionary-mode in V8 and every index read on the interpreter's path would pay for it. */
@@ -1973,13 +1971,13 @@ export class APKRuntime {
         textStyle: v.textStyle ?? 0, textAllCaps: !!v.textAllCaps, singleLine: !!v.singleLine,
         switchWidget: this.platform?.drawableViewHost?.switchWidget?.(this, value)?.bounds ?? null, progressTint: v.progressTint ?? null, fillViewport: !!(v.fields.get('Landroid/widget/ScrollView;->mFillViewport:Z') ?? v.fillViewport), progressStyle: v.progressStyle ?? null,
         scrollX: v.fields.get('Landroid/view/View;->mScrollX:I') ?? 0, scrollY: v.fields.get('Landroid/view/View;->mScrollY:I') ?? 0,
-        drawableSVG: v.backgroundInContent && v.contentRaster ? null : layerCopy(v.drawableSVG),   // a View with a layer draws its background in its content layer (compose-canvas-host leafDraw)
+        drawableSVG: v.backgroundInContent && v.contentRaster ? null : v.drawableSVG ?? null,   // a View with a layer draws its background in its content layer (compose-canvas-host leafDraw)
         webview: this.platform?.webView?.nodeState?.(this, v) ?? null,
         cameraSurface: this.platform?.camera?.nodeState?.(this, v),
         glSurface: this.platform?.gles?.nodeState?.(this, v),   // a SurfaceView an EGL window surface draws into (src/gles-native.js): the page draws its frames in the box   // a TextureView / SurfaceView: the camera stream the page draws in its box (undefined for every other View)
         buttonSVG: v.buttonSVG ?? null, buttonBounds: v.buttonBounds ?? null, compoundPadding: v.compoundPadding ?? null,
-        foregroundSVG: layerCopy(v.foregroundSVG),
-        ...(v.overlaySVG ? { overlaySVG: layerCopy(v.overlaySVG) } : {}),   // what a group's own draw(Canvas) drew after its children (compose-canvas-host renderTree), drawn over them
+        foregroundSVG: v.foregroundSVG ?? null,
+        ...(v.overlaySVG ? { overlaySVG: v.overlaySVG } : {}),   // what a group's own draw(Canvas) drew after its children (compose-canvas-host renderTree), drawn over them
         foregroundBounds: v.foregroundBounds ?? null,
         contentRaster: v.contentRaster ? { ...v.contentRaster } : null,   // a copy: the transport (src/raster-cache.js) rewrites the raster object of the message, not the View's
          canvasChildrenCaptured: !!v.canvasChildrenCaptured,

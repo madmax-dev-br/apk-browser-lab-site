@@ -1,7 +1,7 @@
 // The MCP tools as the lab page answers them (scripts/lab-mcp.mjs lists them for the MCP client and forwards each call here). Every tool reads what the page already has:
 // the plugin host's read-only queries (src/plugin-host.js query: the same ones plugins use, same limits), the plugins' output, the Logcat and network stores. Results are MCP
 // content: text (JSON, compact) and images (base64). DOM-free except Blob reading; no process.*.
-import { blockValue, outputsOf } from './plugin-host.js?v=858dc45125cc';
+import { blockValue, outputsOf } from './plugin-host.js?v=109fde337e64';
 
 export const MAX_TEXT_CHARS = 400_000;
 const LEVEL_ORDER = ['V', 'D', 'I', 'W', 'E', 'A'];
@@ -259,7 +259,7 @@ export function createMcpTools({ debug = null, hook = null, controls = null, que
       let rows = pick(); for (const until = now() + wait; !rows.length && now() < until;) { await sleep(200); rows = pick(); }
       const all = network(), next = all.length ? all.at(-1).seq : since;
       const out = rows.slice(-limit).map(entry => ({ seq: entry.seq, method: entry.method, url: entry.url, status: entry.status, outcome: entry.outcome, complete: entry.complete, durationMs: entry.durationMs, contentType: entry.contentType, responseBytes: entry.responseBytes,
-        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.blockId ? { blockedByUser: entry.blockLabel ?? entry.blockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.proxiedVia ? { proxiedVia: entry.proxiedVia } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}),
+        ...(entry.mockId ? { mock: entry.mockLabel ?? entry.mockId } : {}), ...(entry.mappedUrl ? { redirectedTo: entry.mappedUrl } : {}), ...(entry.proxiedVia ? { proxiedVia: entry.proxiedVia } : {}), ...(entry.refusedHost ? { refusedHost: entry.refusedHost } : {}), ...(entry.failure ? { failure: entry.failure } : {}),
         ...(withBody && typeof entry.responseBody === 'string' ? { responseBody: entry.responseBody.length > 20000 ? entry.responseBody.slice(0, 20000) + '…' : entry.responseBody, responseHeaders: entry.responseHeaders } : {}) }));
       return [text({ requests: out, next })];
     },
@@ -272,30 +272,6 @@ export function createMcpTools({ debug = null, hook = null, controls = null, que
     },
     async remove_mock(args) { if (!actions?.unmock) throw fail('Mocks are not available on this page.'); return [text(await actions.unmock(String(args.id ?? '')))]; },
     async list_mocks() { if (!actions?.mocks) throw fail('Mocks are not available on this page.'); return [text(await actions.mocks())]; },
-    // ---- Blocked calls (Controls › Network › Blocked calls, src/blocked-calls.js) and the one general Export / Import of the Controls (src/config-bundle.js) ----
-    async set_block(args) {
-      if (!controls?.blocks) throw fail('Blocked calls are not available on this page.');
-      const scope = args.scope === undefined ? (args.host !== undefined && args.url === undefined ? 'host' : 'endpoint') : String(args.scope);
-      if (scope === 'host' ? !args.host : !args.url) throw fail(scope === 'host' ? 'host is required for scope "host" (api.example.com, *.example.com, host:port).' : 'url is required for scope "endpoint" (https://api.example.com/v1/profile or /v1/*).');
-      const result = await controls.blocks.add({ id: args.id, scope, name: args.name, method: args.method ?? 'ANY', url: args.url, query: args.query, host: args.host, enabled: args.enabled !== false });
-      return [text({ id: result.id, note: 'Active in Controls › Network › Blocked calls of the open package: the app\'s next call that matches is not made and fails at once (ConnectException; UnknownHostException for a host name). Use reload so the app calls again.' })];
-    },
-    async remove_block(args) { if (!controls?.blocks) throw fail('Blocked calls are not available on this page.'); return [text(await controls.blocks.remove(String(args.id ?? '')))]; },
-    async list_blocks() { if (!controls?.blocks) throw fail('Blocked calls are not available on this page.'); return [text(await controls.blocks.list())]; },
-    async export_config(args) {
-      if (!controls?.config) throw fail('The configuration export is not available on this page.');
-      const parts = Array.isArray(args.parts) && args.parts.length ? args.parts.map(String) : null, known = ['device', 'plugins', 'mocks', 'blockedCalls', 'methodReturns', 'ignoredActivities', 'permissions'];
-      if (parts) { const bad = parts.filter(part => !known.includes(part)); if (bad.length) throw fail(`Unknown parts: ${bad.join(', ')} (available: ${known.join(', ')}).`); }
-      const result = await controls.config.export(parts), size = JSON.stringify(result).length;
-      if (size > MAX_TEXT_CHARS - 2000) throw fail(`The configuration is ${size} characters, more than one answer carries: ask for fewer parts (parts), or use Export in the Controls panel.`);
-      return [text(result)];
-    },
-    async import_config(args) {
-      if (!controls?.config) throw fail('The configuration import is not available on this page.');
-      let document = args.document; if (typeof document === 'string') { try { document = JSON.parse(document); } catch (error) { throw fail(`document is not valid JSON: ${String(error?.message ?? error).slice(0, 120)}`); } }
-      if (document === undefined || document === null) throw fail('document is required (the object export_config returns as "document", or the text of a file saved with Export).');
-      return [text(await controls.config.import(document, { allowPlugins: args.allowPlugins === true }))];
-    },
     // ---- input: the page's own input paths (a real touch on Compose, a click on a View, SetText, ScrollBy) ----
     async tap(args) { if (!input?.tap) throw fail('Input is not available on this page.'); return afterInput(await input.tap(args), args); },
     async type(args) { if (!input?.type) throw fail('Input is not available on this page.'); return afterInput(await input.type(args), args); },
