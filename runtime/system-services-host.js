@@ -1,9 +1,9 @@
-import { procFdFile } from './libcore-io-native.js?v=a737601fbbdf';
-import { processCpuMs } from './process-memory.js?v=a737601fbbdf';
-import { gcRoot } from './heap-gc.js?v=a737601fbbdf';
-import { Invoke } from './interpreter.js?v=a737601fbbdf';
-import { APKError } from './apk-error.js?v=a737601fbbdf';
-import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=a737601fbbdf';
+import { procFdFile } from './libcore-io-native.js?v=109fde337e64';
+import { processCpuMs } from './process-memory.js?v=109fde337e64';
+import { gcRoot } from './heap-gc.js?v=109fde337e64';
+import { Invoke } from './interpreter.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=109fde337e64';
+import { createHostRegistry, doubleBits, floatBits, bitsFloat, bitsDouble as bitsDoubleLocal } from './host-contract.js?v=109fde337e64';
 
 // Process-level Android services needed by production apps' startup paths (StrictMode, telephony math, ...).
 // Each entry is a contract reimplementation of the named AOSP method (android-13.0.0_r1 sources noted inline) over
@@ -485,8 +485,9 @@ export function createSystemServicesHost(platform) {
   platform.environment = ENV;   // the process environment libcore's Linux.getenv/environ report
   def('Ljava/lang/System;', 'getenv', '(Ljava/lang/String;)Ljava/lang/String;', (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'name == null'); return ENV[r.stringCharacters(name)] ?? null; }, { static: true });
 
-  // System.exit(status): the app ends its own virtual process (Crashlytics' handler does this after reporting a crash). It is surfaced as an explicit process-exit stop, never ignored.
-  def('Ljava/lang/System;', 'exit', '(I)V', (_r, _m, [status]) => { throw new APKError(`System.exit(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); }, { static: true });
+  // System.exit(status): the app ends its own virtual process (Crashlytics' handler does this after reporting a crash). It is surfaced as an explicit process-exit stop, never ignored;
+  // status 0 is an ordinary exit, not a crash (the page ends the app as it does for a force-stop, with no error window: a device shows none either).
+  def('Ljava/lang/System;', 'exit', '(I)V', (r, _m, [status]) => { r.record(`RUNTIME System.exit(${status}): the app ended its own process`); throw new APKError(`System.exit(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); }, { static: true });
   def('Ljava/lang/System;', 'mapLibraryName', '(Ljava/lang/String;)Ljava/lang/String;', (r, _m, [name]) => { if (name === null) r.throwJava('Ljava/lang/NullPointerException;', 'libname == null'); return 'lib' + r.stringCharacters(name) + '.so'; }, { static: true }); // libcore System.mapLibraryName
 
   // ---- java.lang.Runtime memory/processor accounting for the virtual heap ------------------------------------------------------------------

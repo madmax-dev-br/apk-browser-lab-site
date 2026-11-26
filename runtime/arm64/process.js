@@ -3,13 +3,13 @@
 // libandroid ...) as host functions (src/arm64/libc.js). Layout: the address space is the fixed window ARM64_WINDOW of the 64-bit space (src/unsafe-native.js),
 // disjoint from the wasm32 libraries' memory and the lab's other native ranges; libraries and mmap regions grow from 16 MiB into it, the heap is malloc's own region,
 // the main thread's stack is 1 MiB with its TLS block (bionic's slots: TLS_SLOT_STACK_GUARD at tp+40) above it. Native threads: src/arm64/threads.js.
-import { APKError } from '../apk-error.js?v=a737601fbbdf';
-import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=a737601fbbdf';
-import { Arm64Memory } from './memory.js?v=a737601fbbdf';
-import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=a737601fbbdf';
-import { NativeThreads } from './threads.js?v=a737601fbbdf';
-import { ARM64_WINDOW } from '../unsafe-native.js?v=a737601fbbdf';
-import { APP_PID } from '../virtual-pids.js?v=a737601fbbdf';
+import { APKError } from '../apk-error.js?v=109fde337e64';
+import { Arm64Cpu, HOST_BASE, BLOCKED } from './cpu.js?v=109fde337e64';
+import { Arm64Memory } from './memory.js?v=109fde337e64';
+import { parseElf, mapLibrary, relocate, initializers, R } from './elf.js?v=109fde337e64';
+import { NativeThreads } from './threads.js?v=109fde337e64';
+import { ARM64_WINDOW } from '../unsafe-native.js?v=109fde337e64';
+import { APP_PID } from '../virtual-pids.js?v=109fde337e64';
 
 export const ARM64_BASE = Number(ARM64_WINDOW);
 const HOST_STUBS = 65536, STUB_BYTES = 32;   // lab functions with a code stub (2 MiB of the address space); any beyond would be bare HOST_BASE addresses   // the process's lowest address (its first page stays unmapped, as NULL's)

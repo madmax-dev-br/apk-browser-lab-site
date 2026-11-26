@@ -1,12 +1,13 @@
-import { APKError } from './apk-runtime.js?v=a737601fbbdf';
-import { createWidgetStateHost } from './widget-state-host.js?v=a737601fbbdf';
-import { gcRoot } from './heap-gc.js?v=a737601fbbdf';
+import { APKError } from './apk-runtime.js?v=109fde337e64';
+import { createWidgetStateHost } from './widget-state-host.js?v=109fde337e64';
+import { gcRoot } from './heap-gc.js?v=109fde337e64';
 
 const VIEW = 'Landroid/view/View;', GROUP = 'Landroid/view/ViewGroup;', PARCELABLE = 'Landroid/os/Parcelable;';
 const SPARSE = 'Landroid/util/SparseArray;', ABS = 'Landroid/view/AbsSavedState;', BASE = 'Landroid/view/View$BaseSavedState;';
 const signatures = [`saveHierarchyState(${SPARSE})V`, `restoreHierarchyState(${SPARSE})V`, `dispatchSaveInstanceState(${SPARSE})V`, `dispatchRestoreInstanceState(${SPARSE})V`, `onSaveInstanceState()${PARCELABLE}`, `onRestoreInstanceState(${PARCELABLE})V`];
 const keys = new Set(signatures.map(signature => VIEW + '->' + signature));
 for (const name of ['dispatchSaveInstanceState', 'dispatchRestoreInstanceState', 'dispatchFreezeSelfOnly', 'dispatchThawSelfOnly']) keys.add(`${GROUP}->${name}(${SPARSE})V`);
+const VIEWS_TAG = 'android:views', FOCUSED_ID_TAG = 'android:focusedViewId';   // PhoneWindow.VIEWS_TAG / FOCUSED_ID_TAG
 const same = (a, b) => a?.ref !== undefined && a.ref === b?.ref;
 
 /** In-process View lifecycle boundary. Original SparseArray and saved-state
@@ -80,4 +81,30 @@ export function createViewStateHost() {
       } finally { dispatchDepth--; }
     },
   };
+}
+
+const virtual = (runtime, receiver, owner, name, parameters, result, values = []) => runtime.dispatch({ owner, name, parameters, result, signature: `(${parameters.join('')})${result}` }, runtime.argumentWords(parameters, values, { receiver }), 'virtual');
+/**
+ * Window.saveHierarchyState(): PhoneWindow (android-13.0.0_r1) saves its content parent's views into a SparseArray put in a Bundle under "android:views", and the id of the focused
+ * view under "android:focusedViewId". The views are the real View.saveHierarchyState above. The panels and the action bar's toolbar state ("android:Panels",
+ * "android:ActionBar") are not modeled: the lab has no menu panels, and a window's decor is its own content tree (src/dialog-window-host.js).
+ */
+export function saveWindowHierarchyState(runtime, platform, content) {
+  const outState = platform.bundle(runtime);
+  if (!content) return outState;   // PhoneWindow: no content parent yet, nothing to save
+  const states = runtime.allocate(SPARSE); runtime.dispatch({ owner: SPARSE, name: '<init>', parameters: [], result: 'V', signature: '()V' }, runtime.argumentWords([], [], { receiver: states }), 'direct');
+  virtual(runtime, content, VIEW, 'saveHierarchyState', [SPARSE], 'V', [states]);
+  platform.put(runtime, outState, VIEWS_TAG, SPARSE, states);
+  const focused = virtual(runtime, content, VIEW, 'findFocus', [], VIEW);
+  if (focused) { const id = virtual(runtime, focused, VIEW, 'getId', [], 'I'); if (id !== -1) platform.put(runtime, outState, FOCUSED_ID_TAG, 'I', id); }
+  return outState;
+}
+/** Window.restoreHierarchyState(Bundle): the views from "android:views", then the focus to the view that had it (when it is still in the content). */
+export function restoreWindowHierarchyState(runtime, platform, content, savedInstanceState) {
+  if (!content) return;
+  if (!savedInstanceState) runtime.throwJava('Ljava/lang/NullPointerException;', "Attempt to invoke virtual method 'android.util.SparseArray android.os.Bundle.getSparseParcelableArray(java.lang.String)' on a null object reference");
+  const states = platform.get(runtime, savedInstanceState, VIEWS_TAG, SPARSE, null);
+  if (states) virtual(runtime, content, VIEW, 'restoreHierarchyState', [SPARSE], 'V', [states]);
+  const focusedId = platform.get(runtime, savedInstanceState, FOCUSED_ID_TAG, 'I', -1);
+  if (focusedId !== -1) { const view = platform.find(runtime, content, focusedId); if (view) virtual(runtime, view, VIEW, 'requestFocus', [], 'Z'); }
 }

@@ -1,9 +1,10 @@
-import { unsignedBytes } from './java-arrays.js?v=a737601fbbdf';
-import { APKError } from './apk-error.js?v=a737601fbbdf';
-import { APKArchive } from './apk-loader.js?v=a737601fbbdf';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=a737601fbbdf';
-import { createHostRegistry } from './host-contract.js?v=a737601fbbdf';
-import { normalizePath } from './virtual-fs.js?v=a737601fbbdf';
+import { unsignedBytes } from './java-arrays.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=109fde337e64';
+import { APKArchive } from './apk-loader.js?v=109fde337e64';
+import { readNativeBytes } from './unsafe-native.js?v=109fde337e64';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=109fde337e64';
+import { createHostRegistry } from './host-contract.js?v=109fde337e64';
+import { normalizePath } from './virtual-fs.js?v=109fde337e64';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -35,15 +36,17 @@ export function createClassLoaderHost(platform) {
   const chainOf = (runtime, loader) => { const out = []; for (let x = loader, depth = 0; x && depth < 64; depth++) { const st = stateOf(runtime, x); if (!st) break; out.push({ ref: x, st }); x = st.parent; } return out; };
   const ALIAS_SUFFIX = (id) => `$$ldr${id};`;
   const HOST_LOADERS = new Set([LOADER, BASE, IN_MEMORY, DEX_CLASS_LOADER, PATH]);
-  /** Whether loader `ref` is of a ClassLoader subclass (code of a package) that overrides loadClass, so its delegation is its own code's. */
-  const overridesLoadClass = (runtime, ref) => {
+  /** Whether loader `ref` is of a ClassLoader subclass (code of a package) that declares one of `methods`. */
+  const overrides = (runtime, ref, methods) => {
     for (let type = runtime.object(ref)?.type, depth = 0; type && !HOST_LOADERS.has(type) && depth < 32; depth++) {
       const cls = runtime.classes.get(type); if (!cls) return false;
-      if (cls.methods.has(`loadClass(${STRING}Z)${CLASS}`) || cls.methods.has(`loadClass(${STRING})${CLASS}`)) return true;
+      if (methods.some(method => cls.methods.has(method))) return true;
       type = cls.superclass;
     }
     return false;
   };
+  /** Whether it overrides loadClass, so its delegation is its own code's. */
+  const overridesLoadClass = (runtime, ref) => overrides(runtime, ref, [`loadClass(${STRING}Z)${CLASS}`, `loadClass(${STRING})${CLASS}`]);
   // A type reference is renamed with its array dimensions kept ([Lfoo/Bar; follows Lfoo/Bar;).
   const renamer = rename => t => { const at = t.lastIndexOf('[') + 1; if (at === 0) return rename.get(t) ?? t; const mapped = rename.get(t.slice(at)); return mapped === undefined ? t : t.slice(0, at) + mapped; };
   /**
@@ -83,7 +86,7 @@ export function createClassLoaderHost(platform) {
     if (rename.size) dex = parse(rename);
     dex.definingLoader = owner;
     const added = runtime.dex.addDynamicFile(dex, label, { skip });
-    for (const key of added) { const plain = key.replace(LOADER_ALIAS, ';'); st.own.set(plain, key); runtime.classOwners.set(key, owner); if (!runtime.dynamicPlain.has(plain)) runtime.dynamicPlain.set(plain, key); }
+    for (const key of added) { const plain = key.replace(LOADER_ALIAS, ';'); st.own.set(plain, key); runtime.classOwners.set(key, owner); const first = runtime.dynamicPlain.get(plain); if (first === undefined || runtime.object(runtime.classOwners.get(first))?.type === DEX_FILE) runtime.dynamicPlain.set(plain, key); }
     const aliased = names.filter(n => own.aliased.has(n)).length, shadowed = names.filter(n => own.visible.has(n)).length;
     runtime.record(`DEXLOADER ${label}: ${added.length} classes defined by loader #${st.id} (${aliased} redefined under alias, ${shadowed} shadowed by a parent)`);
     return { label, classes: names };
@@ -119,6 +122,12 @@ export function createClassLoaderHost(platform) {
   };
   /** Class lookup for a requesting loader: returns the VM table type, the unchanged name (base class / unknown), or false when the class is not visible. */
   const isolatedRoot = (runtime, loader) => { const chain = chainOf(runtime, loader); return chain.find(c => c.st.packageEntry)?.st ?? null; };
+  /** Whether a DexFile is an element of a loader's path list (DexPathList.dexElements, which code may merge reflectively). */
+  const onPath = (runtime, loader, dexFileRef) => {
+    const list = loader && runtime.object(loader).fields?.get(`${BASE}->pathList:${PATH_LIST}`); if (!list) return false;
+    const array = runtime.object(list).fields.get(`${PATH_LIST}->dexElements:${ELEMENTS}`); if (!array) return false;
+    return runtime.array(array).elements.some(e => e && runtime.object(e).fields?.get(`${ELEMENT}->dexFile:${DEX_FILE}`)?.ref === dexFileRef.ref);
+  };
   const mapType = (runtime, loader, plain) => {
     if (loader && loader !== 'boot' && typeof loader === 'object') {   // the system class loader (and a loader under it): the boot layer only
       const root = chainOf(runtime, loader).at(-1)?.st;
@@ -134,8 +143,28 @@ export function createClassLoaderHost(platform) {
     if (!loader && app) loader = app; // code outside any run-time-loaded DEX runs in the app loader
     const chain = chainOf(runtime, loader).reverse();
     for (const { st } of chain) if (st.own.has(plain)) return st.own.get(plain);
-    if (!loader || (app && loader.ref === app.ref)) return runtime.dynamicPlain.get(plain) ?? false; // lenient for the app loader (dexElements merges are not tracked)
+    if (!loader || (app && loader.ref === app.ref)) { // lenient for the app loader (dexElements merges are not tracked), except for a DexFile's classes: a DexFile is no loader, its classes are visible where loadClass defined them or through an element of the path list
+      const key = runtime.dynamicPlain.get(plain); if (key === undefined) return false;
+      const owner = runtime.classOwners.get(key);
+      return runtime.object(owner)?.type === DEX_FILE && !onPath(runtime, app, owner) ? false : key;
+    }
     return false;
+  };
+  /**
+   * ClassLinker::FindClass with a class loader that is not one of ART's own (BaseDexClassLoader and its library subclasses): ART calls loader.loadClass(name) and takes the class it
+   * returns. `loader`'s chain is asked at its nearest loader of app code (a ClassLoader subclass with its own loadClass or findClass), for a name the loader tables do not answer.
+   * Returns the class's type, or null when no loader of the chain is app code (or its loadClass is already being asked for this name). loadClass's exception is the result.
+   */
+  const asking = new Set();
+  const loadThroughCode = (runtime, loader, plain) => {
+    if (!loader || typeof loader !== 'object') return null;
+    const custom = chainOf(runtime, loader).find(c => overridesLoadClass(runtime, c.ref) || overrides(runtime, c.ref, [`findClass(${STRING})${CLASS}`])); if (!custom) return null;
+    const key = `${custom.st.id} ${plain}`; if (asking.has(key)) return null; asking.add(key);
+    try {
+      const name = plain.slice(1, -1).replaceAll('/', '.'), cls = runtime.dispatch({ owner: LOADER, name: 'loadClass', parameters: [STRING], result: CLASS, signature: `(${STRING})${CLASS}` }, [custom.ref, name], 'virtual');
+      if (cls === null || cls === undefined) runtime.throwJava('Ljava/lang/NullPointerException;', `ClassLoader.loadClass returned null for ${name}`);
+      return runtime.object(cls).classType;
+    } finally { asking.delete(key); }
   };
   // ART opens a DEX file once per process (OatFileManager): every class loader over the same unchanged file maps the same bytes and loads only the classes it is asked for.
   // The lab keeps the extracted classes*.dex of a file per virtual-fs node, so another loader over one APK (microG creates one PathClassLoader over its base.apk per Dynamite
@@ -213,8 +242,11 @@ export function createClassLoaderHost(platform) {
     // The original java.nio.ByteBuffer (libcore): heap and direct buffers both expose their bytes as hb[offset + position, offset + limit) on Android.
     const object = runtime.object(ref);
     if (object.byteArray) return runtime.bytesOf(object.byteArray, object.bufferPosition, object.bufferLimit).slice();   // runtimes without the framework DEX use the host ByteBuffer
-    const fields = object.fields, array = runtime.array(fields.get('Ljava/nio/ByteBuffer;->hb:[B')), offset = fields.get('Ljava/nio/ByteBuffer;->offset:I') | 0;
+    const fields = object.fields, hb = fields.get('Ljava/nio/ByteBuffer;->hb:[B') ?? null, offset = fields.get('Ljava/nio/ByteBuffer;->offset:I') | 0;
     const position = fields.get('Ljava/nio/Buffer;->position:I') | 0, limit = fields.get('Ljava/nio/Buffer;->limit:I') | 0;
+    // A direct buffer without a backing array (allocateDirect in an app with a native process, FileChannel.map, NewDirectByteBuffer): ART's DexFile.openInMemoryDexFiles copies [position, limit) from its address.
+    if (hb === null) return readNativeBytes(runtime, BigInt.asIntN(64, BigInt(fields.get('Ljava/nio/Buffer;->address:J') ?? 0n)) + BigInt(position), limit - position).slice();
+    const array = runtime.array(hb);
     return unsignedBytes(array.cells, offset + position, offset + limit).slice();
   };
   /** Builds the loader state first (so its id names alias descriptors), defines the units, then publishes pathList. */
@@ -369,5 +401,5 @@ export function createClassLoaderHost(platform) {
     makePathList(runtime, ref, { units: [{ label: base, classes: [] }] });
     return ref;
   }
-  return { ...registry, interfaces: registry.interfacesOf, createApplicationLoader, createPackageLoader, systemLoader, mapType };
+  return { ...registry, interfaces: registry.interfacesOf, createApplicationLoader, createPackageLoader, systemLoader, mapType, loadThroughCode };
 }

@@ -3,8 +3,8 @@
 // link holds the app for seconds) followed by a SHA-256 in JavaScript (about 20 ms per MB). The shelf keeps every font file that was read and passed its check in the Cache API, and the
 // next time the page opens they are brought to memory and hashed by WebCrypto while the Worker waits for an APK. Nothing is trusted because it came from here: the reader compares the
 // same pinned size and digest, and a copy that does not match is dropped and read again from the server. Without the Cache API or WebCrypto everything works as before. No process.*.
-import { DIGESTS } from './crypto-host.js?v=a737601fbbdf';
-import { knownDigest, noteDigest } from './shared-asset-bytes.js?v=a737601fbbdf';
+import { DIGESTS } from './crypto-host.js?v=109fde337e64';
+import { knownDigest, noteDigest } from './shared-asset-bytes.js?v=109fde337e64';
 
 export const SHELF_NAME = 'apk-web-lab-fonts-1', SHELF_BYTES = 24 * 1024 * 1024;
 const hex = bytes => [...bytes].map(value => value.toString(16).padStart(2, '0')).join('');

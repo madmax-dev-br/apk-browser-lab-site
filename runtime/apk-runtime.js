@@ -1,42 +1,42 @@
-import { procFdFile } from './libcore-io-native.js?v=a737601fbbdf';
-import STATIC_SHIMS from './shim-static-methods.js?v=a737601fbbdf';
-import { VMClock } from './vm-clock.js?v=a737601fbbdf';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=a737601fbbdf';
-import { OperationMonitor } from './operation-monitor.js?v=a737601fbbdf';
-import { ExecutionProfile } from './execution-profile.js?v=a737601fbbdf';
-import { SamplingProfiler } from './sampling-profiler.js?v=a737601fbbdf';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=a737601fbbdf';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=a737601fbbdf';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=a737601fbbdf';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=a737601fbbdf';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=a737601fbbdf';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=a737601fbbdf';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=a737601fbbdf';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=a737601fbbdf';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=a737601fbbdf';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=a737601fbbdf';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=a737601fbbdf';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=a737601fbbdf';
-import { APKError } from './apk-error.js?v=a737601fbbdf';
-import { invokePolymorphic } from './method-handles.js?v=a737601fbbdf';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=a737601fbbdf';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=a737601fbbdf';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=a737601fbbdf';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=a737601fbbdf';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=a737601fbbdf';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=a737601fbbdf';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=a737601fbbdf';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=a737601fbbdf';
+import { procFdFile } from './libcore-io-native.js?v=109fde337e64';
+import STATIC_SHIMS from './shim-static-methods.js?v=109fde337e64';
+import { VMClock } from './vm-clock.js?v=109fde337e64';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=109fde337e64';
+import { OperationMonitor } from './operation-monitor.js?v=109fde337e64';
+import { ExecutionProfile } from './execution-profile.js?v=109fde337e64';
+import { SamplingProfiler } from './sampling-profiler.js?v=109fde337e64';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=109fde337e64';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=109fde337e64';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=109fde337e64';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=109fde337e64';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=109fde337e64';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=109fde337e64';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=109fde337e64';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=109fde337e64';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=109fde337e64';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=109fde337e64';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=109fde337e64';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=109fde337e64';
+import { APKError } from './apk-error.js?v=109fde337e64';
+import { invokePolymorphic } from './method-handles.js?v=109fde337e64';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=109fde337e64';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=109fde337e64';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=109fde337e64';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=109fde337e64';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=109fde337e64';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=109fde337e64';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=109fde337e64';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=109fde337e64';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=a737601fbbdf';
-import { ProcessStartPending } from './package-registry.js?v=a737601fbbdf';
-import { bootClassLacksMember } from './boot-class-members.js?v=a737601fbbdf';
-export { APKError } from './apk-error.js?v=a737601fbbdf';
-import { BinaryReader } from './binary-reader.js?v=a737601fbbdf';
-import { recordCollection } from './runtime-stats.js?v=a737601fbbdf';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=a737601fbbdf';
-import { scrollsItself } from './scrolling-view.js?v=a737601fbbdf';
-import { drawsItself } from './pointer-input-host.js?v=a737601fbbdf';
+import { Scheduler, Blocked } from './scheduler.js?v=109fde337e64';
+import { ProcessStartPending } from './package-registry.js?v=109fde337e64';
+import { bootClassLacksMember } from './boot-class-members.js?v=109fde337e64';
+export { APKError } from './apk-error.js?v=109fde337e64';
+import { BinaryReader } from './binary-reader.js?v=109fde337e64';
+import { recordCollection } from './runtime-stats.js?v=109fde337e64';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=109fde337e64';
+import { scrollsItself } from './scrolling-view.js?v=109fde337e64';
+import { drawsItself } from './pointer-input-host.js?v=109fde337e64';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -2486,6 +2486,8 @@ export class APKRuntime {
     }
     return abis;
   }
+  /** The frame that called System/Runtime.loadLibrary (or load): the first one outside those classes. The WebAssembly core has no currentMethod during a host call, so the frames decide. */
+  libraryCaller() { return (this.captureStack?.() ?? []).find(frame => frame?.owner !== 'Ljava/lang/System;' && frame?.owner !== 'Ljava/lang/Runtime;') ?? null; }
   /**
    * System.loadLibrary(name) / System.load(path) of a library that does not exist for this app: no ABI directory of the APK packages it (only the base APK was opened, without the ABI
    * split that carries its libraries; a name the app tries in turn), or System.load names a file that is not there. On Android PathClassLoader.findLibrary finds nothing,
@@ -2499,8 +2501,7 @@ export class APKRuntime {
     if (this.packagedLibraryAbis(soname).length || PUBLIC_NDK_LIBRARIES.has(soname)) return;
     if (kind === 'load') { let present = true; try { const fs = this.platform?.javaIo?.fs?.(); present = !fs || !!fs.stat(text); } catch { present = true; } if (present) return; }   // a file the app wrote or extracted: it exists, the lab cannot run it
     // the caller: the first frame outside java.lang.System/Runtime; a framework class loads the platform's own libraries (Conscrypt's javacrypto, media_jni ...)
-    const caller = (this.captureStack?.() ?? []).find(frame => frame?.owner !== 'Ljava/lang/System;' && frame?.owner !== 'Ljava/lang/Runtime;') ?? null;
-    const owner = caller?.owner ?? this.currentMethod?.owner;
+    const caller = this.libraryCaller(), owner = caller?.owner ?? this.currentMethod?.owner;
     if (!owner || !this.dex.classes.has(owner) || this.dex.bootClasses?.has(owner)) return;
     // a device component that needs this library to make its failure visible keeps its say (src/microg-device.js), as nativeRequired gives it
     const custom = this.platform?.onNativeLibraryUnavailable?.(this, text, null);
@@ -2775,9 +2776,14 @@ export class APKRuntime {
     let component = type.replace(/^\[+/, '');
     if (this.classOwners?.size && component.length > 1) {
       // Class identity is (defining loader, name): resolve through the requesting loader's delegation chain (the caller's own loader unless one is given).
-      const mapped = this.platform.classLoaders.mapType(this, loader === undefined ? this.callerDefiningLoader() : loader, component);
-      if (mapped === false) this.throwJava('Ljava/lang/ClassNotFoundException;', name);
+      const requesting = loader === undefined ? this.callerDefiningLoader() : loader;
+      let mapped = this.platform.classLoaders.mapType(this, requesting, component);
+      if (mapped === false) mapped = this.platform.classLoaders.loadThroughCode(this, requesting, component) ?? this.throwJava('Ljava/lang/ClassNotFoundException;', name);
       if (mapped !== component) { type = type.slice(0, type.length - component.length) + mapped; component = mapped; }
+    }
+    if (component.length > 1 && !this.classResolvable(component)) {   // no DEX file opened so far has it: a loader of app code may still open one in its findClass
+      const through = this.platform?.classLoaders?.loadThroughCode(this, loader === undefined ? this.callerDefiningLoader() : loader, component);
+      if (through) { type = type.slice(0, type.length - component.length) + through; component = through; }
     }
     if (!this.classResolvable(component)) {   // Class.forName: ClassNotFoundException(name) caused by the class loader's Didn't find class ... on path message
       { const widget = this.platform?.unimplementedWidgetMessage?.(component, this); if (widget) throw new APKError(widget, { kind: 'unsupported-widget' }); }   // a widget of a framework profile that is not loaded: Android has the class
@@ -3480,7 +3486,7 @@ export class APKRuntime {
       if (this.platform?.packages?.multi && !frameworkCaller) { const caller = this.platform.packages.callerEntry(this); if (!caller.main) { const custom = this.platform.onNativeLibraryUnavailable?.(this, text, caller.name); this.throwJava('Ljava/lang/UnsatisfiedLinkError;', typeof custom === 'string' ? custom : `${name === 'load' ? text : 'lib' + text + '.so'}: native libraries of companion package ${caller.name} are not supported in the browser VM`); } }
       // A lab-supplied WebAssembly module (never APK bytes) satisfies the request through the JNI bridge; otherwise the genuine failure below stands.
       if (this.jni && !link?.deleted && (name === 'load' ? this.jni.loadPath(text) : this.jni.loadLibrary(text))) return undefined;
-      if (name === 'loadLibrary' && text === 'media_jni' && this.currentMethod?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
+      if (name === 'loadLibrary' && text === 'media_jni' && (this.currentMethod ?? this.libraryCaller())?.owner?.startsWith('Landroid/media/')) return undefined;   // the framework's own media JNI: the lab binds those natives itself (framework-provider.js: no DRM plugin installed)
       if (this.arm64?.load(name, text, link?.deleted ? link.bytes() : null)) return undefined;   // the APK's own arm64-v8a library, run by the ARM64 interpreter when that option is on (src/arm64/glue.js)
       if (this.stubNativeLibrary(text)) return undefined;
       this.libraryNotFound(name, text);   // no ABI of the APK packages it: Android's own UnsatisfiedLinkError ("dlopen failed: library ... not found")

@@ -1,8 +1,8 @@
-import { APKError } from './apk-error.js?v=a737601fbbdf';
-import { createHostRegistry } from './host-contract.js?v=a737601fbbdf';
-import { Blocked, VMThread } from './scheduler.js?v=a737601fbbdf';
-import { Invoke } from './interpreter.js?v=a737601fbbdf';
-import { GC_ROOTS } from './heap-gc.js?v=a737601fbbdf';
+import { APKError } from './apk-error.js?v=109fde337e64';
+import { createHostRegistry } from './host-contract.js?v=109fde337e64';
+import { Blocked, VMThread } from './scheduler.js?v=109fde337e64';
+import { Invoke } from './interpreter.js?v=109fde337e64';
+import { GC_ROOTS } from './heap-gc.js?v=109fde337e64';
 
 // Cooperative threads for the single-threaded VM.
 //
@@ -309,8 +309,8 @@ export function createConcurrencyHost(platform) {
   def(UNIT, 'sleep', '(J)V', (r, _m, [self, timeout]) => { if (timeout <= 0n) return undefined; const { ms } = unitTimeout(r, self, timeout); return sleep(r, Number(ms)); });
   def(UNIT, 'timedWait', `(${OBJECT}J)V`, (r, _m, [self, target, timeout]) => { if (timeout <= 0n) return undefined; const { ms, nanos } = unitTimeout(r, self, timeout); return vcall(r, target, OBJECT, 'wait', ['J', 'I'], 'V', [ms, nanos]); });
   def(UNIT, 'timedJoin', `(${THREAD}J)V`, (r, _m, [self, thread, timeout]) => { if (timeout <= 0n) return undefined; if (thread === null) throwNew(r, 'Ljava/lang/NullPointerException;'); const { ms, nanos } = unitTimeout(r, self, timeout); return join(r, thread, Number(ms) + (nanos ? 1 : 0)); });
-  // Runtime.exit / halt: as System.exit, the app ends its own virtual process
-  for (const name of ['exit', 'halt']) def(RUNTIME, name, '(I)V', (_r, _m, [, status]) => { throw new APKError(`Runtime.${name}(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); });
+  // Runtime.exit / halt: as System.exit, the app ends its own virtual process (status 0 is an ordinary exit, not a crash)
+  for (const name of ['exit', 'halt']) def(RUNTIME, name, '(I)V', (r, _m, [, status]) => { r.record(`RUNTIME Runtime.${name}(${status}): the app ended its own process`); throw new APKError(`Runtime.${name}(${status}): the app terminated its own virtual process`, { kind: 'process-exit', status }); });
 
   // ---- futures -------------------------------------------------------------------------------------------------------------------------------
   const FUTURE = 'Ljava/util/concurrent/Future;';
