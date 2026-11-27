@@ -13,7 +13,7 @@
 // Java, every line still mapped to its pcs); a method whose instructions cannot be read into statements is shown as its smali in a comment. A whole class always renders.
 // What javac would have written differently stays as the DEX has it: a finally block is its copies plus a catch-all that rethrows, a lambda is the synthetic class d8 wrote,
 // a string switch is its hashCode switch. The methods are the textbook ones (dominators by Cooper, Harvey and Kennedy; structuring in the manner of jadx, Apache-2.0); no code of any decompiler is copied. Pure module: no DOM, no process.*.
-import { ACC, decodeInstruction, OPCODES, readDebugInfo, valueText, javaFloatText, javaDoubleText, floatOfBits, doubleOfBits, smaliOfMethod } from './smali-disassembler.js?v=88e579518234';
+import { ACC, decodeInstruction, OPCODES, readDebugInfo, valueText, javaFloatText, javaDoubleText, floatOfBits, doubleOfBits, smaliOfMethod } from './smali-disassembler.js?v=d20881b83aa7';
 
 export const DECOMPILER_LIMITS = Object.freeze({ sliceMs: 30, structureUnits: 40000, maxBlocks: 6000 });
 const now = () => globalThis.performance?.now?.() ?? Date.now();

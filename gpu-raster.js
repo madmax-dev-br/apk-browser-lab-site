@@ -18,7 +18,7 @@
 // WebGL context with one shared, grow-only drawing buffer and leave as ImageBitmaps the page crops onto a canvas (`{ transport: 'gpu-bitmap' }`: no read-back, no PNG; docs/INTERACTION-PERFORMANCE.md
 // section 32); a layer over SHARED_MAX is read back as raw RGBA (`gpu-rgba`). Without a page (Node, the servers) they are read back and encoded as the PNG of before (`gpu-png`).
 // What stays on the CPU even with GPU selected: Bitmap pixel reads (Bitmap.getPixel/compress, typed surfaces) and the other PNG rasters (shadows, nine-patches, text).
-import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=88e579518234';
+import { trackWebGLContext, releaseWebGLContext, freeWebGLContexts, liveWebGLContexts, lossCause, WORKER_WEBGL_CONTEXTS } from './webgl-contexts.js?v=d20881b83aa7';
 export const RENDERERS = Object.freeze(['cpu', 'gpu']);
 export const DEFAULT_RENDERER = 'cpu';   // what a caller that names no renderer gets (the Worker, Node, the servers): nothing of the GPU path is created
 /** The renderer of the device settings (the lab page and the player) when none was chosen: the GPU replay, which falls back to CPU by itself where WebGL is not available in the Worker. */

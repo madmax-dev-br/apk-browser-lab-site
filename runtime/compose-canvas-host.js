@@ -1,10 +1,10 @@
-import {APKError} from './apk-runtime.js?v=88e579518234';
-import {measureSkiaParagraph} from './skia-paragraph.js?v=88e579518234';
-import {getVectorGraphics} from './vector-native.js?v=88e579518234';
-import {deferRaster} from './deferred-raster.js?v=88e579518234';
+import {APKError} from './apk-runtime.js?v=d20881b83aa7';
+import {measureSkiaParagraph} from './skia-paragraph.js?v=d20881b83aa7';
+import {getVectorGraphics} from './vector-native.js?v=d20881b83aa7';
+import {deferRaster} from './deferred-raster.js?v=d20881b83aa7';
 const VIEW='Landroid/view/View;',GROUP='Landroid/view/ViewGroup;',CANVAS='Landroid/graphics/Canvas;',DRAWABLE='Landroid/graphics/drawable/Drawable;',MATRIX='Landroid/graphics/Matrix;',PAINT='Landroid/graphics/Paint;';
 const NODE='Landroid/graphics/RenderNode;',DISPLAY='Landroid/graphics/RecordingCanvas;',HOST='Landroid/graphics/RenderNode$AnimationHost;';   // API 33 RenderNode/RecordingCanvas (the hardware frontend View.updateDisplayListIfDirty records into)
-import {isComposeOwner} from './compose-owner.js?v=88e579518234';
+import {isComposeOwner} from './compose-owner.js?v=d20881b83aa7';
 const keys=new Set();
 for(const signature of ['insertReorderBarrier()V','insertInorderBarrier()V'])keys.add('Landroid/graphics/Canvas;->'+signature);
 for(const [owner,signatures] of [[VIEW,['draw(Landroid/graphics/Canvas;)V','onDraw(Landroid/graphics/Canvas;)V','dispatchDraw(Landroid/graphics/Canvas;)V','getDrawingTime()J','updateDisplayListIfDirty()Landroid/graphics/RenderNode;']],[GROUP,['dispatchDraw(Landroid/graphics/Canvas;)V','drawChild(Landroid/graphics/Canvas;Landroid/view/View;J)Z']]])for(const signature of signatures)keys.add(owner+'->'+signature);

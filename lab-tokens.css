@@ -37,9 +37,7 @@ body{font-family:var(--sans);background:var(--bg)}
 .topbar{background:var(--surface);-webkit-backdrop-filter:none;backdrop-filter:none;border-bottom:1px solid var(--line)}
 .brand{display:flex;align-items:center;gap:10px;font-family:var(--sans);font-size:16px;font-weight:700;letter-spacing:0;color:var(--ink);text-decoration:none;white-space:nowrap}
 .brand b{font-weight:400}
-.brand-icon{position:relative;flex:none;box-sizing:border-box;width:17px;height:26px;border:2px solid var(--accent);border-radius:5px;background:none;color:transparent;font-size:0;line-height:0}
-.brand-icon span{display:none}
-.brand-icon::after{content:"";position:absolute;left:50%;bottom:2px;width:5px;height:2px;margin-left:-2.5px;border-radius:1px;background:var(--accent)}
+.brand-icon{flex:none;display:block;width:26px;height:26px;padding:0;border:0;border-radius:0;background:none;color:#3ddc84}   /* the Android robot's head (THIRD_PARTY.md) in its own green */
 .topnav a{font-family:var(--sans);font-size:14px;font-weight:500;color:var(--soft);letter-spacing:0}
 .topnav a:hover{color:var(--ink)}
 .topnav a[aria-current=page]{color:var(--ink);font-weight:500;border-bottom-color:var(--accent)}
