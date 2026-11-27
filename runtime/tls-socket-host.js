@@ -1,9 +1,9 @@
-import { APKError } from './apk-error.js?v=5abc89d1cc06';
-import { Blocked } from './scheduler.js?v=5abc89d1cc06';
-import { JavaException } from './apk-runtime.js?v=5abc89d1cc06';
-import { networkOf } from './network-native.js?v=5abc89d1cc06';
-import { httpSocketOf } from './libcore-io-native.js?v=5abc89d1cc06';
-import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=88e579518234';
+import { Blocked } from './scheduler.js?v=88e579518234';
+import { JavaException } from './apk-runtime.js?v=88e579518234';
+import { networkOf } from './network-native.js?v=88e579518234';
+import { httpSocketOf } from './libcore-io-native.js?v=88e579518234';
+import { clientCertHostMatches, destination, parseLabKeystore } from './client-identity.js?v=88e579518234';
 
 // SSLSocket over the virtual HTTP socket (src/virtual-http-socket.js): the TLS surface of a Conscrypt-shaped client socket, WITHOUT any encryption in the VM.
 //
@@ -157,7 +157,10 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
   /**
    * The client certificate (mTLS) for a host the device settings name (network.clientCertHosts): what Conscrypt asks the app's X509KeyManager when the server sends a
    * CertificateRequest -- chooseClientAlias(key types, issuers, socket), then getPrivateKey and getCertificateChain of that alias. The browser does the real TLS and cannot present it,
-   * so the identity goes to the relay for this destination only (network-native.js useClientIdentity). Hosts that are not listed never consult the KeyManager here.
+   * so the identity goes to the relay for this destination only (network-native.js useClientIdentity). A host that is not listed consults the KeyManager only in the automatic mode
+   * (network.clientCertAuto, the owner's decision of 2026-11-27, on in the lab page) and only for a socket whose SSLContext the app built with KeyManagers of its own: the lab cannot see
+   * the server's CertificateRequest, so it asks the app's KeyManager at every handshake of such a socket, and the relay presents the certificate only if the server asks for it (a TLS
+   * client sends one only then). What the automatic mode finds nothing for (no KeyManager, no alias) is not reported: most connections of most apps have no client certificate.
    */
   const X509KM = 'Ljavax/net/ssl/X509KeyManager;', PRINCIPAL = 'Ljava/security/Principal;', PRIVATE_KEY = 'Ljava/security/PrivateKey;';
   /**
@@ -190,11 +193,21 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
       return { id: id === undefined || id === null ? undefined : Number(id), alias: alias === null || alias === undefined || alias === 0 ? null : text(r, alias) };
     } catch { return null; }
   };
+  /** { notAfter (ms), subject } of a certificate, read through the platform's X509Certificate (what the page shows: when the app's certificate expires, and whose it is). */
+  const certificateFacts = (r, cert) => {
+    try {
+      const date = call(r, X509, 'getNotAfter', [], 'Ljava/util/Date;', [cert]), notAfter = Number(call(r, 'Ljava/util/Date;', 'getTime', [], 'J', [date]));
+      const principal = call(r, X509, 'getSubjectX500Principal', [], 'Ljavax/security/auth/x500/X500Principal;', [cert]), name = text(r, call(r, 'Ljavax/security/auth/x500/X500Principal;', 'getName', [], STRING, [principal]));
+      return { notAfter: Number.isFinite(notAfter) ? notAfter : null, subject: /(?:^|,)CN=([^,]*)/.exec(name)?.[1] ?? name };
+    } catch (error) { if (error instanceof JavaException) return { notAfter: null, subject: null }; throw error; }
+  };
   const clientIdentity = (r, self, host, port) => {
-    const network = networkOf(r); if (!clientCertHostMatches(network.policy?.clientCertHosts, host, port)) return;
-    const where = destination(host, port), note = text => { network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
+    const network = networkOf(r), listed = clientCertHostMatches(network.policy?.clientCertHosts, host, port), auto = !listed && network.policy?.clientCertAuto === true;
+    if (!listed && !auto) return;
+    const where = destination(host, port), note = text => { if (auto) return; network.clientIdentityNotes ??= new Set(); const key = `${where} ${text}`; if (!network.clientIdentityNotes.has(key)) { network.clientIdentityNotes.add(key); r.record(`NET tls client certificate for ${where}: ${text}`); } network.noteClientIdentity?.(where, { state: 'none', detail: text.replace(/^none offered: /, '') }); };
     const managers = r.object(self).fields.get(KEYS_KEY);
     const manager = managers === null || managers === undefined || managers === 0 ? null : r.object(managers).elements.find(item => item !== null && item !== 0 && r.isSubtype(r.object(item).type, X509KM));
+    if (!manager && auto) return;   // the app built no KeyManager for this socket: nothing to offer, as nearly every connection
     if (!manager) {
       const none = managers === null || managers === 0 || managers === undefined;
       return note(`none offered: ${state(r, self).defaultFactory ? 'this socket comes from the default SSLContext (SSLContext.getDefault, SSLSocketFactory.getDefault or HttpsURLConnection\'s default factory), which has no KeyManager unless the app made its own context the default with SSLContext.setDefault' : none ? 'the SSLContext of this socket was initialized with null KeyManagers (SSLContext.init(null, ...))' : 'none of the KeyManagers of this socket\'s SSLContext is an X509KeyManager'}; a device offers no certificate either`);
@@ -213,8 +226,9 @@ export function installTlsSockets({ def, type, registry }, { defaults, array }) 
       material = (own?.id !== undefined && entries.find(entry => entry.id === own.id)) || (own?.alias && entries.find(entry => entry.alias === own.alias)) || entries.find(entry => entry.alias === name);
       material = material?.material ?? null;
     }
-    if (!material) return note(`none offered: the private key of alias "${name}" is neither a PKCS#8 key nor an AndroidKeyStore key of this device`);
-    network.useClientIdentity(where, { key: material, chain }, name);
+    if (!material) { if (auto) r.record(`NET tls client certificate for ${where} (automatic): alias "${name}" NOT presented: its private key is neither a PKCS#8 key nor an AndroidKeyStore key of this device`); return note(`none offered: the private key of alias "${name}" is neither a PKCS#8 key nor an AndroidKeyStore key of this device`); }
+    const leaf = r.object(certs).elements.find(item => item !== null && item !== 0);
+    network.useClientIdentity(where, { key: material, chain }, name, { auto, ...certificateFacts(r, leaf) });
   };
   const runHandshake = (r, self) => {
     const tls = state(r, self);

@@ -2,9 +2,9 @@
 // method and URL pattern or host, hits; the fields show when the row is expanded; Move / Remove in the row's menu). Rules are kept per package in localStorage (every access guarded) and
 // applied live to the Worker; hit counts come back with every snapshot. Every change is written to the trace: a rule the user adds changes what the app sees, so the page says so.
 // Off by default and empty: the lab ships no rule and never suggests one. The Network panel's context menu (Ignore this endpoint / Ignore this host) and the MCP tools use the same list.
-import { BLOCK_SCOPES, MAX_BLOCKS, defaultBlock, normalizeBlock, validateBlock, loadBlocks, saveBlocks, blockLabel, blockRuleOf, findBlock } from './blocked-calls.js?v=5abc89d1cc06';
-import { MOCK_METHODS } from './endpoint-mocks.js?v=5abc89d1cc06';
-import { listRow } from './list-rows.js?v=5abc89d1cc06';
+import { BLOCK_SCOPES, MAX_BLOCKS, defaultBlock, normalizeBlock, validateBlock, loadBlocks, saveBlocks, blockLabel, blockRuleOf, findBlock } from './blocked-calls.js?v=88e579518234';
+import { MOCK_METHODS } from './endpoint-mocks.js?v=88e579518234';
+import { listRow } from './list-rows.js?v=88e579518234';
 
 const SAVE_DELAY_MS = 150;
 

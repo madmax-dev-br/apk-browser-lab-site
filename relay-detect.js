@@ -1,4 +1,4 @@
-// Finding the APK Lab Relay (scripts/cors-relay.mjs, published as tools/cors-relay.mjs) on this computer by itself (the owner's decision, 2026-11-20: no token, no address to copy).
+// Finding the APK Lab Relay (its own project, github.com/madmax-dev-br/apk-lab-relay) on this computer by itself (the owner's decision, 2026-11-20: no token, no address to copy).
 // The relay answers GET http://127.0.0.1:8787/hello, from the lab's origins only, with {"relay":"apk-lab-relay","version","features"}; the page asks it on load, when the Device
 // section opens and before an APK is loaded or launched, and uses the relay as the device's Proxy when the field is empty. A typed Proxy is a custom proxy and wins.
 //
@@ -10,7 +10,7 @@
 // ask, nothing is probed without the user's gesture (localNetworkAccess says 'prompt'; the page offers "Look for the relay"), so a visitor who never uses a relay is never asked.
 // A page served from this computer (127.0.0.1, localhost) needs no permission. VM-free; no process.*.
 
-/** Kept equal to DEFAULT_PORT / RELAY_NAME of scripts/cors-relay.mjs (tests/relay-detect.test.mjs checks it). */
+/** Kept equal to DEFAULT_PORT / RELAY_NAME of apk-lab-relay's src/relay.cjs (tests/relay-detect.test.mjs checks it). */
 export const RELAY_DEFAULT_PORT = 8787;
 export const RELAY_NAME = 'apk-lab-relay';
 export const RELAY_AUTO_BASE = `http://127.0.0.1:${RELAY_DEFAULT_PORT}`;

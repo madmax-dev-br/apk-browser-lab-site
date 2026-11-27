@@ -1,74 +1,74 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=5abc89d1cc06';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=5abc89d1cc06';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=5abc89d1cc06';
-import { drawFrameGraph } from './frame-graph.js?v=5abc89d1cc06';
-import { clientIdentityStatus } from './client-identity.js?v=5abc89d1cc06';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=5abc89d1cc06';
-import { initCollapsibleSections } from './panel-sections.js?v=5abc89d1cc06';
-import { warmupLabel } from './warmup.js?v=5abc89d1cc06';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=5abc89d1cc06';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=5abc89d1cc06';
-import { initHelpTips } from './help-tips.js?v=5abc89d1cc06';
-import { initControlPanelUI } from './control-panel-ui.js?v=5abc89d1cc06';
-import { createToolDock } from './tool-dock.js?v=5abc89d1cc06';
-import { createPermissionsPanel } from './permissions-panel.js?v=5abc89d1cc06';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=5abc89d1cc06';
-import { createAppDataPanel } from './app-data-panel.js?v=5abc89d1cc06';
-import { createCameraLab } from './camera-lab.js?v=5abc89d1cc06';
-import { createOverridesPanel } from './overrides-panel.js?v=5abc89d1cc06';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=5abc89d1cc06';
-import { createCodeTool } from './code-tool-loader.js?v=5abc89d1cc06';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=5abc89d1cc06';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=5abc89d1cc06';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=5abc89d1cc06';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=5abc89d1cc06';
-import { MICROG_SERVICES } from './microg-services.js?v=5abc89d1cc06';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=5abc89d1cc06';
-import { createOrientationLock } from './orientation-lock.js?v=5abc89d1cc06';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=5abc89d1cc06';
-import { createHostMapPanel } from './host-map-panel.js?v=5abc89d1cc06';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=5abc89d1cc06';
-import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=5abc89d1cc06';
-import { MAX_PLUGINS } from './plugin-store.js?v=5abc89d1cc06';
-import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=5abc89d1cc06';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5abc89d1cc06';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=5abc89d1cc06';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=5abc89d1cc06';
-import { createDeviceView, createViewState } from './device-view.js?v=5abc89d1cc06';
-import { createTaskSwitcher } from './task-switcher.js?v=5abc89d1cc06';
-import { createDeviceZoom } from './device-zoom.js?v=5abc89d1cc06';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5abc89d1cc06';
-import { formatApiGapReport } from './api-gap-scan.js?v=5abc89d1cc06';
-import { createLogcatPanel } from './logcat-panel.js?v=5abc89d1cc06';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5abc89d1cc06';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=5abc89d1cc06';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=5abc89d1cc06';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=5abc89d1cc06';
-import { createAppPalette } from './app-palette.js?v=5abc89d1cc06';
-import { createScreenRecorder } from './screen-recorder.js?v=5abc89d1cc06';
-import { createDeviceMedia } from './device-media.js?v=5abc89d1cc06';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=5abc89d1cc06';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=5abc89d1cc06';
-import { createAdb } from './adb-commands.js?v=5abc89d1cc06';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=5abc89d1cc06';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=5abc89d1cc06';
-import { createAdbTerminal } from './adb-terminal.js?v=5abc89d1cc06';
-import { memorySummary } from './worker-memory.js?v=5abc89d1cc06';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=5abc89d1cc06';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=5abc89d1cc06';
-import { createPluginNetRoutes } from './plugin-net-routes.js?v=5abc89d1cc06';
-import { createModalHost } from './lab-modal.js?v=5abc89d1cc06';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=5abc89d1cc06';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=5abc89d1cc06';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=5abc89d1cc06';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=5abc89d1cc06';
-import { createDragLayer } from './lab-drag.js?v=5abc89d1cc06';
-import { createLabScroll } from './lab-scroll.js?v=5abc89d1cc06';
-import { createGlSurfaces } from './gl-surfaces.js?v=5abc89d1cc06';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=5abc89d1cc06';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=5abc89d1cc06';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=5abc89d1cc06';
-import { resolveIntentFields } from './intent-resolver.js?v=5abc89d1cc06';
+import { APKWorkerClient } from './apk-worker-client.js?v=88e579518234';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=88e579518234';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=88e579518234';
+import { drawFrameGraph } from './frame-graph.js?v=88e579518234';
+import { clientIdentityStatus } from './client-identity.js?v=88e579518234';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=88e579518234';
+import { initCollapsibleSections } from './panel-sections.js?v=88e579518234';
+import { warmupLabel } from './warmup.js?v=88e579518234';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=88e579518234';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=88e579518234';
+import { initHelpTips } from './help-tips.js?v=88e579518234';
+import { initControlPanelUI } from './control-panel-ui.js?v=88e579518234';
+import { createToolDock } from './tool-dock.js?v=88e579518234';
+import { createPermissionsPanel } from './permissions-panel.js?v=88e579518234';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=88e579518234';
+import { createAppDataPanel } from './app-data-panel.js?v=88e579518234';
+import { createCameraLab } from './camera-lab.js?v=88e579518234';
+import { createOverridesPanel } from './overrides-panel.js?v=88e579518234';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=88e579518234';
+import { createCodeTool } from './code-tool-loader.js?v=88e579518234';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=88e579518234';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=88e579518234';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=88e579518234';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=88e579518234';
+import { MICROG_SERVICES } from './microg-services.js?v=88e579518234';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=88e579518234';
+import { createOrientationLock } from './orientation-lock.js?v=88e579518234';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=88e579518234';
+import { createHostMapPanel } from './host-map-panel.js?v=88e579518234';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=88e579518234';
+import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=88e579518234';
+import { MAX_PLUGINS } from './plugin-store.js?v=88e579518234';
+import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=88e579518234';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=88e579518234';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=88e579518234';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=88e579518234';
+import { createDeviceView, createViewState } from './device-view.js?v=88e579518234';
+import { createTaskSwitcher } from './task-switcher.js?v=88e579518234';
+import { createDeviceZoom } from './device-zoom.js?v=88e579518234';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=88e579518234';
+import { formatApiGapReport } from './api-gap-scan.js?v=88e579518234';
+import { createLogcatPanel } from './logcat-panel.js?v=88e579518234';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=88e579518234';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=88e579518234';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=88e579518234';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=88e579518234';
+import { createAppPalette } from './app-palette.js?v=88e579518234';
+import { createScreenRecorder } from './screen-recorder.js?v=88e579518234';
+import { createDeviceMedia } from './device-media.js?v=88e579518234';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=88e579518234';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=88e579518234';
+import { createAdb } from './adb-commands.js?v=88e579518234';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=88e579518234';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=88e579518234';
+import { createAdbTerminal } from './adb-terminal.js?v=88e579518234';
+import { memorySummary } from './worker-memory.js?v=88e579518234';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=88e579518234';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=88e579518234';
+import { createPluginNetRoutes } from './plugin-net-routes.js?v=88e579518234';
+import { createModalHost } from './lab-modal.js?v=88e579518234';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=88e579518234';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=88e579518234';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=88e579518234';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=88e579518234';
+import { createDragLayer } from './lab-drag.js?v=88e579518234';
+import { createLabScroll } from './lab-scroll.js?v=88e579518234';
+import { createGlSurfaces } from './gl-surfaces.js?v=88e579518234';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=88e579518234';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=88e579518234';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=88e579518234';
+import { resolveIntentFields } from './intent-resolver.js?v=88e579518234';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -858,7 +858,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js?v=5abc89d1cc06');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=88e579518234');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -1292,7 +1292,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=5abc89d1cc06')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=88e579518234')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
@@ -1530,7 +1530,7 @@ let proxyTyping = false;   // the Proxy field's own input is being applied: writ
 function showClientCertState() {
   const pill = $('dev-client-cert-state'), note = $('dev-client-cert-status'); if (!pill || !note) return;
   const hosts = ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), proxyText = $('dev-proxy')?.value ?? '', proxyUrl = effectiveProxy(proxyState(proxyText).state === 'on' ? proxyText : '', relayDetection()).url;
-  const { state: shown, label, text } = clientIdentityStatus({ hosts, proxyUrl, entries: state.lastVmHealth?.clientIdentity ?? null });
+  const { state: shown, label, text } = clientIdentityStatus({ hosts, auto: $('dev-client-cert-auto')?.checked !== false, proxyUrl, entries: state.lastVmHealth?.clientIdentity ?? null });
   pill.textContent = label; pill.dataset.state = shown; note.textContent = text; note.dataset.state = shown === 'error' ? 'error' : shown === 'ok' ? 'ok' : shown === 'warn' ? 'warn' : '';
 }
 function showProxyState() {
@@ -1563,7 +1563,7 @@ $('cp-sec-network')?.addEventListener('toggle', () => { if ($('cp-sec-network').
 function writeDevicePanel(settings) {
   $('dev-screen').value = settings.screen; $('dev-orientation').value = settings.orientation; $('dev-font').value = String(settings.fontScale); $('dev-font-out').textContent = `${settings.fontScale.toFixed(2)}×`;
   { const [language, region] = String(settings.locale).split('-'); $('dev-locale').value = language; if ($('dev-region')) $('dev-region').value = region; } $('dev-dark').checked = settings.darkTheme; $('dev-animator').value = String(settings.animatorScale); $('dev-hour24').checked = settings.hour24; $('dev-tz').value = settings.timeZone;
-  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-frame-graph').checked = !!settings.frameGraph; if (!proxyTyping) $('dev-proxy').value = settings.network.proxyUrl; if ($('dev-client-cert')) $('dev-client-cert').value = (settings.network.clientCertHosts ?? []).join(', '); if ($('dev-relay-channel')) $('dev-relay-channel').checked = settings.network.relayChannel === true; showProxyState();   /* not from its own typing: a URL half typed (or refused) is not kept, and rewriting the field erased it; the line under it says what is in use */ if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB); writeCoreMemory(settings.coreMemory);
+  $('dev-battery').value = String(settings.battery.level); $('dev-battery-out').textContent = `${settings.battery.level}%`; $('dev-charging').checked = settings.battery.charging; $('dev-network').value = settings.connectivity; $('dev-nav').value = settings.navigation; { const all = settings.network.allowedHosts.includes('*'); $('dev-hosts-all').checked = all; $('dev-hosts').disabled = all; $('dev-hosts').value = all ? '*' : settings.network.allowedHosts.join(', '); } $('dev-layout-bounds').checked = !!settings.layoutBounds; $('dev-frame-graph').checked = !!settings.frameGraph; if (!proxyTyping) $('dev-proxy').value = settings.network.proxyUrl; if ($('dev-client-cert')) $('dev-client-cert').value = (settings.network.clientCertHosts ?? []).join(', '); if ($('dev-client-cert-auto')) $('dev-client-cert-auto').checked = settings.network.clientCertAuto !== false; if ($('dev-relay-channel')) $('dev-relay-channel').checked = settings.network.relayChannel === true; showProxyState();   /* not from its own typing: a URL half typed (or refused) is not kept, and rewriting the field erased it; the line under it says what is in use */ if ($('vm-memory')) $('vm-memory').value = String(settings.memoryMiB); writeCoreMemory(settings.coreMemory);
   if ($('vm-event-time')) $('vm-event-time').value = String(settings.eventSeconds ?? 0);
   if ($('vm-renderer')) $('vm-renderer').value = settings.renderer ?? 'gpu'; showEngine(settings);
   if ($('vm-raster-scale')) $('vm-raster-scale').value = String(settings.raster?.motionScale ?? 1); if ($('vm-raster-still')) $('vm-raster-still').value = String(settings.raster?.stillScale ?? 1); if ($('vm-raster-navigation')) $('vm-raster-navigation').checked = settings.raster?.navigation === true;
@@ -1580,7 +1580,7 @@ function writeDevicePanel(settings) {
 }
 function readDevicePanel() {
   return sanitizeSettings({ screen: $('dev-screen').value, customScreen: customScreenPanel.read(deviceState.settings.customScreen), orientation: $('dev-orientation').value, fontScale: Number($('dev-font').value), locale: `${$('dev-locale').value}-${$('dev-region')?.value || 'US'}`, darkTheme: $('dev-dark').checked, animatorScale: Number($('dev-animator').value),
-    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, arm64Native: $('dev-arm64')?.checked === true, arm64Translate: $('dev-arm64-translate')?.checked !== false, glesCpu: $('dev-gles-cpu')?.checked === true, hardwareWindow: $('vm-hardware-window') ? $('vm-hardware-window').checked : true, schedulingOf25: $('vm-scheduling-25') ? $('vm-scheduling-25').checked : false, prepareFromLastRun: $('vm-prepare-last-run') ? $('vm-prepare-last-run').checked : true, microg: $('dev-microg')?.checked === true, microgServices: microgServicesPanel.read(), customIdentity: customIdentityPanel().read(), loadImage: $('vm-load-image')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
+    hour24: $('dev-hour24').checked, timeZone: $('dev-tz').value, battery: { level: Number($('dev-battery').value), charging: $('dev-charging').checked }, connectivity: $('dev-network').value, navigation: $('dev-nav').value, layoutBounds: $('dev-layout-bounds').checked, frameGraph: $('dev-frame-graph').checked, arm64Native: $('dev-arm64')?.checked === true, arm64Translate: $('dev-arm64-translate')?.checked !== false, glesCpu: $('dev-gles-cpu')?.checked === true, hardwareWindow: $('vm-hardware-window') ? $('vm-hardware-window').checked : true, schedulingOf25: $('vm-scheduling-25') ? $('vm-scheduling-25').checked : false, prepareFromLastRun: $('vm-prepare-last-run') ? $('vm-prepare-last-run').checked : true, microg: $('dev-microg')?.checked === true, microgServices: microgServicesPanel.read(), customIdentity: customIdentityPanel().read(), loadImage: $('vm-load-image')?.checked === true, eventSeconds: Number($('vm-event-time')?.value ?? 0), raster: { motionScale: Number($('vm-raster-scale')?.value ?? 0.5), navigation: $('vm-raster-navigation')?.checked === true, stillScale: Number($('vm-raster-still')?.value ?? 1) }, renderer: $('vm-renderer')?.value ?? 'gpu', engine: URL_ENGINE ? deviceState.settings?.engine ?? DEFAULT_ENGINE : $('vm-engine')?.value ?? DEFAULT_ENGINE, coreMemory: readCoreMemory(), network: { allowedHosts: $('dev-hosts-all').checked ? ['*'] : $('dev-hosts').value.split(/[\s,]+/).filter(host => host !== '*'), proxyUrl: $('dev-proxy').value, hostMap: deviceState.settings.network?.hostMap ?? [], clientCertHosts: ($('dev-client-cert')?.value ?? '').split(/[\s,]+/).filter(Boolean), clientCertAuto: $('dev-client-cert-auto') ? $('dev-client-cert-auto').checked : true, relayChannel: $('dev-relay-channel')?.checked === true }, memoryMiB: Number($('vm-memory')?.value ?? 0), location: deviceState.settings.location });
 }
 // "VM memory": the Java heap budget (object limit) used at the next load; the VM limit of each step is memoryBudget({ override }).maxHeapObjects, the same rule the Worker applies (heapLimitFor).
 const vmMemoryLabel = mibValue => { const { maxHeapObjects } = memoryBudget({ override: mibValue }); return `${mibValue >= 1024 ? `${mibValue / 1024} GiB` : `${mibValue} MiB`} · ${maxHeapObjects.toLocaleString('en-US')} objects`; };
@@ -1684,7 +1684,7 @@ function applyDeviceSettings(settings) {
 }
 function initDevicePanel() {
   fillSelect($('dev-screen'), DEVICE_SCREENS); fillSelect($('dev-locale'), DEVICE_LANGUAGES); if ($('dev-region')) fillSelect($('dev-region'), DEVICE_REGIONS); fillSelect($('dev-tz'), DEVICE_ZONES); initVmMemory(); initVmEventTime(); writeDevicePanel(deviceState.settings); syncFrameGraph();
-  for (const id of ['dev-screen', 'dev-custom-w', 'dev-custom-h', 'dev-custom-unit', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-region', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-layout-bounds', 'dev-frame-graph', 'dev-arm64', 'dev-arm64-translate', 'dev-gles-cpu', 'vm-hardware-window', 'vm-scheduling-25', 'vm-prepare-last-run', 'dev-microg', 'dev-hosts', 'dev-proxy', 'dev-relay-channel', 'dev-client-cert', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-still', 'vm-raster-navigation', 'vm-renderer', 'vm-engine', 'vm-load-image']) $(id).addEventListener('input', () => { if (id === 'dev-proxy') { showProxyState(); proxyTyping = true; } if (id === 'dev-client-cert') showClientCertState(); if (id === 'dev-relay-channel') showRelayChannelState(); try { applyDeviceSettings(readDevicePanel()); } finally { proxyTyping = false; } });
+  for (const id of ['dev-screen', 'dev-custom-w', 'dev-custom-h', 'dev-custom-unit', 'dev-orientation', 'dev-font', 'dev-locale', 'dev-region', 'dev-dark', 'dev-animator', 'dev-hour24', 'dev-tz', 'dev-battery', 'dev-charging', 'dev-network', 'dev-nav', 'dev-hosts-all', 'dev-client-cert-auto', 'dev-layout-bounds', 'dev-frame-graph', 'dev-arm64', 'dev-arm64-translate', 'dev-gles-cpu', 'vm-hardware-window', 'vm-scheduling-25', 'vm-prepare-last-run', 'dev-microg', 'dev-hosts', 'dev-proxy', 'dev-relay-channel', 'dev-client-cert', 'vm-memory', 'vm-event-time', 'vm-raster-scale', 'vm-raster-still', 'vm-raster-navigation', 'vm-renderer', 'vm-engine', 'vm-load-image']) $(id).addEventListener('input', () => { if (id === 'dev-proxy') { showProxyState(); proxyTyping = true; } if (id === 'dev-client-cert' || id === 'dev-client-cert-auto') showClientCertState(); if (id === 'dev-relay-channel') showRelayChannelState(); try { applyDeviceSettings(readDevicePanel()); } finally { proxyTyping = false; } });
   for (const [id] of CORE_FIELDS) { $(id)?.addEventListener('change', () => { if (showCoreMemoryTotal(rawCoreMemory())?.error) return; applyDeviceSettings(readDevicePanel()); }); /* a combination that does not fit stays on screen with its reason, and is not applied */ $(id)?.addEventListener('input', () => { showCoreMemoryTotal(rawCoreMemory()); }); }
   $('vm-core-mode')?.addEventListener('change', () => { showCoreMode($('vm-core-mode').value); if (showCoreMemoryTotal(rawCoreMemory())?.error) return; applyDeviceSettings(readDevicePanel()); });   // switching to "Fixed" with sizes that do not fit shows why and keeps the mode that was running
   $('vm-core-reset')?.addEventListener('click', () => { $('vm-core-mode').value = CORE_MEMORY_DEFAULT.mode; for (const [id, key] of CORE_FIELDS) $(id).value = String(CORE_MEMORY_DEFAULT[key]); applyDeviceSettings(readDevicePanel()); });

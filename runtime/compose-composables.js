@@ -9,7 +9,7 @@
 //
 // Inputs. A composition's arguments are kept as a snapshot (values and object ids, never references): primitives, Strings and boxed values by value; an object by its class, its
 // id and, to a bounded depth, the snapshot of its fields (an ArrayList, an Arrays.asList list or an array: its elements). Ids are never reused, so an equal id is the same instance.
-import { debugInfoOf } from './debug-info.js?v=5abc89d1cc06';
+import { debugInfoOf } from './debug-info.js?v=88e579518234';
 
 const COMPOSER = 'Landroidx/compose/runtime/Composer;', START = 'startRestartGroup', START_SIGNATURE = '(I)Landroidx/compose/runtime/Composer;';
 const LAMBDA_IMPL = /^Landroidx\/compose\/runtime\/internal\/ComposableLambda(?:N)?Impl;$/;

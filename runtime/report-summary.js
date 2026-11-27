@@ -1,17 +1,17 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=5abc89d1cc06';
-import { staticRetentionLines } from './heap-gc.js?v=5abc89d1cc06';
-import { overrideSummaryLines } from './method-overrides.js?v=5abc89d1cc06';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=5abc89d1cc06';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=5abc89d1cc06';
-import { blockedCallSummaryLines } from './blocked-calls.js?v=5abc89d1cc06';
-import { configImportSummaryLines } from './config-import-note.js?v=5abc89d1cc06';
-import { networkRouteSummaryLines } from './network-routes.js?v=5abc89d1cc06';
-import { hostMapSummaryLines } from './host-map.js?v=5abc89d1cc06';
-import { attributeGap } from './worker-task-log.js?v=5abc89d1cc06';
-import { loadImageText } from './load-image.js?v=5abc89d1cc06';
-import { identityText } from './device-identity.js?v=5abc89d1cc06';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=88e579518234';
+import { staticRetentionLines } from './heap-gc.js?v=88e579518234';
+import { overrideSummaryLines } from './method-overrides.js?v=88e579518234';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=88e579518234';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=88e579518234';
+import { blockedCallSummaryLines } from './blocked-calls.js?v=88e579518234';
+import { configImportSummaryLines } from './config-import-note.js?v=88e579518234';
+import { networkRouteSummaryLines } from './network-routes.js?v=88e579518234';
+import { hostMapSummaryLines } from './host-map.js?v=88e579518234';
+import { attributeGap } from './worker-task-log.js?v=88e579518234';
+import { loadImageText } from './load-image.js?v=88e579518234';
+import { identityText } from './device-identity.js?v=88e579518234';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 

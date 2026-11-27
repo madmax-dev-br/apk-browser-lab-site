@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=5abc89d1cc06") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=5abc89d1cc06">
-  <link rel="stylesheet" href="./lab-theme.css?v=5abc89d1cc06">
-  <meta name="apk-browser-build" content="5abc89d1cc06">
+  <style>@import url("./styles.css?v=88e579518234") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=88e579518234">
+  <link rel="stylesheet" href="./lab-theme.css?v=88e579518234">
+  <meta name="apk-browser-build" content="88e579518234">
 </head>
 <body>
   <header class="topbar">
@@ -147,8 +147,9 @@
               <section class="cp-sub" id="cp-sub-proxy" aria-labelledby="cp-sub-proxy-title"><h4 class="cp-subtitle" id="cp-sub-proxy-title">Proxy and relay</h4>
                 <div class="cp-item cp-stack" data-keywords="relay cors http"><label for="dev-proxy">Proxy (optional)</label><input id="dev-proxy" type="text" spellcheck="false" autocomplete="off" placeholder="empty: the APK Lab Relay, found by itself" aria-describedby="dev-proxy-note"><p id="dev-proxy-note" class="cp-note" role="status"></p></div>
                 <div class="cp-item" data-keywords="relay multiplex websocket"><label for="dev-relay-channel">Parallel relay channel</label><input id="dev-relay-channel" type="checkbox" role="switch" aria-describedby="dev-relay-channel-note"><p id="dev-relay-channel-note" class="cp-note" role="status"></p></div>
-                <div class="cp-item cp-stack" data-keywords="mtls tls client certificate keystore keymanager"><label for="dev-client-cert">Client certificate hosts (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note"><p id="dev-client-cert-status" class="cp-note" role="status"></p></div>
-                <p id="dev-client-cert-note" class="cp-note">Client certificate hosts: on a TLS connection to one of these hosts the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay on this computer (which answers the lab's pages only), only for these hosts, and live there in memory only. Other hosts never see them.</p>
+                <div class="cp-item cp-stack" data-keywords="mtls tls client certificate keystore keymanager"><label for="dev-client-cert">Client certificate (mTLS) <span id="dev-client-cert-state" class="mtls-pill" data-state="off" title="Whether the client certificate (mTLS) is on and was presented">Off</span></label><input id="dev-client-cert" type="text" spellcheck="false" autocomplete="off" placeholder="automatic; or hosts: api.example.com, mtls.example.com:8443" aria-describedby="dev-client-cert-note"><p id="dev-client-cert-status" class="cp-note" role="status"></p></div>
+                <div class="cp-item" data-keywords="mtls tls client certificate automatic keymanager"><label for="dev-client-cert-auto">Client certificate: automatic</label><input id="dev-client-cert-auto" type="checkbox" role="switch" aria-describedby="dev-client-cert-note"></div>
+                <p id="dev-client-cert-note" class="cp-note">Client certificate: on a TLS connection the device presents the client certificate the app's KeyManager chooses (the key and chain the app registered, from its KeyStore), as a server that asks for one would get it. Automatic (on by default): for any host, whenever the app sets up its connection with its own KeyManager; nothing to type, and the line above says which host got which certificate and until when it is valid. The hosts field adds hosts where the device asks the KeyManager even for a connection the app did not set up that way. It needs the relay (the browser cannot present a client certificate): the key and chain go to the relay on this computer (which answers the lab's pages only), only for these hosts, and live there in memory only. Other hosts never see them.</p>
               </section>
               <section class="cp-sub" id="cp-sub-hostmap" aria-labelledby="cp-hostmap-title" data-keywords="redirect hosts etc hosts rewrite port localhost"><h4 class="cp-subtitle" id="cp-hostmap-title">Redirect hosts<span id="hm-summary" class="cp-badge">0 active</span></h4>
                 <p class="cp-note">Each rule sends the app's requests for one host to another destination, like an /etc/hosts entry that can also change the port and scheme. The app still sees the original URL; only the request the browser makes goes to the destination, and it does not need to be in “Allowed network hosts” (offline mode still applies). Source: <code>https://api.example.com</code>, <code>api.example.com</code>, <code>host:port</code> or <code>*.domain</code>. Destination: <code>host</code>, <code>host:port</code> or <code>http(s)://host:port</code>; without a scheme, <code>localhost</code> and <code>127.0.0.1</code> use http. A local server must answer CORS for the lab page (or use the CORS relay with <code>--allow-private</code>). Applies immediately, counts the responses of each rule and marks the requests in the Network panel.</p>
@@ -390,7 +391,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=5abc89d1cc06"></script>
+  <script type="module" src="./app.js?v=88e579518234"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>

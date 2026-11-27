@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=5abc89d1cc06';
-import { networkOf } from './network-native.js?v=5abc89d1cc06';
-import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=5abc89d1cc06';
-import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=5abc89d1cc06';
-import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=5abc89d1cc06';
-import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=5abc89d1cc06';
-import { endpointHost } from './relay-mux.js?v=5abc89d1cc06';
-import { siteOf } from './cookie-host.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=88e579518234';
+import { networkOf } from './network-native.js?v=88e579518234';
+import { WEBVIEW_ERRORS, ERROR_PAGE_TITLE } from './webview-host.js?v=88e579518234';
+import { buildCsp, bridgeMarkup, asciiMarkup, relayCsp } from './webview-bridge.js?v=88e579518234';
+import { assetEntry, mimeForPath, toBase64, ASSET_PREFIX } from './webview-resources.js?v=88e579518234';
+import { WebViewRelayChannel, webviewRelayEndpoint } from './webview-relay.js?v=88e579518234';
+import { endpointHost } from './relay-mux.js?v=88e579518234';
+import { siteOf } from './cookie-host.js?v=88e579518234';
 
 // The Worker's side of the WebView backend (design: docs/APK-REAL-TASKS.md, task 33). A "page" owns the documents: the lab page with one sandboxed iframe per WebView (src/webview-frame.js),
 // or the document engine without a browser (src/webview-headless.js, used by the Node flows). This module decides what may be loaded, tells the page what to show (`post`), and
@@ -67,7 +67,7 @@ export const FRAME_REFUSING_HOSTS = Object.freeze(['accounts.google.com']);
 export function needsRelayAsTopLevel(url, relayReason = 'no APK Lab Relay runs as the device\'s Proxy') {
   let host; try { host = new URL(url).hostname.toLowerCase(); } catch { return null; }
   if (!FRAME_REFUSING_HOSTS.includes(host)) return null;
-  return { code: WEBVIEW_ERRORS.CONNECT, description: `net::ERR_BLOCKED_BY_RESPONSE (${host} refuses to be shown inside another page (X-Frame-Options / CSP frame-ancestors). An Android WebView is not a frame and shows it as its own document; the lab can only do that through the APK Lab Relay as the device's Proxy, and ${relayReason}: start the relay (tools/cors-relay.mjs) and load again. Google's sign-in needs the relay.)` };
+  return { code: WEBVIEW_ERRORS.CONNECT, description: `net::ERR_BLOCKED_BY_RESPONSE (${host} refuses to be shown inside another page (X-Frame-Options / CSP frame-ancestors). An Android WebView is not a frame and shows it as its own document; the lab can only do that through the APK Lab Relay as the device's Proxy, and ${relayReason}: start the relay (github.com/madmax-dev-br/apk-lab-relay) and load again. Google's sign-in needs the relay.)` };
 }
 
 /** The title Chromium gives a document that sets none: its URL as it is displayed (the http scheme is left out, a file is its name). */

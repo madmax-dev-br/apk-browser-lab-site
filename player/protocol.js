@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=5abc89d1cc06';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=5abc89d1cc06';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=5abc89d1cc06';
-import { parseRule } from '../host-map.js?v=5abc89d1cc06';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=5abc89d1cc06';
-import { isMemoryStep } from '../memory-budget.js?v=5abc89d1cc06';
+import { checkCoreMemory } from '../core-memory.js?v=88e579518234';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=88e579518234';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=88e579518234';
+import { parseRule } from '../host-map.js?v=88e579518234';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=88e579518234';
+import { isMemoryStep } from '../memory-budget.js?v=88e579518234';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -147,7 +147,7 @@ export function configToSettings(config = {}) {
   if (config.theme !== undefined) { if (ALLOWED_THEMES.includes(config.theme)) input.darkTheme = config.theme === 'dark'; else rejected.push('theme'); }
   if (config.statusBarHeight !== undefined) input.statusBarHeightDp = config.statusBarHeight;
   if (config.battery !== undefined || config.charging !== undefined) input.battery = { level: config.battery ?? 80, charging: !!config.charging };
-  if (config.allowedHosts !== undefined || config.proxyUrl !== undefined || config.hostMap !== undefined) input.network = { allowedHosts: config.allowedHosts ?? [], proxyUrl: config.proxyUrl ?? '', hostMap: config.hostMap ?? [] };
+  if (config.allowedHosts !== undefined || config.proxyUrl !== undefined || config.hostMap !== undefined) input.network = { allowedHosts: config.allowedHosts ?? [], proxyUrl: config.proxyUrl ?? '', hostMap: config.hostMap ?? [], clientCertAuto: false };   // the automatic client certificate is the lab page's; an embedder does not get it by default
   for (const key of ['eventSeconds', 'memoryMiB', 'layoutBounds', 'renderer', 'engine', 'coreMemory']) if (config[key] !== undefined) input[key] = config[key];
   const settings = sanitizeSettings(input);
   (config.hostMap ?? []).forEach((rule, index) => { const parsed = parseRule(rule); if (parsed.error) rejected.push(`hostMap[${index}] (${parsed.error})`); });   // kept in the list (as the panel keeps them), ignored by the redirect

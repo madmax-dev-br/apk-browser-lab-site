@@ -7,8 +7,8 @@
 // own origin or a srcdoc is an opaque origin that cannot touch the lab's DOM, Worker or storage. Scripts run only when the app enabled JavaScript. The frame gets no
 // permissions policy features (`allow=""`), no referrer, and no ambient credentials where the browser supports `credentialless`.
 
-import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=5abc89d1cc06';
-import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=5abc89d1cc06';
+import { bridgeMarkup, injectIntoHead } from './webview-bridge.js?v=88e579518234';
+import { rewriteDocument, RESOURCE_MAX_BYTES } from './webview-resources.js?v=88e579518234';
 
 export const FRAME_SANDBOX = Object.freeze({ scripts: 'allow-scripts', forms: 'allow-forms' });
 export const FRAME_ATTRIBUTES = Object.freeze({ allow: '', referrerpolicy: 'no-referrer', loading: 'eager', 'aria-label': 'WebView' });
@@ -198,7 +198,7 @@ export function createWebViewManager({ send, labOrigin = globalThis.location?.or
       if (message.bridge && !message.javascript) frame.staticTitle = staticTitle(source.srcdoc);
       iframe.setAttribute('srcdoc', document_);
     } else if ('src' in source) iframe.setAttribute('src', source.src);
-    // the relay puts the page bridge into the document itself (scripts/relay-webview.cjs): the frame says hello like any scriptable document
+    // the relay puts the page bridge into the document itself (apk-lab-relay's src/webview.cjs): the frame says hello like any scriptable document
     if (frame.relay && message.javascript) frame.bridge = { relay: true, loadId: message.loadId };
     // postUrl targets the frame by name: the name must be on the element before it is inserted, because the nested browsing context takes it when it is created
     // (set afterwards, the submission did not find the frame and navigated a top-level context instead).

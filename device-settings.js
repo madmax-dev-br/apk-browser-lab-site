@@ -1,14 +1,14 @@
-import { coreMemorySetting } from './core-memory.js?v=5abc89d1cc06';
-import { isMemoryStep } from './memory-budget.js?v=5abc89d1cc06';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5abc89d1cc06';
-import { sanitizeHostMap } from './host-map.js?v=5abc89d1cc06';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=5abc89d1cc06';
-import { sanitizeLocation } from './runtime-permissions.js?v=5abc89d1cc06';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=5abc89d1cc06';
-import { sanitizeMicrogServices } from './microg-services.js?v=5abc89d1cc06';
-import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=5abc89d1cc06';
-import { tunnelEndpoint } from './tcp-tunnel.js?v=5abc89d1cc06';
-import { checkCustomIdentity } from './device-identity.js?v=5abc89d1cc06';
+import { coreMemorySetting } from './core-memory.js?v=88e579518234';
+import { isMemoryStep } from './memory-budget.js?v=88e579518234';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=88e579518234';
+import { sanitizeHostMap } from './host-map.js?v=88e579518234';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=88e579518234';
+import { sanitizeLocation } from './runtime-permissions.js?v=88e579518234';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=88e579518234';
+import { sanitizeMicrogServices } from './microg-services.js?v=88e579518234';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=88e579518234';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=88e579518234';
+import { checkCustomIdentity } from './device-identity.js?v=88e579518234';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -39,7 +39,7 @@ export function proxyState(raw, detection = null, { inUse = null } = {}) {
     if (status === 'checking' || status === 'unknown') return { state: 'checking', text: `Looking for the APK Lab Relay on ${auto}…` };
     if (status === 'needs-permission') return { state: 'off', text: `No relay looked for yet: this browser asks before a page reaches your computer. "Look for the relay" asks once; until then the browser fetches directly (CORS applies).${running('')}`, action: 'look' };
     if (status === 'blocked') return { state: 'off', text: `No relay: this browser blocks the page from reaching your computer (site settings › Local network access), so the browser fetches directly (CORS applies).${running('')}`, action: 'look' };
-    return { state: 'off', text: `No relay running: the browser fetches directly (CORS applies). Start the APK Lab Relay on this computer (node cors-relay.mjs, port ${RELAY_DEFAULT_PORT}) and the lab uses it by itself, or type a custom proxy here.${running('')}`, action: 'look' };
+    return { state: 'off', text: `No relay running: the browser fetches directly (CORS applies). Start the APK Lab Relay on this computer (its program or node apk-lab-relay.cjs, from github.com/madmax-dev-br/apk-lab-relay; port ${RELAY_DEFAULT_PORT}) and the lab uses it by itself, or type a custom proxy here.${running('')}`, action: 'look' };
   }
   const kept = sanitizeProxyUrl(typed), host = kept ? hostOfProxy(kept) : null;
   if (kept && host) return { state: 'on', text: `Custom proxy: the app's requests go through ${host}${kept.includes('{url}') ? '' : ' (the target URL is appended at the end)'}. In Network they show the PROXY badge. Empty the field to use the APK Lab Relay found on this computer.${running(kept)}` };
@@ -66,8 +66,8 @@ export const customIdentityForLoad = settings => checkCustomIdentity(settings?.c
 // scripts/build-web.mjs rewrites the next line for APKWEB_DEFAULT_ENGINE=js: a build whose default is the JavaScript VM.
 export const DEFAULT_ENGINE = 'wasm';
 export function sanitizeSettings(input = {}) {
-  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [], relayChannel: false }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
-  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); out.network.relayChannel = input.network.relayChannel === true; }   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host. relayChannel: "Parallel relay channel" (src/relay-mux.js): off here (embedders), on in the lab page's defaults
+  const out = { ...DEFAULT_DEVICE, battery: { ...DEFAULT_DEVICE.battery }, network: { allowedHosts: [], proxyUrl: '', hostMap: [], clientCertHosts: [], clientCertAuto: false, relayChannel: false }, memoryMiB: 0, eventSeconds: 0, location: sanitizeLocation(null) };   // memoryMiB: Java heap budget of the VM in MiB, 0 = automatic; applies at the next load
+  if (input.network && typeof input.network === 'object') { out.network.allowedHosts = sanitizeHosts(input.network.allowedHosts); out.network.proxyUrl = sanitizeProxyUrl(input.network.proxyUrl); out.network.hostMap = sanitizeHostMap(input.network.hostMap); out.network.clientCertHosts = sanitizeHosts(input.network.clientCertHosts).filter(host => host !== '*'); out.network.clientCertAuto = input.network.clientCertAuto !== false;   /* a network given without it (the page's saved settings from before 2026-11-27) gets it on; the player says false itself */ out.network.relayChannel = input.network.relayChannel === true; }   // clientCertAuto (owner, 2026-11-27): the app's own client certificate also for hosts not listed, when the app built its SSLContext with a KeyManager; on unless turned off   // clientCertHosts: where the device presents the app's client certificate (mTLS) through the relay; never every host. relayChannel: "Parallel relay channel" (src/relay-mux.js): off here (embedders), on in the lab page's defaults
   for (const [name, values] of Object.entries(ALLOWED)) if (values.includes(input[name])) out[name] = input[name];
   { const custom = checkCustomScreen(input.customScreen); out.customScreen = custom.value ?? DEFAULT_CUSTOM_SCREEN; if (out.screen === 'custom' && !custom.value) out.screen = DEFAULT_DEVICE.screen; }   // "Personalizado" { width, height, unit: 'dp' | 'px' } (device-profile.js checkCustomScreen); kept while a preset is selected so switching back restores it
   if (Number.isFinite(Number(input.fontScale))) out.fontScale = Math.min(2, Math.max(0.85, Number(input.fontScale)));
@@ -102,7 +102,7 @@ export function sanitizeSettings(input = {}) {
 /** A new user's device reaches every host (allowedHosts = ['*']); sanitizeSettings({}) alone stays the closed policy so embedders that pass no network config keep it. */
 /** The lab page's defaults: every host allowed, animations at 1× (as a device ships), every frame drawn at full resolution, moving or new (raster: motionScale 1, navigation off). */
 /** The parallel relay channel is on (it applies only through the APK Lab Relay; the 2026-11-20 default). */
-export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'], relayChannel: true }, animatorScale: 1 }); }
+export function defaultDeviceSettings() { return sanitizeSettings({ network: { allowedHosts: ['*'], relayChannel: true, clientCertAuto: true }, animatorScale: 1 }); }
 /** Stored-settings format: 2 since the "allow every host" option became the default; a record without the marker was saved by a page that only knew the closed allow list.
  * 3 since the engine and the renderer are choices of the Execução panel with new defaults (the WebAssembly core, the GPU): an older record held the old defaults, not a choice.
  * 4 since animations are off and the moving screen is drawn at 35% by default: an older record held the old defaults (1× and 50%), not a choice.

@@ -4,10 +4,10 @@
 // /mux endpoint carries every exchange at once, multiplexed by id; the relay runs them concurrently with its own HTTP client. VM-free; no process.*.
 //
 // What the app sees does not change: openExchange (src/network-transport.js) builds the same relay query and the same headers as for the per-request path, the relay decides the
-// exchange with the same code (scripts/cors-relay.mjs relayAnswer) and returns the headers the page would have got, and `fetch()` below hands openExchange a response object of the
+// exchange with the same code (apk-lab-relay's src/relay.cjs relayAnswer) and returns the headers the page would have got, and `fetch()` below hands openExchange a response object of the
 // same shape a browser's fetch gives (a Headers, a body reader), so the rest of openExchange (Set-Cookie, Content-Encoding, relay error codes) is the per-request path's own code.
 //
-// Wire protocol, version 1 (the relay's side is muxChannel in scripts/cors-relay.mjs). Text messages are JSON control messages; binary messages are body bytes:
+// Wire protocol, version 1 (the relay's side is muxChannel in apk-lab-relay's src/relay.cjs). Text messages are JSON control messages; binary messages are body bytes:
 // [kind u8][id u32 big-endian][bytes], kind 1 the request body (lab -> relay), kind 2 the response body (relay -> lab).
 //   relay -> lab  {"t":"hello","v":1,"window":262144,"maxBody":33554432,"frame":65536}   first message; a relay without the channel refuses the upgrade, so it never comes
 //   lab -> relay  {"t":"req","id":n,"method":"GET","query":"?url=...","headers":[[name,value]...],"length":bytes}, then `length` body bytes in kind-1 frames (none above maxBody)
@@ -19,7 +19,7 @@
 // Availability: the first exchange opens the channel and waits for the hello. No hello (an older relay, a relay that is not running, a proxy that is not the relay) means the
 // per-request path, for that exchange and for the next ones until `retryMs` later; the app's request never fails because the channel is missing. Exchanges in flight when an open
 // channel drops fail as a dropped connection does (ECONNRESET: java.net.SocketException "Connection reset"); the next exchange opens a new channel.
-import { tunnelEndpoint } from './tcp-tunnel.js?v=5abc89d1cc06';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=88e579518234';
 
 export const MUX_VERSION = 1, MUX_WINDOW = 256 * 1024, MUX_FRAME = 64 * 1024;
 const KIND_REQUEST_BODY = 1, KIND_RESPONSE_BODY = 2;

@@ -1,6 +1,6 @@
-import { tunnelEndpoint } from './tcp-tunnel.js?v=5abc89d1cc06';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=88e579518234';
 
-// The Worker's end of the relay's WebView channel (protocol in scripts/relay-webview.cjs, docs/NETWORK.md "WebView documents through the relay"). With the device's Proxy set to an APK
+// The Worker's end of the relay's WebView channel (protocol in apk-lab-relay's src/webview.cjs, docs/NETWORK.md "WebView documents through the relay"). With the device's Proxy set to an APK
 // Lab Relay address, a WebView's http(s) documents are served to its iframe by the relay (http://<label>.localhost:<port>/...) and every request of those documents is decided here:
 // the backend (src/webview-backend.js) answers `request` and `call` messages, this class only carries them, keeps the slot table (label -> view, origin) and knows whether the relay
 // has the channel at all.

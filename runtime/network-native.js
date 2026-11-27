@@ -1,21 +1,21 @@
-import { APKError } from './apk-error.js?v=5abc89d1cc06';
-import { throwNew } from './java-throw.js?v=5abc89d1cc06';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=5abc89d1cc06';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=5abc89d1cc06';
-import { matchBlockedCall, blockedHost, noteBlockHit } from './blocked-calls.js?v=5abc89d1cc06';
-import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=5abc89d1cc06';
-import { Blocked } from './scheduler.js?v=5abc89d1cc06';
-import { captureBody } from './network-capture.js?v=5abc89d1cc06';
-import { OS_CONSTANTS } from './os-constants-data.js?v=5abc89d1cc06';
-import { openExchange, describeFailure } from './network-transport.js?v=5abc89d1cc06';
-import { WorkerExecutor } from './network-worker-executor.js?v=5abc89d1cc06';
-import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=5abc89d1cc06';
-import { TransportAuthority } from './transport-ca.js?v=5abc89d1cc06';
-import { openWebSocketSession } from './websocket-bridge.js?v=5abc89d1cc06';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=5abc89d1cc06';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=5abc89d1cc06';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=5abc89d1cc06';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=88e579518234';
+import { throwNew } from './java-throw.js?v=88e579518234';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=88e579518234';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=88e579518234';
+import { matchBlockedCall, blockedHost, noteBlockHit } from './blocked-calls.js?v=88e579518234';
+import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=88e579518234';
+import { Blocked } from './scheduler.js?v=88e579518234';
+import { captureBody } from './network-capture.js?v=88e579518234';
+import { OS_CONSTANTS } from './os-constants-data.js?v=88e579518234';
+import { openExchange, describeFailure } from './network-transport.js?v=88e579518234';
+import { WorkerExecutor } from './network-worker-executor.js?v=88e579518234';
+import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=88e579518234';
+import { TransportAuthority } from './transport-ca.js?v=88e579518234';
+import { openWebSocketSession } from './websocket-bridge.js?v=88e579518234';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=88e579518234';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=88e579518234';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=88e579518234';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=88e579518234';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -66,7 +66,7 @@ export class NetworkBridge {
   get policy() {
     if (this.platform.networkPolicy) return this.platform.networkPolicy;
     const network = this.platform.device?.network;
-    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], clientCertHosts: network?.clientCertHosts ?? [], relayChannel: network?.relayChannel === true, fetch: null, redirect: 'auto' } };
+    if (this.derived?.source !== network) this.derived = { source: network, value: { allowedHosts: network?.allowedHosts ?? [], proxyUrl: network?.proxyUrl ?? '', hostMap: network?.hostMap ?? [], clientCertHosts: network?.clientCertHosts ?? [], clientCertAuto: network?.clientCertAuto === true, relayChannel: network?.relayChannel === true, fetch: null, redirect: 'auto' } };
     return this.derived.value;
   }
   /** The Worker's network log (src/netlog.js), or null (tests, hosts that attach none). */
@@ -200,6 +200,7 @@ export class NetworkBridge {
     this.stats.bytesOut += request.body?.length ?? 0;
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null, route: op.routed ?? null }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
+    if (op.executor === 'worker' && this.policy.proxyUrl) this.relayReset(this.policy.proxyUrl);   // the session's reset of the relay's client identities, on this path too (not waited for: the synchronous bridge blocks the thread)
     if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url), relayChannel: this.relayChannelSpec() }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { this.noteChannelOf(op, error); op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
@@ -277,6 +278,7 @@ export class NetworkBridge {
     const entry = this.log?.begin({ method: 'CONNECT', url: `tcp://${host}:${port}`, headers: [], body: null }, { api: 'Tunnel', mapped }) ?? null, record = { head: null, error: null, ended: false, closed: false, received: 0 };
     this.stats.requests++; this.noteHost(host);
     if (mapped) { const counted = noteRedirect(this.runtime, this.redirects, mapped, { method: 'CONNECT', url: original }); counted.responses++; }
+    if (this.policy.proxyUrl) this.relayReset(this.policy.proxyUrl);   // a tunnel is a session's first use of the relay too: what an earlier session handed over is forgotten
     const dest = tls ? destination(target.hostname, targetPort) : null, held = dest ? this.clientIdentities?.get(dest) : null, identity = held?.identity && held.proxyUrl === (this.policy.proxyUrl ?? '') ? held : null;
     const session = openTunnelSession({ endpoint, host: target.hostname, port: targetPort, tls, alpn, create: Socket ? url => new Socket(url) : () => { throw new Error('this realm has no WebSocket'); },
       ready: identity?.job ?? null, clientIdentityKey: identity?.key ?? null,   // the client certificate this TLS tunnel needs: at the relay first, and handed again if the relay restarted
@@ -427,18 +429,19 @@ export class NetworkBridge {
    * per identity, over its token-protected channel, for that destination only (the "Redirecionar hosts" target when a rule maps it). Without a relay the browser cannot present it:
    * the server sees no client certificate, as it would from a device whose app offered none, and the trace says why.
    */
-  useClientIdentity(dest, identity, alias) {
+  useClientIdentity(dest, identity, alias, facts = {}) {   // facts: { auto (found by the automatic mode, not a listed host), notAfter (ms), subject } of the leaf certificate, for the page
     const mapped = this.redirectFor(`https://${dest}/`), target = mapped ? destinationOfUrl(mapped.url) ?? dest : dest, proxyUrl = this.policy.proxyUrl ?? '', key = identityKey(identity);
     this.clientIdentities ??= new Map(); const current = this.clientIdentities.get(target);
     if (current && current.key === key && current.proxyUrl === proxyUrl) return;   // handed over already (its outcome is in clientIdentityStatus)
-    const record = text => this.runtime?.record?.(`NET tls client certificate for ${target}: ${text}`);
-    if (!proxyUrl) { this.clientIdentities.set(target, { key, proxyUrl, job: null }); this.noteClientIdentity(target, { state: 'no-relay', alias, detail: 'the browser cannot present a client certificate: set the relay as the Proxy' }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) NOT presented: a browser cannot present a client certificate; set the relay as the Proxy (Controls > Device)`); return; }
+    const meta = { auto: facts.auto === true, notAfter: Number.isFinite(facts.notAfter) ? facts.notAfter : null, subject: facts.subject ?? null };
+    const record = text => this.runtime?.record?.(`NET tls client certificate for ${target}${meta.auto ? ' (automatic: the app built its SSLContext with its own KeyManager)' : ''}: ${text}${meta.notAfter !== null ? `; certificate ${meta.subject ? `CN=${meta.subject} ` : ''}valid until ${new Date(meta.notAfter).toISOString()}` : ''}`);
+    if (!proxyUrl) { this.clientIdentities.set(target, { key, proxyUrl, job: null }); this.noteClientIdentity(target, { ...meta, state: 'no-relay', alias, detail: 'the browser cannot present a client certificate: set the relay as the Proxy' }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) NOT presented: a browser cannot present a client certificate; set the relay as the Proxy (Controls > Device)`); return; }
     const reset = this.relayReset(proxyUrl);
-    this.noteClientIdentity(target, { state: 'pending', alias, detail: 'handing the certificate to the relay' });
+    this.noteClientIdentity(target, { ...meta, state: 'pending', alias, detail: 'handing the certificate to the relay' });
     // the key goes only to a relay that said it keeps identities (another proxy would forward the POST to the destination); a relay that did not answer is asked again next time
     const job = reset.job.then(answer => { if (!answer?.supported) { if (this.identityReset === reset) this.identityReset = null; throw new Error(answer?.reason ?? 'the relay did not answer'); } return registerClientIdentity({ proxyUrl, fetch: this.fetchFunction(), dest: target, identity }); })
-      .then(() => { this.noteClientIdentity(target, { state: 'presented', alias, detail: `${identity.chain.length} certificate(s) at the relay` }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) handed to the relay, presented in the TLS handshakes to this destination only`); },
-        error => { const detail = String(error?.message ?? error).slice(0, 200); this.noteClientIdentity(target, { state: 'failed', alias, detail }); record(`alias "${alias}" NOT presented: ${detail}`); this.clientIdentities.delete(target); });
+      .then(() => { this.noteClientIdentity(target, { ...meta, state: 'presented', alias, detail: `${identity.chain.length} certificate(s) at the relay` }); record(`alias "${alias}" (${identity.chain.length} certificate(s)) handed to the relay, presented in the TLS handshakes to this destination only`); },
+        error => { const detail = String(error?.message ?? error).slice(0, 200); this.noteClientIdentity(target, { ...meta, state: 'failed', alias, detail }); record(`alias "${alias}" NOT presented: ${detail}`); this.clientIdentities.delete(target); });
     this.clientIdentities.set(target, { key, proxyUrl, job, identity });
   }
   /** The session's "forget every identity" request to this relay (once per relay address; again after a relay that did not answer). Its job resolves { supported, reason }. */
@@ -456,11 +459,11 @@ export class NetworkBridge {
     this.runtime?.record?.(`NET tls client certificate for ${dest}: the relay no longer held it (restarted); handed to it again and the request repeated`);
   }
   /** What the page shows under the mTLS field: per destination, the last outcome (presented, failed, no relay, none offered by the app) and how many requests to it went out after the relay had it. */
-  noteClientIdentity(dest, { state, alias = null, detail = '' }) {
+  noteClientIdentity(dest, { state, alias = null, detail = '', auto = false, notAfter = null, subject = null }) {
     this.clientIdentityStatus ??= new Map(); const previous = this.clientIdentityStatus.get(dest);
     // a connection that offers no certificate (another SSLContext of the app, the default one) does not hide that another connection to the same host presented one
     if (state === 'none' && (previous?.state === 'presented' || previous?.state === 'pending' || previous?.state === 'no-relay')) { previous.without = detail; return; }
-    this.clientIdentityStatus.set(dest, { dest, state, alias, detail, uses: state === 'presented' && previous?.state === 'presented' ? previous.uses : 0, without: state === 'none' ? null : previous?.without ?? (previous?.state === 'none' ? previous.detail : null) });
+    this.clientIdentityStatus.set(dest, { dest, state, alias, detail, auto, notAfter, subject, uses: state === 'presented' && previous?.state === 'presented' ? previous.uses : 0, without: state === 'none' ? null : previous?.without ?? (previous?.state === 'none' ? previous.detail : null) });
   }
   noteClientIdentityUse(dest) { const entry = this.clientIdentityStatus?.get(dest); if (entry?.state === 'presented') entry.uses++; }
   /** -> [{ dest, state, alias, detail, uses }] for vmHealth. */

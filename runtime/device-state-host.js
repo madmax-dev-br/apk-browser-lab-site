@@ -1,11 +1,11 @@
-import { APKError } from './apk-error.js?v=5abc89d1cc06';
-import { defineIntentFilterMatching } from './intent-filter-host.js?v=5abc89d1cc06';
-import { installNetworkCallbacks } from './network-callbacks.js?v=5abc89d1cc06';
-import { createHostRegistry } from './host-contract.js?v=5abc89d1cc06';
-import { resolveDevice } from './device-profile.js?v=5abc89d1cc06';
-import { configurationFor, resourceProfileFor } from './device-configuration.js?v=5abc89d1cc06';
-import { gcRoot } from './heap-gc.js?v=5abc89d1cc06';
-import { installBroadcastQueue } from './broadcast-queue.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=88e579518234';
+import { defineIntentFilterMatching } from './intent-filter-host.js?v=88e579518234';
+import { installNetworkCallbacks } from './network-callbacks.js?v=88e579518234';
+import { createHostRegistry } from './host-contract.js?v=88e579518234';
+import { resolveDevice } from './device-profile.js?v=88e579518234';
+import { configurationFor, resourceProfileFor } from './device-configuration.js?v=88e579518234';
+import { gcRoot } from './heap-gc.js?v=88e579518234';
+import { installBroadcastQueue } from './broadcast-queue.js?v=88e579518234';
 // Live changes of the virtual device (Settings panel) with ActivityThread semantics:
 //   new Configuration -> resource selector re-run (original ResTable_config matching) -> live Themes rebased -> per Activity: onConfigurationChanged when the
 //   manifest's android:configChanges covers every changed bit, otherwise relaunch with saved state -> Application/ComponentCallbacks -> window re-layout/insets.

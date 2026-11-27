@@ -1,7 +1,7 @@
 // The wire side of the web device's network: one HTTP exchange over fetch, shared by the in-realm executor (network-native.js) and the synchronous network worker
 // (network-worker.js). No VM state in here.
-import { mapUrl } from './host-map.js?v=5abc89d1cc06';
-import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=5abc89d1cc06';
+import { mapUrl } from './host-map.js?v=88e579518234';
+import { NO_IDENTITY_CODE, destinationOfUrl, registerClientIdentity, relayUrl } from './client-identity.js?v=88e579518234';
 export const FORBIDDEN_REQUEST_HEADERS = new Set(['content-length', 'host', 'connection', 'transfer-encoding', 'keep-alive', 'upgrade', 'expect', 'te', 'trailer', 'proxy-connection']);
 /** Header names a browser's fetch silently drops; with a relay they travel under an x-apkweb- prefix instead. */
 export const BROWSER_ONLY_FORBIDDEN = new Set(['cookie', 'cookie2', 'user-agent', 'accept-encoding', 'origin', 'referer', 'date', 'dnt', 'via']);
@@ -54,7 +54,7 @@ export async function openExchange(request, options = {}) {
   }
   const channelInfo = channel ? { relayChannel: channel, relayChannelNote: channel === 'fallback' ? String(mux.reason ?? 'the channel is not open') : null } : null;
   if (response.type === 'opaqueredirect') { try { await response.body?.cancel(); } catch { /* ignored */ } throw Object.assign(new Error('The browser does not expose redirect responses; enable redirect following for this connection'), { code: 'APKWEB_OPAQUE_REDIRECT' }); }
-  // A relay that could not reach the target answers 502 with the Node error code (scripts/cors-relay.mjs): it is the same failure as a direct connect, so it becomes the same exception.
+  // A relay that could not reach the target answers 502 with the Node error code (apk-lab-relay's src/relay.cjs): it is the same failure as a direct connect, so it becomes the same exception.
   const relayCode = proxyUrl ? response.headers.get('x-apkweb-relay-error-code') : null;
   if (relayCode) {
     try { await response.body?.cancel(); } catch { /* ignored */ }

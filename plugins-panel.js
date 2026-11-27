@@ -3,12 +3,12 @@
 // with colours and a syntax check, src/code-editor.js; a stored package filter is kept, not edited); the list lives in localStorage (src/plugin-store.js) and is handed to the host
 // (src/plugin-host.js), which runs each enabled plugin in its own Worker. The output panel shows one card per running or failed plugin: its blocks (rendered with textContent
 // and DOM building only, never HTML), badge, console and errors, with Parar / Reiniciar. Renders are coalesced (at most every RENDER_MS) and skipped while the panel is closed.
-import { RENDER_MS } from './plugin-host.js?v=5abc89d1cc06';
-import { syncButtons, buttonItems } from './plugin-buttons.js?v=5abc89d1cc06';
-import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=5abc89d1cc06';
-import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, blankPlugin } from './plugin-store.js?v=5abc89d1cc06';
-import { createCodeEditor, editKey } from './code-editor.js?v=5abc89d1cc06';
-import { listRow, detailList } from './list-rows.js?v=5abc89d1cc06';
+import { RENDER_MS } from './plugin-host.js?v=88e579518234';
+import { syncButtons, buttonItems } from './plugin-buttons.js?v=88e579518234';
+import { POWER, POWER_NOTES, loadPower, savePower, sanitizePower } from './plugin-power.js?v=88e579518234';
+import { MAX_PLUGINS, normalizePlugin, validatePlugin, loadPlugins, savePlugins, blankPlugin } from './plugin-store.js?v=88e579518234';
+import { createCodeEditor, editKey } from './code-editor.js?v=88e579518234';
+import { listRow, detailList } from './list-rows.js?v=88e579518234';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type=hidden]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 const STATUS_LABEL = { rodando: 'running', iniciando: 'starting', parado: 'stopped', erro: 'error' };

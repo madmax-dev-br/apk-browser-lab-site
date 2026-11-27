@@ -5,7 +5,7 @@
 //   { format: 'apkweb-lab-configuration', version: 1, exportedAt: ISO text (information only),
 //     device?:  the device settings as the page keeps them (src/device-settings.js sanitizeSettings): screen, orientation, locale, battery, connectivity, navigation, font and
 //               animation scales, custom screen, custom device identity, microG option and its services, the simulated location, engine, renderer and the other Execution options,
-//               and network: { allowedHosts, proxyUrl, hostMap (Redirect hosts), clientCertHosts, relayChannel },
+//               and network: { allowedHosts, proxyUrl, hostMap (Redirect hosts), clientCertHosts, clientCertAuto, relayChannel },
 //     plugins?: [{ id?, name, code, enabled?, packageFilter?, updates?, height? }]   -- the page plugins (global, JavaScript the page runs): each one replaces the plugin of the same id or name, else is added;
 //               plugins the file does not carry are left alone. Never applied silently: the page asks first, MCP needs allowPlugins,
 //     package?: { name, mocks?: [endpoint mock], blockedCalls?: [blocked call rule], methodReturns?: [{ method, value, enabled }], ignoredActivities?: [{ name, enabled }],
@@ -16,11 +16,11 @@
 // credentials typed into an app or into microG's login, the files added to the device's shared storage, the debugger's breakpoints, what a plugin produced or stored while it ran (its
 // output, console, errors), the method changes plugins and MCP make with lab.hook (they belong to a plugin's session), the denial counters of the permission dialog, and the
 // viewer's own preferences (theme, zoom, panel sizes, the MCP connection fields, the launcher icon's Activity).
-import { sanitizeSettings } from './device-settings.js?v=5abc89d1cc06';
-import { validateMock, normalizeMock, MAX_MOCKS } from './endpoint-mocks.js?v=5abc89d1cc06';
-import { validateBlock, normalizeBlock, MAX_BLOCKS, BLOCK_SCOPES } from './blocked-calls.js?v=5abc89d1cc06';
-import { parseMethodSpec, parseReturnValue } from './method-overrides.js?v=5abc89d1cc06';
-import { validatePlugin, normalizePlugin, blockHeight, MAX_PLUGINS } from './plugin-store.js?v=5abc89d1cc06';
+import { sanitizeSettings } from './device-settings.js?v=88e579518234';
+import { validateMock, normalizeMock, MAX_MOCKS } from './endpoint-mocks.js?v=88e579518234';
+import { validateBlock, normalizeBlock, MAX_BLOCKS, BLOCK_SCOPES } from './blocked-calls.js?v=88e579518234';
+import { parseMethodSpec, parseReturnValue } from './method-overrides.js?v=88e579518234';
+import { validatePlugin, normalizePlugin, blockHeight, MAX_PLUGINS } from './plugin-store.js?v=88e579518234';
 
 export const CONFIG_FORMAT = 'apkweb-lab-configuration';
 export const CONFIG_VERSION = 1;

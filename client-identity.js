@@ -1,6 +1,6 @@
 // The device's TLS client identity (mTLS) for the hosts the device settings name (network.clientCertHosts). What the identity is, is the app's: at the handshake of a TLS socket to one of
 // those hosts the lab asks the KeyManager of the app's SSLContext, as Conscrypt does when a server sends a CertificateRequest (X509KeyManager.chooseClientAlias, then getPrivateKey and
-// getCertificateChain; src/tls-socket-host.js). The browser cannot present a client certificate, so the identity goes to the APK Lab Relay (scripts/cors-relay.mjs, its
+// getCertificateChain; src/tls-socket-host.js). The browser cannot present a client certificate, so the identity goes to the APK Lab Relay (apk-lab-relay's src/relay.cjs, its
 // token-protected channel), only for that destination; the relay keeps it in memory and presents it to that host and port, on the HTTPS path and on the TLS tunnel.
 // The private key is the app's own: a key it loaded (PKCS12/BKS: PrivateKey.getEncoded is its PKCS#8) or a key in the AndroidKeyStore, whose material the lab's software KeyMint
 // holds (framework-aosp/lab-java-jca/dev/apkweb/keystore, its "LKS1" database in the virtual filesystem). No process.*.
@@ -49,24 +49,29 @@ export function parseLabKeystore(bytes) {
 
 /**
  * The line under the mTLS field: { state: 'off' | 'on' | 'ok' | 'warn' | 'error', label, text }.
- * `hosts` the configured client-certificate hosts, `proxyUrl` the proxy in use, `entries` what the running device did (NetworkBridge.clientIdentitySummary, from vmHealth; null without an app).
+ * `hosts` the configured client-certificate hosts, `auto` the automatic mode (the app's own certificate for any host, when the app built its SSLContext with a KeyManager),
+ * `proxyUrl` the proxy in use, `entries` what the running device did (NetworkBridge.clientIdentitySummary, from vmHealth; null without an app), `now` the clock (ms).
  */
-export function clientIdentityStatus({ hosts = [], proxyUrl = '', entries = null } = {}) {
-  if (!hosts.length) return { state: 'off', label: 'Off', text: 'mTLS off: no client certificate host is listed.' };
-  const list = hosts.join(', ');
-  if (!proxyUrl) return { state: 'warn', label: 'On, not working', text: `mTLS on for ${list}, but no relay is set as the Proxy: the browser cannot present a client certificate by itself.` };
+export function clientIdentityStatus({ hosts = [], auto = false, proxyUrl = '', entries = null, now = Date.now() } = {}) {
+  if (!hosts.length && !auto) return { state: 'off', label: 'Off', text: 'mTLS off: no client certificate host is listed and the automatic mode is off.' };
+  const scope = [auto ? 'automatic (the certificate the app itself sets up)' : null, hosts.length ? `for ${hosts.join(', ')}` : null].filter(Boolean).join(' and ');
+  if (!proxyUrl) return { state: 'warn', label: 'On, not working', text: `mTLS on, ${scope}, but no relay is the Proxy: the browser cannot present a client certificate by itself.` };
   const seen = entries ?? [];
-  if (!seen.length) return { state: 'on', label: 'On, waiting', text: `mTLS on for ${list}. Nothing used it yet: it works once the app opens a TLS connection to one of these hosts.` };
+  if (!seen.length) return { state: 'on', label: auto && !hosts.length ? 'Automatic' : 'On, waiting', text: `mTLS on, ${scope}. Nothing used it yet: it works once the app opens a TLS connection with its client certificate.` };
+  const day = ms => new Date(ms).toISOString().slice(0, 10);
+  const validity = entry => entry.notAfter === null || entry.notAfter === undefined ? '' : entry.notAfter <= now ? `, EXPIRED on ${day(entry.notAfter)}` : `, valid until ${day(entry.notAfter)}`;
+  const expired = entry => entry.notAfter !== null && entry.notAfter !== undefined && entry.notAfter <= now;
   const describe = entry => {
-    const who = entry.alias ? `alias "${entry.alias}"` : 'the app';
-    if (entry.state === 'presented') return `${entry.dest}: ${who} presented (${entry.uses} request${entry.uses === 1 ? '' : 's'})${entry.without ? `; other connections to it offered none (${entry.without})` : ''}`;
-    if (entry.state === 'pending') return `${entry.dest}: ${who}, handing to the relay`;
+    const who = `${entry.alias ? `alias "${entry.alias}"` : 'the app'}${entry.subject ? ` (CN=${entry.subject}${validity(entry)})` : validity(entry) ? ` (${validity(entry).slice(2)})` : ''}`, found = entry.auto ? ' [found by itself]' : '';
+    if (entry.state === 'presented') return `${entry.dest}${found}: ${who} presented (${entry.uses} request${entry.uses === 1 ? '' : 's'})${entry.without ? `; other connections to it offered none (${entry.without})` : ''}`;
+    if (entry.state === 'pending') return `${entry.dest}${found}: ${who}, handing to the relay`;
     if (entry.state === 'none') return `${entry.dest}: the app offered no certificate (${entry.detail})`;
-    return `${entry.dest}: ${who} NOT presented (${entry.detail})`;
+    return `${entry.dest}${found}: ${who} NOT presented (${entry.detail})`;
   };
   const text = seen.map(describe).join('; ');
   if (seen.some(entry => entry.state === 'failed' || entry.state === 'no-relay')) return { state: 'error', label: 'On, failing', text: `mTLS: ${text}.` };
-  if (seen.some(entry => entry.state === 'presented')) return { state: 'ok', label: 'On, working', text: `mTLS working: ${text}.` };
+  if (seen.some(entry => expired(entry))) return { state: 'warn', label: 'Certificate expired', text: `mTLS: ${text}. The server refuses an expired certificate: the app has to renew it (as on a phone).` };
+  if (seen.some(entry => entry.state === 'presented')) return { state: 'ok', label: seen.every(entry => entry.auto || entry.state !== 'presented') ? 'Automatic, working' : 'On, working', text: `mTLS working: ${text}.` };
   if (seen.every(entry => entry.state === 'none')) return { state: 'warn', label: 'On, no certificate', text: `mTLS on: ${text}.` };
   return { state: 'on', label: 'On, connecting', text: `mTLS: ${text}.` };
 }
@@ -83,7 +88,7 @@ export function relayUrl(proxyUrl, target, extra = {}) {
   for (const [name, value] of Object.entries(extra)) url += `${url.includes('?') ? '&' : '?'}${name}=${encodeURIComponent(value)}`;
   return url;
 }
-/** True when a relay's answer says it keeps client identities (scripts/cors-relay.mjs `x-apkweb-relay-features`); any other server would forward the POST to the destination. */
+/** True when a relay's answer says it keeps client identities (apk-lab-relay's src/relay.cjs `x-apkweb-relay-features`); any other server would forward the POST to the destination. */
 const keepsIdentities = response => response.status === 204 && /(^|[\s,])client-identity([\s,]|$)/.test(response.headers?.get?.('x-apkweb-relay-features') ?? '');
 
 /**
@@ -95,7 +100,7 @@ export async function forgetClientIdentities({ proxyUrl, fetch: fetchFunction = 
   try { response = await fetchFunction(relayUrl(proxyUrl, 'https://client-identity.invalid/', { 'client-identity': 'forget-all' }), { method: 'POST', body: '', headers: [['content-type', 'text/plain']], credentials: 'omit', cache: 'no-store' }); }
   catch (error) { return { supported: false, reason: `the relay did not answer (${String(error?.message ?? error).slice(0, 120)}): is it running?` }; }
   try { await response.body?.cancel?.(); } catch { /* ignored */ }
-  return keepsIdentities(response) ? { supported: true, reason: null } : { supported: false, reason: `the Proxy is not a relay that keeps client certificates (answer ${response.status}): use scripts/cors-relay.mjs; the key was not sent` };
+  return keepsIdentities(response) ? { supported: true, reason: null } : { supported: false, reason: `the Proxy is not a relay that keeps client certificates (answer ${response.status}): use the APK Lab Relay (github.com/madmax-dev-br/apk-lab-relay); the key was not sent` };
 }
 /** POSTs the identity for `dest` to the relay (its token-protected channel). Resolves when the relay stored it; rejects with the relay's answer otherwise. */
 export async function registerClientIdentity({ proxyUrl, fetch: fetchFunction = globalThis.fetch, dest, identity }) {
