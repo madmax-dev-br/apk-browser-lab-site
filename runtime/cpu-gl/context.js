@@ -3,14 +3,14 @@
 // the error flags and every state query follow the OpenGL ES 3.0.6 specification; where WebGL2 is stricter than ES (buffer-bound checks on draws, robust array indexing in
 // shaders) the lab's WebGL2 path already behaves that way and this one does the same. Pixels: textures, renderbuffers and the default framebuffer are images of
 // src/cpu-gl/formats.js, rows bottom-up as GL addresses them; transferToImageBitmap turns the default framebuffer into the page's picture (top-down). No process.*.
-import { Shader, Program, compileShader, linkProgram, VARYING_BASE, MAX_VERTEX_ATTRIBS, MAX_DRAW_BUFFERS, MAX_COMBINED_UNITS } from './program.js?v=df19921e3eea';
-import { Texture, Sampler, Unit, T as TX, SAMPLER_PARAMS } from './textures.js?v=df19921e3eea';
-import { FORMATS, COMPRESSED_FORMATS, GLC, Image, formatOf, unpackInto, packFrom, clientLayout, uploadAllowed, readFormatAllowed, readPreferred, makeColorWriter, readTexel, quantizeDepth, isKnownType, isKnownFormat, toHalf, fromHalf } from './formats.js?v=df19921e3eea';
-import { draw as drawPipeline, MODES } from './raster.js?v=df19921e3eea';
-import { comps } from './glsl-types.js?v=df19921e3eea';
-import { LOOP_LIMIT } from './glsl-codegen.js?v=df19921e3eea';
-import { WEBGL_CONSTANTS } from './constants.js?v=df19921e3eea';
-import { ETC_FORMATS, compressedSize, decodeInto } from './etc.js?v=df19921e3eea';
+import { Shader, Program, compileShader, linkProgram, VARYING_BASE, MAX_VERTEX_ATTRIBS, MAX_DRAW_BUFFERS, MAX_COMBINED_UNITS } from './program.js?v=28012a33f717';
+import { Texture, Sampler, Unit, T as TX, SAMPLER_PARAMS } from './textures.js?v=28012a33f717';
+import { FORMATS, COMPRESSED_FORMATS, GLC, Image, formatOf, unpackInto, packFrom, clientLayout, uploadAllowed, readFormatAllowed, readPreferred, makeColorWriter, readTexel, quantizeDepth, isKnownType, isKnownFormat, toHalf, fromHalf } from './formats.js?v=28012a33f717';
+import { draw as drawPipeline, MODES } from './raster.js?v=28012a33f717';
+import { comps } from './glsl-types.js?v=28012a33f717';
+import { LOOP_LIMIT } from './glsl-codegen.js?v=28012a33f717';
+import { WEBGL_CONSTANTS } from './constants.js?v=28012a33f717';
+import { ETC_FORMATS, compressedSize, decodeInto } from './etc.js?v=28012a33f717';
 
 export const CPU_RENDERER = 'APK Web Lab CPU rasterizer', CPU_VENDOR = 'APK Web Lab';
 const C = {

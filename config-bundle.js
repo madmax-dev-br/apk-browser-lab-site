@@ -16,11 +16,11 @@
 // credentials typed into an app or into microG's login, the files added to the device's shared storage, the debugger's breakpoints, what a plugin produced or stored while it ran (its
 // output, console, errors), the method changes plugins and MCP make with lab.hook (they belong to a plugin's session), the denial counters of the permission dialog, and the
 // viewer's own preferences (theme, zoom, panel sizes, the MCP connection fields, the launcher icon's Activity).
-import { sanitizeSettings } from './device-settings.js?v=df19921e3eea';
-import { validateMock, normalizeMock, MAX_MOCKS } from './endpoint-mocks.js?v=df19921e3eea';
-import { validateBlock, normalizeBlock, MAX_BLOCKS, BLOCK_SCOPES } from './blocked-calls.js?v=df19921e3eea';
-import { parseMethodSpec, parseReturnValue } from './method-overrides.js?v=df19921e3eea';
-import { validatePlugin, normalizePlugin, blockHeight, MAX_PLUGINS } from './plugin-store.js?v=df19921e3eea';
+import { sanitizeSettings } from './device-settings.js?v=28012a33f717';
+import { validateMock, normalizeMock, MAX_MOCKS } from './endpoint-mocks.js?v=28012a33f717';
+import { validateBlock, normalizeBlock, MAX_BLOCKS, BLOCK_SCOPES } from './blocked-calls.js?v=28012a33f717';
+import { parseMethodSpec, parseReturnValue } from './method-overrides.js?v=28012a33f717';
+import { validatePlugin, normalizePlugin, blockHeight, MAX_PLUGINS } from './plugin-store.js?v=28012a33f717';
 
 export const CONFIG_FORMAT = 'apkweb-lab-configuration';
 export const CONFIG_VERSION = 1;

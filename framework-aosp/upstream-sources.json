@@ -39158,5 +39158,155 @@
     "sha256": "634aa76da0b785a513e2384e278279d6a0883e6af5cb881bbfc570dee4f41c56",
     "bytes": 6693,
     "license": "Apache-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Documented.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Documented.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Documented.java?format=TEXT",
+    "sha256": "5fc37fb1237e5a6977f06d0688e6eeb4654b9aa5f830fdd034ceed343559488f",
+    "bytes": 2342,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Retention.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Retention.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Retention.java?format=TEXT",
+    "sha256": "a58a7335f541d61ecb11dd746892334586238a453420d17a7cbd75aee8550b38",
+    "bytes": 2002,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/RetentionPolicy.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/RetentionPolicy.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/RetentionPolicy.java?format=TEXT",
+    "sha256": "b6be6931feace625f77a5bde894badbd9d790e169fe4e49266576c4b28878e01",
+    "bytes": 2103,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Target.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Target.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Target.java?format=TEXT",
+    "sha256": "42d5647cdf4ed0a59e8c8f8275c5e6f1651d5d4fca0804ff68c92b09d3db516e",
+    "bytes": 3467,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/ElementType.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/ElementType.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/ElementType.java?format=TEXT",
+    "sha256": "b622adb5c81be7536ac63ce5f84a0c18bfec8f47315846ef29933f09c9b5a867",
+    "bytes": 4297,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Inherited.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Inherited.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Inherited.java?format=TEXT",
+    "sha256": "2cd1671bae6a28712fe0d870b0215ae2294dc9fcaceac6a91833e60e5d3cd0cc",
+    "bytes": 2367,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Repeatable.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Repeatable.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Repeatable.java?format=TEXT",
+    "sha256": "c4046bb31afc3467b74a44ba4acf63d26376427539923c781b8c282e21d11ef2",
+    "bytes": 1986,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/Native.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/Native.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/Native.java?format=TEXT",
+    "sha256": "3ff0a014cb5930e7b20195fc67d7740a409464ada6fb6d80d019e95daccd2af1",
+    "bytes": 1647,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/AnnotationFormatError.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/AnnotationFormatError.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/AnnotationFormatError.java?format=TEXT",
+    "sha256": "6bae011431e5460f0f4cc9b11f5f47c9ec81ca78d1bc7d0250f492c5cf6d21f9",
+    "bytes": 3031,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/AnnotationTypeMismatchException.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/AnnotationTypeMismatchException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/AnnotationTypeMismatchException.java?format=TEXT",
+    "sha256": "63f6164d48db041d2a5e3a05409c1177036abcab644dc7225555dd3d8aa230e5",
+    "bytes": 3788,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/annotation/IncompleteAnnotationException.java",
+    "localPath": "framework-aosp/upstream/java/lang/annotation/IncompleteAnnotationException.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/annotation/IncompleteAnnotationException.java?format=TEXT",
+    "sha256": "785362624e217fc2770fa042ba404e17af5c3c3b826a1b296101f956363e1fe6",
+    "bytes": 3165,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/Override.java",
+    "localPath": "framework-aosp/upstream/java/lang/Override.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/Override.java?format=TEXT",
+    "sha256": "78fb6786463ceabe723913dc302abaca5f4ba3526e99a4b1a5a702d729c71ec7",
+    "bytes": 2073,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/SuppressWarnings.java",
+    "localPath": "framework-aosp/upstream/java/lang/SuppressWarnings.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/SuppressWarnings.java?format=TEXT",
+    "sha256": "b0a3cdddb1c0bbe83ce5fc0f446e9e9eafcda95a9b427505e935c81d973d45b4",
+    "bytes": 3283,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/SafeVarargs.java",
+    "localPath": "framework-aosp/upstream/java/lang/SafeVarargs.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/SafeVarargs.java?format=TEXT",
+    "sha256": "ab97fb1d069be51ac78beb1f3d2d8152c35533a335687343f2fb9a68e29c3e48",
+    "bytes": 3746,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
+  },
+  {
+    "project": "platform/libcore",
+    "tag": "android-13.0.0_r1",
+    "path": "ojluni/src/main/java/java/lang/FunctionalInterface.java",
+    "localPath": "framework-aosp/upstream/java/lang/FunctionalInterface.java",
+    "url": "https://android.googlesource.com/platform/libcore/+/android-13.0.0_r1/ojluni/src/main/java/java/lang/FunctionalInterface.java?format=TEXT",
+    "sha256": "7ca97deb2d0f89c89a00542ef13d8ecff7b00c3ed687d3ef9adc5421a2677e5d",
+    "bytes": 2952,
+    "license": "GPL-2.0-only WITH Classpath-exception-2.0"
   }
 ]

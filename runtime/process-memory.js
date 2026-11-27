@@ -13,8 +13,8 @@
 // The device's memory (ActivityManager.getMemoryInfo, /proc/meminfo, sysinfo) is DEVICE_MEMORY_BYTES, the RAM MemoryInfo.totalMem has always reported, and what this one app
 // process does not hold of it (the device runs no other process, kernel, page cache or swap of its own). The process's CPU time (/proc/self/stat utime,
 // Process.getElapsedCpuTime) is the Worker's busy time (the time breakdown without idle, src/time-breakdown.js), never more than the process's uptime.
-import { nativeHeap } from './vm-debug-host.js?v=df19921e3eea';
-import { BUCKET, BUCKET_COUNT } from './time-breakdown.js?v=df19921e3eea';
+import { nativeHeap } from './vm-debug-host.js?v=28012a33f717';
+import { BUCKET, BUCKET_COUNT } from './time-breakdown.js?v=28012a33f717';
 
 export const PAGE = 4096;
 const kb = bytes => Math.floor(bytes / 1024);

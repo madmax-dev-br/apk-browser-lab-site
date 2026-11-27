@@ -296,7 +296,7 @@
       }
     ]
   },
-  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "requiresDefaultFrameworkSha256": "70e8ee36f7878bdd48099b7707ce38e2bff53ecbe3cda54b6055584e1c0e9bbc",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original media data classes (PlaybackState, MediaMetadata, MediaDescription, Rating) that the lab's MediaSession and MediaController host classes pass through unchanged, and the original route provider side of MediaRouter2 (MediaRoute2ProviderService and its binder, route and session data classes, the MediaRouter2 callback bases); no media router service: no system routes, no provider is bound by the device",
   "activationPolicy": "an installed package DEX references android.media.session.PlaybackState, android.media.MediaMetadata, android.media.MediaDescription, android.media.Rating, android.media.MediaRoute2ProviderService, MediaRoute2Info, RoutingSessionInfo, MediaRoute2ProviderInfo or a MediaRouter2 callback base (or explicit loader option)",

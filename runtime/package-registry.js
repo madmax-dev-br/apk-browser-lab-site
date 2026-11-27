@@ -1,7 +1,7 @@
-import { APP_PID, SYSTEM_SERVER_PID } from './virtual-pids.js?v=df19921e3eea';
-import { APKError } from './apk-error.js?v=df19921e3eea';
-import { gcRoot } from './heap-gc.js?v=df19921e3eea';
-import { Blocked } from './scheduler.js?v=df19921e3eea';
+import { APP_PID, SYSTEM_SERVER_PID } from './virtual-pids.js?v=28012a33f717';
+import { APKError } from './apk-error.js?v=28012a33f717';
+import { gcRoot } from './heap-gc.js?v=28012a33f717';
+import { Blocked } from './scheduler.js?v=28012a33f717';
 
 /**
  * Thrown by a host method that needs another package's process while that process starts on the main thread (ensureProcess off the main thread): the Java call site that
@@ -10,9 +10,9 @@ import { Blocked } from './scheduler.js?v=df19921e3eea';
 export class ProcessStartPending extends Error {
   constructor(blocked) { super(blocked.reason); this.name = 'ProcessStartPending'; this.blocked = blocked; }
 }
-import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=df19921e3eea';
-import { AndroidResources } from './android-resources.js?v=df19921e3eea';
-import { isSystemActivityCode } from './system-activities.js?v=df19921e3eea';
+import { FRAMEWORK_PERMISSIONS } from './permission-data.js?v=28012a33f717';
+import { AndroidResources } from './android-resources.js?v=28012a33f717';
+import { isSystemActivityCode } from './system-activities.js?v=28012a33f717';
 
 // The installed packages of the virtual device beyond the app being run (docs/MULTI-PACKAGE.md). Without a companion this registry is inert: `multi` is false and every
 // caller keeps its single-package path, so a device with one package behaves exactly as before.

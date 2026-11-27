@@ -9,7 +9,7 @@
 //   { id, enabled, scope: 'endpoint' | 'host', name, method, url, query, host }
 //   scope 'endpoint': method ('ANY' | GET | POST ...) + url, the same pattern as an endpoint mock ("https://api.example.test/v1/*" or "/v1/*", * and ** segments) and query ('ignore' | 'exact').
 //   scope 'host': host as "api.example.test", "*.example.test" (one label) or "api.example.test:8443"; every method, scheme, path and query. Without a port, any port.
-import { parsePattern, mockMatches, MOCK_METHODS, HOST_PATTERN, IPV6 } from './endpoint-mocks.js?v=df19921e3eea';
+import { parsePattern, mockMatches, MOCK_METHODS, HOST_PATTERN, IPV6 } from './endpoint-mocks.js?v=28012a33f717';
 
 export const BLOCK_SCOPES = ['endpoint', 'host'];
 export const MAX_BLOCKS = 50;

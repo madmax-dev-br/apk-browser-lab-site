@@ -5,7 +5,7 @@
 // failed in any way (an error, a crash, no helper left), expands the entry on its own thread, so results and error messages are those of the sequential path.
 // The VM Worker starts the pool when the page opens (src/apk-worker.js warmAssets): the helpers load their two modules and warm crc32 while the user picks an APK.
 
-import { crc32Combine } from './zip-entry.js?v=df19921e3eea';
+import { crc32Combine } from './zip-entry.js?v=28012a33f717';
 
 /** `create()` makes one helper: an object with postMessage(message, transfer), terminate(), and the onmessage / onerror properties of a Worker. */
 export class InflatePool {

@@ -1,14 +1,14 @@
-import { coreMemorySetting } from './core-memory.js?v=df19921e3eea';
-import { isMemoryStep } from './memory-budget.js?v=df19921e3eea';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=df19921e3eea';
-import { sanitizeHostMap } from './host-map.js?v=df19921e3eea';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=df19921e3eea';
-import { sanitizeLocation } from './runtime-permissions.js?v=df19921e3eea';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=df19921e3eea';
-import { sanitizeMicrogServices } from './microg-services.js?v=df19921e3eea';
-import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=df19921e3eea';
-import { tunnelEndpoint } from './tcp-tunnel.js?v=df19921e3eea';
-import { checkCustomIdentity } from './device-identity.js?v=df19921e3eea';
+import { coreMemorySetting } from './core-memory.js?v=28012a33f717';
+import { isMemoryStep } from './memory-budget.js?v=28012a33f717';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=28012a33f717';
+import { sanitizeHostMap } from './host-map.js?v=28012a33f717';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=28012a33f717';
+import { sanitizeLocation } from './runtime-permissions.js?v=28012a33f717';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=28012a33f717';
+import { sanitizeMicrogServices } from './microg-services.js?v=28012a33f717';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=28012a33f717';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=28012a33f717';
+import { checkCustomIdentity } from './device-identity.js?v=28012a33f717';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };

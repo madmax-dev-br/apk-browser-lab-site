@@ -3,8 +3,8 @@
 // rasterization of points, lines and polygons at pixel centres with the top-left rule (3.4-3.6; vertex positions snapped to 1/256 pixel so shared edges are watertight),
 // perspective-correct interpolation (3.6.1), the fragment shader, then the per-fragment operations (4.1: scissor, stencil, depth with polygon offset, occlusion queries,
 // blending, colour masks) into the draw framebuffer's images. No process.*.
-import { VARYING_BASE } from './program.js?v=df19921e3eea';
-import { makeColorWriter, srgbDecode, srgbEncode, quantizeDepth, fromHalf } from './formats.js?v=df19921e3eea';
+import { VARYING_BASE } from './program.js?v=28012a33f717';
+import { makeColorWriter, srgbDecode, srgbEncode, quantizeDepth, fromHalf } from './formats.js?v=28012a33f717';
 
 export const MODES = { POINTS: 0, LINES: 1, LINE_LOOP: 2, LINE_STRIP: 3, TRIANGLES: 4, TRIANGLE_STRIP: 5, TRIANGLE_FAN: 6 };
 const E = {

@@ -4555,7 +4555,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "requiresDefaultFrameworkSha256": "70e8ee36f7878bdd48099b7707ce38e2bff53ecbe3cda54b6055584e1c0e9bbc",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "The original org.apache.http.legacy library (Apache HttpClient 4.0 as Android ships it, commons-codec and commons-logging, AndroidHttpClient): its network I/O goes through the lab's java.net sockets like any other socket code",
   "activationPolicy": "the package declares <uses-library android:name=\"org.apache.http.legacy\"> (required or not), or its targetSdkVersion is below 28 (or explicit loader option)",

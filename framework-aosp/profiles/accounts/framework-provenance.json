@@ -160,7 +160,7 @@
       }
     ]
   },
-  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "requiresDefaultFrameworkSha256": "70e8ee36f7878bdd48099b7707ce38e2bff53ecbe3cda54b6055584e1c0e9bbc",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original account authenticator classes (the authenticator side of IAccountAuthenticator), AuthenticatorDescription and the system account chooser Activities (ChooseTypeAndAccountActivity, ChooseAccountTypeActivity; started by AccountManager.newChooseAccountIntent, run as Activities of the android package: src/system-activities.js); AccountManagerService is the lab's (src/account-sessions.js): it binds the authenticator's service as the system and calls it through the generated Proxy",
   "activationPolicy": "an installed package DEX references android.accounts.AbstractAccountAuthenticator, AccountAuthenticatorResponse or AccountAuthenticatorActivity (or a companion package is installed, or explicit loader option)",

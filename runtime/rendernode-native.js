@@ -1,9 +1,9 @@
-import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=df19921e3eea';
-import {APKError} from './apk-error.js?v=df19921e3eea';
-import {getVectorGraphics} from './vector-native.js?v=df19921e3eea';
-import {getSolidPaintByHandle} from './paint-host.js?v=df19921e3eea';
-import {createMatrixNativeBindings} from './matrix-native.js?v=df19921e3eea';
-import {colorLongToArgb} from './color-long.js?v=df19921e3eea';
+import {cameraTransform,hasCameraRotation} from './camera-transform.js?v=28012a33f717';
+import {APKError} from './apk-error.js?v=28012a33f717';
+import {getVectorGraphics} from './vector-native.js?v=28012a33f717';
+import {getSolidPaintByHandle} from './paint-host.js?v=28012a33f717';
+import {createMatrixNativeBindings} from './matrix-native.js?v=28012a33f717';
+import {colorLongToArgb} from './color-long.js?v=28012a33f717';
 
 const NODE='Landroid/view/RenderNode;',DISPLAY='Landroid/view/DisplayListCanvas;',RECORD='Landroid/view/RecordingCanvas;';
 const NODE33='Landroid/graphics/RenderNode;',RC33='Landroid/graphics/RecordingCanvas;',BRC='Landroid/graphics/BaseRecordingCanvas;';
@@ -145,8 +145,8 @@ export function createRenderNodeNativeBindings(){const map=new Map();
  n('nSetRevealClip',['J','Z','F','F','F'],'Z',(r,[h,enabled])=>{node(r,h);if(enabled)fail('RenderNode reveal clipping is not implemented');return 0;});
  n('nHasIdentityMatrix',['J'],'Z',(r,[h])=>renderNodeTransform(r,node(r,h)).every((v,i)=>v===identity()[i])?1:0);
  for(const name of ['nGetTransformMatrix','nGetInverseTransformMatrix'])n(name,['J','J'],'V',(r,[h,m])=>{let v=renderNodeTransform(r,node(r,h));if(name.includes('Inverse'))v=r.skia.CanvasKit.Matrix.invert(v)??identity();const arr=r.newArray('[F',9);r.array(arr).elements=v.map(encode);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nSetValues(J[F)V')(r,[m,arr]);});
- d('nCreateDisplayListCanvas',['J','I','I'],'J',(r,[h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('DisplayListCanvas extent exceeds4096');const id=getVectorGraphics(r).createCanvas(),c=canvas(r,id);Object.assign(c,{width:w,height,renderNode:h});stateFor(r).canvases.add(id);return id;});
- d('nResetDisplayListCanvas',['J','J','I','I'],'V',(r,[c,h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('DisplayListCanvas extent exceeds4096');Object.assign(canvas(r,c),{draws:[],matrix:[1,0,0,1,0,0],clips:[],stack:[],width:w,height,renderNode:h});});
+ d('nCreateDisplayListCanvas',['J','I','I'],'J',(r,[h,w,height])=>{node(r,h);if(w<0||height<0)fail('DisplayListCanvas extent is negative');const id=getVectorGraphics(r).createCanvas(),c=canvas(r,id);Object.assign(c,{width:w,height,renderNode:h});stateFor(r).canvases.add(id);return id;});
+ d('nResetDisplayListCanvas',['J','J','I','I'],'V',(r,[c,h,w,height])=>{node(r,h);if(w<0||height<0)fail('DisplayListCanvas extent is negative');Object.assign(canvas(r,c),{draws:[],matrix:[1,0,0,1,0,0],clips:[],stack:[],width:w,height,renderNode:h});});
  for(const name of ['nGetMaximumTextureWidth','nGetMaximumTextureHeight'])d(name,[],'I',()=>4096);
  d('nFinishRecording',['J'],'J',(r,[c])=>finish(r,c));
  // hwui reorder barrier: RenderNode children recorded inside a region are
@@ -212,9 +212,10 @@ export function createRenderNodeNativeBindings(){const map=new Map();
  n3('nGetAnimationMatrix',['J','J'],'Z',(r,[h,m])=>{const x=node(r,h);if(!x.animationMatrix)return 0;const arr=r.newArray('[F',9);r.array(arr).elements=x.animationMatrix.map(encode);createMatrixNativeBindings().get('Landroid/graphics/Matrix;->nSetValues(J[F)V')(r,[m,arr]);return 1;});
  {let unique=1n;n3('nGetUniqueId',['J'],'J',(r,[h])=>{const x=node(r,h);return x.uniqueId??=unique++;});}
  // Not available without hwui: sizes, debug output, position-update listeners and RT animators fail explicitly instead of inventing values.
- // RecordingCanvas
- r3('nCreateDisplayListCanvas',['J','I','I'],'J',(r,[h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('RecordingCanvas extent exceeds4096');const id=getVectorGraphics(r).createCanvas(),c=canvas(r,id);Object.assign(c,{width:w,height,renderNode:h});stateFor(r).canvases.add(id);return id;});
- r3('nResetDisplayListCanvas',['J','J','I','I'],'V',(r,[c,h,w,height])=>{node(r,h);if(w<0||height<0||w>4096||height>4096)fail('RecordingCanvas extent exceeds4096');Object.assign(canvas(r,c),{draws:[],matrix:[1,0,0,1,0,0],clips:[],stack:[],width:w,height,renderNode:h});});
+ // RecordingCanvas. Its width and height are the RenderNode's size and allocate nothing (hwui's SkiaRecordingCanvas records commands, it has no extent limit): a View
+ // taller than the screen (the content of a ScrollView, a long list) records as on a device; only what is drawn onto the screen or a bitmap is rasterized.
+ r3('nCreateDisplayListCanvas',['J','I','I'],'J',(r,[h,w,height])=>{node(r,h);if(w<0||height<0)fail('RecordingCanvas extent is negative');const id=getVectorGraphics(r).createCanvas(),c=canvas(r,id);Object.assign(c,{width:w,height,renderNode:h});stateFor(r).canvases.add(id);return id;});
+ r3('nResetDisplayListCanvas',['J','J','I','I'],'V',(r,[c,h,w,height])=>{node(r,h);if(w<0||height<0)fail('RecordingCanvas extent is negative');Object.assign(canvas(r,c),{draws:[],matrix:[1,0,0,1,0,0],clips:[],stack:[],width:w,height,renderNode:h});});
  for(const name of ['nGetMaximumTextureWidth','nGetMaximumTextureHeight'])r3(name,[],'I',()=>4096);
  r3('nEnableZ',['J','Z'],'V',(r,[c,enabled])=>{const x=canvas(r,c),active=!!x.reorderBarrier;if(active)r.skiaHost.recordNative(c,{op:'reorderEnd'});if(enabled)r.skiaHost.recordNative(c,{op:'reorderBegin'});x.reorderBarrier=!!enabled;});
  r3('nFinishRecording',['J','J'],'V',(r,[c,h])=>{const id=finish(r,c),s=stateFor(r),list=s.recordings.get(id);setList(r,h,list);s.recordings.delete(id);});

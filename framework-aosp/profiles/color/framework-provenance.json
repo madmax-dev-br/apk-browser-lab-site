@@ -72,7 +72,7 @@
       "license": "Apache-2.0"
     }
   ],
-  "requiresDefaultFrameworkSha256": "3685477bcf558986e9a21c5f444ec0acdfc41886a4cd0dcd8166a35551f8f88d",
+  "requiresDefaultFrameworkSha256": "70e8ee36f7878bdd48099b7707ce38e2bff53ecbe3cda54b6055584e1c0e9bbc",
   "compileOnlyDeclarationsPackaged": false,
   "integrationStatus": "Original color math (ColorUtils, CAM16 and HCT): ColorStateList.modulateColor of the default DEX applies android:lStar with it, as on Android 13",
   "activationPolicy": "a color state list of the APK (a res/color*/ XML, or any XML the resource table types as a color) gives android:lStar, or a companion package is installed (its resources are not scanned at load), or explicit loader option",
