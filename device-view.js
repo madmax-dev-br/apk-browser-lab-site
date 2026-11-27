@@ -1,9 +1,9 @@
 // Shared Android device renderer: Views/Compose/WindowManager snapshot -> DOM, input forwarding, system bars. Used verbatim by the lab page (app.js)
 // and by the embeddable player frame (player/frame.js); each supplies the page-specific chrome through `hooks`.
-import { updateWebViewSlot } from './webview-slot.js?v=5afc26aa921f';
-import { createWebViewManager, webViewIds } from './webview-frame.js?v=5afc26aa921f';
-import { isTrustedRasterURL } from './raster-cache.js?v=5afc26aa921f';
-import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=5afc26aa921f';
+import { updateWebViewSlot } from './webview-slot.js?v=5abc89d1cc06';
+import { createWebViewManager, webViewIds } from './webview-frame.js?v=5abc89d1cc06';
+import { isTrustedRasterURL } from './raster-cache.js?v=5abc89d1cc06';
+import { gestureHost, claimKind, DRAG_SLOP } from './pointer-claim.js?v=5abc89d1cc06';
 /** The CSS transform of a View's 3x3 matrix (android.graphics.Matrix order): matrix() when it is affine; matrix3d(), the homography of the plane z = 0, when it has a
  *  perspective row (a View rotated about its X or Y axis: src/camera-transform.js). */
 export function cssTransform(m) {

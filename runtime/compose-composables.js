@@ -9,7 +9,7 @@
 //
 // Inputs. A composition's arguments are kept as a snapshot (values and object ids, never references): primitives, Strings and boxed values by value; an object by its class, its
 // id and, to a bounded depth, the snapshot of its fields (an ArrayList, an Arrays.asList list or an array: its elements). Ids are never reused, so an equal id is the same instance.
-import { debugInfoOf } from './debug-info.js?v=5afc26aa921f';
+import { debugInfoOf } from './debug-info.js?v=5abc89d1cc06';
 
 const COMPOSER = 'Landroidx/compose/runtime/Composer;', START = 'startRestartGroup', START_SIGNATURE = '(I)Landroidx/compose/runtime/Composer;';
 const LAMBDA_IMPL = /^Landroidx\/compose\/runtime\/internal\/ComposableLambda(?:N)?Impl;$/;
@@ -42,7 +42,7 @@ export function restartableMethods(runtime) {
   for (const { dex } of [...runtime.dex.files, ...(runtime.dex.dynamicFiles ?? [])]) {
     if (boot?.has(dex)) continue;
     const starts = new Set(dex.methodsNamed(START).filter(method => method.signature === START_SIGNATURE).map(method => method.index)); if (!starts.size) continue;
-    const composer = dex.types.indexOf(COMPOSER); if (composer < 0) continue;
+    const composer = dex.typeIndex(COMPOSER); if (composer < 0) continue;
     const reader = dex.reader, protos = new Set();
     for (let i = 0; i < dex.protos.length; i++) { const list = reader.u32(dex.protoIdsOffset + i * 12 + 8); if (list) { const n = reader.u32(list); for (let k = 0; k < n; k++) if (reader.u16(list + 4 + k * 2) === composer) { protos.add(i); break; } } }
     for (let i = 0; i < dex.methods.length; i++) {

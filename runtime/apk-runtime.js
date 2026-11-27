@@ -1,42 +1,42 @@
-import { procFdFile } from './libcore-io-native.js?v=5afc26aa921f';
-import STATIC_SHIMS from './shim-static-methods.js?v=5afc26aa921f';
-import { VMClock } from './vm-clock.js?v=5afc26aa921f';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=5afc26aa921f';
-import { OperationMonitor } from './operation-monitor.js?v=5afc26aa921f';
-import { ExecutionProfile } from './execution-profile.js?v=5afc26aa921f';
-import { SamplingProfiler } from './sampling-profiler.js?v=5afc26aa921f';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5afc26aa921f';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=5afc26aa921f';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5afc26aa921f';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5afc26aa921f';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5afc26aa921f';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=5afc26aa921f';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5afc26aa921f';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5afc26aa921f';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5afc26aa921f';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5afc26aa921f';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=5afc26aa921f';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5afc26aa921f';
-import { APKError } from './apk-error.js?v=5afc26aa921f';
-import { invokePolymorphic } from './method-handles.js?v=5afc26aa921f';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=5afc26aa921f';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=5afc26aa921f';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=5afc26aa921f';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=5afc26aa921f';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=5afc26aa921f';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=5afc26aa921f';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=5afc26aa921f';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=5afc26aa921f';
+import { procFdFile } from './libcore-io-native.js?v=5abc89d1cc06';
+import STATIC_SHIMS from './shim-static-methods.js?v=5abc89d1cc06';
+import { VMClock } from './vm-clock.js?v=5abc89d1cc06';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=5abc89d1cc06';
+import { OperationMonitor } from './operation-monitor.js?v=5abc89d1cc06';
+import { ExecutionProfile } from './execution-profile.js?v=5abc89d1cc06';
+import { SamplingProfiler } from './sampling-profiler.js?v=5abc89d1cc06';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5abc89d1cc06';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=5abc89d1cc06';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5abc89d1cc06';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5abc89d1cc06';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5abc89d1cc06';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=5abc89d1cc06';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5abc89d1cc06';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5abc89d1cc06';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5abc89d1cc06';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5abc89d1cc06';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=5abc89d1cc06';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { invokePolymorphic } from './method-handles.js?v=5abc89d1cc06';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=5abc89d1cc06';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=5abc89d1cc06';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=5abc89d1cc06';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=5abc89d1cc06';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=5abc89d1cc06';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=5abc89d1cc06';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=5abc89d1cc06';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=5abc89d1cc06';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=5afc26aa921f';
-import { ProcessStartPending } from './package-registry.js?v=5afc26aa921f';
-import { bootClassLacksMember } from './boot-class-members.js?v=5afc26aa921f';
-export { APKError } from './apk-error.js?v=5afc26aa921f';
-import { BinaryReader } from './binary-reader.js?v=5afc26aa921f';
-import { recordCollection } from './runtime-stats.js?v=5afc26aa921f';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=5afc26aa921f';
-import { scrollsItself } from './scrolling-view.js?v=5afc26aa921f';
-import { drawsItself } from './pointer-input-host.js?v=5afc26aa921f';
+import { Scheduler, Blocked } from './scheduler.js?v=5abc89d1cc06';
+import { ProcessStartPending } from './package-registry.js?v=5abc89d1cc06';
+import { bootClassLacksMember } from './boot-class-members.js?v=5abc89d1cc06';
+export { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { BinaryReader } from './binary-reader.js?v=5abc89d1cc06';
+import { recordCollection } from './runtime-stats.js?v=5abc89d1cc06';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=5abc89d1cc06';
+import { scrollsItself } from './scrolling-view.js?v=5abc89d1cc06';
+import { drawsItself } from './pointer-input-host.js?v=5abc89d1cc06';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -148,6 +148,8 @@ export class ClassTable {
  * field id keeps one identity for the life of the DEX (dispatch caches key on it) and carries non-enumerable `dex` and `index`.
  */
 export class DexFile {
+  /** Every type descriptor, decoded (the table's public face; lookups go through typeAt / hasType / someType, which decode on demand). */
+  get types() { return this.allTypes(); }
   constructor(input, { filename = 'classes.dex', maxBytes = 64 * 1024 * 1024, typeRename = null, internTable = null } = {}) {
     this.filename = filename;
     const b = this.reader = new BinaryReader(input);
@@ -161,8 +163,14 @@ export class DexFile {
     const [tn, to] = table(64, 4);
     // typeRename lets a ClassLoader define a second copy of a class under an alias descriptor: every type reference of this DEX (instructions,
     // method/field refs, supertypes, annotations) is read from this table, so renaming here re-binds the whole DEX to its own copies.
-    this.types = [];
-    for (let i = 0; i < tn; i++) { const t = this.string(b.u32(to + i * 4)); this.types.push(typeRename ? typeRename(t) : t); }
+    // The descriptors are decoded when first used (typeAt), not here: a large app names close to a million types over its DEX files, about 0.3 s of every load and tens of
+    // megabytes of strings, and most are never read. type_ids are sorted by their string index and string_ids by their contents (the format requires both, ART's verifier
+    // rejects a file that breaks them, and stringIndex relies on the second), so the table is sorted by descriptor: hasType / someType answer by binary search, decoding a few
+    // entries. The order of the indices is checked here (u32 reads only); a table out of order, or renamed, is searched linearly instead.
+    this.typeIdsOffset = to; this.typeRename = typeRename; this.typeTable = nulls(tn); this.allTypesDecoded = false;
+    let sorted = !typeRename;
+    for (let i = 0, previous = -1; i < tn; i++) { const index = b.u32(to + i * 4); if (index >= sn) fail(`Invalid DEX string index ${index}`); if (index <= previous) sorted = false; previous = index; }
+    this.typesSorted = sorted;
     this.typeLists = new Map();
     const [pn, po] = table(72, 12); this.protoIdsOffset = po; this.protos = nulls(pn);
     const [fn, fo] = table(80, 8); this.fieldIdsOffset = fo; this.fields = nulls(fn);
@@ -211,7 +219,24 @@ export class DexFile {
     while (low <= high) { const mid = (low + high) >> 1, s = this.string(mid); if (s === text) return mid; if (s < text) low = mid + 1; else high = mid - 1; }
     return -1;
   }
-  type(i) { if (!(i < this.types.length)) fail(`Invalid DEX type index ${i}`); return this.types[i]; }
+  type(i) { if (!(i < this.typeTable.length)) fail(`Invalid DEX type index ${i}`); const t = this.typeTable[i]; return t !== null ? t : this.decodeType(i); }
+  /** The descriptor of type `i`, decoded on first use; undefined for an index outside the table (the instruction paths check it). */
+  typeAt(i) { const t = this.typeTable[i]; return t === null ? this.decodeType(i) : t; }
+  decodeType(i) { const s = this.string(this.reader.u32(this.typeIdsOffset + i * 4)); return this.typeTable[i] = this.typeRename ? this.typeRename(s) : s; }
+  /** Every descriptor, decoded (for a caller that walks the whole table). */
+  allTypes() { if (!this.allTypesDecoded) { const types = this.typeTable; for (let i = 0; i < types.length; i++) if (types[i] === null) this.decodeType(i); this.allTypesDecoded = true; } return this.typeTable; }
+  /** The first index whose descriptor is not below `text` (a sorted table). */
+  typeLowerBound(text) { let low = 0, high = this.typeTable.length; while (low < high) { const mid = (low + high) >>> 1; if (this.typeAt(mid) < text) low = mid + 1; else high = mid; } return low; }
+  /** The index of descriptor `name`, or -1. */
+  typeIndex(name) { if (!this.typesSorted) return this.allTypes().indexOf(name); const i = this.typeLowerBound(name); return i < this.typeTable.length && this.typeAt(i) === name ? i : -1; }
+  hasType(name) { return this.typeIndex(name) >= 0; }
+  /** Whether a descriptor that starts with one of `prefixes` passes `test` (every such descriptor when there is no test). `test` must only accept descriptors with one of the
+   *  prefixes: only their ranges of the sorted table are read. */
+  someType(prefixes, test = null) {
+    if (!this.typesSorted) return this.allTypes().some(t => prefixes.some(p => t.startsWith(p)) && (!test || test(t)));
+    for (const prefix of prefixes) for (let i = this.typeLowerBound(prefix); i < this.typeTable.length; i++) { const t = this.typeAt(i); if (!t.startsWith(prefix)) break; if (!test || test(t)) return true; }
+    return false;
+  }
   /** Protos and classes may share one type_list; each offset is parsed once and callers copy if they keep it. */
   typeList(offset) {
     if (!offset) return [];
@@ -319,7 +344,7 @@ export class DexFile {
   }
   encodedAnnotation(cursor,depth=0){
     if(depth>32)fail('DEX annotation nesting limit exceeded');
-    const index=this.reader.uleb(cursor),type=this.types[index],size=this.reader.uleb(cursor);
+    const index=this.reader.uleb(cursor),type=this.typeAt(index),size=this.reader.uleb(cursor);
     if(!type||size>100000)fail('Invalid/excessive DEX annotation');
     const values=new Map();for(let i=0;i<size;i++){const nameIndex=this.reader.uleb(cursor),name=nameIndex<this.strings.length?this.string(nameIndex):undefined;if(name===undefined||values.has(name))fail('Invalid annotation element name');values.set(name,this.encodedValue(cursor,depth+1));}
     return {encoded:'annotation',type,values};
@@ -342,10 +367,10 @@ export class DexFile {
     if (type === 0x11) return BigInt.asIntN(64, read(8) << BigInt((7 - arg) * 8));
     if ([0x17, 0x18, 0x19, 0x1a, 0x1b].includes(type)) {
       const index = Number(read(4));
-      const count = type === 0x17 ? this.strings.length : type === 0x18 ? this.types.length : type === 0x1a ? this.methods.length : this.fields.length;
+      const count = type === 0x17 ? this.strings.length : type === 0x18 ? this.typeTable.length : type === 0x1a ? this.methods.length : this.fields.length;
       if (index >= count) fail('Invalid encoded DEX reference');
       if (type === 0x17) return this.string(index);
-      return { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: type === 0x18 ? this.types[index] : type === 0x1a ? this.method(index) : this.field(index) };
+      return { encoded: type === 0x18 ? 'class' : type === 0x1a ? 'method' : type === 0x19 ? 'field' : 'enum', value: type === 0x18 ? this.typeAt(index) : type === 0x1a ? this.method(index) : this.field(index) };
     }
     if(type===0x1d&&arg===0)return this.encodedAnnotation(cursor,depth+1);
     if (type === 0x1c && arg === 0) {
@@ -360,9 +385,14 @@ export class DexFile {
 
 /** Global resolution with DEX-local instruction indices and readers retained on definitions. */
 export class DexProgram {
+  /** Every type descriptor of the APK's DEX files, file by file (decoded for this: hasType and someType answer without it). */
+  get types() { return (this.allIds ??= {}).types ??= this.files.flatMap(file => file.dex.allTypes()); }
+  hasType(name) { return this.files.some(file => file.dex.hasType(name)); }
+  /** DexFile.someType over the APK's DEX files. */
+  someType(prefixes, test = null) { return this.files.some(file => file.dex.someType(prefixes, test)); }
   constructor(files, { bootFiles = [] } = {}) {
     if (!Array.isArray(files) || !files.length || files.length > 1024) fail('DEX program requires 1–1024 DEX files');
-    this.files = []; this.classes = new ClassTable(); this.types = []; this.internTable = new Map();
+    this.files = []; this.classes = new ClassTable(); this.internTable = new Map();
     this.methodCount = 0; this.fieldCount = 0; this.stringCount = 0; this.allIds = null;
     let bytes = 0;
     for (let i = 0; i < files.length; i++) {
@@ -378,7 +408,6 @@ export class DexProgram {
         this.classes.set(name, dex);
       }
       this.methodCount += dex.methods.length; this.fieldCount += dex.fields.length; this.stringCount += dex.strings.length;
-      this.types = this.types.concat(dex.types);
     }
     if (!Array.isArray(bootFiles) || bootFiles.length > 16) fail('Framework layer requires at most 16 DEX files');
     this.bootFiles = []; this.bootClasses = new ClassTable(); this.bootDexes = new Set(); let bootBytes = 0;
@@ -1715,7 +1744,7 @@ export class APKRuntime {
     const annotations = b.u32(cls.annotationsOffset); if (!annotations) return info;
     const count = b.u32(annotations); b.table(count, annotations + 4, 4);
     for (let i = 0; i < count; i++) {
-      const cursor = { p: b.u32(annotations + 4 + i * 4) + 1 }, annotationType = cls.dex.types[b.uleb(cursor)];
+      const cursor = { p: b.u32(annotations + 4 + i * 4) + 1 }, annotationType = cls.dex.typeAt(b.uleb(cursor));
       if (!['Ldalvik/annotation/InnerClass;', 'Ldalvik/annotation/EnclosingClass;', 'Ldalvik/annotation/EnclosingMethod;', 'Ldalvik/annotation/MemberClasses;'].includes(annotationType)) continue;
       const size = b.uleb(cursor); if (size > 32) fail('Malformed class nesting annotation');
       const attributes = new Map();
@@ -4610,7 +4639,7 @@ export class APKRuntime {
       if (Math.abs(size) > 10000) fail('Exception handler limit exceeded');
       let target = null;
       for (let j = 0; j < Math.abs(size); j++) {
-        const type = dex.types[b.uleb(cursor)], address = b.uleb(cursor);
+        const type = dex.typeAt(b.uleb(cursor)), address = b.uleb(cursor);
         if (!type || address >= code.units) fail('Malformed DEX exception handler');
         if (target === null && this.isSubtype(this.typeOf(exception), type)) target = address;
       }

@@ -1,6 +1,6 @@
 // The system programs of /system/bin (vendor/system-programs, scripts/build-system-programs.sh): toybox, mksh (/system/bin/sh) and toolbox, compiled from AOSP's own
 // android-13.0.0_r1 sources to WebAssembly, checked against their pinned SHA-256 and compiled once. The process kernel (src/process-kernel.js) instantiates them.
-import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
 
 const decoder = new TextDecoder();
 const fail = (message, kind = 'system-programs') => { throw new APKError(message, { kind }); };
@@ -36,4 +36,6 @@ export class SystemProgramsProvider {
 }
 
 /** Does the app's code reach Runtime.exec / ProcessBuilder (its DEX references java.lang.Process or ProcessBuilder)? Then the loader loads the programs. */
-export const usesProcesses = types => types.some(type => type === 'Ljava/lang/Process;' || type === 'Ljava/lang/ProcessBuilder;' || type === 'Ljava/lang/UNIXProcess;');
+const PROCESS_TYPES = ['Ljava/lang/Process;', 'Ljava/lang/ProcessBuilder;', 'Ljava/lang/UNIXProcess;'];
+/** Whether the app's code names a process class: `types` is a program (DexProgram.hasType, answered by binary search) or a list of descriptors. */
+export const usesProcesses = types => typeof types?.hasType === 'function' ? PROCESS_TYPES.some(name => types.hasType(name)) : types.some(type => PROCESS_TYPES.includes(type));

@@ -35,7 +35,7 @@ export function backPull(dx) {
   return { offset: pull * 0.75, grow: Math.min(1, 0.55 + progress * 0.45), armed: dx >= BACK_COMMIT, edge: BACK_EDGE };
 }
 
-export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {}, onIcon = () => {} }) {
+export function createTaskSwitcher({ document: doc = document, $, vm, render, back, relaunch, canGoBack, busy, opening = () => false, begin, finish, report, dismiss = () => {}, announce = () => {}, shelf: shelfActions = {}, onInfo = () => {}, onIcon = () => {} }) {
   const screen = $('android-screen');
   if (!screen || typeof screen.prepend !== 'function' || typeof screen.querySelector !== 'function') return { sync() {}, closed() {}, home() {}, restate() {}, reset() {}, setShelf() {}, infoSettled: async () => {}, icon: () => null, state: () => 'foreground', resume: async () => {}, navigate: async () => null };   // no device on this page (or a host without a full DOM): nothing to navigate
   const el = (tag, className, parent) => { const node = doc.createElement(tag); node.className = className; parent?.append(node); return node; };
@@ -47,8 +47,15 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const zone = el('div', 'task-gesture-zone'); zone.setAttribute('aria-hidden', 'true'); screen.append(zone);
   const edges = ['left', 'right'].map(side => { const strip = el('div', `task-back-edge ${side}`); strip.dataset.side = side; strip.setAttribute('aria-hidden', 'true'); screen.append(strip); return strip; });
   const bubble = el('div', 'task-back-bubble'); bubble.hidden = true; bubble.setAttribute('aria-hidden', 'true'); bubble.innerHTML = '<svg viewBox="0 0 24 24"><path d="M14.5 6l-6 6 6 6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'; screen.append(bubble);
-  const targets = () => [$('android-content'), $('android-window-layer'), $('android-action-mode-layer')].filter(Boolean);
+  // the app's windows: its content, its dialogs and popups, its action mode, its starting window (the splash while it opens) and the system windows shown on top of its task
+  // (the permission dialog and the chooser are activities of the app's task on Android: in the recents they shrink with it)
+  const targets = () => [$('android-content'), $('android-window-layer'), $('android-action-mode-layer'), $('boot-overlay'), $('permission-dialog'), $('system-picker')].filter(Boolean);
   let mode = 'foreground', info = null, infoFor = null, iconURL = null, drag = null, working = false, pendingLabel = '';
+  // While the app opens (the page's opening session: its APK read, then its Activity started) the device is already the app's: its starting window is on screen and the
+  // gestures work as on a phone. Leaving it only moves the windows: the VM is busy with the open, so the app goes to the background (onPause, onStop) once it has opened
+  // (`awayAfterOpen`), and coming back before that only brings the starting window back.
+  let awayAfterOpen = false;
+  const blocked = () => working || (busy() && !opening());
   // the saved apps (src/apk-shelf.js), one beside the other in the order they were added; the app of this run keeps its own icon (`app`) at its place among them
   let shelfItems = [], shelfCurrent = null, shelfButtons = [], shelfURLs = [], savedIconURL = null, savedLabel = '';   // savedIconURL, savedLabel: the icon and label stored with the app of this run, shown until its PackageManager answers (opening a saved app does not lose its icon meanwhile)
   const renderShelf = () => {
@@ -169,13 +176,16 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
       await dismiss();   // the page shows the launcher with the app's icon (closed())
     } catch (error) { report?.(error?.message ?? String(error), error); } finally { dismissing = false; }
   };
-  const leave = async next => { if (mode === 'foreground' || mode === 'dragging') { show(next); await run('Leaving the app…', () => vm().home()); announce(next); } else show(next); };   // announced again: the snapshot of the stopped app repainted the status line
-  const resume = async () => { if (mode === 'installing' || mode === 'idle') return; if (mode === 'closed' || mode === 'installed') { show('foreground'); await relaunch(); return; } const ok = await run('Returning to the app…', () => vm().resumeTask()); if (ok) show('foreground'); };
+  const leave = async next => {
+    if (opening()) { if (mode === 'foreground' || mode === 'dragging') awayAfterOpen = true; show(next); return; }   // the open goes on behind the launcher
+    if (mode === 'foreground' || mode === 'dragging') { show(next); await run('Leaving the app…', () => vm().home()); announce(next); } else show(next);
+  };   // announced again: the snapshot of the stopped app repainted the status line
+  const resume = async () => { if (mode === 'installing' || mode === 'idle') return; if (opening() && mode !== 'closed') { awayAfterOpen = false; show('foreground'); return; } if (mode === 'closed' || mode === 'installed') { show('foreground'); await relaunch(); return; } const ok = await run('Returning to the app…', () => vm().resumeTask()); if (ok) show('foreground'); };
 
   // ---- the swipe-up gesture ---------------------------------------------------------------------------------------------------------------------------------------------
   const pageScale = () => { const rect = screen.getBoundingClientRect(); return screen.offsetHeight > 0 && rect.height > 0 ? rect.height / screen.offsetHeight : 1; };
   zone.addEventListener('pointerdown', event => {
-    if (event.button !== 0 || working || busy() || away() || $('sysbar-nav')?.classList.contains('buttons')) return;
+    if (event.button !== 0 || blocked() || away() || $('sysbar-nav')?.classList.contains('buttons')) return;
     drag = { id: event.pointerId, y: event.clientY, scale: pageScale(), from: mode, last: null, at: now(), samples: [{ t: now(), y: event.clientY }] }; try { zone.setPointerCapture(event.pointerId); } catch { /* released already */ }
     event.preventDefault(); event.stopPropagation();
   });
@@ -198,7 +208,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   zone.addEventListener('pointerup', end); zone.addEventListener('pointercancel', end);
 
   // ---- the back gesture: press an edge and pull towards the middle; a bubble with the arrow follows the finger and going far enough arms it -------------------------------
-  const goBack = () => { if (mode !== 'foreground' || working || busy()) return; if (canGoBack()) back(); else leave('home'); };   // on the root Activity of the launcher task, Back leaves it in the background (Android 12+)
+  const goBack = () => { if (mode !== 'foreground' || blocked()) return; if (!opening() && canGoBack()) back(); else leave('home'); };   // on the root Activity of the launcher task, Back leaves it in the background (Android 12+)
   let pull = null;
   // A press on the strip that never became a pull is a tap on the app: it is handed to whatever is underneath.
   const tapThrough = event => { for (const strip of edges) strip.style.pointerEvents = 'none'; const under = doc.elementFromPoint(event.clientX, event.clientY); for (const strip of edges) strip.style.pointerEvents = ''; if (!under) return;
@@ -255,8 +265,8 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
   const currentItem = () => { if (!away() || mode === 'installing' || mode === 'idle') return null; const saved = shelfItems.find(item => item.id === shelfCurrent); return saved ? { ...saved, current: true } : { id: null, current: true, label: label.textContent || pendingLabel, name: pendingLabel }; };
   menuKeys(app, currentItem); longPress(app, currentItem);
   app.addEventListener('click', () => resume());
-  const button = (selector, action) => screen.querySelector(selector)?.addEventListener('click', event => { event.stopPropagation(); if (!working && !busy()) action(); });
-  button('.sysbar-back', () => { if (mode === 'overview') { resume(); return; } if (away()) return; if (canGoBack()) back(); else leave('home'); });   // Back on the root Activity of the launcher task leaves it in the background (Android 12+)
+  const button = (selector, action) => screen.querySelector(selector)?.addEventListener('click', event => { event.stopPropagation(); if (!blocked()) action(); });
+  button('.sysbar-back', () => { if (mode === 'overview') { resume(); return; } if (away()) return; if (!opening() && canGoBack()) back(); else leave('home'); });   // Back on the root Activity of the launcher task leaves it in the background (Android 12+)
   button('.sysbar-home', () => { if (mode === 'overview' || !away()) leave('home'); });
   button('.sysbar-recents', () => { if (mode === 'overview') resume(); else if (!away()) leave('overview'); });
 
@@ -282,14 +292,25 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     sync(snapshot, key) {
       loadInfo(key);
       const background = !!snapshot?.navigation?.taskInBackground;
+      if (awayAfterOpen) return;   // the user left while it opened: the page sends it to the background once the open ends (opened())
       if (mode === 'closed' || mode === 'idle' || mode === 'installing' || mode === 'installed') { show('foreground'); return; }
       if (background && (mode === 'foreground')) show('home');
       else if (!background && (mode === 'overview' || mode === 'home') && !working) show('foreground');
     },
-    closed() { paintIcon(); show('closed'); },
+    closed() { awayAfterOpen = false; paintIcon(); show('closed'); },
+    /** The app starts opening: its starting window is on screen (the page shows it) and the launcher keeps its icon for when the user leaves. `text`: the file's name, the
+     *  label until the package's own is known; `fresh`: another package than the last one (its label and icon are read again). */
+    launching({ label: text = '', fresh = false } = {}) {
+      awayAfterOpen = false;
+      if (fresh) { info = null; infoFor = null; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } pendingLabel = String(text ?? '').replace(/\.apk$/i, ''); }
+      show('foreground'); paintIcon();
+    },
+    /** The open ended (the first frame is on screen, or it failed): an app the user left meanwhile goes to the background now, as on a phone where it opened behind the launcher. */
+    opened() { if (!awayAfterOpen) return; awayAfterOpen = false; if (mode === 'home' || mode === 'overview') { const next = mode; run('Leaving the app…', () => vm().home()).then(() => announce(next)); } },
     /** The launcher before an app runs: 'idle' (nothing installed), 'installing' (the package is being read: its name under a spinner) or 'installed' (tap the icon to start; `key` loads its real label and icon). */
     home(next, { label: text = '', key = null } = {}) {
       if (next !== 'idle' && next !== 'installing' && next !== 'installed') return;
+      if (next === 'installed' && opening()) { paintIcon(); if (key) loadInfo(key); return; }   // read during an open: its label and icon, and the starting window stays
       if (next === 'installing') { info = null; infoFor = null; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } pendingLabel = String(text ?? '').replace(/\.apk$/i, ''); }
       show(next); if (next !== 'idle') paintIcon(); if (next === 'installed' && key) loadInfo(key);
     },
@@ -302,7 +323,7 @@ export function createTaskSwitcher({ document: doc = document, $, vm, render, ba
     },
     /** After a render repainted the page's status: say again that the app is in the background. */
     restate() { if (mode === 'overview' || mode === 'home') announce(mode); },
-    reset() { drag = null; pull = null; card = null; swallowClick = false; dismissing = false; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'idle'; screen.dataset.task = 'home'; launcher.hidden = false; hit.hidden = true;
+    reset() { awayAfterOpen = false; drag = null; pull = null; card = null; swallowClick = false; dismissing = false; bubble.hidden = true; working = false; info = null; infoFor = null; pendingLabel = ''; delete screen.dataset.launcher; if (iconURL) { URL.revokeObjectURL(iconURL); iconURL = null; } mode = 'idle'; screen.dataset.task = 'home'; launcher.hidden = false; hit.hidden = true;
       // The windows of the run that ends stay out of sight, at once and without a transition: shown again at full size here they would flash on screen (with what the previous app last drew)
       // and then shrink into the launcher when the next run shows it. The launcher stays on screen until the page says what comes next (installing, idle).
       const height = screen.offsetHeight; for (const node of targets()) { node.style.transition = 'none'; node.style.transformOrigin = '50% 50%'; node.style.transform = `translateY(${-height * 0.02}px) scale(0.2)`; node.style.borderRadius = '28px'; node.style.opacity = '0'; } },

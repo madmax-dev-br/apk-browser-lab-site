@@ -178,9 +178,9 @@
 .control-panel input[type=text]::placeholder,.control-panel input[type=search]::placeholder{color:#b3b7c3}.control-panel input[type=text]:focus-visible,.control-panel input[type=search]:focus-visible{outline:3px solid #b1adff;outline-offset:1px}
 :root[data-theme=dark] .control-panel input[type=text],.control-panel input[type=search]{color:#acacb5;border-color:#363944;background:#101520}:root[data-theme=dark] .control-panel input[type=text]::placeholder{color:#5f6270}
 /* boot overlay: the phone frame shown from the click on "Executar APK" until the first real frame */
-.boot-overlay{position:absolute;left:50%;top:50%;z-index:6;width:calc(var(--boot-w,411)*1px + 10px);height:calc(var(--boot-h,914)*1px + 10px);transform:translate(-50%,-50%) scale(var(--boot-scale,.7));transform-origin:center center;background:#262934;border-radius:34px;padding:5px;opacity:1;transition:opacity .35s ease;pointer-events:none}
+.boot-overlay{position:absolute;inset:0;z-index:40;opacity:1;transition:opacity .35s ease;pointer-events:none}   /* the app's starting window (as Android's splash screen): inside the device, under its system bars; the task gestures move it with the app's other windows */
 .boot-overlay.fading{opacity:0}
-.boot-screen{width:100%;height:100%;border-radius:28px;background:radial-gradient(circle at 50% 42%,#1c2030 0,#0b0d14 70%);color:#3ddc84;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
+.boot-screen{width:100%;height:100%;border-radius:inherit;background:radial-gradient(circle at 50% 42%,#1c2030 0,#0b0d14 70%);color:#3ddc84;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px}
 .boot-logo{width:104px;height:104px;animation:boot-pulse 1.6s ease-in-out infinite}
 .boot-eye{fill:#0b0d14}
 .boot-bar{width:140px;height:4px;border-radius:2px;background:#2a2f40;overflow:hidden;position:relative}
@@ -680,3 +680,6 @@ body.lab-dragging{user-select:none;-webkit-user-select:none}
 .android-input::placeholder{color:var(--android-hint-color,#757575);opacity:1}
 .android-progress.android-progress-vm::-webkit-progress-bar,.android-progress.android-progress-vm::-webkit-progress-value{background:transparent}.android-progress.android-progress-vm::-moz-progress-bar{background:transparent}
 .lab-confirm{font:13px/1.5 system-ui,sans-serif}.lab-confirm-text{margin:0 0 14px;white-space:pre-line}.lab-confirm-actions{display:flex;justify-content:flex-end;gap:8px}
+.android-screen[data-task=overview]>.boot-overlay,.android-screen[data-task=dragging]>.boot-overlay{box-shadow:0 18px 50px #000a;overflow:hidden}
+/* the lab's own drawings over the app (layout bounds, frame graph, highlights, the debugger's plate) belong to no window: out of sight while the app's window is not on screen at full size */
+.android-screen:is([data-task=overview],[data-task=dragging],[data-task=home],[data-task=closed])>:is(.layout-bounds-canvas,.frame-graph-canvas,.lab-highlight-layer,.debug-paused-overlay){visibility:hidden}

@@ -1,7 +1,7 @@
-import { APKError } from './apk-error.js?v=5afc26aa921f';
-import { BUCKET } from './time-breakdown.js?v=5afc26aa921f';
-import { Blocked, QUANTUM } from './scheduler.js?v=5afc26aa921f';
-import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { BUCKET } from './time-breakdown.js?v=5abc89d1cc06';
+import { Blocked, QUANTUM } from './scheduler.js?v=5abc89d1cc06';
+import { compileMethod, EXIT, YIELD, CALL, RET, MAX_COMPILED_UNITS, DIRECT_DEPTH } from './baseline-compiler.js?v=5abc89d1cc06';
 
 // Frame-based DEX interpreter.
 //
@@ -461,7 +461,7 @@ function decodeTries(rt, code, dex) {
     if (Math.abs(size) > 10000) fail('Exception handler limit exceeded');
     const catches = [];
     for (let j = 0; j < Math.abs(size); j++) {
-      const type = dex.types[b.uleb(cursor)], address = b.uleb(cursor);
+      const type = dex.typeAt(b.uleb(cursor)), address = b.uleb(cursor);
       if (!type || address >= code.units) fail('Malformed DEX exception handler');
       catches.push({ type, address });
     }
@@ -829,14 +829,14 @@ function runLoop(rt, owner, base, single = null) {
             pc++; break;
           }
           case 0x1f: {
-            const type = dex.types[u[pc + 1]], value = regs[a]; if (!type) fail('Invalid type index');
+            const type = dex.typeAt(u[pc + 1]), value = regs[a]; if (!type) fail('Invalid type index');
             if (!isNull(value) && !subtypeAt(rt, prog, pc, rt.typeOf(value), type)) { rt.assertResolvable(type); rt.throwJava('Ljava/lang/ClassCastException;', `Cannot cast ${rt.typeOf(value)} to ${type}`); }
             pc += 2; break;
           }
-          case 0x20: { const type = dex.types[u[pc + 1]], value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
+          case 0x20: { const type = dex.typeAt(u[pc + 1]), value = regs[hi]; if (!type) fail('Invalid instanceof type'); regs[lo] = !isNull(value) && subtypeAt(rt, prog, pc, rt.typeOf(value), type) ? 1 : (rt.assertResolvable(type), 0); pc += 2; break; }
           case 0x21: regs[lo] = rt.vmArray(regs[hi]).cells.length; pc++; break;
-          case 0x22: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
-          case 0x23: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
+          case 0x22: { const type = dex.typeAt(u[pc + 1]); if (!type) fail('Invalid allocation type'); if (rt.initialized.get(type)?.status !== 'initialized') { const gate = rt.initStep(type); if (gate !== undefined) { f.pc = start; f.callPc = start; if (gate instanceof Blocked) { thread.blocked = gate; thread.blockKind = 'site'; thread.state = 'blocked'; need = true; } else input = { kind: 'start', invoke: gate }; break inner; } } rt.bytecodeAlloc = true; try { regs[a] = rt.allocate(type); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
+          case 0x23: { const type = dex.typeAt(u[pc + 1]); if (!type) fail('Invalid array type'); rt.bytecodeAlloc = true; try { regs[lo] = rt.newArray(type, int(regs[hi])); } finally { rt.bytecodeAlloc = false; } pc += 2; break; }
           case 0x27: { const value = regs[a]; if (isNull(value)) rt.throwJava('Ljava/lang/NullPointerException;', 'throw with null exception'); throw new JavaException(value, rt.object(value).message ?? rt.typeOf(value), rt.object(value).exceptionDetails); }
           case 0x28: { const target = pc + ((a << 24) >> 24); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } break; }
           case 0x29: { const target = pc + ((u[pc + 1] << 16) >> 16); if (target < 0 || target >= f.code.units) fail('Branch target outside method'); pc = target; if (target <= start && ((++prog.loops === rt.jitLoops && rt.jit) ? compileHot(rt, prog) : false, (--quantum <= 0 || rt.q <= 0))) { quantum = QUANTUM; rt.q = QUANTUM; rt.budgetTick(); if (rt.gcWanted()) rt.safepointCollect(); if (mustYield()) { f.pc = pc; need = true; break inner; } } break; }
@@ -1194,9 +1194,9 @@ function stepRare(rt, f, regs, u, dex, pc, op, a, lo, hi) {
       case 0x17: regs[a] = BigInt(u[pc + 1] | (u[pc + 2] << 16)); regs[a + 1] = WIDE_HIGH; pc += 3; break;
       case 0x18: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) | BigInt(u[pc + 2]) << 16n | BigInt(u[pc + 3]) << 32n | BigInt(u[pc + 4]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 5; break;
       case 0x19: regs[a] = BigInt.asIntN(64, BigInt(u[pc + 1]) << 48n); regs[a + 1] = WIDE_HIGH; pc += 2; break;
-      case 0x1c: { const type = dex.types[u[pc + 1]]; if (!type) fail('Invalid class type'); if (!rt.classes.has(type)) rt.assertResolvable(type); regs[a] = rt.classObject(type); pc += 2; break; }
+      case 0x1c: { const type = dex.typeAt(u[pc + 1]); if (!type) fail('Invalid class type'); if (!rt.classes.has(type)) rt.assertResolvable(type); regs[a] = rt.classObject(type); pc += 2; break; }
       case 0x24: case 0x25: {
-        const type = dex.types[u[pc + 1]]; if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
+        const type = dex.typeAt(u[pc + 1]); if (!type?.startsWith('[') || ['J', 'D'].includes(type.slice(1))) fail('Invalid filled-new-array type');
         const registers = invokeRegisters(u, pc, regs, op, a, lo, hi); rt.bytecodeAlloc = true; let value; try { value = rt.newArray(type, registers.length); } finally { rt.bytecodeAlloc = false; } const array = rt.object(value);
         for (let i = 0; i < registers.length; i++) { const entry = regs[registers[i]]; rt.checkArrayValue(array, entry); array.cells[i] = narrow(entry, type.slice(1)); }
         f.result = value; pc += 3; break;

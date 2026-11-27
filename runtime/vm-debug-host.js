@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=5afc26aa921f';
-import { createHostRegistry } from './host-contract.js?v=5afc26aa921f';
-import { RUNTIME_STAT_NAMES, allocCount, resetAllocCount, runtimeStat, runtimeStatsArray, setAllocCounting, ALLOC_KIND } from './runtime-stats.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { createHostRegistry } from './host-contract.js?v=5abc89d1cc06';
+import { RUNTIME_STAT_NAMES, allocCount, resetAllocCount, runtimeStat, runtimeStatsArray, setAllocCounting, ALLOC_KIND } from './runtime-stats.js?v=5abc89d1cc06';
 
 // android.os.Debug and the parts of dalvik.system.VMDebug it delegates to (frameworks/base core/java/android/os/Debug.java and libcore dalvik/system/VMDebug.java,
 // android-13.0.0_r1). The runtime statistics, allocation counts and collector figures come from the lab's own collector (src/runtime-stats.js); the native heap is the VM's

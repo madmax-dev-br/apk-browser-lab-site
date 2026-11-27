@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=5afc26aa921f';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=5afc26aa921f';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=5afc26aa921f';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=5afc26aa921f';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=5afc26aa921f';
-import { inspectELF } from './native-inspector.js?v=5afc26aa921f';
-import { elfBuildId } from './elf-build-id.js?v=5afc26aa921f';
-import { crc32 } from './zip-entry.js?v=5afc26aa921f';
-import { resolveDevice } from './device-profile.js?v=5afc26aa921f';
-import { resourceProfileFor } from './device-configuration.js?v=5afc26aa921f';
-import { JniBridge } from './jni-host.js?v=5afc26aa921f';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=5afc26aa921f';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=5afc26aa921f';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=5afc26aa921f';
-import { AndroidResources } from './android-resources.js?v=5afc26aa921f';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=5afc26aa921f';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=5afc26aa921f';
-import { FrameworkProvider } from './framework-provider.js?v=5afc26aa921f';
-import { APKArchive } from './apk-archive.js?v=5afc26aa921f';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=5afc26aa921f';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=5afc26aa921f';
+import { usesProcesses } from './system-programs.js?v=5abc89d1cc06';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=5abc89d1cc06';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=5abc89d1cc06';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=5abc89d1cc06';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=5abc89d1cc06';
+import { inspectELF } from './native-inspector.js?v=5abc89d1cc06';
+import { elfBuildId } from './elf-build-id.js?v=5abc89d1cc06';
+import { crc32 } from './zip-entry.js?v=5abc89d1cc06';
+import { resolveDevice } from './device-profile.js?v=5abc89d1cc06';
+import { resourceProfileFor } from './device-configuration.js?v=5abc89d1cc06';
+import { JniBridge } from './jni-host.js?v=5abc89d1cc06';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=5abc89d1cc06';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=5abc89d1cc06';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=5abc89d1cc06';
+import { AndroidResources } from './android-resources.js?v=5abc89d1cc06';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=5abc89d1cc06';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=5abc89d1cc06';
+import { FrameworkProvider } from './framework-provider.js?v=5abc89d1cc06';
+import { APKArchive } from './apk-archive.js?v=5abc89d1cc06';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=5abc89d1cc06';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=5abc89d1cc06';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -512,11 +512,28 @@ const SET_CHECK_IN_HELPERS = 4 << 20;
 async function verifySetChecks(checks) {
   for (const check of checks) { const crc = (await check.job) ?? crc32(check.bytes); if (crc !== check.crc) check.archive.crcMismatch(check.name); }
 }
-/** Whether `bytes` contain the ASCII text. */
-function containsAscii(bytes, text) {
-  const first = text.charCodeAt(0);
-  for (let at = bytes.indexOf(first); at >= 0 && at <= bytes.length - text.length; at = bytes.indexOf(first, at + 1)) { let k = 1; while (k < text.length && bytes[at + k] === text.charCodeAt(k)) k++; if (k === text.length) return true; }
+/** A non-enumerable property of `target` computed by `compute` on first read, then kept as a plain value. */
+function lazyField(target, name, compute) {
+  Object.defineProperty(target, name, { configurable: true, enumerable: false, get() { const value = compute(); Object.defineProperty(target, name, { value, configurable: true, enumerable: false, writable: true }); return value; } });
+}
+/** Whether `bytes` contain the ASCII text (Horspool: the byte under the pattern's last position says how far the pattern can move, so most bytes are never compared). */
+export function containsAscii(bytes, text) {
+  const m = text.length, last = m - 1; if (m === 0) return true;
+  const pattern = new Uint8Array(m); for (let i = 0; i < m; i++) pattern[i] = text.charCodeAt(i) & 0xff;
+  const skip = new Uint8Array(256).fill(Math.min(m, 255)); for (let i = 0; i < last; i++) skip[pattern[i]] = Math.min(last - i, 255);
+  const tail = pattern[last];
+  for (let at = 0, end = bytes.length - m; at <= end; at += skip[bytes[at + last]]) {
+    if (bytes[at + last] !== tail) continue;
+    let k = last - 1; while (k >= 0 && bytes[at + k] === pattern[k]) k--; if (k < 0) return true;
+  }
   return false;
+}
+const LIBRARY_SCAN_LIMIT = 256 * 1024 * 1024;
+/** Whether the native library `name` contains the ASCII text. A stored library (the usual case) is read in place: no copy, and its CRC-32 is left to its load, which checks it
+ *  (extractSync) when the app loads it; a deflated one is expanded and checked. */
+function libraryContains(archive, name, text) {
+  const entry = archive.entries.get(name);
+  return containsAscii(entry?.method === 0 && entry.size <= LIBRARY_SCAN_LIMIT ? archive.payload(name).compressed : archive.extractSync(name, LIBRARY_SCAN_LIMIT), text);
 }
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
@@ -648,8 +665,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
     let type=activity.name.startsWith('L')?activity.name:'L'+activity.name.replaceAll('.','/')+';',seen=new Set();
     while(type){if(type==='Landroidx/appcompat/app/AppCompatActivity;')return true;if(seen.has(type)||seen.size>=128)fail('Invalid/excessive Activity superclass chain');seen.add(type);type=apkSuperclass(type);}return false;
   });
-  const usesWindowSurfaces=files.some(file=>file.dex.types.some(type=>['Landroid/app/Dialog;','Landroid/view/WindowManager;'].includes(type)));
-  const usesSurfaceViews=files.some(file=>file.dex.types.some(type=>['Landroid/view/SurfaceView;','Landroid/opengl/GLSurfaceView;','Landroid/view/TextureView;'].includes(type)));   // a surface's size is its View's: measured and laid out in the VM, as a producer (EGL, the camera) sizes its buffers from it
+  const usesWindowSurfaces=files.some(file=>['Landroid/app/Dialog;','Landroid/view/WindowManager;'].some(name=>file.dex.hasType(name)));
+  const usesSurfaceViews=files.some(file=>['Landroid/view/SurfaceView;','Landroid/opengl/GLSurfaceView;','Landroid/view/TextureView;'].some(name=>file.dex.hasType(name)));   // a surface's size is its View's: measured and laid out in the VM, as a producer (EGL, the camera) sizes its buffers from it
   // Gravity-dependent drawables (LayerDrawable, InsetDrawable, ScaleDrawable, ClipDrawable, RippleDrawable) need the original View/Gravity layer of the layouts profile: load it when the code names
   // those classes or a drawable/mipmap XML of the APK uses one of their tags (the tag is a whole string of the compiled XML string pool, UTF-8 or UTF-16).
   const gravityDrawableTypes=new Set(['LayerDrawable','InsetDrawable','ScaleDrawable','ClipDrawable','RippleDrawable','TransitionDrawable'].map(name=>`Landroid/graphics/drawable/${name};`));
@@ -657,7 +674,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const poolString=(text,utf16)=>{const bytes=[];if(utf16){bytes.push(text.length,0);for(const c of text)bytes.push(c.charCodeAt(0),0);bytes.push(0,0);}else{bytes.push(text.length,text.length);for(const c of text)bytes.push(c.charCodeAt(0));bytes.push(0);}return bytes;};
   const tagPatterns=gravityTags.flatMap(tag=>[poolString(tag,false),poolString(tag,true)]);
   const containsPattern=(data,pattern)=>{outer:for(let at=data.indexOf(pattern[0]);at>=0&&at<=data.length-pattern.length;at=data.indexOf(pattern[0],at+1)){for(let i=1;i<pattern.length;i++)if(data[at+i]!==pattern[i])continue outer;return true;}return false;};
-  const usesGravityDrawables=files.some(file=>file.dex.types.some(type=>gravityDrawableTypes.has(type)))||[...archive.entries.keys()].filter(name=>/^res\/(?:drawable|mipmap)[^/]*\/[^/]+\.xml$/.test(name)).slice(0,512).some(name=>{
+  const usesGravityDrawables=files.some(file=>[...gravityDrawableTypes].some(name=>file.dex.hasType(name)))||[...archive.entries.keys()].filter(name=>/^res\/(?:drawable|mipmap)[^/]*\/[^/]+\.xml$/.test(name)).slice(0,512).some(name=>{
     if(archive.entries.get(name).size>65536)return false;let data;try{data=archive.inspectSync(name,65536);}catch{return false;}return tagPatterns.some(pattern=>containsPattern(data,pattern));
   });
   // Widgets that an APK may use only as a layout tag. android.widget.TextClock (an original framework class) computes its next tick with java.time, which needs the ICU and tz backends
@@ -667,18 +684,18 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // and is skipped for a question the code (or another reason to load the profile) already answered.
   const profileWidgetTypes=new Set(LAYOUTS_PROFILE_WIDGETS.map(name=>`Landroid/widget/${name};`));
   const widgetTags=namesOfTags=>namesOfTags.flatMap(name=>[name,`android.widget.${name}`]).flatMap(tag=>[poolString(tag,false),poolString(tag,true)]);
-  const clockScan={patterns:widgetTags(['TextClock']),found:files.some(file=>file.dex.types.includes('Landroid/widget/TextClock;'))};
+  const clockScan={patterns:widgetTags(['TextClock']),found:files.some(file=>file.dex.hasType('Landroid/widget/TextClock;'))};
   // android.widget.Toolbar, ActionMenuView and the menu popups (PopupMenu and the list rows MenuInflater's menus are shown with) are original classes of the default framework DEX
   // over the original LinearLayout / FrameLayout, PopupWindow and ListPopupWindow of the layouts profile: the profile is loaded when the code names one or a layout uses the Toolbar or
   // ActionMenuView tag.
   const menuWidgetTypes=new Set(['Landroid/widget/Toolbar;','Landroid/widget/ActionMenuView;','Landroid/widget/PopupMenu;','Landroid/widget/PopupWindow;','Landroid/widget/ListPopupWindow;','Landroid/view/MenuInflater;']);
-  const menuScan={patterns:widgetTags(['Toolbar','ActionMenuView']),found:files.some(file=>file.dex.types.some(type=>menuWidgetTypes.has(type)))};
-  const profileScan={patterns:widgetTags(LAYOUTS_PROFILE_WIDGETS),found:files.some(file=>file.dex.types.some(type=>profileWidgetTypes.has(type)))};
+  const menuScan={patterns:widgetTags(['Toolbar','ActionMenuView']),found:files.some(file=>[...menuWidgetTypes].some(name=>file.dex.hasType(name)))};
+  const profileScan={patterns:widgetTags(LAYOUTS_PROFILE_WIDGETS),found:files.some(file=>[...profileWidgetTypes].some(name=>file.dex.hasType(name)))};
   // A ProgressBar (and the seek bars over it) is drawn and measured with the drawables of its style, which for the Material styles are layer drawables placed with the original
   // android.view.Gravity of the layouts profile; android.animation.LayoutTransition and the View overlays are original classes of the profile too. An APK whose code names one of
   // them, or whose layouts use a progress bar tag, gets the profile.
   const barTypes=new Set(['ProgressBar','SeekBar','RatingBar','AbsSeekBar'].map(name=>`Landroid/widget/${name};`)),profileOnlyTypes=new Set(['Landroid/animation/LayoutTransition;','Landroid/view/ViewOverlay;','Landroid/view/ViewGroupOverlay;']);
-  const barScan={patterns:widgetTags(['ProgressBar','SeekBar','RatingBar']),found:files.some(file=>file.dex.types.some(type=>barTypes.has(type)||profileOnlyTypes.has(type)))};
+  const barScan={patterns:widgetTags(['ProgressBar','SeekBar','RatingBar']),found:files.some(file=>[...barTypes,...profileOnlyTypes].some(name=>file.dex.hasType(name)))};
   // The attributes only an original class of the profile applies (src/host-styleables.js: LinearLayout's weight sum, dividers and baseline alignment, FrameLayout's
   // measureAllChildren, layout animations and transitions, a ProgressBar interpolator): found in a layout by the attribute's name (a whole string of the string pool) or by its
   // public id (the resource map of the compiled XML, which a build that strips the names keeps), and in a style by the id (resources.arsc keys a style's items by attribute id).
@@ -686,9 +703,11 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const attributeScan={patterns:Object.entries(LAYOUTS_PROFILE_ATTRIBUTES).flatMap(([name,entry])=>[poolString(name,false),poolString(name,true),idBytes(entry.id)]),found:false};
   // android:lineBreakStyle / lineBreakWordStyle (LineBreakConfig) are applied by the optimal line breaker over the ICU line-break iterator, which is otherwise prepared for an APK
   // whose code names a class that needs it (icuTypes below). An APK without such code whose layouts or styles give one of the two attributes gets the iterator too.
+  // the ranges of the sorted type table icuTypes can accept (DexFile.someType reads only these)
+  const ICU_PREFIXES=['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;','Landroid/database/','Ljava/time/','Ljava/math/'];
   const icuTypes=type=>['Ljava/text/BreakIterator;','Landroid/icu/text/BreakIterator;','Ljava/util/regex/Pattern;','Ljava/util/regex/Matcher;'].includes(type)||type.startsWith('Landroid/database/')||type.startsWith('Ljava/time/')||type.startsWith('Ljava/math/');
   const lineBreakIds=new Set(Object.values(LINE_BREAK_ATTRIBUTES).map(entry=>entry.id&0xffff));
-  const lineBreakScan={patterns:Object.entries(LINE_BREAK_ATTRIBUTES).flatMap(([name,entry])=>[poolString(name,false),poolString(name,true),idBytes(entry.id)]),found:false,skip:!!options.icuBreakBackend||!options.icuBreakProvider||files.some(file=>file.dex.types.some(icuTypes))};
+  const lineBreakScan={patterns:Object.entries(LINE_BREAK_ATTRIBUTES).flatMap(([name,entry])=>[poolString(name,false),poolString(name,true),idBytes(entry.id)]),found:false,skip:!!options.icuBreakBackend||!options.icuBreakProvider||files.some(file=>file.dex.someType(ICU_PREFIXES,icuTypes))};
   const layoutScans=[clockScan,menuScan,profileScan,barScan,attributeScan,lineBreakScan].filter(scan=>!scan.found&&!scan.skip&&!(scan!==clockScan&&scan!==lineBreakScan&&(options.enableLayoutProfile!==undefined||appCompatActivity||usesWindowSurfaces||usesSurfaceViews||usesGravityDrawables)));
   if(layoutScans.length){
     const layoutFiles=(await layoutFilesReady)??[...archive.entries.keys()].filter(name=>/^res\/layout[^/]*\/[^/]+\.xml$/.test(name));
@@ -716,12 +735,12 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesLineBreakAttributes=lineBreakScan.found;
   const usesTextClock=clockScan.found,usesMenuWidgets=menuScan.found,usesProfileWidgets=profileScan.found,usesProgressBars=barScan.found,usesProfileAttributes=attributeScan.found;
   // (a companion package's code is not scanned at load: the "With microG" option's screens are AppCompat Activities, whose delegate makes a configuration Context)
-  const appUsesConfiguration=files.some(file=>file.dex.types.includes('Landroid/content/res/Configuration;'));
+  const appUsesConfiguration=files.some(file=>file.dex.hasType('Landroid/content/res/Configuration;'));
   const usesConfiguration=appUsesConfiguration||(options.companionPackages?.length??0)>0||!!options.microg;
-  const usesSpeech=files.some(file=>file.dex.types.some(type=>type.startsWith('Landroid/speech/tts/')));
+  const usesSpeech=files.some(file=>file.dex.someType(['Landroid/speech/tts/']));
   // the original SMS decoding classes (framework-aosp/profiles/telephony): referenced by the APK, or possibly by a companion package (its code is not scanned at load: the "With microG"
   // option's SMS Retriever decodes SMS_RECEIVED with them)
-  const usesTelephony=files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))||(options.companionPackages?.length??0)>0||!!options.microg;   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
+  const usesTelephony=files.some(file=>file.dex.someType(['Landroid/telephony/SmsMessage;','Landroid/provider/Telephony']))||(options.companionPackages?.length??0)>0||!!options.microg;   // the original android.speech.tts classes (framework-aosp/profiles/speech): not in the default DEX, which is at the 64K reference limit
   // the original android.app.IntentService (framework-aosp/profiles/services): referenced by the APK, or possibly by a companion package (microG's check-in service is one)
   // the org.apache.http.legacy shared library (framework-aosp/profiles/apache-http): declared with <uses-library> (required or not), or implied by a targetSdkVersion below 28, for which
   // PackageManager adds it itself (it left the boot class path in Android 9)
@@ -732,25 +751,25 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // and the route provider side of MediaRouter2 (MediaRoute2ProviderService, its binder interfaces, route and session data, the MediaRouter2 callback bases): referenced by the APK, or
   // possibly by a companion package (its code is not scanned at load: the "With microG" option's media route provider extends MediaRoute2ProviderService)
   const MEDIA_ROUTE=/^Landroid\/media\/(MediaRoute2ProviderService|MediaRoute2Info|RoutingSessionInfo|MediaRoute2ProviderInfo|IMediaRoute2ProviderService(Callback)?|MediaRouter2\$(RouteCallback|TransferCallback|ControllerCallback|OnGetControllerHintsListener))[;$]/;
-  const appUsesMedia=files.some(file=>file.dex.types.some(type=>MEDIA_TYPES.has(type)||MEDIA_ROUTE.test(type)));
+  const appUsesMedia=files.some(file=>[...MEDIA_TYPES].some(name=>file.dex.hasType(name))||file.dex.someType(['Landroid/media/'],type=>MEDIA_ROUTE.test(type)));
   const usesMedia=appUsesMedia||(options.companionPackages?.length??0)>0||!!options.microg;
   // the libcore java.util.concurrent classes of framework-aosp/profiles/concurrent (TransferQueue, LinkedTransferQueue, BrokenBarrierException, Flow), and CyclicBarrier, which throws
   // BrokenBarrierException: referenced by the APK
   const CONCURRENT=/^Ljava\/util\/concurrent\/(TransferQueue|LinkedTransferQueue|BrokenBarrierException|CyclicBarrier|Flow)[;$]/;
-  const usesConcurrent=files.some(file=>file.dex.types.some(type=>CONCURRENT.test(type)));
+  const usesConcurrent=files.some(file=>file.dex.someType(['Ljava/util/concurrent/'],type=>CONCURRENT.test(type)));
   // the libcore java.lang.invoke originals (framework-aosp/profiles/invoke: MethodHandles, MethodHandle, MethodType, Transformers, VarHandle ...): referenced by the APK
-  const usesInvoke=files.some(file=>file.dex.types.some(type=>type.startsWith('Ljava/lang/invoke/')));
+  const usesInvoke=files.some(file=>file.dex.someType(['Ljava/lang/invoke/']));
   // the android.net data classes of framework-aosp/profiles/net (UrlQuerySanitizer and its nested classes, MailTo, Credentials): referenced by the APK
   const NET=/^Landroid\/net\/(UrlQuerySanitizer|MailTo|Credentials)[;$]/;
-  const usesNet=files.some(file=>file.dex.types.some(type=>NET.test(type)));
+  const usesNet=files.some(file=>file.dex.someType(['Landroid/net/'],type=>NET.test(type)));
   // the org.apache.http classes of framework.jar (framework-aosp/profiles/apache-boot): referenced by the APK, or under the legacy apache-http profile
   const BOOT_HTTP=/^Lorg\/apache\/http\/(conn\/(ssl|scheme)\/|params\/(CoreConnectionPNames|HttpConnectionParams|HttpParams);|conn\/ConnectTimeoutException;)/;
-  const appUsesBootHttp=files.some(file=>file.dex.types.some(type=>BOOT_HTTP.test(type)));
-  const usesIntentService=files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
+  const appUsesBootHttp=files.some(file=>file.dex.someType(['Lorg/apache/http/'],type=>BOOT_HTTP.test(type)));
+  const usesIntentService=files.some(file=>file.dex.hasType('Landroid/app/IntentService;'))||(options.companionPackages?.length??0)>0||!!options.microg;
   // the original account authenticator classes (framework-aosp/profiles/accounts): referenced by the APK (an app that is an account authenticator), or possibly by a companion package
   // (microG's authenticator and its login and consent screens)
   const ACCOUNT_TYPES=new Set(['Landroid/accounts/AbstractAccountAuthenticator;','Landroid/accounts/AccountAuthenticatorResponse;','Landroid/accounts/AccountAuthenticatorActivity;','Landroid/accounts/IAccountAuthenticator;','Landroid/accounts/IAccountAuthenticatorResponse;']);
-  const appAuthenticator=files.some(file=>file.dex.types.some(type=>ACCOUNT_TYPES.has(type)));
+  const appAuthenticator=files.some(file=>[...ACCOUNT_TYPES].some(name=>file.dex.hasType(name)));
   // the system's account chooser (ChooseTypeAndAccountActivity, in the same profile; a ListView of the layouts profile): an APK that calls AccountManager.newChooseAccountIntent
   const appChoosesAccount=files.some(file=>file.dex.methodsNamed(['newChooseAccountIntent']).some(method=>method.owner==='Landroid/accounts/AccountManager;'));
   const usesAccounts=appAuthenticator||appChoosesAccount||(options.companionPackages?.length??0)>0||!!options.microg;
@@ -771,10 +790,10 @@ export async function loadAPK(arrayBuffer, options = {}) {
     {name:'concurrent',explicit:options.enableConcurrentProfile,automatic:usesConcurrent,reason:'APK-references-java.util.concurrent.LinkedTransferQueue-TransferQueue-Flow-or-CyclicBarrier'},
     {name:'invoke',explicit:options.enableInvokeProfile,automatic:usesInvoke,reason:'APK-references-java.lang.invoke'},
     {name:'net',explicit:options.enableNetProfile,automatic:usesNet,reason:'APK-references-android.net.UrlQuerySanitizer-MailTo-or-Credentials'},
-    {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.types.includes('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
+    {name:'services',explicit:options.enableServicesProfile,automatic:usesIntentService,reason:files.some(file=>file.dex.hasType('Landroid/app/IntentService;'))?'APK-references-android.app.IntentService':'companion-package-installed'},
     {name:'accounts',explicit:options.enableAccountsProfile,automatic:usesAccounts,reason:appAuthenticator?'APK-references-android.accounts.AbstractAccountAuthenticator':appChoosesAccount?'APK-calls-AccountManager.newChooseAccountIntent':'companion-package-installed'},
     {name:'color',explicit:options.enableColorProfile,automatic:usesColorMath,reason:(options.companionPackages?.length??0)>0||!!options.microg?'companion-package-installed':'APK-color-state-list-gives-android:lStar'},
-    {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.types.some(type=>type==='Landroid/telephony/SmsMessage;'||type.startsWith('Landroid/provider/Telephony')))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
+    {name:'telephony',explicit:options.enableTelephonyProfile,automatic:usesTelephony,reason:files.some(file=>file.dex.someType(['Landroid/telephony/SmsMessage;','Landroid/provider/Telephony']))?'APK-references-android.telephony.SmsMessage':'companion-package-installed'},
   ];
   for(const selection of profiles){
     const requested=selection.explicit===true||(selection.explicit!==false&&selection.automatic);if(!requested)continue;
@@ -816,18 +835,18 @@ export async function loadAPK(arrayBuffer, options = {}) {
   const usesViewTransforms = program.files.some(({ dex }) => dex.methodsNamed(transformNames).some(method => transformSignatures.has(method.name + method.signature) && viewOwner(method.owner)));
   // With the layouts profile every View is measured in the VM by the original layout classes, text included: an APK that got the profile for a widget it uses only as a layout tag
   // (no android.graphics type in its own code) needs the text backend like any other.
-  const needsSkia=program.types.some(type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||(framework?.metadata?.profiles??[]).some(profile=>profile.name==='layouts')||
-    usesViewTransforms || program.files.some(({ dex }) => dex.methodsNamed('onMeasure').some(method => method.signature === '(II)V'))&&program.types.some(type=>['Landroid/widget/TextView;','Landroid/widget/Button;'].includes(type));
+  const needsSkia=program.someType(['Landroid/graphics/','Landroid/view/View$MeasureSpec;'],type=>/^Landroid\/graphics\//.test(type)||type==='Landroid/view/View$MeasureSpec;')||(framework?.metadata?.profiles??[]).some(profile=>profile.name==='layouts')||
+    usesViewTransforms || program.files.some(({ dex }) => dex.methodsNamed('onMeasure').some(method => method.signature === '(II)V'))&&['Landroid/widget/TextView;','Landroid/widget/Button;'].some(name=>program.hasType(name));
   // the system programs (below), started now so their download and compile overlap the backends and resources this load still waits for
-  const systemProgramsLoading=!options.systemPrograms&&options.systemProgramsProvider&&usesProcesses(program.types)?(typeof options.systemProgramsProvider==='function'?options.systemProgramsProvider():options.systemProgramsProvider.load()):null;
+  const systemProgramsLoading=!options.systemPrograms&&options.systemProgramsProvider&&usesProcesses(program)?(typeof options.systemProgramsProvider==='function'?options.systemProgramsProvider():options.systemProgramsProvider.load()):null;
   systemProgramsLoading?.catch?.(()=>{});   // its failure is reported where it is awaited
   let skia=options.skiaBackend??null;
   if(!skia&&options.skiaProvider&&(needsSkia||options.forceSkia===true)){const source=options.skiaProvider;skia=typeof source==='function'?await source({onProgress:options.onProgress}):await source.load({onProgress:options.onProgress});}
   // JPEG/WebP/AVIF codecs (vendor/lab-codecs) load only for an APK that can decode or encode images: it references BitmapFactory / ImageDecoder / Bitmap.CompressFormat, or ships image files.
-  const usesImageCodecs=program.types.some(type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;'||type==='Landroid/media/ImageReader;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
+  const usesImageCodecs=program.someType(['Landroid/graphics/BitmapFactory','Landroid/graphics/ImageDecoder','Landroid/graphics/Bitmap$CompressFormat;','Landroid/media/ImageReader;'],type=>/^Landroid\/graphics\/(BitmapFactory|ImageDecoder)(\$|;)/.test(type)||type==='Landroid/graphics/Bitmap$CompressFormat;'||type==='Landroid/media/ImageReader;')||[...archive.entries.keys()].some(name=>/\.(jpe?g|webp|avif)$/i.test(name));
   if(skia&&usesImageCodecs&&typeof skia.prepareCodecs==='function')await skia.prepareCodecs();
   // A native text engine reads the system fonts itself (the path of fonts.xml is in its library): they are fetched now, all at once, instead of one synchronous read after another in the launch.
-  if(skia&&options.arm64Native&&typeof skia.prepareSystemFonts==='function'&&[...archive.entries.keys()].some(name=>/^lib\/arm64-v8a\/[^/]+\.so$/.test(name)&&containsAscii(archive.extractSync(name,256*1024*1024),'/system/etc/fonts.xml'))){
+  if(skia&&options.arm64Native&&typeof skia.prepareSystemFonts==='function'&&[...archive.entries.keys()].some(name=>/^lib\/arm64-v8a\/[^/]+\.so$/.test(name)&&libraryContains(archive,name,'/system/etc/fonts.xml'))){
     await options.onProgress?.({phase:'skia',completed:3,total:3,message:'Loading the system fonts'}); await skia.prepareSystemFonts();
   }
   if(skia&&(typeof skia.createHost!=='function'||typeof skia.rasterizeCanvas!=='function'))fail('Invalid official Skia provider result');
@@ -837,14 +856,14 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let icuBreakBackend=options.icuBreakBackend??null;
   // A companion package's code (options.companionPackages, the microG option) is not scanned at load: it may need any of the lazily chosen backends below, so with one installed
   // every one of them is prepared (a device with the app alone decides by the app's types, as before).
-  const backendTypes = (options.companionPackages?.length ?? 0) > 0 || options.microg ? { some: () => true } : program.types;
-  if(!icuBreakBackend&&options.icuBreakProvider&&backendTypes.some(icuTypes)||!icuBreakBackend&&options.icuBreakProvider&&(usesTextClock||usesLineBreakAttributes)){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
+  const backendTypes = (options.companionPackages?.length ?? 0) > 0 || options.microg ? { someType: () => true } : program;
+  if(!icuBreakBackend&&options.icuBreakProvider&&backendTypes.someType(ICU_PREFIXES,icuTypes)||!icuBreakBackend&&options.icuBreakProvider&&(usesTextClock||usesLineBreakAttributes)){ // android.database.sqlite's own SQLiteDatabaseConfiguration compiles a java.util.regex.Pattern
     const provider=options.icuBreakProvider;icuBreakBackend=typeof provider==='function'?await provider():await provider.load();
     if(typeof icuBreakBackend?.breaks!=='function')fail('Invalid original ICU break-analysis provider');
   }
   // Android 13 SQLite (Wasm) for the framework's SQLiteConnection/CursorWindow natives; loaded only when the app references android.database.*.
   let sqliteBackend=options.sqliteBackend??null;
-  if(!sqliteBackend&&options.sqliteProvider&&backendTypes.some(type=>type.startsWith('Landroid/database/'))){
+  if(!sqliteBackend&&options.sqliteProvider&&backendTypes.someType(['Landroid/database/'])){
     const provider=options.sqliteProvider;sqliteBackend=typeof provider==='function'?await provider():await provider.load();
     if(!sqliteBackend?.module)fail('Invalid Android SQLite provider');
   }
@@ -859,13 +878,13 @@ export async function loadAPK(arrayBuffer, options = {}) {
   {const javacrypto=options.javacryptoProvider??getDefaultJavacryptoProvider();if(javacrypto)nativeLibraryProvider=javacrypto.compose(nativeLibraryProvider);}
   // IANA tz database (AOSP tzdata2022a compiled to java.time ZoneRules) for the original java.time sources; loaded when the app can reach java.time.
   let tzdata=options.tzdata??null;
-  if(!tzdata&&options.tzdataProvider&&(usesTextClock||backendTypes.some(type=>type.startsWith('Ljava/time/')||['Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;'].includes(type)))){
+  if(!tzdata&&options.tzdataProvider&&(usesTextClock||backendTypes.someType(['Ljava/time/','Ljava/util/Date;','Ljava/util/TimeZone;','Ljava/util/GregorianCalendar;']))){
     const provider=options.tzdataProvider;tzdata=typeof provider==='function'?await provider():await provider.load();
     if(!tzdata?.bytes)fail('Invalid tz database provider');
   }
   // zlib + zip_util (Wasm) for the original java.util.zip classes; loaded when the app can reach them.
   let zlibBackend=options.zlibBackend??null;
-  if(!zlibBackend&&options.zlibProvider&&backendTypes.some(type=>type.startsWith('Ljava/util/zip/')||type.startsWith('Ljava/util/jar/'))){
+  if(!zlibBackend&&options.zlibProvider&&backendTypes.someType(['Ljava/util/zip/','Ljava/util/jar/'])){
     const provider=options.zlibProvider;zlibBackend=typeof provider==='function'?await provider():await provider.load();
     if(!zlibBackend?.module)fail('Invalid zlib provider');
   }
@@ -878,7 +897,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   }
   // ICU4C converters (Wasm) behind the original java.nio.charset coders (CharsetDecoderICU/EncoderICU); needed by anything that encodes/decodes through a Charset object.
   let icuConverterBackend=options.icuConverterBackend??null;
-  if(!icuConverterBackend&&options.icuConverterProvider&&backendTypes.some(type=>type.startsWith('Ljava/nio/charset/')||type.startsWith('Ljava/util/zip/')||/^Ljava\/io\/(InputStreamReader|OutputStreamWriter|PrintStream|PrintWriter|FileReader|FileWriter|LineNumberReader|StreamTokenizer);/.test(type))){
+  if(!icuConverterBackend&&options.icuConverterProvider&&backendTypes.someType(['Ljava/nio/charset/','Ljava/util/zip/','Ljava/io/'],type=>type.startsWith('Ljava/nio/charset/')||type.startsWith('Ljava/util/zip/')||/^Ljava\/io\/(InputStreamReader|OutputStreamWriter|PrintStream|PrintWriter|FileReader|FileWriter|LineNumberReader|StreamTokenizer);/.test(type))){
     const provider=options.icuConverterProvider;icuConverterBackend=typeof provider==='function'?await provider():await provider.load();
     if(!icuConverterBackend?.module)fail('Invalid ICU converter provider');
   }
@@ -928,7 +947,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   // DEX files are expanded now in the load's helper Workers (prefetchDex; the browser Worker's inflate pool: where there is none, as in Node, expanding here would only move
   // the same work onto this thread); an app that does not gets nothing expanded ahead.
   const companionDex = [];   // awaited before the load returns: the expansion runs alongside the rest of the load, and is done before the app's first instruction
-  const appReaches = prefix => program.types.some(type => type.startsWith(prefix));
+  const appReaches = prefix => program.someType([prefix]);
   const reachesGms = companions.some(c => c.deviceOption === 'microg') && appReaches('Lcom/google/android/gms/'), reachesVending = companions.some(c => c.deviceOption === 'microg') && appReaches('Lcom/android/vending/');
   for (const companion of companions) {
     if (options.inflatePool && companion.deviceOption === 'microg' && ((companion.packageName === 'com.google.android.gms' && reachesGms) || (companion.packageName === 'com.android.vending' && reachesVending))) companionDex.push(companion.prefetchDex?.(options.inflatePool));
@@ -994,12 +1013,12 @@ export async function loadAPK(arrayBuffer, options = {}) {
     }
   }
   if (!manifest.activities.length) manifest.activities = runtime.activities().map(type => ({ name: dottedName(type), descriptor: type, launcher: false }));
-  const kotlin = program.types.some(t => t.startsWith('Lkotlin/'));
-  const compose = program.types.some(t => t.startsWith('Landroidx/compose/') || t.startsWith('Lorg/jetbrains/compose/'));
+  const kotlin = program.someType(['Lkotlin/']);
+  const compose = program.someType(['Landroidx/compose/', 'Lorg/jetbrains/compose/']);
   if (compose) warnings.push('Compose references detected. Actual execution still depends on the Android/Compose APIs reached by DEX; source-compiled Compose Web is separate.');
   if (kotlin) warnings.push('Kotlin bytecode is preserved. Packaged library methods execute through DEX when their instructions are supported.');
   if (nativeLibraries.length) warnings.push(`${nativeSummary.files} native files (${nativeSummary.uniqueLibraries} library names, ${nativeSummary.abiCount} ABIs) are packaged. Their presence does not block DEX; required JNI/ELF execution fails specifically when reached.`);
-  if (program.types.some(t => t.startsWith('Lcom/facebook/react/')) || nativeLibraryDetails.some(l => /reactnative|react_native|react_nativemodule/.test(l.basename))) embeddedFrameworks.push('React Native');
+  if (program.someType(['Lcom/facebook/react/']) || nativeLibraryDetails.some(l => /reactnative|react_native|react_nativemodule/.test(l.basename))) embeddedFrameworks.push('React Native');
   if (nativeLibraryDetails.some(l => /hermes/i.test(l.basename))) embeddedFrameworks.push('Hermes');
   if (archive.entries.has('assets/index.android.bundle')) {
     const path = 'assets/index.android.bundle', entry = archive.entries.get(path);
@@ -1014,9 +1033,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
     } catch (error) { bundle.inspectionError = error.message; }
     bundles.push(bundle);
   }
-  const dependencyOwnerSet = new Set(); for (const { dex } of program.files) for (let i = 0; i < dex.methods.length; i++) { const owner = dex.methodOwner(i); if (!program.classes.has(owner)) dependencyOwnerSet.add(owner); }
-  const dependencyOwners = [...dependencyOwnerSet];
-  const inventory = { ...manifest, classes: program.classes.size, classNames: [...program.classes.keys()].map(dottedName),
+  const inventory = { ...manifest, classes: program.classes.size,
     framework: framework ? { ...framework.metadata, ...program.frameworkSummary } : { enabled: false, classes: 0, dexFiles: [], policy: 'no-boot-layer' },
     frameworkResources: frameworkResources ? { ...frameworkResources.metadata, enabled: true, entries: frameworkResources.table.entries?.size ?? null, packages: frameworkResources.table.packages } : { enabled: false, entries: 0 },
     resourceConfiguration: resourceConfiguration ? {...resourceConfiguration.metadata,enabled:true,stats:resourceConfiguration.stats?.()??null} : {enabled:false},
@@ -1025,10 +1042,18 @@ export async function loadAPK(arrayBuffer, options = {}) {
     dexFiles, dexSummaries, totalDexBytes, nativeLibraries, nativeLibraryDetails, nativeByABI, nativeSummary,
     resourceSummary: resources.summary,
     splits: (archive.splits ?? []).map(split => ({ name: split.name, entries: split.entries.length })),   // the split APKs installed with the base (installSplits), as PackageInfo.splitNames lists them
-    kotlin, compose, embeddedFrameworks, bundles, dependencies: dependencyOwners.map(dottedName),
+    kotlin, compose, embeddedFrameworks, bundles,
     unsupportedFeatures, warnings, nativeInspection: { requested: false, inspected: 0, skipped: nativeLibraries.length, bytes: 0 },
     microg: options.microg ? { version: options.microg.version, packages: companions.filter(c => c.deviceOption === 'microg').map(c => c.packageName) } : null,
     companionPackages: companions.map(c => ({ packageName: c.packageName, deviceOption: c.deviceOption ?? null, versionName: c.manifest.manifestAttrs?.versionName ?? null, versionCode: c.manifest.manifestAttrs?.versionCode ?? null, dexFiles: c.dexFiles, dexBytes: c.dexBytes, services: c.manifest.services.length, providers: c.manifest.providers.length, nativeFiles: c.nativeLibraries.length, resources: c.hasResources })) };
+
+  // Every class name and the classes the code names that the APK does not define (the platform's and the JDK's): computed when asked, not at the load. A large app has hundreds of
+  // thousands of classes and millions of method ids, and nothing on the launch path reads them; non-enumerable, so they do not travel with the inventory the Worker sends the page.
+  lazyField(inventory, 'classNames', () => [...program.classes.keys()].map(dottedName));
+  lazyField(inventory, 'dependencies', () => {
+    const owners = new Set(); for (const { dex } of program.files) for (let i = 0; i < dex.methods.length; i++) { const owner = dex.methodOwner(i); if (!program.classes.has(owner)) owners.add(owner); }
+    return [...owners].map(dottedName);
+  });
 
   /** Lazy ELF metadata inspection. Accept exact archive paths; never resolves or calls JNI. */
   const inspectNativeLibraries = async (paths = nativeLibraries, limits = {}) => {

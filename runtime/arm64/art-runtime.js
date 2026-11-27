@@ -17,10 +17,10 @@
 //   jmethodID / jfieldID  the ArtMethod* / ArtField* (JniIdType::kPointer, a non-debuggable app), or ART's opaque odd indices (kIndices) for a debuggable app; Executable.artMethod
 //                  is the ArtMethod* either way.
 // Members the lab serves from host code (a framework class without a DEX body) get their own ArtMethod / ArtField with dex index kDexNoIndex and no code item.
-import { APKError } from '../apk-error.js?v=5afc26aa921f';
-import { parseSignature } from '../host-contract.js?v=5afc26aa921f';
-import { ART_METHOD, ART_FIELD, arrayElementOffset, ACC, DEX_NO_INDEX, JIT_WARMUP_THRESHOLD, loadMethodFlags, loadFieldFlags, quickEntryPoint, imtIndex, linkFieldOffsets, firstStaticFieldOffset, MIRROR_CLASS } from '../art-structures.js?v=5afc26aa921f';
-import { ART_INTRINSICS } from '../art-intrinsics-data.js?v=5afc26aa921f';
+import { APKError } from '../apk-error.js?v=5abc89d1cc06';
+import { parseSignature } from '../host-contract.js?v=5abc89d1cc06';
+import { ART_METHOD, ART_FIELD, arrayElementOffset, ACC, DEX_NO_INDEX, JIT_WARMUP_THRESHOLD, loadMethodFlags, loadFieldFlags, quickEntryPoint, imtIndex, linkFieldOffsets, firstStaticFieldOffset, MIRROR_CLASS } from '../art-structures.js?v=5abc89d1cc06';
+import { ART_INTRINSICS } from '../art-intrinsics-data.js?v=5abc89d1cc06';
 
 export const LIBART_PATH = '/apex/com.android.art/lib64/libart.so';
 export const LIBART_ENTRY_POINTS = ['ExecuteNterpImpl', 'art_quick_to_interpreter_bridge', 'art_quick_generic_jni_trampoline', 'art_quick_resolution_trampoline', 'art_jni_dlsym_lookup_stub',

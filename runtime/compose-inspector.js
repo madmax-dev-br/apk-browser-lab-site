@@ -9,9 +9,9 @@
 // built from what the node really has: the semantics Role, an editable text, the semantics text, and the measure policy class (source 'semantics' or 'layout'). Never invented.
 //
 // With recomposition counting on (src/compose-recompositions.js) each node also carries `recomposition`: the counts of the restart group that emits it. Off, nothing is read for it.
-import { createComposeSemanticsDriver } from './compose-semantics.js?v=5afc26aa921f';
-import { composableName, composeOwnerViews, reachableRoots, rootComposition, walkComposition } from './compose-compositions.js?v=5afc26aa921f';
-import { composableRows, nodeRecomposition, recompositionStatus } from './compose-recompositions.js?v=5afc26aa921f';
+import { createComposeSemanticsDriver } from './compose-semantics.js?v=5abc89d1cc06';
+import { composableName, composeOwnerViews, reachableRoots, rootComposition, walkComposition } from './compose-compositions.js?v=5abc89d1cc06';
+import { composableRows, nodeRecomposition, recompositionStatus } from './compose-recompositions.js?v=5abc89d1cc06';
 export { composableName };
 
 const VIEW = 'Landroid/view/View;', OWNER_VIEW = 'Landroidx/compose/ui/platform/AndroidComposeView;', NODE = 'Landroidx/compose/ui/node/LayoutNode;';

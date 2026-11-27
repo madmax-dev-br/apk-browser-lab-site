@@ -1,6 +1,7 @@
-import { APKError } from './apk-error.js?v=5afc26aa921f';
-import { createHostRegistry } from './host-contract.js?v=5afc26aa921f';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { createHostRegistry } from './host-contract.js?v=5abc89d1cc06';
+import { GC_ROOTS } from './heap-gc.js?v=5abc89d1cc06';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=5abc89d1cc06';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
@@ -116,8 +117,9 @@ export function createApkChecksumsHost(platform) {
   const SLICE_MS = 12;
   // A step may yield a Promise (a digest computed off this thread): the job waits for it without a slice of its own, counted as outside work (the pump's waitingIO), and goes on
   // with its result as a main-thread task when it settles (null on a refusal).
+  // While it waits, nothing of the Looper holds the job: its roots (the listener) are held here, or the collector would free the listener before the result arrives.
   let waiting = 0;
-  const outside = { delay: () => null, pending: () => waiting };
+  const outside = { delay: () => null, pending: () => waiting }, parked = new Set();
   const runJob = (r, steps, finished, roots) => {
     let sent;
     const slice = () => {
@@ -127,7 +129,8 @@ export function createApkChecksumsHost(platform) {
         if (next.done) { finished(); return; }
         if (typeof next.value?.then === 'function') {
           if (waiting++ === 0) platform.addExternalSource?.(outside);
-          const resume = value => { waiting--; sent = value; platform.queueTask(slice, 0, roots); platform.onExternalActivity?.(); };
+          parked.add(roots);
+          const resume = value => { waiting--; parked.delete(roots); sent = value; platform.queueTask(slice, 0, roots); platform.onExternalActivity?.(); };
           next.value.then(resume, () => resume(null)); return;
         }
         if (performance.now() - started >= SLICE_MS) break;
@@ -165,5 +168,6 @@ export function createApkChecksumsHost(platform) {
     const answer = () => deliver(r, listener, [...known].filter(([t, v]) => (wanted & t) && v).sort((a, b) => a[0] - b[0]));
     runJob(r, computeSteps(source, wanted, known, r), () => answer(), [listener]);   // already cached: the first slice finishes at once
   });
+  registry[GC_ROOTS] = visit => { for (const roots of parked) for (const value of roots) visit(value); };
   return registry;
 }

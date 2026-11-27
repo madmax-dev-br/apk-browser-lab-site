@@ -1,74 +1,74 @@
-import { APKWorkerClient } from './apk-worker-client.js?v=5afc26aa921f';
-import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=5afc26aa921f';
-import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=5afc26aa921f';
-import { drawFrameGraph } from './frame-graph.js?v=5afc26aa921f';
-import { clientIdentityStatus } from './client-identity.js?v=5afc26aa921f';
-import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=5afc26aa921f';
-import { initCollapsibleSections } from './panel-sections.js?v=5afc26aa921f';
-import { warmupLabel } from './warmup.js?v=5afc26aa921f';
-import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=5afc26aa921f';
-import { ISO_COUNTRIES } from './iso-codes-data.js?v=5afc26aa921f';
-import { initHelpTips } from './help-tips.js?v=5afc26aa921f';
-import { initControlPanelUI } from './control-panel-ui.js?v=5afc26aa921f';
-import { createToolDock } from './tool-dock.js?v=5afc26aa921f';
-import { createPermissionsPanel } from './permissions-panel.js?v=5afc26aa921f';
-import { createSharedFilesPanel } from './shared-files-panel.js?v=5afc26aa921f';
-import { createAppDataPanel } from './app-data-panel.js?v=5afc26aa921f';
-import { createCameraLab } from './camera-lab.js?v=5afc26aa921f';
-import { createOverridesPanel } from './overrides-panel.js?v=5afc26aa921f';
-import { createMethodHooksPanel } from './method-hooks-panel.js?v=5afc26aa921f';
-import { createCodeTool } from './code-tool-loader.js?v=5afc26aa921f';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
-import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=5afc26aa921f';
-import { createMicrogServicesPanel } from './microg-services-panel.js?v=5afc26aa921f';
-import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=5afc26aa921f';
-import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=5afc26aa921f';
-import { MICROG_SERVICES } from './microg-services.js?v=5afc26aa921f';
-import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=5afc26aa921f';
-import { createOrientationLock } from './orientation-lock.js?v=5afc26aa921f';
-import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=5afc26aa921f';
-import { createHostMapPanel } from './host-map-panel.js?v=5afc26aa921f';
-import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=5afc26aa921f';
-import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=5afc26aa921f';
-import { MAX_PLUGINS } from './plugin-store.js?v=5afc26aa921f';
-import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=5afc26aa921f';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5afc26aa921f';
-import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=5afc26aa921f';
-import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=5afc26aa921f';
-import { createDeviceView, createViewState } from './device-view.js?v=5afc26aa921f';
-import { createTaskSwitcher } from './task-switcher.js?v=5afc26aa921f';
-import { createDeviceZoom } from './device-zoom.js?v=5afc26aa921f';
-import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5afc26aa921f';
-import { formatApiGapReport } from './api-gap-scan.js?v=5afc26aa921f';
-import { createLogcatPanel } from './logcat-panel.js?v=5afc26aa921f';
-import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5afc26aa921f';
-import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=5afc26aa921f';
-import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=5afc26aa921f';
-import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=5afc26aa921f';
-import { createAppPalette } from './app-palette.js?v=5afc26aa921f';
-import { createScreenRecorder } from './screen-recorder.js?v=5afc26aa921f';
-import { createDeviceMedia } from './device-media.js?v=5afc26aa921f';
-import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=5afc26aa921f';
-import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=5afc26aa921f';
-import { createAdb } from './adb-commands.js?v=5afc26aa921f';
-import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=5afc26aa921f';
-import { createCustomIdentityPanel } from './custom-identity-panel.js?v=5afc26aa921f';
-import { createAdbTerminal } from './adb-terminal.js?v=5afc26aa921f';
-import { memorySummary } from './worker-memory.js?v=5afc26aa921f';
-import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=5afc26aa921f';
-import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=5afc26aa921f';
-import { createPluginNetRoutes } from './plugin-net-routes.js?v=5afc26aa921f';
-import { createModalHost } from './lab-modal.js?v=5afc26aa921f';
-import { openPackageModal, defaultActivity } from './package-modal.js?v=5afc26aa921f';
-import { createCustomScreenPanel } from './custom-screen-panel.js?v=5afc26aa921f';
-import { createDeviceFullscreen } from './device-fullscreen.js?v=5afc26aa921f';
-import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=5afc26aa921f';
-import { createDragLayer } from './lab-drag.js?v=5afc26aa921f';
-import { createLabScroll } from './lab-scroll.js?v=5afc26aa921f';
-import { createGlSurfaces } from './gl-surfaces.js?v=5afc26aa921f';
-import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=5afc26aa921f';
-import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=5afc26aa921f';
-import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=5afc26aa921f';
-import { resolveIntentFields } from './intent-resolver.js?v=5afc26aa921f';
+import { APKWorkerClient } from './apk-worker-client.js?v=5abc89d1cc06';
+import { layoutBoundsRects, drawLayoutBounds } from './layout-bounds.js?v=5abc89d1cc06';
+import { FrameMeter, SAMPLE_MS } from './frame-meter.js?v=5abc89d1cc06';
+import { drawFrameGraph } from './frame-graph.js?v=5abc89d1cc06';
+import { clientIdentityStatus } from './client-identity.js?v=5abc89d1cc06';
+import { loadDeviceSettings, saveDeviceSettings, sanitizeSettings, defaultDeviceSettings, resolveDevice, deviceForVM, vmDeviceModel, DEFAULT_ENGINE, proxyState, relayChannelState, customIdentityForLoad, sanitizeCustomIdentity } from './device-settings.js?v=5abc89d1cc06';
+import { initCollapsibleSections } from './panel-sections.js?v=5abc89d1cc06';
+import { warmupLabel } from './warmup.js?v=5abc89d1cc06';
+import { createApkShelf, indexedDbShelfBackend, printableShelfId, resolveShelfApp } from './apk-shelf.js?v=5abc89d1cc06';
+import { ISO_COUNTRIES } from './iso-codes-data.js?v=5abc89d1cc06';
+import { initHelpTips } from './help-tips.js?v=5abc89d1cc06';
+import { initControlPanelUI } from './control-panel-ui.js?v=5abc89d1cc06';
+import { createToolDock } from './tool-dock.js?v=5abc89d1cc06';
+import { createPermissionsPanel } from './permissions-panel.js?v=5abc89d1cc06';
+import { createSharedFilesPanel } from './shared-files-panel.js?v=5abc89d1cc06';
+import { createAppDataPanel } from './app-data-panel.js?v=5abc89d1cc06';
+import { createCameraLab } from './camera-lab.js?v=5abc89d1cc06';
+import { createOverridesPanel } from './overrides-panel.js?v=5abc89d1cc06';
+import { createMethodHooksPanel } from './method-hooks-panel.js?v=5abc89d1cc06';
+import { createCodeTool } from './code-tool-loader.js?v=5abc89d1cc06';   // the Code tool and the debugger: their modules load on first use (src/code-tool-loader.js)
+import { createMicrogEntriesPanel } from './microg-entries-panel.js?v=5abc89d1cc06';
+import { createMicrogServicesPanel } from './microg-services-panel.js?v=5abc89d1cc06';
+import { microgDataText, canClearMicrogData } from './microg-data-panel.js?v=5abc89d1cc06';
+import { canAddGoogleAccount, googleAccountText } from './microg-account-panel.js?v=5abc89d1cc06';
+import { MICROG_SERVICES } from './microg-services.js?v=5abc89d1cc06';
+import { createMicrogSettingsDialog } from './microg-settings-dialog.js?v=5abc89d1cc06';
+import { createOrientationLock } from './orientation-lock.js?v=5abc89d1cc06';
+import { createIgnoredActivitiesPanel } from './ignored-activities-panel.js?v=5abc89d1cc06';
+import { createHostMapPanel } from './host-map-panel.js?v=5abc89d1cc06';
+import { createEndpointMocksPanel } from './endpoint-mocks-panel.js?v=5abc89d1cc06';
+import { createBlockedCallsPanel } from './blocked-calls-panel.js?v=5abc89d1cc06';
+import { MAX_PLUGINS } from './plugin-store.js?v=5abc89d1cc06';
+import { buildConfigDocument, parseConfigDocument, describeConfigDocument, planPluginImport, serializeConfig, configFileName, NOT_INCLUDED } from './config-bundle.js?v=5abc89d1cc06';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=5abc89d1cc06';
+import { MEMORY_STEPS_MIB, memoryBudget } from './memory-budget.js?v=5abc89d1cc06';
+import { CORE_MEMORY_DEFAULT, checkCoreMemory, sameCoreMemory } from './core-memory.js?v=5abc89d1cc06';
+import { createDeviceView, createViewState } from './device-view.js?v=5abc89d1cc06';
+import { createTaskSwitcher } from './task-switcher.js?v=5abc89d1cc06';
+import { createDeviceZoom } from './device-zoom.js?v=5abc89d1cc06';
+import { buildDiagnosticReport, causeOf } from './diagnostic-report.js?v=5abc89d1cc06';
+import { formatApiGapReport } from './api-gap-scan.js?v=5abc89d1cc06';
+import { createLogcatPanel } from './logcat-panel.js?v=5abc89d1cc06';
+import { createComposeInspectorPanel, flattenViews, buildLayoutBoundsElements } from './compose-inspector-panel.js?v=5abc89d1cc06';
+import { createNetlogPanel, addAllowedHost } from './netlog-panel.js?v=5abc89d1cc06';
+import { createPluginHost, layoutBoundsElementOut } from './plugin-host.js?v=5abc89d1cc06';
+import { captureImage, paintScreen, drawnByDom, renderDomElement } from './screen-capture.js?v=5abc89d1cc06';
+import { createAppPalette } from './app-palette.js?v=5abc89d1cc06';
+import { createScreenRecorder } from './screen-recorder.js?v=5abc89d1cc06';
+import { createDeviceMedia } from './device-media.js?v=5abc89d1cc06';
+import { createPluginsPanel, powerStatsText } from './plugins-panel.js?v=5abc89d1cc06';
+import { createMcpTools, waitScreenReady } from './mcp-tools.js?v=5abc89d1cc06';
+import { createAdb } from './adb-commands.js?v=5abc89d1cc06';
+import { identityProperties, identityText, customIdentityFor } from './device-identity.js?v=5abc89d1cc06';
+import { createCustomIdentityPanel } from './custom-identity-panel.js?v=5abc89d1cc06';
+import { createAdbTerminal } from './adb-terminal.js?v=5abc89d1cc06';
+import { memorySummary } from './worker-memory.js?v=5abc89d1cc06';
+import { createMcpLink, migrateMcpSettings, mcpServeCommand, mcpAgentSetup, MCP_AGENTS, mcpBridgePort } from './mcp-link.js?v=5abc89d1cc06';
+import { createRelayDetector, localNetworkAccess, effectiveProxy, describeProxyForTrace } from './relay-detect.js?v=5abc89d1cc06';
+import { createPluginNetRoutes } from './plugin-net-routes.js?v=5abc89d1cc06';
+import { createModalHost } from './lab-modal.js?v=5abc89d1cc06';
+import { openPackageModal, defaultActivity } from './package-modal.js?v=5abc89d1cc06';
+import { createCustomScreenPanel } from './custom-screen-panel.js?v=5abc89d1cc06';
+import { createDeviceFullscreen } from './device-fullscreen.js?v=5abc89d1cc06';
+import { createSideTabHost, createTabAction } from './lab-side-tabs.js?v=5abc89d1cc06';
+import { createDragLayer } from './lab-drag.js?v=5abc89d1cc06';
+import { createLabScroll } from './lab-scroll.js?v=5abc89d1cc06';
+import { createGlSurfaces } from './gl-surfaces.js?v=5abc89d1cc06';
+import { createHighlightLayer, createHighlightAction } from './lab-highlight.js?v=5abc89d1cc06';
+import { createOverlayHost, createOverlayAction, frameGeometry } from './lab-overlays.js?v=5abc89d1cc06';
+import { buildDeepLinkRequest, describeDeepLink } from './deep-link-panel.js?v=5abc89d1cc06';
+import { resolveIntentFields } from './intent-resolver.js?v=5abc89d1cc06';
 const apkVM = new APKWorkerClient();
 // The device's home screen keeps every APK opened here (src/apk-shelf.js: this browser's IndexedDB, with the file handle where the browser gives one), one icon beside the other.
 const apkShelf = (() => { try { const backend = indexedDbShelfBackend(); return backend ? createApkShelf(backend) : null; } catch { return null; } })();
@@ -304,6 +304,11 @@ function endAppProcess(note) {
 /** The user threw the app away (its recents card dragged off, or the window flung up: src/task-switcher.js), or adb closed it (am force-stop): as when Android removes a
  *  task from the recents, the app's process is killed with no further callback. */
 function dismissApp(by = 'by the user (swiped out of the recents)') {
+  if (state.mode === 'apk' && state.currentSource && state.opening) {   // thrown away while it opened: the open ends with its VM, and the icon opens it again from the start
+    cancelOperation(); state.needsRestart = true; taskSwitcher?.closed();
+    appendTrace(`The app was ended ${by} while it opened; tap its icon on the home screen to open it again in a new VM.`);
+    setStatus('App ended · tap its icon on the home screen to open it again'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> ENDED'; return;
+  }
   if (state.mode !== 'apk' || !state.currentSource || !state.runtime) return;
   endAppProcess(`The app was ended ${by}: its process was killed; tap its icon on the home screen to open it again in a new VM.`);
 }
@@ -313,49 +318,75 @@ function dismissError() {
   hideError(); state.lastAPKError = null; state.stickyError = false;
   if (state.mode === 'apk' && !state.apkRunning) taskSwitcher?.focusApp?.();   // the launcher was on screen under the window already
 }
-// Boot screen: the phone frame appears in the click's own frame (before the Worker answers), shows the phase text, and fades out when the first real frame is drawn (or the operation ends without one).
-function sizeBootOverlay() {
-  const stage = $('preview-stage'), overlay = $('boot-overlay'); if (!stage || !overlay) return;
-  const d = resolveDevice(deviceState.settings), w = d.widthDp, h = d.heightDp, fitted = Math.min(0.7, Math.max(120, stage.clientWidth - 24) / (w + 10), Math.max(160, stage.clientHeight - 16) / (h + 10)), scale = Number.isFinite(deviceState.zoom) && deviceState.zoom > 0 ? deviceState.zoom : fitted;   // the launch screen follows the stage zoom
-  overlay.style.setProperty('--boot-w', String(w)); overlay.style.setProperty('--boot-h', String(h)); overlay.style.setProperty('--boot-scale', scale.toFixed(4));
+// The opening of an app (the page's opening session): from the moment its APK is chosen (or its icon tapped) until the app's first frame, one screen and one clock. The device
+// shows the app's starting window (#boot-overlay, inside the device like Android's splash screen: the app's icon on a plain background, under the system bars, moved by the
+// task gestures with the app's other windows) and the status line says one of two things, the APK being read or the Activity being opened, with the seconds since the start.
+// The time it took in all is the one the status bar keeps ("opened in"); the details say how it split.
+const OPENING_MESSAGE = { read: 'Reading the APK…', open: 'Opening the activity…' };
+function beginOpening() { state.opening = { startedAt: performance.now(), stage: 'read' }; appInfo.render(); return state.opening; }
+function openingStage(stage) { if (!state.opening) return; state.opening.stage = stage; const message = OPENING_MESSAGE[stage]; $('operation-message').textContent = message; $('operation-progress').removeAttribute('value'); setBootCaption(message); if (state.mode === 'apk') setStatus(message); }
+/** The opening session `session` ended (the app's first frame, a failure, another APK): the status line and the starting window go as an operation's do. */
+function endOpening(session) {
+  if (!session || state.opening !== session) return; state.opening = null;
+  if (!state.busy) { clearInterval(state.operationTimer); $('operation-panel').hidden = true; }
+  hideBoot(); appInfo.render(); taskSwitcher?.opened?.();
+  const palette = state.paletteAfterOpen; state.paletteAfterOpen = null; if (palette && palette === taskSwitcher?.icon?.()) appPalette.fromURL(palette);
 }
+/** The starting window goes at once, without its fade (the run it belonged to was ended). */
+function dropBoot() { const overlay = $('boot-overlay'); clearTimeout(state.bootTimer); state.bootVisible = false; if (overlay) { overlay.hidden = true; overlay.classList.remove('fading', 'idle'); } }
 // The caption sits in a box of fixed height under the logo (styles.css .boot-caption): a longer or shorter status never moves the logo; the full text is the tooltip.
 /** No app window on screen: the device shows its launcher. 'idle' (nothing opened yet), 'installing' (the package is being read) or 'installed' (tap the icon to start). */
 function showDeviceHome(mode = state.homeMode ?? 'idle', label = '') {
   if (!taskSwitcher || !deviceView) return;
-  state.homeMode = mode; const d = resolveDevice(deviceState.settings), buttons = d.navigation === 'buttons';
+  state.homeMode = mode; showDeviceFrame();
+  taskSwitcher.home(mode, { label, key: mode === 'installed' ? state.inventory : null });
+}
+/** The device on the stage with its system bars (the app's own bars once it draws). */
+function showDeviceFrame() {
+  const d = resolveDevice(deviceState.settings), buttons = d.navigation === 'buttons';
   if (!state.apkRunning) deviceView.renderSystemBars({ widthDp: d.widthDp, heightDp: d.heightDp, status: { height: 24, visible: true, color: 0, light: false }, nav: { mode: buttons ? 'buttons' : 'gesture', thickness: buttons ? 48 : 24, side: 'bottom', visible: true, color: 0, light: false }, contentFrame: { left: 0, top: 0, right: d.widthDp, bottom: d.heightDp } });
   $('android-device').hidden = false; $('android-device').inert = false; $('empty-preview').hidden = true;
-  taskSwitcher.home(mode, { label, key: mode === 'installed' ? state.inventory : null });
+}
+/** The app's own icon on its starting window, like Android's splash screen (the Android mark while the package has none to show yet); one known only once the APK was read fades in. */
+function showBootIcon(url, { fade = true } = {}) {
+  const overlay = $('boot-overlay'), icon = $('boot-app-icon'); if (!overlay || !icon) return;
+  if (!url) { icon.hidden = true; icon.removeAttribute?.('src'); overlay.classList.remove('has-app-icon'); return; }
+  if (icon.getAttribute?.('src') === url && !icon.hidden) return;
+  icon.src = url; icon.hidden = false; overlay.classList.add('has-app-icon');
+  if (fade) icon.animate?.([{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'scale(1)' }], { duration: 320, easing: 'ease-out' });
 }
 function setBootCaption(text) { const caption = $('boot-caption'); if (!caption) return; caption.textContent = text; caption.title = text; }
 function showBoot(caption) {
   const overlay = $('boot-overlay'); if (!overlay) return;
-  clearTimeout(state.bootTimer); sizeBootOverlay(); setBootCaption(caption); overlay.classList.remove('fading', 'idle'); overlay.hidden = false;
-  { const icon = $('boot-app-icon'), url = taskSwitcher?.icon?.() ?? null; if (icon) { icon.hidden = !url; if (url) icon.src = url; else icon.removeAttribute?.('src'); overlay.classList.toggle('has-app-icon', !!url); } }   // the app's own icon, like Android's splash screen; the Android mark only when the package has none to show
+  clearTimeout(state.bootTimer); setBootCaption(caption); overlay.classList.remove('fading', 'idle'); overlay.hidden = false;
+  $('android-device').hidden = false; $('android-device').inert = false;
+  showBootIcon(taskSwitcher?.icon?.() ?? null, { fade: false });   // the app's own icon, like Android's splash screen; the Android mark only when the package has none to show
   $('empty-preview').hidden = true; state.bootVisible = true;
 }
 function hideBoot({ force = false } = {}) {
   const overlay = $('boot-overlay'); if (!overlay || !state.bootVisible) return;
+  if (!force && state.opening) return;   // between reading the APK and opening its Activity the starting window stays: one screen for the whole open
   // An APK that is loaded but not running keeps the phone frame on screen, idle, with the one thing the user can do next; the frame only goes away when the app
   // draws its first frame (force) or when there is no APK (an error, a closed file).
+  const left = ['home', 'overview'].includes(taskSwitcher?.state?.());   // the user left the app while it opened: the launcher or the recents stay as they are
+  if (!force && left) { dropBoot(); return; }
   if (!force && state.currentSource && !state.apkRunning && !state.lastAPKError && state.mode === 'apk') { state.bootVisible = false; overlay.hidden = true; overlay.classList.remove('fading', 'idle'); showDeviceHome(state.runtime ? 'installed' : state.homeMode); return; }   // loaded but not running: the launcher with the app's icon
   state.bootVisible = false; overlay.classList.add('fading'); overlay.classList.remove('idle'); clearTimeout(state.bootTimer);
-  state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk') showDeviceHome(); }, 380);
+  state.bootTimer = setTimeout(() => { overlay.hidden = true; overlay.classList.remove('fading'); if (!state.apkRunning && state.mode === 'apk' && !['home', 'overview'].includes(taskSwitcher?.state?.())) showDeviceHome(); }, 380);
 }
 function beginOperation(message) {
   const token = ++state.operation;
   setBusy(true); $('operation-panel').hidden = false;
   $('operation-message').textContent = message; $('operation-progress').removeAttribute('value');
   // Each operation counts its own time from zero: the line is written at once, so it never shows the seconds of the operation before it (loading, then starting the Activity).
-  const started = performance.now(), tick = () => { $('operation-detail').textContent = `${Math.floor((performance.now() - started) / 1000)} s`; };   // the status line has room for the time; what it means is the element's title
+  const started = state.opening?.startedAt ?? performance.now(), tick = () => { $('operation-detail').textContent = `${Math.floor((performance.now() - started) / 1000)} s`; };   // an opening counts from its start, across the read and the launch   // the status line has room for the time; what it means is the element's title
   clearInterval(state.operationTimer); tick();
   state.operationTimer = setInterval(tick, 1000);
   return token;
 }
 function finishOperation(token) {
   if (token !== state.operation) return;
-  clearInterval(state.operationTimer); hideBoot(); $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
+  clearInterval(state.operationTimer); hideBoot(); if (!state.opening) $('operation-panel').hidden = true; state.abortController = null; setBusy(false); if (state.pendingInputs.size || state.pendingFocus.length || state.pendingComposeActions.length || state.pendingScrolls.size || state.pendingPointers.length || state.pendingScrollBys.size) flushPendingInputs();
 }
 /** Load timing per stage (shown under the inspection and in the execution log): the phases the Worker reports, from the first to the last. */
 function notePhase(phase) {
@@ -428,9 +459,10 @@ const appInfo = (() => {
     const inventory = state.inventory, times = state.loadTimes, rows = [];
     rows.push(row(appLabel(), inventory?.manifestAttrs?.versionName ? `version ${inventory.manifestAttrs.versionName}` : ''));
     if (times?.done) {
-      rows.push(row('Loaded in', seconds(times.loadMs)), row('file read', `${times.readMs} ms`, { sub: true }));
+      if (times.totalMs !== undefined) rows.push(row('Opened in', seconds(times.totalMs)));   // the whole open; how it split below
+      rows.push(row(times.totalMs !== undefined ? 'APK read in' : 'Loaded in', seconds(times.loadMs)), row('file read', `${times.readMs} ms`, { sub: true }));
       for (const part of loadPhaseParts(times)) { const at = part.lastIndexOf(' ', part.length - 4); rows.push(row(part.slice(0, at), part.slice(at + 1), { sub: true })); }
-      if (times.launchMs !== undefined) rows.push(row('Activity opened in', seconds(times.launchMs)));
+      if (times.launchMs !== undefined) rows.push(row('Activity started in', seconds(times.launchMs)));
     }
     if (inventory?.packageName) rows.push(row('Package', inventory.packageName));
     if (inventory?.manifestAttrs?.versionCode !== undefined) rows.push(row('Version code', String(inventory.manifestAttrs.versionCode)));
@@ -461,8 +493,8 @@ const appInfo = (() => {
   return {
     render() {
       const times = state.loadTimes;
-      if (!state.inventory || !times?.done) { button.hidden = true; show(false); return; }
-      const text = `${appLabel()} · loaded in ${seconds(times.loadMs)}${times.launchMs !== undefined ? ` · opened in ${seconds(times.launchMs)}` : ''}`;
+      if (!state.inventory || !times?.done || state.opening) { button.hidden = true; show(false); return; }   // while the app opens the status line has its clock; the time comes once, for the whole open
+      const text = `${appLabel()} · ${times.totalMs !== undefined ? `opened in ${seconds(times.totalMs)}` : times.launchMs !== undefined ? `opened in ${seconds(times.launchMs)}` : `loaded in ${seconds(times.loadMs)}`}`;   // one time: the whole open when it was one (APK read and Activity started), else what this run did
       button.hidden = false; button.querySelector('.app-info-text').textContent = text; button.setAttribute('aria-label', `${text}. Details on hover or focus.`); button.title = '';
       if (!panel.hidden) { fill(); place(); }
     },
@@ -473,17 +505,18 @@ function onWorkerProgress(progress = {}) {
   notePhase(progress.phase);
   const phases = { 'framework-resources': 'Loading original Android styles data', framework: 'Loading compiled AOSP code', manifest: 'Reading the manifest', dex: 'Inspecting DEX', native: 'Taking inventory of native libraries', complete: 'Inspection complete', launch: 'Trying to start the Activity', intent: 'Opening the link', click: 'Running DEX callback', back: 'Returning to the previous Activity', resources: 'Reading resources and XML layouts' };
   const message = `${phases[progress.phase] || 'Processing in the Worker'}${progress.filename ? ` · ${progress.filename}` : ''}`;
+  if (state.opening) return;   // an opening says only what stage it is in (openingStage); the phases are in the load times and the execution log
   $('operation-message').textContent = message; if (state.bootVisible) setBootCaption(message);
   const bar = $('operation-progress');
   if (progress.total > 0) { bar.max = progress.total; bar.value = progress.completed || 0; }
   else bar.removeAttribute('value');
   if (state.mode === 'apk') setStatus(message);
 }
-function cancelOperation() {
+function cancelOperation({ keepOpening = false } = {}) {   // keepOpening: the VM is replaced inside an opening that goes on (a launch reopening its APK): its screen and clock stay
   ++state.operation; state.abortController?.abort(); apkVM.cancel(); setTimeout(() => apkVM.prewarm?.(), 0); state.apiGaps = null; pluginHost.vmChanged();   // the next APK starts in a Worker that is already warming
   state.viewSession++; resetWebViews(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear(); state.runtime = null; state.apkRunning = false; state.canGoBack = false; state.lastAPKError = null;
-  clearInterval(state.operationTimer); $('operation-panel').hidden = true;
-  state.homeMode = 'idle'; showDeviceHome('idle');
+  clearInterval(state.operationTimer);
+  if (!keepOpening) { $('operation-panel').hidden = true; state.opening = null; state.paletteAfterOpen = null; dropBoot(); state.homeMode = 'idle'; showDeviceHome('idle'); }
   setBusy(false);
   if (state.mode === 'apk') { hideError(); setStatus('VM ended · reopen the APK to continue'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = '<span></span> CANCELED'; }
 }
@@ -746,8 +779,9 @@ function showInventory(inventory) {
   $('unsupported-list').replaceChildren(...unsupported.map((item) => { const li = document.createElement('li'); li.textContent = item; return li; }));
 }
 async function importSource(source, autoRun = false) {
+  const sameApp = state.currentSource === source, ongoing = autoRun ? null : state.opening, left = ['home', 'overview'].includes(taskSwitcher?.state?.());   // left: the user went to the launcher or the recents during the open   // ongoing: the opening of a launch that reopens its APK (runAPKOnce)
   // Another APK (a file, a launcher icon, an example) while one loads or runs: the current VM is ended first, with no button for it (the new load would end it too; this also drops the operation in flight).
-  if (state.busy || state.runStarting) { cancelOperation(); state.runStarting = false; }
+  if (state.busy || state.runStarting) { cancelOperation({ keepOpening: !!ongoing }); state.runStarting = false; }
   state.reimportShelfId = null;   // set again if this load fails for an installed app
   state.currentSource = source; state.launchAttempted = false; state.lastAPKError = null; state.stickyError = false; state.needsRestart = false; state.viewSession++; resetWebViews(); for (const id of ['android-content', 'android-window-layer', 'android-action-mode-layer']) for (const child of [...($(id)?.children || [])]) child.remove(); state.viewElements.clear(); state.shadowElements.clear(); state.windowSurfaceElements.clear(); $('android-window-layer')?.replaceChildren?.(); state.composeElements.clear(); state.nativeOverlayElements.clear(); state.pendingInputs.clear(); state.pendingFocus.length = 0; state.pendingComposeActions.length = 0; state.pendingScrolls.clear(); state.pendingPointers.length = 0; state.pendingScrollBys.clear();
   glSurfaces.reset(); permissionsPanel?.detach(); filesPanel?.detach(); appDataPanel?.reset(); cameraLab?.detach(); microgEntriesPanel?.reset(); overridesPanel?.detach(); methodHooksPanel?.vmEnded(); codeTool?.vmEnded(); ignoredPanel?.detach(); mocksPanel?.detach(); blockedPanel?.detach(); hostMapPanel?.resetHits(); pluginHost.vmChanged();
@@ -757,13 +791,16 @@ async function importSource(source, autoRun = false) {
   logcatPanel.reset(); netlogPanel.reset(); composeInspector.reset(); state.oomSeen = 0; state.lastVmHealth = null; showClientCertState(); state.lastSnapshot = null; state.errorReport = null; apkVM.lastHeartbeat = null; apkVM.lastScreenSnapshot = null; if ($('memory-meter')) $('memory-meter').hidden = true;
   taskSwitcher?.reset(); switchMode('apk'); hideError(); state.runtime = null; state.inventory = null; state.apkRunning = false; state.canGoBack = false;
   $('empty-preview').querySelector('h2').textContent = 'Your app starts here.'; $('empty-preview').querySelector('p').innerHTML = emptyPreviewHint();
-  const token = beginOperation('Reading the APK file…');
+  const opening = autoRun ? beginOpening() : ongoing;   // opened right away (a new clock), or reopened by a launch (its clock): the read is the first stage of the open
+  if (opening) opening.stage = 'read';
+  const token = beginOperation(opening ? OPENING_MESSAGE.read : 'Reading the APK…');
   $('unsupported-notice').hidden = true;
   $('preview-name').textContent = source.name;
+  if (opening) { if ((autoRun || !left) && taskSwitcher && deviceView) { showDeviceFrame(); taskSwitcher.launching({ label: source.name, fresh: !sameApp }); } showBoot(OPENING_MESSAGE.read); setStatus(OPENING_MESSAGE.read); }   // (the reset above put the launcher back: the starting window again, unless the user had left it)   // its starting window at once, the read and the launch under it
+  else showDeviceHome('installing', source.name);   // the app shows up on the launcher at once, under a spinner, while the package is read
   state.shelfId = source.shelfId ?? null; await refreshShelf();
-  showDeviceHome('installing', source.name);   // the app shows up on the launcher at once, under a spinner, while the package is read
   state.trace = []; appendTrace(`Opening ${source.name} in an isolated Web Worker. No upload.`);
-  setStatus('Reading the APK file…');
+  setStatus(opening ? OPENING_MESSAGE.read : 'Reading the APK…');
   try {
     let buffer; state.loadTimes = { startedAt: performance.now(), phases: [], readMs: 0, loadMs: 0 }; state.currentFileBytes = source.file?.size ?? null; appInfo.render();
     if (source.file) buffer = await source.file.arrayBuffer();
@@ -801,7 +838,7 @@ async function importSource(source, autoRun = false) {
     }
     appendTrace(`Package: ${result.inventory.packageName || '(not identified)'}`);
     if (state.mode === 'apk') {
-      setStatus(result.inventory.unsupportedFeatures?.length ? 'File inspected · see the file limits' : autoRun ? 'Installed · opening the app…' : 'Installed · tap its icon on the home screen to open it', result.inventory.unsupportedFeatures?.length ? 'error' : '');
+      if (!opening || result.inventory.unsupportedFeatures?.length) setStatus(result.inventory.unsupportedFeatures?.length ? 'File inspected · see the file limits' : autoRun ? 'Installed · opening the app…' : 'Installed · tap its icon on the home screen to open it', result.inventory.unsupportedFeatures?.length ? 'error' : '');
       $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = `<span></span> ${result.inventory.unsupportedFeatures?.length ? 'FILE LIMIT' : 'INSPECTED'}`;
     }
   } catch (error) {
@@ -810,9 +847,10 @@ async function importSource(source, autoRun = false) {
     // An installed app that failed to open keeps its icon on the launcher (it is not the app of a run any more: drawn as a saved app, to tap again), and the error offers to
     // choose its APK again, which replaces the stored copy. Before, the entry stayed "the app of this run", whose icon the idle launcher hides: the app vanished from the home screen.
     if (source.shelfId) { state.reimportShelfId = source.shelfId; state.shelfId = null; await refreshShelf(); }
-    showDeviceHome('idle'); reportAPKError(error, source.shelfId ? 'Could not open the installed app' : 'Could not inspect the APK', { crash: false });
+    endOpening(opening); dropBoot(); showDeviceHome('idle'); reportAPKError(error, source.shelfId ? 'Could not open the installed app' : 'Could not inspect the APK', { crash: false });
   } finally { finishOperation(token); }
   if (token === state.operation && autoRun && state.runtime && !state.inventory?.unsupportedFeatures?.length) await runAPK();
+  else if (autoRun) endOpening(opening);
 }
 /**
  * An Android App Bundle (.aab) chosen or dropped: the APK of its base module (src/aab-bundle.js, what bundletool's universal APK holds), as a File named .apk; an .apk is returned
@@ -820,7 +858,7 @@ async function importSource(source, autoRun = false) {
  */
 async function bundleAsApk(file) {
   if (!/\.aab$/i.test(file.name)) return file;
-  const { appBundleToApk } = await import('./aab-bundle.js?v=5afc26aa921f');
+  const { appBundleToApk } = await import('./aab-bundle.js?v=5abc89d1cc06');
   const { bytes, notes } = appBundleToApk(new Uint8Array(await file.arrayBuffer()));
   if (notes.length) console.warn(`App Bundle ${file.name}: ${notes.join('; ')}`);
   return new File([bytes], file.name.replace(/\.aab$/i, '.apk'), { type: 'application/vnd.android.package-archive' });
@@ -1254,7 +1292,7 @@ const adbDevice = {
     deviceView.queueComposeAction(field.ownerViewId, field.nodeId, 'ime', [op]); await flushPendingInputs();
     return op.kind === 'key' ? 'cursor key through the focused field\'s InputConnection (sendKeyEvent)' : op.kind === 'enter' ? 'keyboard action (Enter) on the focused field' : op.kind === 'commit' ? `"${character}" by the keyboard (commitText) in the focused field` : 'delete in the focused field';
   },
-  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=5afc26aa921f')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
+  async keyCode(name) { const table = (await import('./framework-constants-data.js?v=5abc89d1cc06')).default.classes['android/view/KeyEvent'] ?? []; for (const group of table) for (const [constant, type, value] of group) if (constant === name && type === 'I') return value; return null; },
   async nav(button) {
     await waitIdle(); const done = await taskSwitcher?.navigate?.(button);
     if (!done) throw adbFail(button === 'back' ? 'BACK: there is no app in front.' : button === 'home' ? 'HOME: the device is already on the home screen.' : 'APP_SWITCH: there is no open app.');
@@ -1466,14 +1504,14 @@ const deviceView = createDeviceView({ $, state, deviceState, frameMeter, hideErr
 const { renderSnapshot, flushPendingInputs, updateSystemBarIcons } = deviceView; deviceView.bindVM(apkVM);
 const appPalette = createAppPalette({ origin: () => $('android-screen') });   // src/app-palette.js: the page in the open app's colours, as soon as the launcher knows its icon (task switcher onIcon: the stored icon of a saved app, then the VM's)
 window.apkLabPalette = appPalette;   // test and console access: .state
-taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item), hasPackage: item => !!state.inventory && (item.current || item.id === state.shelfId), package: () => showPackageWindow() }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); appInfo.render(); }, onIcon: url => { if (url) appPalette.fromURL(url); }, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
+taskSwitcher = createTaskSwitcher({ dismiss: () => dismissApp(), opening: () => !!state.opening, shelf: { open: id => openSavedApp(id), remove: item => removeSavedApp(item), hasPackage: item => !!state.inventory && (item.current || item.id === state.shelfId), package: () => showPackageWindow() }, onInfo: info => { state.launcherInfo = { inventory: state.inventory, info }; describeSavedApp(); appInfo.render(); }, onIcon: url => { if (url) { if (state.opening) state.paletteAfterOpen = url; else appPalette.fromURL(url); } if (state.bootVisible) showBootIcon(url); } /* the page's colours change once the app opened: their reveal (a View Transition) takes every tap and gesture of the page while it runs */, $, vm: () => state.runtime, render: snapshot => renderSnapshot(snapshot), back: () => backAPK(), relaunch: () => runAPK(), canGoBack: () => !!state.canGoBack, busy: () => state.busy || !state.runtime,
   begin: message => beginOperation(message), finish: token => finishOperation(token), report: (message, error) => { if (error) reportAPKError(error, 'Device navigation'); else appendTrace(message); },
   announce: mode => { if (state.mode !== 'apk' || !['overview', 'home', 'closed'].includes(mode)) return; setStatus(mode === 'closed' ? 'App ended · tap its icon to open it again' : 'App in the background (onPause, onStop) · tap to go back'); $('runtime-badge').className = 'runtime-badge'; $('runtime-badge').innerHTML = mode === 'closed' ? '<span></span> ENDED' : '<span></span> PAUSED'; } });
 // The stage changes size when the window does or a dock panel opens (the workspace fills the viewport above the dock): the device is fitted again.
 // "−  70%  +" over the stage's top right corner (src/device-zoom.js): the device's scale on the stage; the label resets to "fit".
-const refitDevice = () => { sizeBootOverlay(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); else { const d = resolveDevice(deviceState.settings); deviceView.fitDevice(d.widthDp, d.heightDp); } };
+const refitDevice = () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); else { const d = resolveDevice(deviceState.settings); deviceView.fitDevice(d.widthDp, d.heightDp); } };
 const deviceZoom = createDeviceZoom({ stage: $('preview-stage'), deviceState, refit: refitDevice, shownScale: () => Number($('android-device')?.style?.getPropertyValue?.('--scale')) || 0.7 });
-if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); sizeBootOverlay(); deviceZoom?.sync(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
+if (typeof ResizeObserver === 'function' && $('preview-stage')) new ResizeObserver(() => { const stage = $('preview-stage'); stage.style.setProperty('--stage-h', `${stage.clientHeight}px`); deviceZoom?.sync(); if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); }).observe($('preview-stage'));
 createDeviceFullscreen({ stage: $('preview-stage'), openButton: $('fullscreen-button'), closeButton: $('fullscreen-close'), deviceState, refit: () => { if (deviceState.bars) deviceView.fitDevice(deviceState.bars.widthDp, deviceState.bars.heightDp); } });   // "Full screen" (src/device-fullscreen.js): CSS scale only
 const customScreenPanel = createCustomScreenPanel({ $ });   // "Screen" -> "Custom" (src/custom-screen-panel.js)
 // ---- Virtual device settings panel ("Virtual device") ----
@@ -1661,9 +1699,14 @@ function initDevicePanel() {
 // ---- "Open": a deep link / Intent resolved against the manifest's intent filters (src/deep-link-host.js) ----
 async function runAPK() {
   if (!(state.runtime || (state.needsRestart && state.currentSource)) || state.busy || state.runStarting) return;
-  if (state.inventory?.unsupportedFeatures?.length) { switchMode('apk'); showDeviceHome('installed'); showError(new Error(`This APK cannot be run yet: ${state.inventory.unsupportedFeatures.join('; ')}`), 'File limit'); return; }   // the launcher icon of an APK the lab cannot run says why
-  state.runStarting = true; showBoot('Starting the app…');
-  try { await runAPKOnce(); } finally { state.runStarting = false; }
+  if (state.inventory?.unsupportedFeatures?.length) { endOpening(state.opening); switchMode('apk'); showDeviceHome('installed'); showError(new Error(`This APK cannot be run yet: ${state.inventory.unsupportedFeatures.join('; ')}`), 'File limit'); return; }   // the launcher icon of an APK the lab cannot run says why
+  const starts = !state.opening;   // a tap on its icon: the open starts here (with a read when its VM is replaced); after a load that opens right away it goes on
+  if (starts) beginOpening().stage = state.launchAttempted || state.needsRestart ? 'read' : 'open';
+  const session = state.opening;
+  state.runStarting = true;
+  if (starts && taskSwitcher && deviceView && !state.apkRunning) { showDeviceFrame(); taskSwitcher.launching(); }
+  showBoot(OPENING_MESSAGE[session.stage]); if (starts && state.mode === 'apk') setStatus(OPENING_MESSAGE[session.stage]);
+  try { await runAPKOnce(); } finally { state.runStarting = false; endOpening(session); }
 }
 async function runAPKOnce(retried = false) {
   await flushPendingInputs();
@@ -1676,10 +1719,10 @@ async function runAPKOnce(retried = false) {
   await taskSwitcher?.infoSettled?.();   // the launcher's label and icon request of the load just finished (the VM client takes one request at a time)
   await syncRunProxy();   // a relay started (or stopped) since the load: the proxy the app starts with
   switchMode('apk'); hideError(); state.lastAPKError = null; state.stickyError = false; state.launchAttempted = true;
-  if (!state.bootVisible) showBoot('Starting the app…');   // a run after a failure reopens the APK first, and the end of that load hides the overlay: the launch gets it back
-  const token = beginOperation('Trying to start the Activity…');
+  if (!state.bootVisible) showBoot(OPENING_MESSAGE.open);   // the starting window, if a failure took it away
+  const token = beginOperation(OPENING_MESSAGE.open); openingStage('open');
   state.runStartedAt = Date.now(); const launchStarted = performance.now();
-  try { const snapshot = await state.runtime.launch(activityToLaunch(), { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-data')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
+  try { const snapshot = await state.runtime.launch(activityToLaunch(), { onProgress: onWorkerProgress }); if (token === state.operation) { renderSnapshot(snapshot); if ($('cp-sec-data')?.open) setTimeout(() => appDataPanel.refresh(), 0); if (state.loadTimes) { state.loadTimes.launchMs = Math.round(performance.now() - launchStarted); state.loadTimes.totalMs = state.opening ? Math.round(performance.now() - state.opening.startedAt) : undefined; showLoadTimes(); appendTrace(`Activity opened in ${state.loadTimes.launchMs} ms`); } } }
   catch (error) {
     // The Worker was still inside an earlier operation (a run that failed while it kept working): start over once in a fresh Worker instead of reporting "already busy".
     if (token === state.operation && !retried && error?.name === 'ProtocolError' && /processando|processing/i.test(error.message ?? '')) { finishOperation(token); state.needsRestart = true; return runAPKOnce(true); }

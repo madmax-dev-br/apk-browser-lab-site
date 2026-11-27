@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
 
 // Java primitive arrays live in the VM heap as typed arrays: the storage of a byte[] of n elements is n bytes, not n boxed JavaScript numbers.
 //

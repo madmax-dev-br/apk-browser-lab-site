@@ -10,8 +10,8 @@
 // The report holds ONLY framework/JDK names and counts (and the native library file names the user asked for): app class names, method names and strings never
 // enter it, so it can be pasted into a chat. DOM-free and process-free: it runs in the Worker and in Node.
 
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5afc26aa921f';
-import { describeNativeLibrary } from './native-library-hints.js?v=5afc26aa921f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5abc89d1cc06';
+import { describeNativeLibrary } from './native-library-hints.js?v=5abc89d1cc06';
 
 export const FRAMEWORK = /^L(android|java|javax|dalvik|libcore|sun|org\/(json|xml|w3c))\//;
 const SDK_INT_FIELD = 'Landroid/os/Build$VERSION;->SDK_INT:I';
@@ -151,7 +151,7 @@ export async function scanApiGaps(runtime, { archive = null, nativeLibraries = n
     }
     for (const [key, counts] of state.typeCounts) {
       await tick();
-      const [kind, idx] = key.split(':').map(Number), type = dex.types[idx];
+      const [kind, idx] = key.split(':').map(Number), type = dex.typeAt(idx);
       if (!type || type[0] === '[' || !framework(type) || classKnown(type, kind)) continue;
       const e = entry(type); e.missingClass = true; e.kinds.add({ 0x22: 'new', 0x1c: 'class', 0x60: 'static field' }[kind]);
       for (let k = 0; k < 3; k++) e.classSites[k] += counts[k];

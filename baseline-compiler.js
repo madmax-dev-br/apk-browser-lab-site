@@ -361,7 +361,7 @@ export function compileMethod(rt, method, code, prog, tries, support, direct = f
   try {
     const factory = new Function('rt', 'H', 'S', 'T', 'FR', 'Z', 'W', 'P', 'G', 'ST', 'E', source);
     if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT_DUMP && method.key.includes(process.env.APKWEB_DEBUG_JIT_DUMP)) console.error('JIT', method.key, '\n' + source);
-    return factory(rt, support.helpers, dex.strings, dex.types, dex.fields, sites, support.WIDE_HIGH, prog, direct ? prog.ghost : null, prog.stats, direct ? support.helpers.entryOf(prog) : null);   // S/T/FR: the DexFile caches themselves (every index this code uses was decoded above)
+    return factory(rt, support.helpers, dex.strings, dex.allTypes(), dex.fields, sites, support.WIDE_HIGH, prog, direct ? prog.ghost : null, prog.stats, direct ? support.helpers.entryOf(prog) : null);   // S/T/FR: the DexFile caches themselves (every index this code uses was decoded above)
   } catch (error) {
     if (typeof process !== 'undefined' && process.env?.APKWEB_DEBUG_JIT) console.error('JIT compile failed for', method.key, error.message, '\n', source.slice(0, 2000));
     return null;

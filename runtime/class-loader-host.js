@@ -1,10 +1,10 @@
-import { unsignedBytes } from './java-arrays.js?v=5afc26aa921f';
-import { APKError } from './apk-error.js?v=5afc26aa921f';
-import { APKArchive } from './apk-loader.js?v=5afc26aa921f';
-import { readNativeBytes } from './unsafe-native.js?v=5afc26aa921f';
-import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=5afc26aa921f';
-import { createHostRegistry } from './host-contract.js?v=5afc26aa921f';
-import { normalizePath } from './virtual-fs.js?v=5afc26aa921f';
+import { unsignedBytes } from './java-arrays.js?v=5abc89d1cc06';
+import { APKError } from './apk-error.js?v=5abc89d1cc06';
+import { APKArchive } from './apk-loader.js?v=5abc89d1cc06';
+import { readNativeBytes } from './unsafe-native.js?v=5abc89d1cc06';
+import { DexFile, LOADER_ALIAS } from './apk-runtime.js?v=5abc89d1cc06';
+import { createHostRegistry } from './host-contract.js?v=5abc89d1cc06';
+import { normalizePath } from './virtual-fs.js?v=5abc89d1cc06';
 
 // dalvik.system.{BaseDexClassLoader, InMemoryDexClassLoader, DexClassLoader, PathClassLoader, DexFile}: code that is only available at run time
 // (decrypted payloads, downloaded plugins). The DEX bytes are parsed by the same DexFile reader as APK classes and joined to the single VM class
@@ -64,7 +64,7 @@ export function createClassLoaderHost(platform) {
     const names = [...dex.classes.keys()];
     if (isolated) {
       const boot = runtime.dex.bootClasses, rename = new Map(), skip = new Set(); let shadowed = 0, hidden = 0;
-      for (const t of dex.types) {
+      for (const t of dex.allTypes()) {
         const component = t.slice(t.lastIndexOf('[') + 1);
         if (component[0] !== 'L' || rename.has(component) || boot?.has(component)) continue;
         if ((packageClasses.has(component) || runtime.dex.classes.has(component)) && runtime.deviceProvidesClass(component)) continue;   // a platform class the hosts implement: the device's, like the boot layer's
