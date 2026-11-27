@@ -1,10 +1,10 @@
 // Versioned host <-> frame message schema and the <apk-player> configuration model. No DOM: shared by the host script, the frame and the tests.
-import { checkCoreMemory } from '../core-memory.js?v=4a7b2c308dd9';
-import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=4a7b2c308dd9';
-import { buildDiagnosticReport } from '../diagnostic-report.js?v=4a7b2c308dd9';
-import { parseRule } from '../host-map.js?v=4a7b2c308dd9';
-import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=4a7b2c308dd9';
-import { isMemoryStep } from '../memory-budget.js?v=4a7b2c308dd9';
+import { checkCoreMemory } from '../core-memory.js?v=0feec282e5a9';
+import { sanitizeSettings, checkCustomScreen } from '../device-settings.js?v=0feec282e5a9';
+import { buildDiagnosticReport } from '../diagnostic-report.js?v=0feec282e5a9';
+import { parseRule } from '../host-map.js?v=0feec282e5a9';
+import { EVENT_SECONDS_STEPS } from '../time-limits.js?v=0feec282e5a9';
+import { isMemoryStep } from '../memory-budget.js?v=0feec282e5a9';
 export const PROTOCOL = 'apk-player';
 /** Envelope version: every message carries it; a frame or host of another version is refused. Unchanged since the first release, so old hosts keep working. */
 export const VERSION = 1;
@@ -22,10 +22,10 @@ export const MAX_APK_BYTES = 1024 * 1024 * 1024;
 /** Keys that change the device model the VM sees (delivered live through setDevice, Android Configuration semantics). */
 export const DEVICE_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'hostMap']);
 /** The lab's debugging features (the "Controles" of the test page), revision 2: the same lists the panels keep, validated in the frame by the panels' own sanitizers. */
-export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer', 'engine', 'coreMemory', 'loadImage']);   // loadImage: the load image (src/load-image.js), off by default
+export const LAB_KEYS = Object.freeze(['hostMap', 'eventSeconds', 'memoryMiB', 'strictCrash', 'layoutBounds', 'methodOverrides', 'ignoredActivities', 'endpointMocks', 'permissions', 'location', 'permissionDialog', 'renderer', 'engine', 'coreMemory', 'loadImage', 'prepareFromLastRun']);   // loadImage: the load image (src/load-image.js), off by default
 export const CONFIG_KEYS = Object.freeze(['device', 'orientation', 'locale', 'theme', 'fontScale', 'animatorScale', 'hour24', 'timeZone', 'battery', 'charging', 'connectivity', 'navigation', 'statusBarHeight', 'allowedHosts', 'proxyUrl', 'tolerateMissing', 'webview', ...LAB_KEYS]);
 export const ATTRIBUTES = Object.freeze({ device: 'device', orientation: 'orientation', locale: 'locale', theme: 'theme', 'font-scale': 'fontScale', 'animator-scale': 'animatorScale', 'hour-24': 'hour24', 'time-zone': 'timeZone', battery: 'battery', charging: 'charging', connectivity: 'connectivity', navigation: 'navigation', 'status-bar-height': 'statusBarHeight', 'allowed-hosts': 'allowedHosts', 'proxy-url': 'proxyUrl', 'tolerate-missing': 'tolerateMissing', webview: 'webview',
-  'host-map': 'hostMap', 'event-seconds': 'eventSeconds', 'memory-mib': 'memoryMiB', 'strict-crash': 'strictCrash', 'layout-bounds': 'layoutBounds', 'ignored-activities': 'ignoredActivities', 'permission-dialog': 'permissionDialog', renderer: 'renderer', engine: 'engine', 'load-image': 'loadImage' });
+  'host-map': 'hostMap', 'event-seconds': 'eventSeconds', 'memory-mib': 'memoryMiB', 'strict-crash': 'strictCrash', 'layout-bounds': 'layoutBounds', 'ignored-activities': 'ignoredActivities', 'permission-dialog': 'permissionDialog', renderer: 'renderer', engine: 'engine', 'load-image': 'loadImage', 'prepare-from-last-run': 'prepareFromLastRun' });
 /** Missing-API policy of the VM (apk-runtime tolerateMissing). 'off' (the player default) stops at the first unsupported API; embedders opt in to stubs. Applies at the next launch. */
 export const TOLERATE_MISSING = Object.freeze(['off', 'void', 'primitives', 'all']);
 const bool = value => value === true || value === 'true' || value === '' || value === '1' ? true : value === false || value === 'false' || value === '0' ? false : undefined;
@@ -73,7 +73,7 @@ export function parseLabValue(key, raw) {
       const number = Number(raw); if (raw === '' || typeof raw === 'boolean' || raw === null || !Number.isFinite(number)) return undefined;
       return key === 'eventSeconds' ? (number === 0 || EVENT_SECONDS_STEPS.includes(number) ? number : undefined) : isMemoryStep(number) ? number : undefined;
     }
-    case 'strictCrash': case 'layoutBounds': case 'loadImage': return bool(raw);
+    case 'strictCrash': case 'layoutBounds': case 'loadImage': case 'prepareFromLastRun': return bool(raw);
     case 'permissionDialog': return PERMISSION_DIALOG.includes(raw) ? raw : undefined;
     case 'renderer': return raw === 'cpu' || raw === 'gpu' ? raw : undefined;   // 'gpu' (default: WebGL replay in the Worker, src/gpu-raster.js, falling back to CPU by itself) or 'cpu'; applied live
     case 'coreMemory': { if (!raw || typeof raw !== 'object') return undefined; const checked = checkCoreMemory(raw); return checked.error ? undefined : checked.value; }   // { mode, heapMiB, metaMiB, threads }: the mode ('dynamic' by default, or 'fixed') and sizes of the WebAssembly core's memory (src/core-memory.js); only with engine 'wasm', applies at the next launch

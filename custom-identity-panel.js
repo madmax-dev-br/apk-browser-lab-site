@@ -1,7 +1,7 @@
 // "Custom device identity" block of Controls › Device (CLAUDE.md, owner decision of 2026-11-21): off by default, the fields empty; the user types the product names and the
 // next load applies them (src/device-identity.js customIdentityFor, src/apk-loader.js). The lab never fills the fields in: each placeholder shows the lab's own value,
 // the one an empty field keeps. Each field's error shows under it; an identity with an error is not applied (the lab's applies) and the status line says so.
-import { CUSTOM_IDENTITY_FIELDS, IDENTITY_PROPERTIES, checkCustomIdentity, customIdentityFor, customIdentityFieldsText } from './device-identity.js?v=4a7b2c308dd9';
+import { CUSTOM_IDENTITY_FIELDS, IDENTITY_PROPERTIES, checkCustomIdentity, customIdentityFor, customIdentityFieldsText } from './device-identity.js?v=0feec282e5a9';
 
 /** What the status line of the block says (pure): { state: 'off' | 'empty' | 'error' | 'on', text }. `checked`: checkCustomIdentity(...). */
 export function customIdentityStatus(checked) {

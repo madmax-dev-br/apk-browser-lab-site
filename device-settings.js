@@ -1,14 +1,14 @@
-import { coreMemorySetting } from './core-memory.js?v=4a7b2c308dd9';
-import { isMemoryStep } from './memory-budget.js?v=4a7b2c308dd9';
-import { EVENT_SECONDS_STEPS } from './time-limits.js?v=4a7b2c308dd9';
-import { sanitizeHostMap } from './host-map.js?v=4a7b2c308dd9';
-import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=4a7b2c308dd9';
-import { sanitizeLocation } from './runtime-permissions.js?v=4a7b2c308dd9';
-import { sanitizeRendererSetting } from './gpu-raster.js?v=4a7b2c308dd9';
-import { sanitizeMicrogServices } from './microg-services.js?v=4a7b2c308dd9';
-import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=4a7b2c308dd9';
-import { tunnelEndpoint } from './tcp-tunnel.js?v=4a7b2c308dd9';
-import { checkCustomIdentity } from './device-identity.js?v=4a7b2c308dd9';
+import { coreMemorySetting } from './core-memory.js?v=0feec282e5a9';
+import { isMemoryStep } from './memory-budget.js?v=0feec282e5a9';
+import { EVENT_SECONDS_STEPS } from './time-limits.js?v=0feec282e5a9';
+import { sanitizeHostMap } from './host-map.js?v=0feec282e5a9';
+import { DEFAULT_DEVICE, SCREEN_PRESETS, DEFAULT_CUSTOM_SCREEN, checkCustomScreen, resolveDevice } from './device-profile.js?v=0feec282e5a9';
+import { sanitizeLocation } from './runtime-permissions.js?v=0feec282e5a9';
+import { sanitizeRendererSetting } from './gpu-raster.js?v=0feec282e5a9';
+import { sanitizeMicrogServices } from './microg-services.js?v=0feec282e5a9';
+import { RELAY_AUTO_BASE, RELAY_AUTO_PROXY, RELAY_DEFAULT_PORT } from './relay-detect.js?v=0feec282e5a9';
+import { tunnelEndpoint } from './tcp-tunnel.js?v=0feec282e5a9';
+import { checkCustomIdentity } from './device-identity.js?v=0feec282e5a9';
 // Per-viewer virtual-device settings, kept in localStorage (every access guarded: private windows / blocked storage must not break the page).
 const KEY = 'apk-lab-device-v1';
 const ALLOWED = { screen: [...SCREEN_PRESETS.map(p => p.id), 'custom'], orientation: ['portrait', 'landscape'], connectivity: ['online', 'offline', 'metered'], navigation: ['gesture', 'buttons'] };
@@ -86,6 +86,7 @@ export function sanitizeSettings(input = {}) {
   out.frameGraph = input.frameGraph === true;   // page-only developer option ("Show frame rate": the FPS line and the frame-time bars, src/frame-meter.js); off by default, applied live, the VM never sees it
   out.arm64Native = input.arm64Native === true;
   out.arm64Translate = input.arm64Translate !== false;   // "Translate hot ARM64 code" (src/arm64/translate.js): on by default; read by the next load   // "Run ARM64 native code" (src/arm64/, docs/ARM64-NATIVE.md): off by default; read by the next load, recorded in the trace
+  out.prepareFromLastRun = input.prepareFromLastRun !== false;   // "Prepare from the last run" (src/prepare-memory.js): on by default
   out.schedulingOf25 = input.schedulingOf25 === true;   // "Scheduling of 25/11": the thread scheduling and the atomics of the build of 2026-11-25 (src/apk-worker.js SCHEDULING_OF_25), for an app that got slower with the changes of 2026-11-26; off by default
   out.hardwareWindow = input.hardwareWindow !== false;   // "Hardware-accelerated windows" (View.isHardwareAccelerated, src/view-window-host.js): on by default, as on a device; off draws the app through the software Canvas; read by the next load, recorded in the trace
   out.glesCpu = input.glesCpu === true;   // "OpenGL ES on the CPU" (src/cpu-gl/, docs/OPENGL-ES-ON-CPU.md): off by default (WebGL2 when the Worker has it, the CPU otherwise); read by the next load, recorded in the trace, never part of the device model the app sees
@@ -134,4 +135,4 @@ export { resolveDevice, checkCustomScreen };
 /** The part of the settings the running app's Configuration/device model reads (src/device-profile.js resolveDevice): a change of anything else (motion/still
  * resolution, renderer, time per event: side calls; memory, core memory, engine: next load) needs no exclusive 'device' VM operation. */
 export function vmDeviceModel(settings) { const { raster, eventSeconds, memoryMiB, coreMemory, engine, ...device } = deviceForVM(settings); return device; }
-export function deviceForVM(settings) { const { location, renderer, microg, microgServices, customIdentity, arm64Native, arm64Translate, glesCpu, hardwareWindow, schedulingOf25, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model
+export function deviceForVM(settings) { const { location, renderer, microg, microgServices, customIdentity, arm64Native, arm64Translate, glesCpu, hardwareWindow, schedulingOf25, prepareFromLastRun, layoutBounds, frameGraph, ...device } = settings; return device; }   // layoutBounds and frameGraph: page overlays, the app never sees them (turning one on is not a Configuration change); microg: a load option (the installed packages), not part of the device model

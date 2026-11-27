@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=4a7b2c308dd9';
-import { createHostRegistry } from './host-contract.js?v=4a7b2c308dd9';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=4a7b2c308dd9';
+import { APKError } from './apk-error.js?v=0feec282e5a9';
+import { createHostRegistry } from './host-contract.js?v=0feec282e5a9';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=0feec282e5a9';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
-//   - whole-file MD5 / SHA-1 / SHA-256 / SHA-512 are computed over the loaded base APK by host-native streaming digests (src/fast-digests.js), in slices that do not block the VM;
+//   - whole-file MD5 / SHA-1 / SHA-256 / SHA-512 are computed over the loaded base APK by WebCrypto off the VM's thread where the environment has it (SHA-*), else by host-native streaming digests (src/fast-digests.js), in slices that do not block the VM;
 //   - the 4K Merkle root is the fs-verity/apk-verity tree root over the whole file (apk-checksums.js);
 //   - the partial 1 MiB Merkle roots are the APK Signature Scheme v3/v2 content digests read from the signing block (absent for an APK without a v2/v3 signature, as on a device);
 //   - the listener runs on a "Binder:<pid>_N" thread, as the framework delivers it from the package manager service; split APKs: none are installed.
@@ -81,20 +81,50 @@ export function createApkChecksumsHost(platform) {
   const cache = new WeakMap();   // bytes -> Map(type -> Uint8Array | null)
   const SIGNATURE_BACKED = new Map([[TYPE.PARTIAL_MERKLE_ROOT_1M_SHA256, CONTENT_DIGEST.CHUNKED_SHA256], [TYPE.PARTIAL_MERKLE_ROOT_1M_SHA512, CONTENT_DIGEST.CHUNKED_SHA512]]);
   /** Generator that fills `known` (Map type -> bytes | null) for the required types, yielding between slices. */
-  function* computeSteps(source, required, known) {
+  function* computeSteps(source, required, known, r = null) {
     const { bytes, archive } = source;
     for (const wanted of Object.values(TYPE).sort((a, b) => a - b)) {
       if (!(required & wanted) || known.has(wanted)) continue;
       if (wanted === TYPE.WHOLE_MERKLE_ROOT_4K_SHA256) known.set(wanted, yield* merkleSteps(bytes));
       else if (SIGNATURE_BACKED.has(wanted)) known.set(wanted, signatureContentDigests(archive).get(SIGNATURE_BACKED.get(wanted)) ?? null);   // absent when the APK is not signed with that digest
-      else known.set(wanted, yield* digestSteps(WHOLE.find(([t]) => t === wanted)[1], bytes));
+      else {
+        const algorithm = WHOLE.find(([t]) => t === wanted)[1], ahead = offThreadDigest(algorithm, bytes);
+        const value = ahead ? yield ahead : null;   // runJob sends the digest back, or null when WebCrypto refused: then the same digest in slices on this thread
+        tracePath(r, algorithm, value instanceof Uint8Array);
+        known.set(wanted, value instanceof Uint8Array ? value : yield* digestSteps(algorithm, bytes));
+      }
     }
   }
+  // SHA-1 / SHA-256 / SHA-512 of the whole file by WebCrypto where the environment has it: the browser hashes off the VM's thread (a large APK took about 0.4 s of the Worker's time
+  // during the app's start in slices); null without WebCrypto, and for MD5 (WebCrypto has none), and the digest is computed in slices as before. Same bytes, same algorithm.
+  const traced = new Set(), tracePath = (r, algorithm, offThread) => {
+    const line = `PackageManager.requestChecksums: whole-file ${algorithm} ${offThread ? 'by WebCrypto, off the VM thread' : 'by the lab\'s own digest, in slices on the VM thread'}`;
+    if (!r || traced.has(line)) return; traced.add(line); const was = r.hostTaskTrace; r.hostTaskTrace = true; try { r.record?.(line); } finally { r.hostTaskTrace = was; }   // run from a host task of the Looper: not the pump's plumbing
+  };
+  const offThreadDigest = (algorithm, bytes) => {
+    const subtle = globalThis.crypto?.subtle;
+    if (!subtle || algorithm === 'MD5' || bytes.length < 1 << 20) return null;
+    try { return subtle.digest(algorithm, bytes).then(digest => new Uint8Array(digest)); } catch { return null; }
+  };
   const SLICE_MS = 12;
+  // A step may yield a Promise (a digest computed off this thread): the job waits for it without a slice of its own, counted as outside work (the pump's waitingIO), and goes on
+  // with its result as a main-thread task when it settles (null on a refusal).
+  let waiting = 0;
+  const outside = { delay: () => null, pending: () => waiting };
   const runJob = (r, steps, finished, roots) => {
+    let sent;
     const slice = () => {
       const started = performance.now();
-      for (;;) { const next = steps.next(); if (next.done) { finished(); return; } if (performance.now() - started >= SLICE_MS) break; }
+      for (;;) {
+        const next = steps.next(sent); sent = undefined;
+        if (next.done) { finished(); return; }
+        if (typeof next.value?.then === 'function') {
+          if (waiting++ === 0) platform.addExternalSource?.(outside);
+          const resume = value => { waiting--; sent = value; platform.queueTask(slice, 0, roots); platform.onExternalActivity?.(); };
+          next.value.then(resume, () => resume(null)); return;
+        }
+        if (performance.now() - started >= SLICE_MS) break;
+      }
       platform.queueTask(slice, 0, roots);
     };
     platform.queueTask(slice, 0, roots);
@@ -126,7 +156,7 @@ export function createApkChecksumsHost(platform) {
     const source = r.apkFileSource?.(); if (!source) throw new APKError('PackageManager.requestChecksums: the loaded APK bytes are not available to this runtime', { kind: 'checksums-apk-unavailable' });
     const known = cache.get(source.bytes) ?? cache.set(source.bytes, new Map()).get(source.bytes), wanted = required | 0;
     const answer = () => deliver(r, listener, [...known].filter(([t, v]) => (wanted & t) && v).sort((a, b) => a[0] - b[0]));
-    runJob(r, computeSteps(source, wanted, known), () => answer(), [listener]);   // already cached: the first slice finishes at once
+    runJob(r, computeSteps(source, wanted, known, r), () => answer(), [listener]);   // already cached: the first slice finishes at once
   });
   return registry;
 }

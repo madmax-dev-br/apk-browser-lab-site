@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=4a7b2c308dd9';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=4a7b2c308dd9';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=4a7b2c308dd9';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=4a7b2c308dd9';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=4a7b2c308dd9';
-import { inspectELF } from './native-inspector.js?v=4a7b2c308dd9';
-import { elfBuildId } from './elf-build-id.js?v=4a7b2c308dd9';
-import { crc32 } from './zip-entry.js?v=4a7b2c308dd9';
-import { resolveDevice } from './device-profile.js?v=4a7b2c308dd9';
-import { resourceProfileFor } from './device-configuration.js?v=4a7b2c308dd9';
-import { JniBridge } from './jni-host.js?v=4a7b2c308dd9';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=4a7b2c308dd9';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=4a7b2c308dd9';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=4a7b2c308dd9';
-import { AndroidResources } from './android-resources.js?v=4a7b2c308dd9';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=4a7b2c308dd9';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=4a7b2c308dd9';
-import { FrameworkProvider } from './framework-provider.js?v=4a7b2c308dd9';
-import { APKArchive } from './apk-archive.js?v=4a7b2c308dd9';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=4a7b2c308dd9';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=4a7b2c308dd9';
+import { usesProcesses } from './system-programs.js?v=0feec282e5a9';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=0feec282e5a9';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=0feec282e5a9';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=0feec282e5a9';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=0feec282e5a9';
+import { inspectELF } from './native-inspector.js?v=0feec282e5a9';
+import { elfBuildId } from './elf-build-id.js?v=0feec282e5a9';
+import { crc32 } from './zip-entry.js?v=0feec282e5a9';
+import { resolveDevice } from './device-profile.js?v=0feec282e5a9';
+import { resourceProfileFor } from './device-configuration.js?v=0feec282e5a9';
+import { JniBridge } from './jni-host.js?v=0feec282e5a9';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=0feec282e5a9';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=0feec282e5a9';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=0feec282e5a9';
+import { AndroidResources } from './android-resources.js?v=0feec282e5a9';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=0feec282e5a9';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=0feec282e5a9';
+import { FrameworkProvider } from './framework-provider.js?v=0feec282e5a9';
+import { APKArchive } from './apk-archive.js?v=0feec282e5a9';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=0feec282e5a9';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=0feec282e5a9';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -492,10 +492,12 @@ export function installSplits(archive, splitInputs, warnings = []) {
 export function apkSetParts(archive) {
   const inner = [...archive.entries.keys()].filter(name => /\.apk$/i.test(name) && !name.includes('/') || /^splits\/[^/]+\.apk$/i.test(name));
   if (!inner.length) return null;
-  const hasCode = name => { try { return new APKArchive(archive.extractSync(name, 1 << 30)).entries.has('classes.dex'); } catch { return false; } };
+  // each inner APK is expanded and CRC-checked once: the one looked into for a classes.dex is the one installed (the base of a large set is hundreds of megabytes)
+  const expanded = new Map(), bytesOf = name => expanded.get(name) ?? expanded.set(name, archive.extractSync(name, 1 << 30)).get(name);
+  const hasCode = name => { try { return new APKArchive(bytesOf(name)).entries.has('classes.dex'); } catch { return false; } };
   const named = inner.find(name => /(^|\/)base(-master)?\.apk$/i.test(name)), base = named && hasCode(named) ? named : inner.find(hasCode);
   if (!base) return null;   // no installable base inside: loadAPK's error names the bundle
-  return { base: archive.extractSync(base, 1 << 30), splits: inner.filter(name => name !== base).map(name => archive.extractSync(name, 1 << 30)) };
+  return { base: bytesOf(base), splits: inner.filter(name => name !== base).map(bytesOf) };
 }
 /** Whether `bytes` contain the ASCII text. */
 function containsAscii(bytes, text) {

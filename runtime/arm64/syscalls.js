@@ -2,8 +2,8 @@
 // number in X8 and the arguments in X0-X5, or bionic's syscall(3)) instead of calling libc. Both reach the same lab implementations as the libc functions: the
 // arm64 (asm-generic) numbers below map to the libc function whose arguments the call has in the same order. A raw call returns -errno, as the kernel does;
 // syscall(3) returns -1 and sets errno, as bionic does. A number the lab does not provide fails naming it, never a silent 0.
-import { APKError } from '../apk-error.js?v=4a7b2c308dd9';
-import { BLOCKED } from './cpu.js?v=4a7b2c308dd9';
+import { APKError } from '../apk-error.js?v=0feec282e5a9';
+import { BLOCKED } from './cpu.js?v=0feec282e5a9';
 
 // number -> libc function taking the same arguments in the same registers
 const SAME = {

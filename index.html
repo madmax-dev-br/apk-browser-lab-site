@@ -8,10 +8,10 @@
   <title>APK Browser Lab</title>
   <link rel="icon" type="image/png" sizes="32x32" href="./icons/apk-lab-icon-32.png">
   <link rel="apple-touch-icon" href="./icons/apk-lab-icon-180.png">
-  <style>@import url("./styles.css?v=4a7b2c308dd9") layer(legacy);</style>
-  <link rel="stylesheet" href="./lab-tokens.css?v=4a7b2c308dd9">
-  <link rel="stylesheet" href="./lab-theme.css?v=4a7b2c308dd9">
-  <meta name="apk-browser-build" content="4a7b2c308dd9">
+  <style>@import url("./styles.css?v=0feec282e5a9") layer(legacy);</style>
+  <link rel="stylesheet" href="./lab-tokens.css?v=0feec282e5a9">
+  <link rel="stylesheet" href="./lab-theme.css?v=0feec282e5a9">
+  <meta name="apk-browser-build" content="0feec282e5a9">
 </head>
 <body>
   <header class="topbar">
@@ -241,6 +241,7 @@
                 <p id="vm-memory-note" class="cp-note">This number is the Java heap budget (VM objects and arrays; the other budgets grow with it). The browser uses more than that: DEX tables, CanvasKit, rasters and one JavaScript object per Java object. A tab above ~2–4 GiB may be killed by the browser. The engine limit is 2,097,152 objects (4 GiB is capped to it).</p>
                 <p id="vm-memory-device" class="cp-note"></p>
                 <details class="cp-advanced"><summary>Advanced</summary>
+                  <label class="cp-check" for="vm-prepare-last-run"><input id="vm-prepare-last-run" type="checkbox" role="switch" checked><span>Prepare from the last run<small>On by default. The classes and methods the last run of the same APK laid out and linked are kept in this browser (names only) and prepared in the quiet moments after the next launch, so the first taps find them ready. No class is initialized and no app code runs for it. Applies at the next launch; shown in the trace.</small></span></label>
                   <label class="cp-check" for="vm-scheduling-25"><input id="vm-scheduling-25" type="checkbox" role="switch"><span>Scheduling of 25/11<small>Off by default. The thread scheduling and the atomics of the build of 25 November: no 50 ms yield of a background-only pump, no posted re-arm, no frame-paced reply to a click, the background floor's four slices, and the atomics answered by JavaScript instead of the core's C natives. For an app that got slower after 26 November. Applies at the next launch; shown in the trace.</small></span></label>
                   <label class="cp-check" for="vm-hardware-window"><input id="vm-hardware-window" type="checkbox" role="switch" checked><span>Hardware-accelerated windows<small>On by default, as on a device: Views and Compose layers record into RenderNodes, and a frame that only moves a layer does not draw its content again. Off, they draw through the software Canvas, as the lab did before. Applies to the next APK opened.</small></span></label>
                   <label class="cp-check" for="vm-load-image"><input id="vm-load-image" type="checkbox" role="switch"><span>Load image<small>Off by default. Keeps, in this browser's private storage, the expanded DEX files and compiled XML of an APK after its launch (of an APK set: of the base and its splits together), so the next open of the same APK reads them instead of expanding them (a few tens of ms on a large APK, for about the APK's DEX size in storage). The APK is not changed; the image is checked (content hash, lab build, checksums) before each use, and the diagnostics summary says whether it was used, written or refused. Applies when the APK is opened again</small></span></label>
@@ -389,7 +390,7 @@
     </div>
     <div class="tool-dock-bar" role="toolbar" aria-label="Diagnostic tools"></div>
   </div>
-  <script type="module" src="./app.js?v=4a7b2c308dd9"></script>
+  <script type="module" src="./app.js?v=0feec282e5a9"></script>
 <div id="em-dialog" class="em-scrim" hidden>
   <div class="em-card" role="dialog" aria-modal="true" aria-labelledby="em-dialog-title" aria-describedby="em-dialog-help">
     <div class="em-card-head"><h2 id="em-dialog-title">Add mock</h2><button id="em-close" type="button" class="em-close" aria-label="Close without saving">×</button></div>
