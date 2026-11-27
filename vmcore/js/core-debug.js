@@ -8,7 +8,7 @@
 // vmcore/js/core-threads.js advance() hands the three to coreStop (park the thread, or go on) and continueFrom (resume past the stop). Frames are read from the thread record's
 // stack in linear memory (abi.h: frame[0] caller, frame[1] return pc, frame[2] Method, then the registers); the runs nested below the innermost one (host steps on the record,
 // runs host code waits for on the JavaScript stack) are found from what their callers kept (thread.core.steps 'run' entries, thread.debugOuter).
-import { METHOD } from './linker.js?v=d20881b83aa7';
+import { METHOD } from './linker.js?v=df19921e3eea';
 
 const T = { steps: 32, maxSteps: 40, result: 48, frame: 2132, pc: 2136, depth: 2140, debugFlags: 2208, debugPc: 2212, debugWord: 2216, debugThrown: 2220 };
 const M_CLINIT = 4, OPCODE = 0x73, DEBUG_STEP = 1, DEBUG_EXCEPTIONS = 2, NO_BUDGET = 1n << 60n;

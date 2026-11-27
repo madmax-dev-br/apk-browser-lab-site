@@ -1,4 +1,4 @@
-import { APKError } from './apk-error.js?v=d20881b83aa7';
+import { APKError } from './apk-error.js?v=df19921e3eea';
 
 // Registry for "contract hosts": JS reimplementations of named platform methods, each registered with its exact JVM
 // signature. The registry answers the runtime's supports()/invoke()/parent()/reflection queries uniformly so that

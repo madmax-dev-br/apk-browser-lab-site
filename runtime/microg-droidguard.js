@@ -1,4 +1,4 @@
-import { setMethodInterceptor } from './method-overrides.js?v=d20881b83aa7';
+import { setMethodInterceptor } from './method-overrides.js?v=df19921e3eea';
 
 // DroidGuard, SafetyNet and Play Integrity on the "com microG" device (CLAUDE.md, docs/MICROG.md section 6).
 //

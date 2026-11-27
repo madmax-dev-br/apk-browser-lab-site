@@ -1,21 +1,21 @@
-import { APKError } from './apk-error.js?v=d20881b83aa7';
-import { throwNew } from './java-throw.js?v=d20881b83aa7';
-import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=d20881b83aa7';
-import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=d20881b83aa7';
-import { matchBlockedCall, blockedHost, noteBlockHit } from './blocked-calls.js?v=d20881b83aa7';
-import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=d20881b83aa7';
-import { Blocked } from './scheduler.js?v=d20881b83aa7';
-import { captureBody } from './network-capture.js?v=d20881b83aa7';
-import { OS_CONSTANTS } from './os-constants-data.js?v=d20881b83aa7';
-import { openExchange, describeFailure } from './network-transport.js?v=d20881b83aa7';
-import { WorkerExecutor } from './network-worker-executor.js?v=d20881b83aa7';
-import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=d20881b83aa7';
-import { TransportAuthority } from './transport-ca.js?v=d20881b83aa7';
-import { openWebSocketSession } from './websocket-bridge.js?v=d20881b83aa7';
-import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=d20881b83aa7';
-import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=d20881b83aa7';
-import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=d20881b83aa7';
-import { ExchangeTrace, NetTrace } from './net-trace.js?v=d20881b83aa7';
+import { APKError } from './apk-error.js?v=df19921e3eea';
+import { throwNew } from './java-throw.js?v=df19921e3eea';
+import { mapUrl, hostMapServesHost, noteRedirect } from './host-map.js?v=df19921e3eea';
+import { matchEndpointMock, mockServesHost, noteMockHit } from './endpoint-mocks.js?v=df19921e3eea';
+import { matchBlockedCall, blockedHost, noteBlockHit } from './blocked-calls.js?v=df19921e3eea';
+import { noteRouteHit, continuedRequest, fulfilledResponse, abortFailure, ROUTE_TIMEOUT_MS, MAX_ROUTED_BODY_BYTES } from './network-routes.js?v=df19921e3eea';
+import { Blocked } from './scheduler.js?v=df19921e3eea';
+import { captureBody } from './network-capture.js?v=df19921e3eea';
+import { OS_CONSTANTS } from './os-constants-data.js?v=df19921e3eea';
+import { openExchange, describeFailure } from './network-transport.js?v=df19921e3eea';
+import { WorkerExecutor } from './network-worker-executor.js?v=df19921e3eea';
+import { parseNetworkSecurityConfig, cleartextPermittedFor, trustConfigFor } from './network-security-config.js?v=df19921e3eea';
+import { TransportAuthority } from './transport-ca.js?v=df19921e3eea';
+import { openWebSocketSession } from './websocket-bridge.js?v=df19921e3eea';
+import { tunnelEndpoint, openTunnelSession } from './tcp-tunnel.js?v=df19921e3eea';
+import { RelayMux, muxEndpoint, endpointHost, unavailableChannel } from './relay-mux.js?v=df19921e3eea';
+import { destination, destinationOfUrl, identityKey, registerClientIdentity, forgetClientIdentities } from './client-identity.js?v=df19921e3eea';
+import { ExchangeTrace, NetTrace } from './net-trace.js?v=df19921e3eea';
 
 
 // The web device's network: the boundary between the original java.net classes in framework.dex and the browser's fetch.
@@ -201,7 +201,11 @@ export class NetworkBridge {
     op.executor = this.executorFor(); const mapped = this.redirectFor(request.url); op.log = this.log?.begin(request, { api: request.api, mapped, proxy: proxyHost(this.policy.proxyUrl), channel: this.relayChannelOn() ? 'pending' : null, route: op.routed ?? null }) ?? null;
     if (mapped) { op.redirect = { record: noteRedirect(this.runtime, this.redirects, mapped, request), settled: false }; this.stats.redirected = (this.stats.redirected ?? 0) + 1; }
     if (op.executor === 'worker' && this.policy.proxyUrl) this.relayReset(this.policy.proxyUrl);   // the session's reset of the relay's client identities, on this path too (not waited for: the synchronous bridge blocks the thread)
-    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url), relayChannel: this.relayChannelSpec() }); const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
+    if (op.executor === 'worker') { try { const worker = (this.worker ??= new WorkerExecutor(this)), start = () => {   // run later when it waits for a client identity: a failure here is the request's own error, not a promise rejection nobody sees (the request would hang until the app's timeout)
+          if (op.closed || op.error) return;
+          try { worker.start(op, request, { proxyUrl: this.policy.proxyUrl, redirect: this.policy.redirect ?? 'auto', hostMap: this.policy.hostMap ?? [], clientIdentity: this.clientIdentityFor(request.url), relayChannel: this.relayChannelSpec() }); }
+          catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); }
+        }; const identity = this.clientIdentityJob(request.url); if (identity) { const dest = destinationOfUrl(this.redirectFor(request.url)?.url ?? request.url); identity.then(() => this.noteClientIdentityUse(dest), () => {}); } if (identity) identity.then(start, start); else start(); } catch (error) { op.error = describeFailure(error, request); this.stats.failures++; this.observe(op); this.signal(); } }
     else this.run(op).catch(error => { this.noteChannelOf(op, error); op.error ??= describeFailure(error, request, request.timedOut); this.stats.failures++; }).finally(() => { this.observe(op); this.signal(); });
     return op;
   }
@@ -430,6 +434,9 @@ export class NetworkBridge {
    * the server sees no client certificate, as it would from a device whose app offered none, and the trace says why.
    */
   useClientIdentity(dest, identity, alias, facts = {}) {   // facts: { auto (found by the automatic mode, not a listed host), notAfter (ms), subject } of the leaf certificate, for the page
+    // copies of the bytes: what the TLS host hands over may be views on the VM's memory (on the WebAssembly core, its whole memory), which the identity outlives and which a
+    // postMessage to the network worker would try to clone whole (DataCloneError)
+    identity = { key: new Uint8Array(identity.key), chain: identity.chain.map(cert => new Uint8Array(cert)) };
     const mapped = this.redirectFor(`https://${dest}/`), target = mapped ? destinationOfUrl(mapped.url) ?? dest : dest, proxyUrl = this.policy.proxyUrl ?? '', key = identityKey(identity);
     this.clientIdentities ??= new Map(); const current = this.clientIdentities.get(target);
     if (current && current.key === key && current.proxyUrl === proxyUrl) return;   // handed over already (its outcome is in clientIdentityStatus)

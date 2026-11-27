@@ -1,7 +1,7 @@
-import { createHostRegistry } from './host-contract.js?v=d20881b83aa7';
-import { APKError } from './apk-error.js?v=d20881b83aa7';
-import { gcRoot } from './heap-gc.js?v=d20881b83aa7';
-import { definePopupWindowMembers } from './popup-window-needs.js?v=d20881b83aa7';
+import { createHostRegistry } from './host-contract.js?v=df19921e3eea';
+import { APKError } from './apk-error.js?v=df19921e3eea';
+import { gcRoot } from './heap-gc.js?v=df19921e3eea';
+import { definePopupWindowMembers } from './popup-window-needs.js?v=df19921e3eea';
 
 // Action modes and their menus, with the semantics of android-13.0.0_r1:
 //   * View.startActionMode / ViewGroup.startActionModeForChild (View.java, ViewGroup.java: the typed / legacy call dance with SENTINEL_ACTION_MODE) carry the request up the parent

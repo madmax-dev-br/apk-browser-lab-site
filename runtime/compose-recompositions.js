@@ -21,9 +21,9 @@
 //
 // Not available (said, never guessed): the app has no RecomposeScopeImpl under that name (no Compose, or a minifier renamed it), the class lacks start/scopeSkipped (a minifier
 // inlined them), or a method change the user made already replaces one of them.
-import { RUN_BODY, setMethodInterceptors } from './method-overrides.js?v=d20881b83aa7';
-import { RECOMPOSE_SCOPE, composeOwnerViews, rootComposition, vmCaller, walkComposition } from './compose-compositions.js?v=d20881b83aa7';
-import { compareInputs, composableOfLambda, composableOfMethod, composableOfScope, composerArgument, fieldOf, isComposableLambda, lambdaBlock, restartableMethods, snapshotInputs } from './compose-composables.js?v=d20881b83aa7';
+import { RUN_BODY, setMethodInterceptors } from './method-overrides.js?v=df19921e3eea';
+import { RECOMPOSE_SCOPE, composeOwnerViews, rootComposition, vmCaller, walkComposition } from './compose-compositions.js?v=df19921e3eea';
+import { compareInputs, composableOfLambda, composableOfMethod, composableOfScope, composerArgument, fieldOf, isComposableLambda, lambdaBlock, restartableMethods, snapshotInputs } from './compose-composables.js?v=df19921e3eea';
 
 const NODE = 'Landroidx/compose/ui/node/LayoutNode;', COORDS = 'Landroidx/compose/ui/layout/LayoutCoordinates;', COORDS_KT = 'Landroidx/compose/ui/layout/LayoutCoordinatesKt;', RECT = 'Landroidx/compose/ui/geometry/Rect;';
 const START = 'start(I)V', SKIPPED = 'scopeSkipped()V', INVALIDATED = 'setRequiresRecompose(Z)V', END = 'end(I)', STATE = 'invalidateForResult(Ljava/lang/Object;)', EXPLICIT = 'invalidate()V', RESTART = 'compose(Landroidx/compose/runtime/Composer;)V';
