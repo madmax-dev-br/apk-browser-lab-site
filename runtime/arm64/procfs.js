@@ -5,7 +5,7 @@
 //   mem         the process's memory at the file offset = address (src/arm64/libc.js reads and writes it; an unmapped address is EIO)
 //   task/       its threads: the main thread, the Java threads that called native code, the threads native code created (src/arm64/threads.js), each with its comm
 //   fd/         its own descriptors beside Java's
-import { processComm } from '../procfs.js?v=0feec282e5a9';
+import { processComm } from '../procfs.js?v=5afc26aa921f';
 
 const hex = (value, width = 8) => value.toString(16).padStart(width, '0');
 export const threadComm = processComm;   // ART's SetThreadName applies the same rule to thread names

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { throwNew } from './java-throw.js?v=0feec282e5a9';
-import { sharedAssetBytes, knownDigest, noteDigest } from './shared-asset-bytes.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { throwNew } from './java-throw.js?v=5afc26aa921f';
+import { sharedAssetBytes, knownDigest, noteDigest } from './shared-asset-bytes.js?v=5afc26aa921f';
 
 // com.android.icu.charset.NativeConverter converter natives (open/close/decode/encode/reset/callbacks) over the unmodified ICU4C 70.1 ucnv implementation compiled to
 // WebAssembly (vendor/icu/70.1/icu-converter.wasm, scripts/build-icu-converter.sh). The wrapper code follows external/icu android-13.0.0_r1

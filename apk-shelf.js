@@ -58,26 +58,32 @@ export async function checkApkBytes(blob) {
   return { ok: false, readable: true, reason: 'is not a complete APK (the end of the ZIP is missing: cut short, or still being written)' };
 }
 
-/** The shelf over a backend { all(), get(id), put(entry), delete(id) } (async). Entries: { id, name, packageName, label, icon: { bytes, mime } | null, size, addedAt, openedAt,
- *  blob (the APK bytes at the last open), handle (FileSystemFileHandle | null) }. */
+/** The shelf over a backend { all(), get(id), put(entry, { keepBlob }), delete(id) } (async). Entries: { id, name, packageName, label, icon: { bytes, mime } | null, size, addedAt,
+ *  openedAt, blob (the APK bytes at the last open), handle (FileSystemFileHandle | null) }. all() need not carry the blobs. put(entry, { keepBlob: true }) writes the entry's other
+ *  fields and keeps the APK bytes the backend already stores under that id: recording an icon, a label or the time of an open rewrote the whole APK before (a quarter of a second
+ *  for 240 MB, two or three times at every open). */
 export function createApkShelf(backend, { now = () => Date.now() } = {}) {
   // Saving an APK and recording its label and icon are each a read, then a write, of the same entry, and the page starts them independently (the icon arrives from the VM
   // while the APK is still being saved): they run one at a time, so neither writes back an entry read before the other finished (an icon recorded and then lost).
   let queue = Promise.resolve();
   const serial = task => { const run = queue.then(task, task); queue = run.catch(() => {}); return run; };
   const summary = entry => ({ id: entry.id, name: entry.name, packageName: entry.packageName ?? null, label: entry.label ?? null, icon: entry.icon ?? null, size: entry.size ?? 0, addedAt: entry.addedAt, openedAt: entry.openedAt, hasHandle: !!entry.handle, problem: entry.problem ?? null });
+  // The Files file() made from a stored copy, and the entry they were read from: saving one of them under the same entry keeps the stored bytes instead of writing them again.
+  const storedCopies = new WeakMap();
   const saveNow = async ({ id, name, packageName = null, blob, handle = null, previousId = null }) => {
     const key = shelfKey(packageName, name) ?? id; if (!key || !blob) throw new Error('An APK shelf entry needs a key and the APK bytes');
     const legacy = packageName ? await backend.get(packageName) : null;   // the one-per-package format: the same app under the same file name is this entry
     if (legacy && legacy.name === name && !previousId) previousId = packageName;
     const old = await backend.get(key) ?? (previousId && previousId !== key ? await backend.get(previousId) : null), time = now();
     const entry = { ...(old ?? {}), id: key, name: name ?? old?.name ?? key, packageName: packageName ?? old?.packageName ?? null, blob, size: blob.size ?? old?.size ?? 0, handle: handle ?? old?.handle ?? null, addedAt: old?.addedAt ?? time, openedAt: time, problem: null };   // a new copy: the mark of an unusable one goes
-    await backend.put(entry); if (previousId && previousId !== key) await backend.delete(previousId);
+    const keepBlob = !!old?.blob && old.id === key && storedCopies.get(blob) === key;   // the stored copy opened again: the same bytes
+    if (keepBlob) entry.blob = old.blob;
+    await backend.put(entry, { keepBlob }); if (previousId && previousId !== key) await backend.delete(previousId);
     const all = await backend.all();
     if (all.length > SHELF_LIMIT) for (const stale of all.sort((a, b) => a.openedAt - b.openedAt).slice(0, all.length - SHELF_LIMIT)) if (stale.id !== key) await backend.delete(stale.id);
     return summary(entry);
   };
-  const describeNow = async (id, { label = null, icon = null, activities = null } = {}) => { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; if (Array.isArray(activities)) entry.activities = activities; await backend.put(entry); return summary(entry); };
+  const describeNow = async (id, { label = null, icon = null, activities = null } = {}) => { const entry = await backend.get(id); if (!entry) return null; if (label) entry.label = label; if (icon?.bytes) entry.icon = { bytes: icon.bytes, mime: icon.mime || 'image/png' }; if (Array.isArray(activities)) entry.activities = activities; await backend.put(entry, { keepBlob: true }); return summary(entry); };
   return {
     /** Every entry in the order they were first added (the launcher's order: one beside the other, a new app at the end). */
     async list() { return (await backend.all()).sort((a, b) => a.addedAt - b.addedAt || String(a.id).localeCompare(String(b.id))).map(summary); },
@@ -111,29 +117,55 @@ export function createApkShelf(backend, { now = () => Date.now() } = {}) {
       }
       const fail = async (code, reason) => {
         const message = `The copy of ${entry.label || entry.name} stored in this browser ${reason}${note ? `, and ${note}` : ''}. Choose the APK file again to reinstall it (its app data is kept).`;
-        await serial(async () => { const now = await backend.get(id); if (now) { now.problem = { code, message }; await backend.put(now); } }).catch(() => {});
+        await serial(async () => { const now = await backend.get(id); if (now) { now.problem = { code, message }; await backend.put(now, { keepBlob: true }); } }).catch(() => {});
         throw new ShelfFileError(code, message, id);
       };
       if (!entry.blob) return fail('stored-copy-missing', 'is missing');
       const check = await checkApkBytes(entry.blob);
       if (!check.ok) return fail(check.readable ? 'stored-copy-invalid' : 'stored-copy-unreadable', check.reason);
-      return { file: new File([entry.blob], entry.name, { type: 'application/vnd.android.package-archive' }), fromDisk: false, note };
+      const file = new File([entry.blob], entry.name, { type: 'application/vnd.android.package-archive' }); storedCopies.set(file, id);
+      return { file, fromDisk: false, note };
     },
     remove(id) { return serial(() => backend.delete(id)); },
   };
 }
 
-/** The browser's backend: one IndexedDB object store. Null where IndexedDB is not available (the shelf is then simply absent). */
+/** The browser's backend: IndexedDB, the entries in the object store `apps` and each APK's bytes in `apks` under the entry's id (version 2; version 1 kept the bytes inside the
+ *  entry, and opening it moves them out once). Null where IndexedDB is not available (the shelf is then simply absent). */
 export function indexedDbShelfBackend({ name = 'apkweb-shelf', idb = globalThis.indexedDB } = {}) {
   if (!idb) return null;
   let opened = null;
-  const db = () => opened ??= new Promise((resolve, reject) => { const request = idb.open(name, 1); request.onupgradeneeded = () => request.result.createObjectStore('apps', { keyPath: 'id' }); request.onsuccess = () => resolve(request.result); request.onerror = () => { opened = null; reject(request.error); }; });
-  const run = async (mode, use) => { const store = (await db()).transaction('apps', mode).objectStore('apps'); return new Promise((resolve, reject) => { const request = use(store); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); };
-  return { all: () => run('readonly', store => store.getAll()), get: id => run('readonly', store => store.get(id)), put: entry => run('readwrite', store => store.put(entry)), delete: id => run('readwrite', store => store.delete(id)) };
+  const db = () => opened ??= new Promise((resolve, reject) => {
+    const request = idb.open(name, 2);
+    request.onupgradeneeded = event => {
+      const base = request.result, tx = request.transaction;
+      if (!base.objectStoreNames.contains('apps')) base.createObjectStore('apps', { keyPath: 'id' });
+      if (!base.objectStoreNames.contains('apks')) base.createObjectStore('apks');
+      if (event.oldVersion >= 1 && event.oldVersion < 2) {   // version 1: the APK inside each entry
+        const apps = tx.objectStore('apps'), apks = tx.objectStore('apks'), cursor = apps.openCursor();
+        cursor.onsuccess = () => { const at = cursor.result; if (!at) return; const { blob, ...entry } = at.value; if (blob) { apks.put(blob, entry.id); at.update(entry); } at.continue(); };
+      }
+    };
+    request.onsuccess = () => { const base = request.result; base.onversionchange = () => { base.close(); opened = null; }; resolve(base); };
+    request.onerror = () => { opened = null; reject(request.error); };
+  });
+  const run = async (mode, use) => {
+    const tx = (await db()).transaction(['apps', 'apks'], mode);
+    return new Promise((resolve, reject) => { let result; Promise.resolve(use(tx.objectStore('apps'), tx.objectStore('apks'), value => { result = value; })).catch(reject); tx.oncomplete = () => resolve(result); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error ?? new Error('IndexedDB transaction aborted')); });
+  };
+  const ask = request => new Promise(resolve => { request.onsuccess = () => resolve(request.result); });
+  return {
+    all: () => run('readonly', (apps, _apks, done) => ask(apps.getAll()).then(done)),
+    get: id => run('readonly', async (apps, apks, done) => { const [entry, blob] = await Promise.all([ask(apps.get(id)), ask(apks.get(id))]); done(entry ? { ...entry, blob: blob ?? entry.blob ?? null } : undefined); }),
+    put: (entry, { keepBlob = false } = {}) => run('readwrite', (apps, apks) => { const { blob, ...rest } = entry; apps.put(rest); if (!keepBlob) { if (blob) apks.put(blob, entry.id); else apks.delete(entry.id); } }),
+    delete: id => run('readwrite', (apps, apks) => { apps.delete(id); apks.delete(id); }),
+  };
 }
 
 /** An in-memory backend (tests, and pages where IndexedDB is refused). */
 export function memoryShelfBackend() {
   const map = new Map(), copy = value => value && ({ ...value });
-  return { all: async () => [...map.values()].map(copy), get: async id => copy(map.get(id)) ?? undefined, put: async entry => { map.set(entry.id, copy(entry)); }, delete: async id => { map.delete(id); } };
+  const backend = { blobWrites: 0, all: async () => [...map.values()].map(copy), get: async id => copy(map.get(id)) ?? undefined, delete: async id => { map.delete(id); },
+    put: async (entry, { keepBlob = false } = {}) => { const next = copy(entry); if (keepBlob) next.blob = map.get(entry.id)?.blob ?? null; else if (next.blob) backend.blobWrites++; map.set(entry.id, next); } };
+  return backend;
 }

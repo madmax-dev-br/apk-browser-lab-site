@@ -18,11 +18,11 @@
 //     a cached string) keeps what was read before; the page re-applies the edits when the APK is opened again (Reopen), before the app's code runs. Every edit is listed on
 //     the page as "App modified", recorded in the trace (EDIT FILE / UNEDIT FILE) and in the diagnostics summary (src/report-summary.js entryEditLines), and removable.
 // Runs in the Worker and in Node tests: no DOM, no process.*.
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { DexFile } from './apk-runtime.js?v=0feec282e5a9';
-import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=0feec282e5a9';
-import { javaOutline } from './java-outline.js?v=0feec282e5a9';
-import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { DexFile } from './apk-runtime.js?v=5afc26aa921f';
+import { readClassModel, disassembleClass, accessFlagsText, valueText, decodeInstruction, instructionUnits, smaliOfMethod } from './smali-disassembler.js?v=5afc26aa921f';
+import { javaOutline } from './java-outline.js?v=5afc26aa921f';
+import { checkSmaliBody, listMethodHooks } from './method-hooks.js?v=5afc26aa921f';
 
 export const CODE_LIMITS = Object.freeze({ decompileCache: 4, decompileLines: 400000, sliceMs: 30, results: 200, textBytes: 4 * 1024 * 1024, hexBytes: 64 * 1024, editBytes: 8 * 1024 * 1024, edits: 200, queryChars: 200, dexListClasses: 200000 });
 const KINDS = ['class', 'method', 'field', 'string', 'file'];
@@ -33,7 +33,7 @@ const fail = (code, message) => Object.assign(new APKError(message), { code });
 // ---- the decompiler: imported on its first use only ------------------------------------------------------------------------------------------------------------------
 let decompilerModule = null, decompilerLoading = null;
 /** Imports src/java-decompiler.js (once). */
-export function loadDecompiler() { if (decompilerModule) return Promise.resolve(decompilerModule); decompilerLoading ??= import('./java-decompiler.js?v=0feec282e5a9').then(m => (decompilerModule = m)); return decompilerLoading; }
+export function loadDecompiler() { if (decompilerModule) return Promise.resolve(decompilerModule); decompilerLoading ??= import('./java-decompiler.js?v=5afc26aa921f').then(m => (decompilerModule = m)); return decompilerLoading; }
 /** True once the decompiler module was imported (tests check that nothing imports it before the Java view asks). */
 export const decompilerLoaded = () => decompilerModule !== null;
 
@@ -514,6 +514,7 @@ function entryEdits(rt) {
   const edits = new Map(), read = rt.apkReader, range = rt.apkEntryRange;
   Object.defineProperty(rt, 'entryEdits', { value: edits, configurable: true });
   rt.apkReader = name => { const edit = edits.get(name); return edit ? edit.bytes.slice() : read(name); };
+  const size = rt.apkEntrySize; if (size) rt.apkEntrySize = name => edits.get(name)?.bytes.length ?? size(name);
   rt.apkEntryRange = name => {
     if (edits.has(name)) throw new APKError(`${name} was edited by the user (App modified): a file descriptor over the installed APK (AssetManager.openFd, openRawResourceFd) would read the original bytes, so it is not opened; open() reads the edited file`, { kind: 'edited-entry' });
     return range ? range(name) : null;

@@ -1,6 +1,6 @@
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { createHostRegistry } from './host-contract.js?v=0feec282e5a9';
-import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { createHostRegistry } from './host-contract.js?v=5afc26aa921f';
+import { CONTENT_DIGEST, TYPE, TYPE_NAMES, digestSteps, merkleSteps, signatureContentDigests } from './apk-checksums.js?v=5afc26aa921f';
 
 // PackageManager.requestChecksums (API 31+) with android.content.pm.Checksum / ApkChecksum, as ApplicationPackageManager and PackageManagerService/ApkChecksums (android-13.0.0_r1) answer for an app that
 // was side-loaded (no installer: no installer-provided checksums, so the trusted-installer part is empty):
@@ -88,23 +88,30 @@ export function createApkChecksumsHost(platform) {
       if (wanted === TYPE.WHOLE_MERKLE_ROOT_4K_SHA256) known.set(wanted, yield* merkleSteps(bytes));
       else if (SIGNATURE_BACKED.has(wanted)) known.set(wanted, signatureContentDigests(archive).get(SIGNATURE_BACKED.get(wanted)) ?? null);   // absent when the APK is not signed with that digest
       else {
-        const algorithm = WHOLE.find(([t]) => t === wanted)[1], ahead = offThreadDigest(algorithm, bytes);
-        const value = ahead ? yield ahead : null;   // runJob sends the digest back, or null when WebCrypto refused: then the same digest in slices on this thread
-        tracePath(r, algorithm, value instanceof Uint8Array);
+        const algorithm = WHOLE.find(([t]) => t === wanted)[1], ahead = nativeDigest(r, algorithm, bytes);
+        const value = ahead ? yield ahead.digest : null;   // runJob sends the digest back, or null when WebCrypto refused: then the same digest in slices on this thread
+        tracePath(r, algorithm, value instanceof Uint8Array ? ahead.where : null);
         known.set(wanted, value instanceof Uint8Array ? value : yield* digestSteps(algorithm, bytes));
       }
     }
   }
-  // SHA-1 / SHA-256 / SHA-512 of the whole file by WebCrypto where the environment has it: the browser hashes off the VM's thread (a large APK took about 0.4 s of the Worker's time
-  // during the app's start in slices); null without WebCrypto, and for MD5 (WebCrypto has none), and the digest is computed in slices as before. Same bytes, same algorithm.
-  const traced = new Set(), tracePath = (r, algorithm, offThread) => {
-    const line = `PackageManager.requestChecksums: whole-file ${algorithm} ${offThread ? 'by WebCrypto, off the VM thread' : 'by the lab\'s own digest, in slices on the VM thread'}`;
+  // SHA-1 / SHA-256 / SHA-512 of the whole file by WebCrypto where the environment has it (the lab's own digest in slices took about 0.5 s of the Worker's time for a large APK
+  // during the app's start; WebCrypto is about four times faster). In the browser it runs in a helper Worker of the APK's inflate pool (src/zip-inflate-pool.js), on a copy of
+  // the bytes: Chrome's WebCrypto computes a digest on the thread that asks for it, in one step (measured: no event-loop turn during 120 MB), so on the VM's own thread it would
+  // block the app for the whole digest. Without a helper it runs on this thread (Node's WebCrypto hashes on its own thread pool); null without WebCrypto, and for MD5 (WebCrypto
+  // has none), and the digest is computed in slices as before. Same bytes, same algorithm.
+  const traced = new Set(), tracePath = (r, algorithm, where) => {
+    const line = `PackageManager.requestChecksums: whole-file ${algorithm} ${where === 'helper' ? 'by WebCrypto in a helper Worker, off the VM thread' : where === 'here' ? 'by WebCrypto on the VM thread' : 'by the lab\'s own digest, in slices on the VM thread'}`;
     if (!r || traced.has(line)) return; traced.add(line); const was = r.hostTaskTrace; r.hostTaskTrace = true; try { r.record?.(line); } finally { r.hostTaskTrace = was; }   // run from a host task of the Looper: not the pump's plumbing
   };
-  const offThreadDigest = (algorithm, bytes) => {
-    const subtle = globalThis.crypto?.subtle;
-    if (!subtle || algorithm === 'MD5' || bytes.length < 1 << 20) return null;
-    try { return subtle.digest(algorithm, bytes).then(digest => new Uint8Array(digest)); } catch { return null; }
+  // Only where the VM's driver runs an event loop between pumps (the browser Worker sets platform.hostEventLoop): a driver that pumps the VM synchronously on a virtual clock
+  // (the Node flows) never lets a Promise settle, and a thread waiting for the checksums would never wake; there the slices keep the run deterministic.
+  const nativeDigest = (r, algorithm, bytes) => {
+    const subtle = globalThis.crypto?.subtle, pool = r?.helperPool;
+    if (algorithm === 'MD5' || bytes.length < 1 << 20 || platform.hostEventLoop !== true) return null;
+    if (pool?.available) return { where: 'helper', digest: pool.digest(bytes, algorithm).then(digest => new Uint8Array(digest), () => subtle ? subtle.digest(algorithm, bytes).then(digest => new Uint8Array(digest)) : null) };
+    if (!subtle) return null;
+    try { return { where: 'here', digest: subtle.digest(algorithm, bytes).then(digest => new Uint8Array(digest)) }; } catch { return null; }
   };
   const SLICE_MS = 12;
   // A step may yield a Promise (a digest computed off this thread): the job waits for it without a slice of its own, counted as outside work (the pump's waitingIO), and goes on

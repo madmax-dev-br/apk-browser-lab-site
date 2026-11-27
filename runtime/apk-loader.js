@@ -1,24 +1,24 @@
-import { usesProcesses } from './system-programs.js?v=0feec282e5a9';
-import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=0feec282e5a9';
-import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=0feec282e5a9';
-import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=0feec282e5a9';
-import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=0feec282e5a9';
-import { inspectELF } from './native-inspector.js?v=0feec282e5a9';
-import { elfBuildId } from './elf-build-id.js?v=0feec282e5a9';
-import { crc32 } from './zip-entry.js?v=0feec282e5a9';
-import { resolveDevice } from './device-profile.js?v=0feec282e5a9';
-import { resourceProfileFor } from './device-configuration.js?v=0feec282e5a9';
-import { JniBridge } from './jni-host.js?v=0feec282e5a9';
-import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=0feec282e5a9';
-import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=0feec282e5a9';
-import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=0feec282e5a9';
-import { AndroidResources } from './android-resources.js?v=0feec282e5a9';
-import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=0feec282e5a9';
-import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=0feec282e5a9';
-import { FrameworkProvider } from './framework-provider.js?v=0feec282e5a9';
-import { APKArchive } from './apk-archive.js?v=0feec282e5a9';
-import { beginLoadImage, routeImageReads } from './load-image.js?v=0feec282e5a9';
-import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=0feec282e5a9';
+import { usesProcesses } from './system-programs.js?v=5afc26aa921f';
+import { createArm64Native, ARM64_LIB_DIR } from './arm64/glue.js?v=5afc26aa921f';
+import { APKError, APKRuntime, BinaryReader, DexFile, DexProgram, dottedName } from './apk-runtime.js?v=5afc26aa921f';
+import { MICROG_PACKAGES, enableMicrog } from './microg-device.js?v=5afc26aa921f';
+import { detectReactNativeVersion, detectHermesBytecodeVersion, formatVersion } from './rn-version.js?v=5afc26aa921f';
+import { inspectELF } from './native-inspector.js?v=5afc26aa921f';
+import { elfBuildId } from './elf-build-id.js?v=5afc26aa921f';
+import { crc32 } from './zip-entry.js?v=5afc26aa921f';
+import { resolveDevice } from './device-profile.js?v=5afc26aa921f';
+import { resourceProfileFor } from './device-configuration.js?v=5afc26aa921f';
+import { JniBridge } from './jni-host.js?v=5afc26aa921f';
+import { providerForApk, shipsArm64ReactNative, withoutReactNativeForArm64 } from './native-provider-variants.js?v=5afc26aa921f';
+import { getDefaultJavacryptoProvider } from './javacrypto-native.js?v=5afc26aa921f';
+import { nativeProviderWithSqlcipher } from './sqlcipher-native.js?v=5afc26aa921f';
+import { AndroidResources } from './android-resources.js?v=5afc26aa921f';
+import { AndroidPlatform, LAYOUTS_PROFILE_WIDGETS } from './android-platform.js?v=5afc26aa921f';
+import { LAYOUTS_PROFILE_ATTRIBUTES, LINE_BREAK_ATTRIBUTES } from './host-styleables.js?v=5afc26aa921f';
+import { FrameworkProvider } from './framework-provider.js?v=5afc26aa921f';
+import { APKArchive } from './apk-archive.js?v=5afc26aa921f';
+import { beginLoadImage, routeImageReads } from './load-image.js?v=5afc26aa921f';
+import { identityTraceLine, checkCustomIdentity, customIdentityFor, deviceProperty } from './device-identity.js?v=5afc26aa921f';
 export { APKArchive };
 
 const fail = message => { throw new APKError(message); };
@@ -489,15 +489,28 @@ export function installSplits(archive, splitInputs, warnings = []) {
   return archive;
 }
 /** An APK set (.apks / .xapk / .apkm: a ZIP of a base APK and its split APKs) as { base, splits } of bytes, or null when the archive is not one. */
-export function apkSetParts(archive) {
+export function apkSetParts(archive, { pool = null } = {}) {
   const inner = [...archive.entries.keys()].filter(name => /\.apk$/i.test(name) && !name.includes('/') || /^splits\/[^/]+\.apk$/i.test(name));
   if (!inner.length) return null;
-  // each inner APK is expanded and CRC-checked once: the one looked into for a classes.dex is the one installed (the base of a large set is hundreds of megabytes)
-  const expanded = new Map(), bytesOf = name => expanded.get(name) ?? expanded.set(name, archive.extractSync(name, 1 << 30)).get(name);
-  const hasCode = name => { try { return new APKArchive(bytesOf(name)).entries.has('classes.dex'); } catch { return false; } };
+  // each inner APK is expanded and CRC-checked once: the one looked into for a classes.dex is the one installed (the base of a large set is hundreds of megabytes). A large stored
+  // one has its CRC-32 taken in the helper Workers (`pool`), in parallel pieces, while this thread goes on with the load: `checks` (verifySetChecks) holds what is still owed
+  // (about 0.2 s of a 240 MB set on this thread before).
+  const checks = [], read = name => {
+    const entry = archive.entries.get(name), bytes = pool?.available && entry?.method === 0 && entry.size >= SET_CHECK_IN_HELPERS ? archive.storedSync(name, 1 << 30) : null;
+    if (!bytes) return archive.extractSync(name, 1 << 30);
+    checks.push({ name, crc: entry.crc, bytes, archive, job: pool.crc32(bytes).catch(() => null) }); return bytes;
+  };
+  const expanded = new Map(), bytesOf = name => expanded.get(name) ?? expanded.set(name, read(name)).get(name);
+  // an inner APK whose bytes do not match its CRC is that error (it used to read as "no code here"); one that is not an APK has no code
+  const hasCode = name => { const bytes = bytesOf(name); try { return new APKArchive(bytes).entries.has('classes.dex'); } catch { return false; } };
   const named = inner.find(name => /(^|\/)base(-master)?\.apk$/i.test(name)), base = named && hasCode(named) ? named : inner.find(hasCode);
   if (!base) return null;   // no installable base inside: loadAPK's error names the bundle
-  return { base: bytesOf(base), splits: inner.filter(name => name !== base).map(bytesOf) };
+  return { base: bytesOf(base), splits: inner.filter(name => name !== base).map(bytesOf), checks };
+}
+const SET_CHECK_IN_HELPERS = 4 << 20;
+/** The CRC-32 checks apkSetParts left to the helpers: each one's result, or the CRC taken here when its helper failed; a mismatch is extractSync's error for that entry. */
+async function verifySetChecks(checks) {
+  for (const check of checks) { const crc = (await check.job) ?? crc32(check.bytes); if (crc !== check.crc) check.archive.crcMismatch(check.name); }
 }
 /** Whether `bytes` contain the ASCII text. */
 function containsAscii(bytes, text) {
@@ -508,7 +521,17 @@ function containsAscii(bytes, text) {
 export async function loadAPK(arrayBuffer, options = {}) {
   if (!(arrayBuffer instanceof ArrayBuffer) && !(arrayBuffer instanceof Uint8Array)) fail('loadAPK requires an APK ArrayBuffer');
   let archive = new APKArchive(arrayBuffer);
-  if (!archive.entries.has('classes.dex')) { const set = apkSetParts(archive); if (set) return loadAPK(set.base, { ...options, splits: [...set.splits, ...(options.splits ?? [])] }); }
+  if (!archive.entries.has('classes.dex')) {
+    const set = apkSetParts(archive, { pool: options.inflatePool });
+    if (set) {   // the inner APKs' CRC checks finish before the load does; when the load fails, a CRC mismatch is the error reported (damaged bytes explain the rest)
+      let result; try { result = await loadAPK(set.base, { ...options, splits: [...set.splits, ...(options.splits ?? [])] }); } catch (error) { await verifySetChecks(set.checks); throw error; }
+      await verifySetChecks(set.checks); return result;
+    }
+  }
+  // The SHA-256 of the APK, which native libraries scoped to one APK are matched by (below): started now in a helper Worker, on a copy, so it runs while this thread reads the
+  // rest of the APK (WebCrypto hashes on the calling thread in Chrome: 75 ms of a 240 MB set on this thread). Without a helper it is computed here, below, as before.
+  const apkHash = [...(options.nativeLibraryProvider?.modules?.values?.() ?? [])].some(entry => entry.apkSha256) && options.inflatePool?.available
+    ? options.inflatePool.digest(arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)).catch(() => null) : null;
   const splitWarnings = [];
   archive = installSplits(archive, options.splits, splitWarnings);
   const names = [...archive.entries.keys()];
@@ -920,7 +943,8 @@ export async function loadAPK(arrayBuffer, options = {}) {
   runtime.platform.resourceSelector = resourceConfiguration ?? null; // live device changes re-select resources through the same original ResTable_config matcher
   if (nativeLibraryProvider && [...nativeLibraryProvider.modules.values()].some(entry => entry.apkSha256)) {
     // libraries scoped to one APK (its own generated native code) are offered only to that APK: compared by the SHA-256 of the file
-    runtime.apkSha256 = [...new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer)))].map(b => b.toString(16).padStart(2, '0')).join('');
+    const digest = (await apkHash) ?? await globalThis.crypto.subtle.digest('SHA-256', arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer));
+    runtime.apkSha256 = [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
   }
   if (nativeLibraryProvider) {   // open-source androidx libraries are served by artifact version: META-INF/androidx.<group>_<artifact>.version holds just the version string
     runtime.androidxVersions = Object.create(null);
@@ -1040,5 +1064,7 @@ export async function loadAPK(arrayBuffer, options = {}) {
   let signingCertificates;   // read on first PackageManager request: the APK's signer certificates
   runtime.apkSigningCertificates = () => signingCertificates ??= apkSigningCertificates(archive);
   runtime.apkFileSource = () => ({ bytes: archive.reader.bytes, archive });   // the loaded base APK: PackageManager.requestChecksums
+  runtime.apkEntrySize = name => archive.entries.get(name)?.size ?? null;   // an entry's expanded length (central directory): files mounted before they are read (src/arm64/glue.js)
+  runtime.helperPool = options.inflatePool ?? null;   // its whole-file digests run in a helper Worker (src/apk-checksums-host.js)
   return { runtime, inventory, inspectNativeLibraries, archive, loadImage };
 }

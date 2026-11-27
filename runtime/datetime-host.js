@@ -1,10 +1,10 @@
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { gcRoot } from './heap-gc.js?v=0feec282e5a9';
-import { createHostRegistry, parseSignature } from './host-contract.js?v=0feec282e5a9';
-import { JavaException } from './apk-runtime.js?v=0feec282e5a9';
-import { bestDateTimePattern } from './date-skeleton.js?v=0feec282e5a9';
-import { Invoke } from './interpreter.js?v=0feec282e5a9';
-import { Blocked } from './scheduler.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { gcRoot } from './heap-gc.js?v=5afc26aa921f';
+import { createHostRegistry, parseSignature } from './host-contract.js?v=5afc26aa921f';
+import { JavaException } from './apk-runtime.js?v=5afc26aa921f';
+import { bestDateTimePattern } from './date-skeleton.js?v=5afc26aa921f';
+import { Invoke } from './interpreter.js?v=5afc26aa921f';
+import { Blocked } from './scheduler.js?v=5afc26aa921f';
 
 // java.util.Date / java.util.TimeZone / java.text.SimpleDateFormat for the browser VM.
 // Contract reimplementation over JavaScript's Intl (IANA tz database, English month/day names unless the Locale names another language).

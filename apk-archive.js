@@ -1,9 +1,9 @@
 // The APK's ZIP container (central directory, bounded entry expansion with CRC checks), apart from the loader so the page can open an archive (an App Bundle's
 // base module, src/aab-bundle.js) without loading the VM. src/apk-loader.js re-exports it. Imports only the light ZIP helpers and APKError.
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { BinaryReader } from './binary-reader.js?v=0feec282e5a9';
-import { inflateRaw } from './inflate.js?v=0feec282e5a9';
-import { crc32, inflateEntry } from './zip-entry.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { BinaryReader } from './binary-reader.js?v=5afc26aa921f';
+import { inflateRaw } from './inflate.js?v=5afc26aa921f';
+import { crc32, inflateEntry } from './zip-entry.js?v=5afc26aa921f';
 
 const fail = message => { throw new APKError(message); };
 const utf8 = new TextDecoder('utf-8', { fatal: true });
@@ -75,6 +75,20 @@ export class APKArchive {
     if (data.length !== e.size || crc32(data) !== e.crc) fail(`APK entry size/CRC mismatch: ${name}`);
     return data;
   }
+  /** A stored (uncompressed) entry's bytes, copied, with the same bounds and size check as extractSync but its CRC-32 left to the caller, which checks it with crcMismatch()
+   *  (src/apk-loader.js apkSetParts: the CRC of a large inner APK is taken in the helper Workers while this thread goes on). Null for a deflated entry. */
+  storedSync(name, limit) {
+    const e = this.entries.get(name);
+    if (!e) fail(`APK is missing ${name}`);
+    if (!Number.isSafeInteger(limit) || limit < 0) fail('APK extraction requires a nonnegative byte limit');
+    if (e.size > limit) fail(`${name} exceeds ${Math.round(limit / 1024 / 1024)} MiB limit`);
+    if (e.method !== 0) return null;
+    const data = this.payload(name).compressed.slice();
+    if (data.length !== e.size) this.crcMismatch(name);
+    return data;
+  }
+  /** The error of an entry whose bytes do not match its central-directory record (extractSync's own). */
+  crcMismatch(name) { fail(`APK entry size/CRC mismatch: ${name}`); }
   /** Starts expanding `names` (deflated entries within `limit`) in the helper Workers of `pool` (src/zip-inflate-pool.js); extract() then takes the result instead of expanding
    *  on this thread. Nothing is checked or reported here: extract() does every check, and an entry whose helper failed is expanded again by extract() itself. */
   prefetch(names, limit, pool) {

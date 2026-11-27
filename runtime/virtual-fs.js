@@ -52,6 +52,14 @@ export class VirtualFileSystem {
     for (const observer of this.observers) observer({ mask: mask | (node.type === 'dir' ? 0x40000000 : 0), node, parent: directory, name, cookie, child, self });
   }
   mount(path, bytes) { this.put(path, { type: 'file', buf: bytes, size: bytes.length, mtime: this.now(), mode: 0o644, mounted: true }); }
+  /** Mounts a file whose bytes are read (`read()`, once) the first time something reads them: stat and directory listings see `size` and read nothing, as the files a package
+   *  manager leaves inside the APK on a device (the native libraries of an app that does not extract them) cost nothing until they are opened. `buf` is not enumerable, so a walk
+   *  over the VM's host state (the collector's root walk) does not read the file either. */
+  mountLazy(path, size, read) {
+    let data = null; const node = { type: 'file', size, mtime: this.now(), mode: 0o644, mounted: true };
+    Object.defineProperty(node, 'buf', { enumerable: false, configurable: true, get() { if (data === null) { data = read(); node.size = data.length; } return data; }, set(bytes) { data = bytes; } });
+    this.put(path, node);
+  }
   directory() { return { type: 'dir', mtime: this.now(), mode: 0o771 }; }
   canonical(path) {
     const absolute = path.startsWith('/') ? path : '/' + path, parts = [];

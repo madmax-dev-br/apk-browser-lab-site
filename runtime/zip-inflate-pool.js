@@ -5,6 +5,8 @@
 // failed in any way (an error, a crash, no helper left), expands the entry on its own thread, so results and error messages are those of the sequential path.
 // The VM Worker starts the pool when the page opens (src/apk-worker.js warmAssets): the helpers load their two modules and warm crc32 while the user picks an APK.
 
+import { crc32Combine } from './zip-entry.js?v=5afc26aa921f';
+
 /** `create()` makes one helper: an object with postMessage(message, transfer), terminate(), and the onmessage / onerror properties of a Worker. */
 export class InflatePool {
   constructor({ size = 2, create }) {
@@ -55,20 +57,39 @@ export class InflatePool {
       catch (error) { this.crash(helper, error); }
     });
   }
-  /** SHA-256 of `bytes` (a view; copied, never detached) in the least loaded helper: resolves the digest as an ArrayBuffer (the load image's source hash, src/load-image.js). */
-  digest(bytes) {
+  /** The WebCrypto digest `algorithm` (SHA-256 unless named: SHA-1, SHA-256, SHA-384, SHA-512) of `bytes` (a view; copied, never detached) in the least loaded helper: resolves
+   *  the digest as an ArrayBuffer (the load image's source hash, src/load-image.js; PackageManager.requestChecksums, src/apk-checksums-host.js). */
+  digest(bytes, algorithm = 'SHA-256') {
     this.start();
     if (!this.helpers.length) return Promise.reject(new Error('no APK inflate helper'));
     const helper = this.helpers.reduce((best, h) => h.queuedBytes < best.queuedBytes ? h : best), id = this.nextId++, copy = bytes.slice();
     return new Promise((resolve, reject) => {
       helper.jobs.set(id, { resolve, reject, bytes: bytes.length, digest: true }); helper.queuedBytes += bytes.length;
-      try { helper.worker.postMessage({ id, op: 'sha256', bytes: copy }, [copy.buffer]); }
+      try { helper.worker.postMessage({ id, op: 'sha256', algorithm, bytes: copy }, [copy.buffer]); }
       catch (error) { this.crash(helper, error); }
     });
+  }
+  /** CRC-32 of `bytes` (a view; never detached), in pieces of at least `piece` bytes spread over the helpers, each on its own copy, joined in order (src/zip-entry.js
+   *  crc32Combine): resolves the CRC, rejects on any helper error (the caller then takes it on its own thread). */
+  crc32(bytes, { piece = 8 << 20 } = {}) {
+    this.start();
+    if (!this.helpers.length) return Promise.reject(new Error('no APK inflate helper'));
+    const count = Math.max(1, Math.min(this.helpers.length, Math.ceil(bytes.length / piece))), size = Math.ceil(bytes.length / count), parts = [];
+    for (let at = 0; at < bytes.length || !parts.length; at += size) {
+      const view = bytes.subarray(at, Math.min(bytes.length, at + size)), helper = this.helpers.reduce((best, h) => h.queuedBytes < best.queuedBytes ? h : best), id = this.nextId++, copy = view.slice();
+      parts.push(new Promise((resolve, reject) => {
+        helper.jobs.set(id, { resolve: crc => resolve([crc, view.length]), reject, bytes: view.length, crc: true }); helper.queuedBytes += view.length;
+        try { helper.worker.postMessage({ id, op: 'crc32', bytes: copy }, [copy.buffer]); }
+        catch (error) { this.crash(helper, error); }
+      }));
+      if (!bytes.length) break;
+    }
+    return Promise.all(parts).then(done => done.reduce((crc, [part, length], index) => index ? crc32Combine(crc, part, length) : part, 0));
   }
   settle(helper, data) {
     const job = helper.jobs.get(data?.id); if (!job) return;
     helper.jobs.delete(data.id); helper.queuedBytes -= job.bytes;
+    if (job.crc) { if (Number.isInteger(data.crc)) job.resolve(data.crc >>> 0); else job.reject(new Error(String(data?.error ?? 'APK helper gave no CRC'))); return; }
     if (job.digest) { if (data.digest instanceof ArrayBuffer) job.resolve(data.digest); else job.reject(new Error(String(data?.error ?? 'APK helper gave no digest'))); return; }
     if (job.image) { if (data.bytes instanceof Uint8Array && typeof data.sum === 'string') job.resolve({ bytes: data.bytes, sum: data.sum, ms: data.ms }); else job.reject(new Error(String(data?.error ?? 'APK helper gave no image file'))); return; }
     if (data.bytes instanceof Uint8Array && Number.isInteger(data.crc)) job.resolve({ bytes: data.bytes, crc: data.crc >>> 0 });

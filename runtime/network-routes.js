@@ -10,8 +10,8 @@
 // A route whose plugin does not answer within ROUTE_TIMEOUT_MS also goes on unchanged, said in the trace. With no route the network path pays one property test.
 // The filter uses the endpoint mocks' URL pattern ("https://host/path/**", a host-less "/path", "*" labels and segments); without a url it takes every request.
 // DOM-free and no process.*: runs in the VM's Worker.
-import { validateMock, matchEndpointMock, MOCK_METHODS } from './endpoint-mocks.js?v=0feec282e5a9';
-import { REASONS } from './virtual-http-socket.js?v=0feec282e5a9';
+import { validateMock, matchEndpointMock, MOCK_METHODS } from './endpoint-mocks.js?v=5afc26aa921f';
+import { REASONS } from './virtual-http-socket.js?v=5afc26aa921f';
 
 export const MAX_ROUTES = 50, ROUTE_TIMEOUT_MS = 30000, MAX_ROUTED_BODY_BYTES = 32 * 1024 * 1024;
 const ID = /^[\w.-]{1,80}$/;

@@ -1,42 +1,42 @@
-import { procFdFile } from './libcore-io-native.js?v=0feec282e5a9';
-import STATIC_SHIMS from './shim-static-methods.js?v=0feec282e5a9';
-import { VMClock } from './vm-clock.js?v=0feec282e5a9';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=0feec282e5a9';
-import { OperationMonitor } from './operation-monitor.js?v=0feec282e5a9';
-import { ExecutionProfile } from './execution-profile.js?v=0feec282e5a9';
-import { SamplingProfiler } from './sampling-profiler.js?v=0feec282e5a9';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=0feec282e5a9';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=0feec282e5a9';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=0feec282e5a9';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=0feec282e5a9';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=0feec282e5a9';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=0feec282e5a9';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=0feec282e5a9';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=0feec282e5a9';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=0feec282e5a9';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=0feec282e5a9';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=0feec282e5a9';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=0feec282e5a9';
-import { APKError } from './apk-error.js?v=0feec282e5a9';
-import { invokePolymorphic } from './method-handles.js?v=0feec282e5a9';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=0feec282e5a9';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=0feec282e5a9';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=0feec282e5a9';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=0feec282e5a9';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=0feec282e5a9';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=0feec282e5a9';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=0feec282e5a9';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=0feec282e5a9';
+import { procFdFile } from './libcore-io-native.js?v=5afc26aa921f';
+import STATIC_SHIMS from './shim-static-methods.js?v=5afc26aa921f';
+import { VMClock } from './vm-clock.js?v=5afc26aa921f';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=5afc26aa921f';
+import { OperationMonitor } from './operation-monitor.js?v=5afc26aa921f';
+import { ExecutionProfile } from './execution-profile.js?v=5afc26aa921f';
+import { SamplingProfiler } from './sampling-profiler.js?v=5afc26aa921f';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=5afc26aa921f';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=5afc26aa921f';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=5afc26aa921f';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=5afc26aa921f';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=5afc26aa921f';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=5afc26aa921f';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=5afc26aa921f';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=5afc26aa921f';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=5afc26aa921f';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=5afc26aa921f';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=5afc26aa921f';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=5afc26aa921f';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
+import { invokePolymorphic } from './method-handles.js?v=5afc26aa921f';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=5afc26aa921f';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=5afc26aa921f';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=5afc26aa921f';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=5afc26aa921f';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=5afc26aa921f';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=5afc26aa921f';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=5afc26aa921f';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=5afc26aa921f';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=0feec282e5a9';
-import { ProcessStartPending } from './package-registry.js?v=0feec282e5a9';
-import { bootClassLacksMember } from './boot-class-members.js?v=0feec282e5a9';
-export { APKError } from './apk-error.js?v=0feec282e5a9';
-import { BinaryReader } from './binary-reader.js?v=0feec282e5a9';
-import { recordCollection } from './runtime-stats.js?v=0feec282e5a9';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=0feec282e5a9';
-import { scrollsItself } from './scrolling-view.js?v=0feec282e5a9';
-import { drawsItself } from './pointer-input-host.js?v=0feec282e5a9';
+import { Scheduler, Blocked } from './scheduler.js?v=5afc26aa921f';
+import { ProcessStartPending } from './package-registry.js?v=5afc26aa921f';
+import { bootClassLacksMember } from './boot-class-members.js?v=5afc26aa921f';
+export { APKError } from './apk-error.js?v=5afc26aa921f';
+import { BinaryReader } from './binary-reader.js?v=5afc26aa921f';
+import { recordCollection } from './runtime-stats.js?v=5afc26aa921f';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=5afc26aa921f';
+import { scrollsItself } from './scrolling-view.js?v=5afc26aa921f';
+import { drawsItself } from './pointer-input-host.js?v=5afc26aa921f';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -1146,7 +1146,7 @@ export const LATE_RUNTIME_PROPERTIES = Object.freeze([
   'loadTiming', 'loadImage', 'rasterStats', 'rasterCache', 'rasterCacheBytes', 'threadGroups', 'systemThreadGroup', 'mainThreadGroup', 'uncaughtHook', 'themeLightingCache', 'gcDeferral', 'gcDeferralStats', 'gcMarkChunks',
   'gcHeavyPaths', 'gcTopRoots', 'gcFreedRing', 'gcPhases', 'gcNextAt', 'gcMinAlloc', 'gcOldSize', 'gcMinorMs', 'gcPressure', 'gcCellPressure', 'gcLastNextId', 'arrayBytes', 'gcStats', 'gcLastEnd',
   'gcLastMs', 'gcTotalMs', 'gcMinorHeld', 'gcMinorStats', 'gcNurseryNow', 'gcSafepointTries', 'libcoreIo', 'hostStaticValues', 'rasterCacheDisabled', 'rasterCacheVerify', 'strictCrash',
-  'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
+  'androidxVersions', 'packagedBuildIds', 'reactNativeVersion', 'hermesBytecodeVersion', 'apkSigningCertificates', 'apkFileSource', 'helperPool', 'apkEntrySize', 'gcExtraRoots', 'gcEnabled', 'propertyValuesHolderJni', 'pointerGesture',
   'lastPointerTime', 'sliceLog', 'nativeCollectionHooks', 'reflectionGaps', 'hostWindowManagerGlobal', 'textColorFailures', 'avdRtState', 'textRasterScale', 'platformTrust',
 ]);
 export class APKRuntime {

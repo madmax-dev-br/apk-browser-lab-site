@@ -1,7 +1,7 @@
 // What expands one deflated (or stored) APK ZIP entry and checks it: CRC-32 and the bounded deflate-raw expansion. Shared by APKArchive (src/apk-loader.js) and by the helper
 // Workers that expand an APK's DEX files in parallel (src/zip-inflate-pool.js, src/zip-inflate-worker.js), so both run the same code. It imports nothing but APKError: a helper
 // Worker loads this module and nothing of the VM.
-import { APKError } from './apk-error.js?v=0feec282e5a9';
+import { APKError } from './apk-error.js?v=5afc26aa921f';
 
 const fail = message => { throw new APKError(message); };
 // CRC-32 (ZIP, reflected 0xEDB88320), slicing-by-8: eight tables, eight bytes per step (an APK's entries are checked as they are extracted; byte at a time this was
@@ -23,6 +23,20 @@ export function crc32(bytes, previous = 0) {
   for (; i < n; i++) crc = t[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
   return ~crc >>> 0;
 }
+// crc32Combine: zlib's crc32_combine (multmodp / x2nmodp over the reflected polynomial), so the CRC of a file can be taken in pieces on several threads and joined in order.
+const CRC_POLY = 0xedb88320;
+function multModP(a, b) {
+  let m = 1 << 31, p = 0;
+  for (;;) {
+    if (a & m) { p ^= b; if ((a & (m - 1)) === 0) break; }
+    m >>>= 1; b = b & 1 ? (b >>> 1) ^ CRC_POLY : b >>> 1;
+  }
+  return p >>> 0;
+}
+const X2N = (() => { const t = new Uint32Array(32); let p = 1 << 30; t[0] = p; for (let n = 1; n < 32; n++) t[n] = p = multModP(p, p); return t; })();   // x^(2^n) mod p(x)
+function x2nModP(n, k) { let p = 1 << 31; while (n) { if (n & 1) p = multModP(X2N[k & 31], p); n = Math.floor(n / 2); k++; } return p >>> 0; }
+/** The CRC-32 of a followed by b, from crc32(a), crc32(b) and b's length. */
+export function crc32Combine(crcA, crcB, lengthB) { return (multModP(x2nModP(lengthB, 3), crcA >>> 0) ^ (crcB >>> 0)) >>> 0; }
 /** Runs crc32 over a scratch buffer: idle-time work toward optimized code before the first real entry (src/zip-inflate-worker.js runs it in rounds; cold, crc32 runs at about
  *  0.4 times its optimized speed). The load image's checksum (below) is warmed with it. */
 export function warmCrc32(bytes = 1 << 20) { const scratch = new Uint8Array(bytes); for (let i = 0; i < 3; i++) { crc32(scratch); contentSum(scratch); } }
