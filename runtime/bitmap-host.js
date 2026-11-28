@@ -1,7 +1,8 @@
-import {APKError} from './apk-error.js?v=28012a33f717';
-import {getVectorGraphics} from './vector-native.js?v=28012a33f717';
-import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=28012a33f717';
-import { gcRoot } from './heap-gc.js?v=28012a33f717';
+import {APKError} from './apk-error.js?v=e0932d3cf1f5';
+import {getVectorGraphics} from './vector-native.js?v=e0932d3cf1f5';
+import {getSolidPaint,getSolidPaintByHandle} from './paint-host.js?v=e0932d3cf1f5';
+import { gcRoot } from './heap-gc.js?v=e0932d3cf1f5';
+import { requireBitmapExtent } from './bitmap-extent.js?v=e0932d3cf1f5';
 const BITMAP='Landroid/graphics/Bitmap;',CONFIG='Landroid/graphics/Bitmap$Config;',SPACE='Landroid/graphics/ColorSpace;',NAMED='Landroid/graphics/ColorSpace$Named;',CANVAS='Landroid/graphics/Canvas;';
 // android.graphics.Bitmap.Config declaration order (android-13.0.0_r1: RGBA_1010102 is API 33 and last) / ColorSpace.Named order (API 34 HLG/PQ appended).
 const CONFIGS=['ALPHA_8','RGB_565','ARGB_4444','ARGB_8888','RGBA_F16','HARDWARE','RGBA_1010102'];
@@ -78,7 +79,7 @@ export function createBitmapHost(runtime,{recordNative,rectF,matrixValues}){
   const requested=space?runtime.object(space).colorSpaceName:null;
   if(requested&&requested!=='SRGB'&&name!=='RGBA_F16'&&name!=='ALPHA_8')fail(`ColorSpace.Named.${requested} is only implemented for Bitmap.Config.RGBA_F16 bitmaps`);
   if(requested&&!SPACES[requested])fail(`ColorSpace ${requested} is not implemented for Bitmap`);
-  if(width>4096||height>4096||width*height>4*1024*1024)fail('Bitmap extent exceeds4096px/4Mpixel VM limit');
+  requireBitmapExtent(runtime,width,height,CONFIG_INFO[name].bytes,fail);   // as on Android: any size that fits (src/bitmap-extent.js)
   const graphics=getVectorGraphics(runtime),handle=graphics.createCanvas(),canvas=graphics.get(handle,'canvas');Object.assign(canvas,{width,height});
   const ref=runtime.makeObject(BITMAP),o=runtime.object(ref);
   const spaceName=name==='ALPHA_8'?null:name==='RGBA_F16'?(requested&&requested!=='SRGB'?requested:'LINEAR_EXTENDED_SRGB'):'SRGB'   // RGBA_F16 defaults to (and, requested as sRGB, becomes) linear extended sRGB;

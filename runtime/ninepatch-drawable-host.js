@@ -1,5 +1,6 @@
-import { APKError } from './apk-runtime.js?v=28012a33f717';
-import { snapshotPaintColorFilter } from './color-filter-native.js?v=28012a33f717';
+import { APKError } from './apk-runtime.js?v=e0932d3cf1f5';
+import { snapshotPaintColorFilter } from './color-filter-native.js?v=e0932d3cf1f5';
+import { bitmapExtentProblem } from './bitmap-extent.js?v=e0932d3cf1f5';
 // android.graphics.drawable.NinePatchDrawable for compiled 9-patch PNGs (aapt2 npTc chunk).
 // Layout contract (intrinsic size, getPadding) comes from the real compiled chunk; pixels are stretched with the
 // official Skia rasterizer (CanvasKit) exactly along the chunk's stretch regions. No platform-drawable look-alikes.
@@ -71,7 +72,7 @@ export function createNinePatchDrawableHost(platform) {
     const tint = tintColor(r, st), key = `${width}x${height}:${tint}:${st.alpha}:${st.blendMode ?? 'SrcIn'}`;
     if (st.cache?.key === key) return st.cache.raster;
     const CK = r.skia?.CanvasKit; if (!CK?.MakeImageFromEncoded) fail('9-patch drawing requires the verified Skia CanvasKit backend');
-    if (!(width > 0 && height > 0) || width > 4096 || height > 4096 || width * height > 4 * 1024 * 1024) fail('9-patch extent exceeds 4096px/4Mpixel VM limit');
+    { const problem = bitmapExtentProblem(Math.ceil(width), Math.ceil(height), 4); if (problem) fail(`9-patch raster: ${problem}`); }   // drawn at the View's size, as large as a bitmap may be (src/bitmap-extent.js)
     const image = CK.MakeImageFromEncoded(st.bytes); if (!image) fail('Skia rejected the 9-patch PNG');
     const surface = CK.MakeSurface(width, height), paint = new CK.Paint(); let filter = null;
     try {

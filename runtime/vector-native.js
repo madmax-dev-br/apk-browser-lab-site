@@ -1,7 +1,8 @@
-import { APKError } from './apk-error.js?v=28012a33f717';
-import { getSolidPaint } from './paint-host.js?v=28012a33f717';
-import { getMatrixValues } from './matrix-native.js?v=28012a33f717';
-import { getColorFilterSnapshot } from './color-filter-native.js?v=28012a33f717';
+import { APKError } from './apk-error.js?v=e0932d3cf1f5';
+import { getSolidPaint } from './paint-host.js?v=e0932d3cf1f5';
+import { getMatrixValues } from './matrix-native.js?v=e0932d3cf1f5';
+import { getColorFilterSnapshot } from './color-filter-native.js?v=e0932d3cf1f5';
+import { bitmapExtentProblem } from './bitmap-extent.js?v=e0932d3cf1f5';
 
 const VECTOR='Landroid/graphics/drawable/VectorDrawable;', PARSER='Landroid/util/PathParser;';
 const bits=new DataView(new ArrayBuffer(4));
@@ -164,7 +165,7 @@ export function createVectorNativeBindings(){
  parser('nCreatePathFromPathData',['J','J'],'V',(g,[handle,data],vm)=>{if(!vm.skiaHost?.parsePath)problem('PathParser requires the verified Skia Path backend');vm.skiaHost.parsePath(handle,g.get(data,'pathData').path);});
  vector('nDraw',['J','J','J','Landroid/graphics/Rect;','Z','Z'],'I',(g,[tree,canvas,filter,rect,mirror],vm)=>{
   const colorFilter=getColorFilterSnapshot(vm,filter);if(colorFilter&&!vm.skia?.rasterizeCanvas)problem('Filtered vectors require the original Skia raster backend');const fields=vm.object(rect).fields,get=n=>fields.get(`Landroid/graphics/Rect;->${n}:I`)??0,w=get('right')-get('left'),h=get('bottom')-get('top');if(w<=0||h<=0)return 0;
-  if(w*h>16*1024*1024)problem('Vector raster extent exceeds VM pixel limit');const draw=g.snapshot(tree,{width:w,height:h,mirrored:!!mirror});draw.colorFilter=colorFilter;draw.x=get('left');draw.y=get('top');const output=g.get(canvas,'canvas');draw.matrix=output.matrix.slice();draw.clips=(output.clips??[]).slice();draw.vectorTree=tree;draw.vectorState=g.captureVector(tree);draw.mirrored=!!mirror;if(output.draws.length>=1024)problem('Vector canvas command limit exceeded');g.reserveDrawStorage(draw.svg.length);output.draws.push(draw);return Math.ceil(w*h);
+  {const extent=bitmapExtentProblem(Math.ceil(w),Math.ceil(h),4);if(extent)problem(`Vector raster: ${extent}`);}/* as large as a bitmap may be (src/bitmap-extent.js) */const draw=g.snapshot(tree,{width:w,height:h,mirrored:!!mirror});draw.colorFilter=colorFilter;draw.x=get('left');draw.y=get('top');const output=g.get(canvas,'canvas');draw.matrix=output.matrix.slice();draw.clips=(output.clips??[]).slice();draw.vectorTree=tree;draw.vectorState=g.captureVector(tree);draw.mirrored=!!mirror;if(output.draws.length>=1024)problem('Vector canvas command limit exceeded');g.reserveDrawStorage(draw.svg.length);output.draws.push(draw);return Math.ceil(w*h);
  });
  for(const [name,delta]of [['nIncStrong',1],['nDecStrong',-1]])add('Lcom/android/internal/util/VirtualRefBasePtr;',name,['J'],'V',(g,[h])=>{const object=g.get(h);if(object.refs+delta<0)problem('Unbalanced vector handle release');object.refs+=delta;if(!object.refs&&delta<0)g.release(h);});
  for(const [name,delta]of [['registerNativeAllocation',1n],['registerNativeFree',-1n]])add('Ldalvik/system/VMRuntime;',name,['J'],'V',(g,args,vm)=>{

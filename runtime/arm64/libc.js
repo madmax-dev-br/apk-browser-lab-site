@@ -3,16 +3,17 @@
 // Files go through the VM's file system (the same one Java's FileInputStream uses), logs to the VM log as android.util.Log does, properties to the device's
 // SystemProperties. A function this table does not have is bound to an entry that fails naming it when called (process.missingSymbol); pthread_create fails the
 // same way, because the lab runs no native threads.
-import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=28012a33f717';
-import { addProcesses } from './processes.js?v=28012a33f717';
-import { APKError } from '../apk-error.js?v=28012a33f717';
-import { BLOCKED } from './cpu.js?v=28012a33f717';
-import { extendLibc } from './libc-extra.js?v=28012a33f717';
-import { addGles } from './gles.js?v=28012a33f717';
-import { utf8 } from './text.js?v=28012a33f717';
-import { createProcfs } from './procfs.js?v=28012a33f717';
-import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=28012a33f717';
-import { release } from '../libcore-io-native.js?v=28012a33f717';
+import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=e0932d3cf1f5';
+import { addProcesses } from './processes.js?v=e0932d3cf1f5';
+import { APKError } from '../apk-error.js?v=e0932d3cf1f5';
+import { ARM64_HWCAP, DEVICE_CPU_COUNT } from '../device-identity.js?v=e0932d3cf1f5';
+import { BLOCKED } from './cpu.js?v=e0932d3cf1f5';
+import { extendLibc } from './libc-extra.js?v=e0932d3cf1f5';
+import { addGles } from './gles.js?v=e0932d3cf1f5';
+import { utf8 } from './text.js?v=e0932d3cf1f5';
+import { createProcfs } from './procfs.js?v=e0932d3cf1f5';
+import { APP_PID, ZYGOTE_PID } from '../virtual-pids.js?v=e0932d3cf1f5';
+import { release } from '../libcore-io-native.js?v=e0932d3cf1f5';
 
 const EISDIR = 21, ENOTDIR = 20, EACCES = 13, EINVAL = 22, ENOENT = 2, EBADF = 9, ENOMEM = 12, EAGAIN = 11, ENOSYS = 38, ERANGE = 34;
 const text = bytes => utf8.decode(bytes);   // memory views: src/arm64/text.js
@@ -182,10 +183,11 @@ export function createLibc({ runtime, properties = () => null, fs = () => null, 
   lib.atexit = (p, c) => { p.atexit.push([n(c, 0), 0, 0]); return 0; };
   lib.__cxa_finalize = () => {};
   lib.__register_atfork = lib.pthread_atfork = () => 0;
+  // (sysconf: bionic's _SC_NPROCESSORS_CONF / _ONLN are 96 / 97, the device's CPU count src/device-identity.js; 83 / 84 are _SC_THREAD_PRIO_INHERIT / _PROTECT, not CPUs.)
   // AT_HWCAP names what the CPU executes: here the interpreter's own set, fp | asimd | atomics (LSE). Crypto (AES, PMULL, SHA1/2) and CRC32 are not advertised because
   // src/arm64/cpu.js does not execute them; libraries that check (BoringSSL, zlib, codecs) then take their portable paths, as on a core without those extensions.
-  lib.getauxval = (p, c) => ({ 16: 0x103n, 26: 0n, 6: 4096n, 23: 0n }[n(c, 0)] ?? 0n);
-  lib.sysconf = (p, c) => ({ 39: 4096, 40: 4096, 96: 8, 97: 8, 84: 8, 83: 8, 3: 1024, 0: 2097152, 2: 100 }[n(c, 0)] ?? (setErrno(p, EINVAL)));
+  lib.getauxval = (p, c) => ({ 16: BigInt(ARM64_HWCAP), 26: 0n, 6: 4096n, 23: 0n }[n(c, 0)] ?? 0n);
+  lib.sysconf = (p, c) => ({ 39: 4096, 40: 4096, 96: DEVICE_CPU_COUNT, 97: DEVICE_CPU_COUNT, 3: 1024, 0: 2097152, 2: 100 }[n(c, 0)] ?? (setErrno(p, EINVAL)));
   lib.getpagesize = () => 4096;
   lib.getpid = () => runtime?.platform?.virtualProcess?.pid ?? APP_PID;
   lib.getuid = lib.geteuid = lib.getgid = lib.getegid = () => runtime?.platform?.virtualProcess?.uid ?? 10123;

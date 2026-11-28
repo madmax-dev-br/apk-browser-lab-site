@@ -1,5 +1,5 @@
-import {APKError} from './apk-runtime.js?v=28012a33f717';
-import {sha256Hex} from './font-shelf.js?v=28012a33f717';
+import {APKError} from './apk-runtime.js?v=e0932d3cf1f5';
+import {sha256Hex} from './font-shelf.js?v=e0932d3cf1f5';
 
 /** Android font fallback (Minikin FontCollection) over the vendored Android 13 fallback chain.
  *

@@ -24,7 +24,7 @@
 //     Class records and the boxPrimitive caches, so the box natives (natives.c, bound by vmcore/js/host-bridge.js to the bridges the JavaScript VM selects) and the record
 //     facades' `boxed` (host-bridge.js) share one value. AtomicInteger gets the same payload for its `atomicValue` (its get/compareAndSet natives); AtomicReference a reference
 //     payload for its `atomicValue` (its get native); AtomicReferenceArray one for its `atomicArray`; the field updaters a payload of the field's offset and its owner's Class record (atomics.c), written by the facade's
-//     `updaterField` setter (host-bridge.js).
+//     `updaterField` setter (host-bridge.js). java.lang.Enum gets an Integer's payload for its `enumOrdinal` (the ordinal native), inherited by every enum class.
 //  8. An interface method of the app that only a host superclass implements (linker.buildVtable leaves the abstract interface method in the slot): a host-dispatch record of
 //     the nearest host superclass, selected by APKRuntime.dispatch.
 //  9. android.graphics.Paint (a host class) is laid out with the paint payload (vmcore/paint.h: its state, its references in the Class's reference map, and the field mBidiFlags
@@ -35,13 +35,13 @@
 //  5. Constructors of Throwable classes without DEX code are host methods like any other (not METHOD_THROWABLE_INIT): the JavaScript VM's constructor bridges keep the message,
 //     cause and captured stack on the record, which here is the companion, where Throwable's host methods read them.
 
-import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES, UPDATER_CLASSES, ATOMIC_REFERENCE_ARRAY, ATOMIC_LONG, ATOMIC_BOOLEAN } from './natives.js?v=28012a33f717';
-import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=28012a33f717';
+import { BOX_CLASSES, ATOMIC_INTEGER, ATOMIC_REFERENCE, PAINT, PAINT_NATIVES, UPDATER_CLASSES, ATOMIC_REFERENCE_ARRAY, ATOMIC_LONG, ATOMIC_BOOLEAN, ENUM, ENUM_ORDINAL_METHOD } from './natives.js?v=e0932d3cf1f5';
+import { PAINT_RECORD, CLASS_PAINT_RECORD, PAINT_REFERENCES, PAINT_ENUM_SLOTS, HOST_STATE_PAINT_ENUMS } from './paint-record.js?v=e0932d3cf1f5';
 
 const OBJECT = 'Ljava/lang/Object;', STRING = 'Ljava/lang/String;';
 // natives.h HostState: boxClass[8] then boxCache[8], atomicIntegerClass, the thread identity (HOST_STATE_THREAD); the box payload sizes; the kinds with a boxPrimitive cache (B S C I J)
 export const HOST_STATE_THREAD = { valid: 72, object: 76, idValid: 80, id: 88 };
-const VM_HOST_STATE = 44, HOST_STATE_BYTES = 136, HOST_STATE_BOOLEANS = 128, HOST_STATE_ATOMIC_LONG = 120, HOST_STATE_ATOMIC_BOOLEAN = 124, HOST_STATE_ATOMIC_ARRAY = 116, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, HOST_STATE_UPDATERS = 104, UPDATER_BYTES = 16, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
+const VM_HOST_STATE = 44, HOST_STATE_BYTES = 144, HOST_STATE_ENUM = 136, HOST_STATE_BOOLEANS = 128, HOST_STATE_ATOMIC_LONG = 120, HOST_STATE_ATOMIC_BOOLEAN = 124, HOST_STATE_ATOMIC_ARRAY = 116, HOST_STATE_ATOMIC_INTEGER = 64, HOST_STATE_ATOMIC_REFERENCE = 96, HOST_STATE_UPDATERS = 104, UPDATER_BYTES = 16, CLASS_REF_MAP = 8, BOX_CACHE_SLOTS = 256, CACHED_KINDS = [1, 2, 3, 4, 5], CLASS_INSTANCE_SIZE = 4;
 const CLASS_VTABLE = 24, CLASS_ITABLE = 32, METHOD_KIND = 12, METHOD_FLAGS = 20, METHOD_VTABLE_INDEX = 24;
 const METHOD_UNBOUND = 0x7fff0003, METHOD_THROWABLE_INIT = 0x7fff0004, METHOD_HOST_DISPATCH = 64, M_INTERFACE = 32, M_ABSTRACT = 16, NO_SLOT = 0xffffffff;
 const K_NEW = 3, K_IFIELD = 4, K_SFIELD = 5, K_VIRTUAL = 6, K_SUPER = 7, K_DIRECT = 8, K_STATIC = 9, K_INTERFACE = 10, RESOLVE_CODE = 0xffffffff, RESOLVE_WELL_KNOWN = 0xffffff00, UNRESOLVED = 34;
@@ -118,6 +118,8 @@ export function installHostLinking(linker, runtime, { staticValue }) {
     } else if (type === ATOMIC_REFERENCE_ARRAY && !info.isInterface) {   // (7): `atomicArray`, the Object[] its constructor made, as a reference at +8 (the collector traces it) with a state word at +12
       info.instanceSize = 16; info.refs = [8]; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); this.w32(info.address + CLASS_REF_MAP, this.countedList(info.refs));
       this.w32(hostState + HOST_STATE_ATOMIC_ARRAY, info.address); info.memoryProperty = 'atomicArray';
+    } else if (type === ENUM && !info.isInterface) {   // (7): `enumOrdinal` as an Integer's payload; every enum class below it (host or DEX) inherits it, its own fields after it
+      info.instanceSize = 16; this.w32(info.address + CLASS_INSTANCE_SIZE, 16); if (!this.enumOrdinalDeclared) this.w32(hostState + HOST_STATE_ENUM, info.address); info.memoryProperty = 'enumOrdinal';
     } else if (UPDATER_CLASSES.has(type) && !info.isInterface) {   // (7): the updaters' payload: the field's offset and the owner's Class record (atomics.c), written when newUpdater made the updater
       info.instanceSize = UPDATER_BYTES; this.w32(info.address + CLASS_INSTANCE_SIZE, UPDATER_BYTES); this.w32(hostState + HOST_STATE_UPDATERS + 4 * UPDATER_CLASSES.get(type), info.address); info.memoryProperty = 'updater';
     } else if (type === PAINT && !info.isInterface && info.instanceSize === OBJECT_HEADER) {   // (9)
@@ -145,6 +147,11 @@ export function installHostLinking(linker, runtime, { staticValue }) {
   const PAINT_METHODS = new Set(PAINT_NATIVES), dexClass = linker.dexClass;
   linker.dexClass = function (type, cls) {
     const info = dexClass.call(this, type, cls), parent = info.superInfo;
+    // (7) Enum.ordinal() is final, so the ordinal native answers for every record below Enum. A class below Enum that declares ordinal() all the same (Android refuses to link
+    // it; the JavaScript VM would select its method) switches the native off for good: every call goes to the JavaScript VM's routing again.
+    if (!info.isInterface && !this.enumOrdinalDeclared && info.methods.has(ENUM_ORDINAL_METHOD)) {
+      for (let c = parent; c; c = c.superInfo) if (c.type === ENUM) { this.enumOrdinalDeclared = true; this.w32(hostState + HOST_STATE_ENUM, 0); break; }
+    }
     if (parent?.paintRecord && !info.isInterface) {
       info.paintRecord = true;
       let declares = false; for (const nameSig of info.methods.keys()) if (PAINT_METHODS.has(nameSig)) { declares = true; break; }

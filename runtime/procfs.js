@@ -25,10 +25,11 @@
 // - /proc/meminfo: MemTotal, MemFree, MemAvailable (the device's memory and what the app's process does not hold of it, as ActivityManager.getMemoryInfo reports them);
 //   Buffers, Cached, SwapCached, SwapTotal and SwapFree are 0 (the virtual device has no page cache and no swap); the kernel's other counters are left out
 // Anything else under the app's process directory is ENOENT, and the trace says the lab does not model it (once per path).
-import { ZYGOTE_EXECUTABLE } from './virtual-pids.js?v=28012a33f717';
-import { ART_BLOCKED } from './arm64/signals.js?v=28012a33f717';
-import { mountsText, procVersionText, appSecurityContext } from './system-image.js?v=28012a33f717';
-import { processMappings, smapsRollupText, statmText, statusMemoryLines, processMemory, deviceMemory, processCpuMs, PAGE_SIZE } from './process-memory.js?v=28012a33f717';
+import { ZYGOTE_EXECUTABLE } from './virtual-pids.js?v=e0932d3cf1f5';
+import { ART_BLOCKED } from './arm64/signals.js?v=e0932d3cf1f5';
+import { DEVICE_CPUS, ARM64_HWCAP, ARM64_CNTFRQ_HZ, cpuListText, deviceCurrentCpu } from './device-identity.js?v=e0932d3cf1f5';
+import { mountsText, procVersionText, appSecurityContext } from './system-image.js?v=e0932d3cf1f5';
+import { processMappings, smapsRollupText, statmText, statusMemoryLines, processMemory, deviceMemory, processCpuMs, PAGE_SIZE } from './process-memory.js?v=e0932d3cf1f5';
 
 const encoder = new TextEncoder();
 const text = value => encoder.encode(value);
@@ -60,8 +61,25 @@ const signalBits = mask => BigInt.asUintN(64, mask ?? 0n) & 0x7fffffffn;   // do
 export function statLine(f) {
   const fields = [f.pid, `(${f.comm})`, f.state ?? 'R', f.ppid, f.pgrp, f.session, 0, -1, 0, 0, 0, 0, 0, ticks(f.cpuMs), 0, 0, 0, 20 + f.nice, f.nice, f.threads, 0, ticks(f.startMs),
     f.vsize, f.rss, '18446744073709551615', 0, 0, f.startStack ?? 0, 0, 0, signalBits(f.signals?.pending), signalBits(f.signals?.blocked), signalBits(f.signals?.ignored), signalBits(f.signals?.caught),
-    0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    0, 0, 0, 17, deviceCurrentCpu(), 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   return fields.join(' ') + '\n';
+}
+/** The arm64 kernel's names for the AT_HWCAP bits (arch/arm64/kernel/cpuinfo.c hwcap_str, 5.10; bits 0-31). */
+const HWCAP_NAMES = ['fp', 'asimd', 'evtstrm', 'aes', 'pmull', 'sha1', 'sha2', 'crc32', 'atomics', 'fphp', 'asimdhp', 'cpuid', 'asimdrdm', 'jscvt', 'fcma', 'lrcpc', 'dcpop', 'sha3', 'sm3', 'sm4',
+  'asimddp', 'sha512', 'sve', 'asimdfhm', 'dit', 'uscat', 'ilrcpc', 'flagm', 'ssbs', 'sb', 'paca', 'pacg'];
+/**
+ * /proc/cpuinfo as arch/arm64/kernel/cpuinfo.c c_show prints it, one block per online CPU (src/device-identity.js): processor, BogoMIPS (the generic timer's frequency / 500000, as
+ * the arch timer sets loops_per_jiffy: 19.2 MHz -> 38.40), Features (the names of the AT_HWCAP bits the lab's CPU executes, the same value getauxval gives native code) and the
+ * kernel's fixed "CPU architecture: 8". The MIDR fields (CPU implementer, variant, part, revision) are NOT printed: the lab defines no MIDR (the interpreter's ID registers read 0
+ * and AT_HWCAP does not advertise HWCAP_CPUID), and no value is made up for them.
+ */
+export function cpuinfoText(cpus = DEVICE_CPUS) {
+  const features = HWCAP_NAMES.filter((name, bit) => (ARM64_HWCAP >> bit) & 1).join(' '), bogo = ARM64_CNTFRQ_HZ / 500000;
+  return cpus.map(id => `processor\t: ${id}\nBogoMIPS\t: ${bogo.toFixed(2)}\nFeatures\t: ${features}\nCPU architecture: 8\n\n`).join('');
+}
+/** /sys/devices/system/cpu's files (drivers/base/cpu.c, cpulist format): possible, present and online are the device's CPUs, offline is empty. kernel_max (the kernel's NR_CPUS - 1, a build setting the lab has no source for) is not there: ENOENT. */
+export function cpuSysfs(cpus = DEVICE_CPUS) {
+  return { possible: cpuListText(cpus) + '\n', present: cpuListText(cpus) + '\n', online: cpuListText(cpus) + '\n', offline: '\n' };
 }
 /** /proc/meminfo's lines (meminfo_proc_show: the name padded to 16 columns, the kB value right-aligned in 8). */
 export function meminfoText({ total, available }) {
@@ -171,6 +189,12 @@ export function installProcfs(fs, platform) {
   fs.put('/proc/version', { type: 'file', buf: new Uint8Array(0), size: 0, mtime: fs.now(), mode: 0o444, uid: 0, gid: 0, generate: () => fs.procfs.versionText() });
   fs.put('/proc/meminfo', { type: 'file', buf: new Uint8Array(0), size: 0, mtime: fs.now(), mode: 0o444, uid: 0, gid: 0, generate: () => text(meminfoText(deviceMemory(platform.vmRuntime ?? null))) });
   fs.put('/proc/uptime', { type: 'file', buf: new Uint8Array(0), size: 0, mtime: fs.now(), mode: 0o444, uid: 0, gid: 0, generate: () => { const up = (platform.clock?.now() ?? 0) / 1000; return text(`${up.toFixed(2)} 0.00\n`); } });   // the app's /proc/self, /proc/<pid>, /proc/thread-self: read through fs.node / list (its trace lines go to the runtime that attaches)
+  // the CPUs (src/device-identity.js: one source for Java, native code and the programs): /proc/cpuinfo, root:root 0444 like the kernel's; /sys/devices/system/cpu: sysfs directories 0755 and
+  // attribute files 0444, one cpuN directory per CPU (its attributes are not modelled: reading one is ENOENT)
+  fs.put('/proc/cpuinfo', { type: 'file', buf: new Uint8Array(0), size: 0, mtime: fs.now(), mode: 0o444, uid: 0, gid: 0, generate: () => text(cpuinfoText()) });
+  for (const path of ['/sys/devices', '/sys/devices/system', '/sys/devices/system/cpu']) dir(path, 0o755);
+  for (const [name, content] of Object.entries(cpuSysfs())) fs.put(`/sys/devices/system/cpu/${name}`, { type: 'file', buf: new Uint8Array(0), size: 0, mtime: fs.now(), mode: 0o444, uid: 0, gid: 0, generate: () => text(content) });
+  for (const id of DEVICE_CPUS) dir(`/sys/devices/system/cpu/cpu${id}`, 0o755);
   for (const prefix of ['/dev', '/sys', '/proc']) fs.readOnly.add(prefix);
   return fs.procfs;
 }

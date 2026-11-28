@@ -15,14 +15,14 @@
 // What an untrusted_app's processes may not do fails as it fails on a device: no write to the read-only partitions (EROFS), no listing of /data or another app's data
 // (EACCES), no other uid's processes in /proc (hidepid=invisible: ENOENT), no mount, module, reboot, time or hostname changes (EPERM), no relabeling (EACCES).
 // What the lab does not model fails naming it (ENOSYS and a trace line): sockets, inotify, timers.
-import { Blocked, VMThread } from './scheduler.js?v=28012a33f717';
-import { APP_PID, ZYGOTE_PID, INIT_PID } from './virtual-pids.js?v=28012a33f717';
-import { deviceProperty, devicePropertyNames } from './device-identity.js?v=28012a33f717';
-import { ANDROID_IDS } from './android-ids-data.js?v=28012a33f717';
-import { installSystemImage, SEARCH_ONLY, mountOf, mountTable, unameFields, appSecurityContext, IMAGE_TIME_MS } from './system-image.js?v=28012a33f717';
-import { processComm } from './procfs.js?v=28012a33f717';
-import { inode, state as libcoreState } from './libcore-io-native.js?v=28012a33f717';
-import { runForkedChild } from './arm64/processes.js?v=28012a33f717';
+import { Blocked, VMThread } from './scheduler.js?v=e0932d3cf1f5';
+import { APP_PID, ZYGOTE_PID, INIT_PID } from './virtual-pids.js?v=e0932d3cf1f5';
+import { deviceProperty, devicePropertyNames, CPU_MASK_BYTES, cpuMaskBytes, deviceCurrentCpu } from './device-identity.js?v=e0932d3cf1f5';
+import { ANDROID_IDS } from './android-ids-data.js?v=e0932d3cf1f5';
+import { installSystemImage, SEARCH_ONLY, mountOf, mountTable, unameFields, appSecurityContext, IMAGE_TIME_MS } from './system-image.js?v=e0932d3cf1f5';
+import { processComm } from './procfs.js?v=e0932d3cf1f5';
+import { inode, state as libcoreState } from './libcore-io-native.js?v=e0932d3cf1f5';
+import { runForkedChild } from './arm64/processes.js?v=e0932d3cf1f5';
 
 // errno as the programs' C library numbers them (Emscripten's libc uses WASI's numbering; strerror gives the usual text)
 export const E = { ACCES: 2, AFNOSUPPORT: 5, AGAIN: 6, BADF: 8, BUSY: 10, CHILD: 12, EXIST: 20, FAULT: 21, INTR: 27, INVAL: 28, IO: 29, ISDIR: 31, LOOP: 32, MFILE: 33, NAMETOOLONG: 37,
@@ -1002,10 +1002,17 @@ export class ProcessKernel {
         const list = node.label || node.system ? text('security.selinux\0') : new Uint8Array(0);
         if (a[2] === 0) return list.length; if (a[2] < list.length) return -E.RANGE; new Uint8Array(dv().buffer).set(list, a[1]); return list.length;
       }
-      case 118: case 119: case 120: case 121: case 122: case 123: case 125: case 126: case 127: return number === 119 || number === 118 ? -E.PERM : 0;   // sched_*: SCHED_FIFO/RR need CAP_SYS_NICE; getters answer SCHED_OTHER / priority 0
+      case 122: case 123: {   // sched_setaffinity / sched_getaffinity (kernel/sched/core.c): the device's online CPUs (src/device-identity.js); the raw get returns the bytes copied
+        if (!(a[0] === 0 || a[0] === proc.pid || this.processes.has(a[0]))) return -E.SRCH;
+        if (a[1] < CPU_MASK_BYTES || (a[1] & 7)) return -E.INVAL;
+        if (number === 123) { const copied = Math.min(a[1], CPU_MASK_BYTES); new Uint8Array(dv().buffer).set(cpuMaskBytes(copied), a[2]); return copied; }
+        const mask = new Uint8Array(dv().buffer, a[2], a[1]); return cpuMaskBytes(CPU_MASK_BYTES).some((byte, i) => byte & mask[i]) ? 0 : -E.INVAL;
+      }
+      case 118: case 119: case 120: case 121: case 125: case 126: case 127: return number === 119 || number === 118 ? -E.PERM : 0;   // sched_*: SCHED_FIFO/RR need CAP_SYS_NICE; getters answer SCHED_OTHER / priority 0
       case 30: case 31: return number === 31 ? 0 : -E.PERM;   // ioprio_set (a better class needs CAP_SYS_ADMIN) / ioprio_get
       case 117: return -E.PERM;   // ptrace: an untrusted_app's processes may not trace (seccomp and SELinux)
       case 178: return proc.pid;  // gettid
+      case 168: { const v = dv(); if (a[0]) v.setUint32(a[0], deviceCurrentCpu(), true); if (a[1]) v.setUint32(a[1], 0, true); return 0; }   // getcpu(cpu*, node*): the device's one CPU, NUMA node 0
     }
     return unsupported(`system call ${number}`);
   }

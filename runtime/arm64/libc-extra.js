@@ -1,15 +1,16 @@
 // More of bionic for the ARM64 process (src/arm64/libc.js has the core): locales and wide characters as bionic has them (one UTF-8 "C.UTF-8" locale, which
 // libc++ initializes at start-up), time conversion, sorting and searching (comparators run as native code), sscanf, setjmp/longjmp, directories and paths,
 // process limits and identity, and more of libm. Sockets and event-loop primitives (poll, epoll, eventfd) are not here: they fail by name.
-import { APKError } from '../apk-error.js?v=28012a33f717';
-import { formatC, variadic, vaList } from './libc.js?v=28012a33f717';
-import { addSockets } from './sockets.js?v=28012a33f717';
-import { addMoreLibc } from './libc-more.js?v=28012a33f717';
-import { addSyscalls } from './syscalls.js?v=28012a33f717';
-import { addSignals } from './signals.js?v=28012a33f717';
-import { addTimers } from './timers.js?v=28012a33f717';
-import { utf8 } from './text.js?v=28012a33f717';
-import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=28012a33f717';
+import { APKError } from '../apk-error.js?v=e0932d3cf1f5';
+import { CPU_MASK_BYTES, cpuMaskBytes } from '../device-identity.js?v=e0932d3cf1f5';
+import { formatC, variadic, vaList } from './libc.js?v=e0932d3cf1f5';
+import { addSockets } from './sockets.js?v=e0932d3cf1f5';
+import { addMoreLibc } from './libc-more.js?v=e0932d3cf1f5';
+import { addSyscalls } from './syscalls.js?v=e0932d3cf1f5';
+import { addSignals } from './signals.js?v=e0932d3cf1f5';
+import { addTimers } from './timers.js?v=e0932d3cf1f5';
+import { utf8 } from './text.js?v=e0932d3cf1f5';
+import { parseCFloat, roundBinary, bitsToNumber, BINARY32, BINARY64, BINARY128 } from './strtod.js?v=e0932d3cf1f5';
 
 const ENOENT = 2, EINVAL = 22, ENOTDIR = 20, EEXIST = 17;
 const decoder = utf8, encoder = new TextEncoder();
@@ -216,7 +217,26 @@ export function extendLibc(lib, { runtime, fs = () => null, clock = () => Date.n
   lib.getrlimit = lib.getrlimit64 = (p, c) => { p.memory.write64(n(c, 1), 0xffffffffffffffffn); p.memory.write64(n(c, 1) + 8, 0xffffffffffffffffn); return 0; };
   lib.setrlimit = lib.setrlimit64 = lib.prlimit = lib.prlimit64 = () => 0;
   lib.getrusage = (p, c) => { p.memory.fill(n(c, 1), 0, 144); return 0; };
-  lib.getpriority = () => 0; lib.sched_setaffinity = lib.sched_getaffinity = () => 0;
+  lib.getpriority = () => 0;
+  // sched_getaffinity / sched_setaffinity (kernel/sched/core.c; bionic's wrappers): the mask is whole 64-bit words, at least cpumask_size() bytes and a multiple of 8 (EINVAL otherwise);
+  // `pid` 0, this process or one of its threads (ESRCH otherwise). get copies the device's online CPUs (src/device-identity.js) and the raw call returns the bytes copied, bionic's
+  // wrapper zeroes the rest and returns 0; set needs at least one online CPU in the mask (EINVAL), and with one CPU the affinity cannot change.
+  const ESRCH_ = 3, ownTask = (p, pid) => pid === 0 || pid === runtime?.platform?.virtualProcess?.pid || p.threads?.threads?.has(pid);
+  const affinityArgs = (p, c) => { const pid = s32(c, 0), size = n(c, 1); return !ownTask(p, pid) ? ESRCH_ : size < CPU_MASK_BYTES || size & 7 ? EINVAL : 0; };
+  lib.__sched_getaffinity = (p, c) => {
+    const bad = affinityArgs(p, c); if (bad) return setErrno(p, bad);
+    const size = n(c, 1), copied = Math.min(size, CPU_MASK_BYTES); p.memory.copyIn(n(c, 2), cpuMaskBytes(copied)); return BigInt(copied);
+  };
+  lib.sched_getaffinity = (p, c) => {
+    const size = n(c, 1), result = lib.__sched_getaffinity(p, c); if (result === 0xffffffffffffffffn) return result;
+    if (size > Number(result)) p.memory.copyIn(n(c, 2) + Number(result), new Uint8Array(size - Number(result)));   // bionic: memset((char*) set + rc, 0, size - rc)
+    return 0;
+  };
+  lib.sched_setaffinity = (p, c) => {
+    const bad = affinityArgs(p, c); if (bad) return setErrno(p, bad);
+    const mask = p.memory.bytes(n(c, 2), n(c, 1)), online = cpuMaskBytes(CPU_MASK_BYTES);
+    return online.some((byte, i) => byte & mask[i]) ? 0 : setErrno(p, EINVAL);
+  };
   lib.sched_get_priority_max = () => 99; lib.sched_get_priority_min = () => 1; lib.pthread_getschedparam = lib.pthread_attr_getschedparam = (p, c) => { if (n(c, 2)) p.memory.writeU32(n(c, 2), 0); return 0; };
   lib.pthread_attr_getguardsize = (p, c) => { p.memory.write64(n(c, 1), 4096n); return 0; };
   lib.sigaltstack = (p, c) => {   // the calling thread's alternate signal stack (stack_t: ss_sp, ss_flags, ss_size); bionic installs one per thread (src/arm64/threads.js selfOf). No signal is delivered here, so it is state only

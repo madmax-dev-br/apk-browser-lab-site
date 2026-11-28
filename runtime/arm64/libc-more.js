@@ -1,13 +1,14 @@
 // A further part of bionic for the ARM64 process (src/arm64/libc.js, libc-extra.js): stdio data pointers, POSIX semaphores, vectored I/O, stream helpers, string
 // helpers, time parsing, network-interface queries, floating-point environment and the *_chk wrappers. fork, POSIX
 // timers and inotify are not provided by the lab and fail by name.
-import { deviceMemory, bootUptimeMs } from '../process-memory.js?v=28012a33f717';
-import { APKError } from '../apk-error.js?v=28012a33f717';
-import { BLOCKED } from './cpu.js?v=28012a33f717';
-import { formatC, variadic } from './libc.js?v=28012a33f717';
-import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=28012a33f717';
-import { restrictedNetlink } from './netlink.js?v=28012a33f717';
-import { utf8 } from './text.js?v=28012a33f717';
+import { deviceMemory, bootUptimeMs } from '../process-memory.js?v=e0932d3cf1f5';
+import { APKError } from '../apk-error.js?v=e0932d3cf1f5';
+import { DEVICE_CPU_COUNT, deviceCurrentCpu } from '../device-identity.js?v=e0932d3cf1f5';
+import { BLOCKED } from './cpu.js?v=e0932d3cf1f5';
+import { formatC, variadic } from './libc.js?v=e0932d3cf1f5';
+import { lookup, deviceInterfaces } from '../libcore-io-native.js?v=e0932d3cf1f5';
+import { restrictedNetlink } from './netlink.js?v=e0932d3cf1f5';
+import { utf8 } from './text.js?v=e0932d3cf1f5';
 
 export function addMoreLibc(lib, { runtime } = {}) {
   const x = (c, i) => c.x[i], n = (c, i) => Number(c.x[i]), s32 = (c, i) => Number(BigInt.asIntN(32, c.x[i]));
@@ -101,7 +102,9 @@ export function addMoreLibc(lib, { runtime } = {}) {
   lib.ilogb = (p, c) => { const v = Math.abs(c.getD(0)); return v === 0 ? 0x80000000n : BigInt(Math.floor(Math.log2(v))); }; lib.ilogbf = (p, c) => { const v = Math.abs(c.getS(0)); return v === 0 ? 0x80000000n : BigInt(Math.floor(Math.log2(v))); };
   lib.logb = (p, c) => ({ double: Math.floor(Math.log2(Math.abs(c.getD(0)))) });
   // ---- process, scheduling, files
-  lib.sched_getcpu = () => 0; lib.pthread_gettid_np = (p, c) => p.threads.byPthread(n(c, 0))?.tid ?? -1; lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
+  lib.sched_getcpu = () => deviceCurrentCpu();   // one CPU (src/device-identity.js)
+  lib.get_nprocs = lib.get_nprocs_conf = () => DEVICE_CPU_COUNT;   // bionic reads /sys/devices/system/cpu/online and /possible, which src/procfs.js generates from the same count
+   lib.pthread_gettid_np = (p, c) => p.threads.byPthread(n(c, 0))?.tid ?? -1; lib.pthread_attr_setscope = lib.pthread_attr_setguardsize = lib.sched_getscheduler = lib.sched_getparam = () => 0; lib.nice = () => 0; lib.setsid = () => 1; lib.setpgid = () => 0;
   lib.__libc_current_sigrtmin = () => 34; lib.__libc_current_sigrtmax = () => 64;
   lib.sigwait = () => 0;   // the sigset_t functions, sigaction64 and sigprocmask64: src/arm64/signals.js
   lib.posix_fadvise = lib.mlock = lib.munlock = () => 0;   // mincore: src/arm64/libc.js (residency of mapped pages)

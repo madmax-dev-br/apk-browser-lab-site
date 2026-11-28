@@ -1,10 +1,11 @@
-import { gcRoot } from './heap-gc.js?v=28012a33f717';
-import { APKError } from './apk-error.js?v=28012a33f717';
-import { createHostRegistry } from './host-contract.js?v=28012a33f717';
-import { getVectorGraphics } from './vector-native.js?v=28012a33f717';
-import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=28012a33f717';
-import { createBitmapOps } from './bitmap-ops-host.js?v=28012a33f717';
-import { encodeOpaqueStoredPng } from './png-store.js?v=28012a33f717';
+import { gcRoot } from './heap-gc.js?v=e0932d3cf1f5';
+import { APKError } from './apk-error.js?v=e0932d3cf1f5';
+import { createHostRegistry } from './host-contract.js?v=e0932d3cf1f5';
+import { getVectorGraphics } from './vector-native.js?v=e0932d3cf1f5';
+import { jpegNativeScale, sampledDimension, samplePixels } from './image-codecs.js?v=e0932d3cf1f5';
+import { createBitmapOps } from './bitmap-ops-host.js?v=e0932d3cf1f5';
+import { encodeOpaqueStoredPng } from './png-store.js?v=e0932d3cf1f5';
+import { requireBitmapExtent } from './bitmap-extent.js?v=e0932d3cf1f5';
 
 // android.graphics.BitmapFactory (+ Options), Bitmap.CompressFormat and the Bitmap operations on top of the recorded-canvas Bitmap of bitmap-host.js: decoding PNG/JPEG/GIF/WebP/BMP
 // with the official Skia codecs (CanvasKit), inSampleSize / density scaling / inJustDecodeBounds / inBitmap reuse as in frameworks/base BitmapFactory.cpp, pixel access
@@ -145,7 +146,7 @@ export function createBitmapCodecHost(platform) {
       const outConfig = hardware ? o.inPreferredConfig : host.enumValue(CONFIG, host.CONFIGS, decoded);
       writeOptions(r, optionsRef, [['outWidth', 'I', scaledWidth], ['outHeight', 'I', scaledHeight], ['outMimeType', STRING, mime], ['outConfig', CONFIG, outConfig]]);
       if (o.justBounds) return null;
-      if (scaledWidth > 4096 || scaledHeight > 4096 || scaledWidth * scaledHeight > 4 * 1024 * 1024) fail(`Decoded image ${scaledWidth}x${scaledHeight} exceeds the VM bitmap limit (4096px/4Mpixel); use inSampleSize to decode a smaller version`, { width: scaledWidth, height: scaledHeight });
+      requireBitmapExtent(r, scaledWidth, scaledHeight, decoded === 'RGBA_F16' ? 8 : decoded === 'RGB_565' ? 2 : 4, message => fail(message, { width: scaledWidth, height: scaledHeight }));   // as on Android: any size that fits (src/bitmap-extent.js)
       // the pixels: the encoded PNG itself when no resampling is needed, otherwise a Skia rendering at the output size
       let png = mime === 'image/png' && !lab && scaledWidth === image.width() && scaledHeight === image.height() ? bytes : null;
       const encodedHere = png === null;   // the PNG below is Skia's encoding of N32 sRGB pixels (not the file's own bytes): for an opaque image, bitmap-host's plainRaster may use it as the bitmap's raster

@@ -6,9 +6,10 @@
 // entry (a libc or JNI function the lab provides, src/arm64/libc.js, src/arm64/jni.js; code reaches it through the 16-byte stub src/arm64/process.js gives each one): branching there calls the JavaScript body with the AAPCS64 argument
 // registers and returns to X30. An encoding this interpreter does not implement stops the run with an Arm64Unsupported error naming the encoding: nothing is
 // emulated by approximation.
-import { APKError } from '../apk-error.js?v=28012a33f717';
-import { executeNeon } from './neon.js?v=28012a33f717';
-import { DecodeCache } from './decode-cache.js?v=28012a33f717';
+import { APKError } from '../apk-error.js?v=e0932d3cf1f5';
+import { ARM64_CNTFRQ_HZ } from '../device-identity.js?v=e0932d3cf1f5';
+import { executeNeon } from './neon.js?v=e0932d3cf1f5';
+import { DecodeCache } from './decode-cache.js?v=e0932d3cf1f5';
 
 export const M64 = (1n << 64n) - 1n, M32 = 0xffffffffn;
 export const HOST_BASE = 0x7f0000000000;   // host entries: HOST_BASE + 16 * index (never mapped memory)
@@ -271,7 +272,7 @@ export class Arm64Cpu {
       if (key === '3.3.4.4.0') { if (l) this.w(rt, this.fpcr); else this.fpcr = this.r(rt); return; }      // FPCR
       if (key === '3.3.4.4.1') { if (l) this.w(rt, this.fpsr); else this.fpsr = this.r(rt); return; }      // FPSR
       if (key === '3.3.14.0.2' && l) { this.w(rt, BigInt(Math.floor(performance.now() * 19200)) & M64); return; }   // CNTVCT_EL0 at 19.2 MHz
-      if (key === '3.3.14.0.0' && l) { this.w(rt, 19200000n); return; }                                           // CNTFRQ_EL0
+      if (key === '3.3.14.0.0' && l) { this.w(rt, BigInt(ARM64_CNTFRQ_HZ)); return; }                                           // CNTFRQ_EL0
       if (key === '3.3.0.0.7' && l) { this.w(rt, 0x0004n << 16n | 4n); return; }                                  // DCZID_EL0: DC ZVA permitted, 64-byte blocks
       if (key === '3.3.0.0.1' && l) { this.w(rt, 0x8444c004n); return; }                                         // CTR_EL0: 64-byte lines
       if (op0 === 3 && op1 === 0 && crn === 0 && l) { this.w(rt, 0n); return; }                                   // ID_* registers read from EL0 (as the kernel emulates them: no optional features)

@@ -1,42 +1,43 @@
-import { procFdFile } from './libcore-io-native.js?v=28012a33f717';
-import STATIC_SHIMS from './shim-static-methods.js?v=28012a33f717';
-import { VMClock } from './vm-clock.js?v=28012a33f717';
-import { hookCall, RUN_BODY } from './method-overrides.js?v=28012a33f717';
-import { OperationMonitor } from './operation-monitor.js?v=28012a33f717';
-import { ExecutionProfile } from './execution-profile.js?v=28012a33f717';
-import { SamplingProfiler } from './sampling-profiler.js?v=28012a33f717';
-import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=28012a33f717';
-import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=28012a33f717';
-import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=28012a33f717';
-import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=28012a33f717';
-import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=28012a33f717';
-import { unicodeNumericValue } from './unicode-numeric-data.js?v=28012a33f717';
-import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=28012a33f717';
-import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=28012a33f717';
-import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=28012a33f717';
-import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=28012a33f717';
-import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=28012a33f717';
-import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=28012a33f717';
-import { APKError } from './apk-error.js?v=28012a33f717';
-import { invokePolymorphic } from './method-handles.js?v=28012a33f717';
-import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=28012a33f717';
-import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=28012a33f717';
-import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=28012a33f717';
-import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=28012a33f717';
-import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=28012a33f717';
-import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=28012a33f717';
-import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=28012a33f717';
-import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=28012a33f717';
+import { procFdFile } from './libcore-io-native.js?v=e0932d3cf1f5';
+import STATIC_SHIMS from './shim-static-methods.js?v=e0932d3cf1f5';
+import { VMClock } from './vm-clock.js?v=e0932d3cf1f5';
+import { hookCall, RUN_BODY } from './method-overrides.js?v=e0932d3cf1f5';
+import { OperationMonitor } from './operation-monitor.js?v=e0932d3cf1f5';
+import { ExecutionProfile } from './execution-profile.js?v=e0932d3cf1f5';
+import { SamplingProfiler } from './sampling-profiler.js?v=e0932d3cf1f5';
+import { PROTECTED_NATIVE_LIBRARY } from './protected-native.js?v=e0932d3cf1f5';
+import { annotationHash, annotationEquals, annotationToString } from './annotation-proxy.js?v=e0932d3cf1f5';
+import { charsetRegistryCreation, charsetRegistryRegistration } from './charset-native.js?v=e0932d3cf1f5';
+import { canonicalCharset, decodeBytes, encodeString, SUPPORTED_CODECS } from './string-codec.js?v=e0932d3cf1f5';
+import { androidCharacterDirectionality } from './unicode-bidi-data.js?v=e0932d3cf1f5';
+import { unicodeNumericValue } from './unicode-numeric-data.js?v=e0932d3cf1f5';
+import { textLayoutRegistryBridge, TEXT_LAYOUT_CLEANER } from './text-layout-native.js?v=e0932d3cf1f5';
+import { ICU_BREAK, ICU_BREAK_INSTANCE, ICU_BREAK_KEYS, invokeICUBreak } from './icu-break-host.js?v=e0932d3cf1f5';
+import { COLOR_FILTER_CLEANER, colorFilterRegistryBridge } from './color-filter-native.js?v=e0932d3cf1f5';
+import { RENDER_NODE_CLEANER, renderNodeRegistryBridge } from './rendernode-native.js?v=e0932d3cf1f5';
+import { HARDWARE_BUFFER_CLEANER, hardwareBufferRegistryBridge } from './hardware-buffer-native.js?v=e0932d3cf1f5';
+import { REGEX_CLEANER, regexRegistryBridge } from './regex-native.js?v=e0932d3cf1f5';
+import { APKError } from './apk-error.js?v=e0932d3cf1f5';
+import { invokePolymorphic } from './method-handles.js?v=e0932d3cf1f5';
+import { newCells, cellsFrom, copyCells, unsignedBytes, ELEMENT_BYTES, NO_FIELDS } from './java-arrays.js?v=e0932d3cf1f5';
+import { ObjectRecord, Shape, EMPTY_SHAPE, EMPTY_SLOTS } from './object-shapes.js?v=e0932d3cf1f5';
+import { collectGarbage, collectionDue, collectionKind, auditGeneration, heapCensus, freedBy, cellsOf, gcBlockReason, directFrames } from './heap-gc.js?v=e0932d3cf1f5';
+import { constantField, constantFields, nonConstantField, knownClass } from './framework-constants.js?v=e0932d3cf1f5';
+import { FAST_PATHS, FALLTHROUGH } from './io-fast-paths.js?v=e0932d3cf1f5';
+import { TimeBreakdown, BUCKET } from './time-breakdown.js?v=e0932d3cf1f5';
+import { hiddenReflection, hiddenFields, hiddenMethods, hiddenStatic, isTabled, ACCESSORS as HIDDEN_ACCESSORS } from './hidden-members.js?v=e0932d3cf1f5';
+import { PendingCall, Invoke, runNested, runSlice, bindSupport, currentThread, JIT_THRESHOLD, JIT_LOOPS, T2_THRESHOLD, foldDirectCalls } from './interpreter.js?v=e0932d3cf1f5';
 const TIER2 = globalThis.process?.env?.APKWEB_TIER2 === '1';   // the direct compiled form (interpreter.js, "Direct form"): an experiment, off unless APKWEB_TIER2=1 (Node) or runtime.tier2 = true with a runtime.t2Threshold (docs/INTERACTION-PERFORMANCE.md, section 9)
-import { Scheduler, Blocked } from './scheduler.js?v=28012a33f717';
-import { ProcessStartPending } from './package-registry.js?v=28012a33f717';
-import { bootClassLacksMember } from './boot-class-members.js?v=28012a33f717';
-export { APKError } from './apk-error.js?v=28012a33f717';
-import { BinaryReader } from './binary-reader.js?v=28012a33f717';
-import { recordCollection } from './runtime-stats.js?v=28012a33f717';
-import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=28012a33f717';
-import { scrollsItself } from './scrolling-view.js?v=28012a33f717';
-import { drawsItself } from './pointer-input-host.js?v=28012a33f717';
+import { Scheduler, Blocked } from './scheduler.js?v=e0932d3cf1f5';
+import { ProcessStartPending } from './package-registry.js?v=e0932d3cf1f5';
+import { bootClassLacksMember } from './boot-class-members.js?v=e0932d3cf1f5';
+export { APKError } from './apk-error.js?v=e0932d3cf1f5';
+import { BinaryReader } from './binary-reader.js?v=e0932d3cf1f5';
+import { recordCollection } from './runtime-stats.js?v=e0932d3cf1f5';
+import { isComposeOwner, COMPOSE_OWNER_NAME } from './compose-owner.js?v=e0932d3cf1f5';
+import { scrollsItself } from './scrolling-view.js?v=e0932d3cf1f5';
+import { drawsItself } from './pointer-input-host.js?v=e0932d3cf1f5';
+import { DEVICE_CPU_COUNT } from './device-identity.js?v=e0932d3cf1f5';
 export { BinaryReader };
 
 /* A bounded, local DEX interpreter. Android callbacks execute their original instructions. */
@@ -3557,7 +3558,7 @@ export class APKRuntime {
       }
     }
     if (method.owner === 'Ljava/lang/Runtime;' && name === 'getRuntime') return this.runtimeObject ??= this.makeObject(method.owner);
-    if (method.owner === 'Ljava/lang/Runtime;' && name === 'availableProcessors') { this.object(args[0]); return 1; } // One logical CPU in the explicit single-thread VM device profile.
+    if (method.owner === 'Ljava/lang/Runtime;' && name === 'availableProcessors') { this.object(args[0]); return DEVICE_CPU_COUNT; } // ART: sysconf(_SC_NPROCESSORS_CONF); the device's one CPU (src/device-identity.js)
     if (method.owner === 'Ljava/lang/Math;') {
       if(name==='rint'){
         const value=doubleNumber(args[0]);if(!Number.isFinite(value)||value===0)return args[0];

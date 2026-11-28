@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=28012a33f717';
-import { APKError } from './apk-error.js?v=28012a33f717';
+import { createHostRegistry } from './host-contract.js?v=e0932d3cf1f5';
+import { APKError } from './apk-error.js?v=e0932d3cf1f5';
 
 // android.content.ContentResolver (android-13.0.0_r1 ContentResolver.java) and the default bodies of android.content.ContentProvider for the virtual device. The device has one package, so a
 // content authority resolves to a provider this app declares and installed at start (ActivityThread.installContentProviders); the ContentResolver calls it directly on the calling thread, which is what

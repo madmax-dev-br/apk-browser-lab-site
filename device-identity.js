@@ -4,12 +4,43 @@
 // (the ABIs the device really runs), as a 32-bit image and a 64-bit one of the same build differ.
 // android.os.Build reads its fields from these properties as Build.java does (src/build-host.js); Java's SystemProperties and native code read the same table
 // (src/framework-provider.js, src/arm64/glue.js), so every reader sees one device.
-import { DEVICE_IDENTITY_TAG, DEVICE_IDENTITY_PROPERTIES, DEVICE_IDENTITY_ABI_PROPERTIES, FINGERPRINT_PARTS, BUILD_FIELD_PROPERTIES, VARIANT_RULES, RELEASE_TAG_CHANGES, LAB_PLATFORM_CERTIFICATE_SHA256 } from './device-identity-data.js?v=28012a33f717';
+import { DEVICE_IDENTITY_TAG, DEVICE_IDENTITY_PROPERTIES, DEVICE_IDENTITY_ABI_PROPERTIES, FINGERPRINT_PARTS, BUILD_FIELD_PROPERTIES, VARIANT_RULES, RELEASE_TAG_CHANGES, LAB_PLATFORM_CERTIFICATE_SHA256 } from './device-identity-data.js?v=e0932d3cf1f5';
 
 export { BUILD_FIELD_PROPERTIES, FINGERPRINT_PARTS, LAB_PLATFORM_CERTIFICATE_SHA256 };
 export const IDENTITY_PROPERTIES = new Map(DEVICE_IDENTITY_PROPERTIES);
 const ABI = { default: new Map(DEVICE_IDENTITY_ABI_PROPERTIES.default), arm64: new Map(DEVICE_IDENTITY_ABI_PROPERTIES.arm64) };
 export const ABI_PROPERTY_NAMES = Object.freeze([...new Set([...ABI.default.keys(), ...ABI.arm64.keys()])]);
+
+// ---- The device's CPUs (one source for every reader) --------------------------------------------------------------------------------------------------------------
+// The lab runs every thread, Java and native, as a green thread inside one Worker, so the device has ONE CPU, the same for every app (no setting, no per-app value). Everything
+// that reports a CPU count or set reads it from here: Runtime.availableProcessors() (ART: sysconf(_SC_NPROCESSORS_CONF)), Os.sysconf, the ARM64 libc (sysconf, get_nprocs,
+// get_nprocs_conf, sched_getaffinity, sched_getcpu, getcpu), the process kernel (the programs' sched_getaffinity, so toybox nproc), /proc/self/stat's processor field,
+// /proc/cpuinfo and /sys/devices/system/cpu (src/procfs.js). Possible, present and online are the same set.
+export const DEVICE_CPU_COUNT = 1;
+export const DEVICE_CPUS = Object.freeze(Array.from({ length: DEVICE_CPU_COUNT }, (_, id) => id));
+/** The CPU every thread of the VM is running on (sched_getcpu, getcpu, /proc/<pid>/stat's processor): the first online one, as there is only the one. */
+export const deviceCurrentCpu = () => DEVICE_CPUS[0];
+/** A CPU set as the kernel prints cpulists (lib/vsprintf.c bitmap_list_string, drivers/base/cpu.c): "0", "0-3", "0,2-3". */
+export function cpuListText(cpus = DEVICE_CPUS) {
+  const ranges = []; let start = null, prev = null;
+  for (const id of [...cpus].sort((a, b) => a - b)) {
+    if (prev !== null && id === prev + 1) { prev = id; continue; }
+    if (start !== null) ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+    start = prev = id;
+  }
+  if (start !== null) ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(',');
+}
+/** The kernel's cpumask_size: a CPU mask is whole 64-bit words (arm64, nr_cpu_ids = the device's CPU count), the smallest buffer sched_getaffinity accepts. */
+export const CPU_MASK_BYTES = Math.ceil(DEVICE_CPU_COUNT / 64) * 8;
+/** The online CPUs as the bytes sched_getaffinity copies out (little-endian bit i = CPU i), `size` bytes long. */
+export function cpuMaskBytes(size = CPU_MASK_BYTES, cpus = DEVICE_CPUS) {
+  const out = new Uint8Array(size); for (const id of cpus) if (id >> 3 < size) out[id >> 3] |= 1 << (id & 7); return out;
+}
+/** The hardware capabilities the lab's CPU (the ARM64 interpreter, src/arm64/cpu.js) executes, as AT_HWCAP: fp (bit 0), asimd (bit 1), atomics (bit 8, LSE). */
+export const ARM64_HWCAP = 0x103;
+/** CNTFRQ_EL0 of the interpreter (the generic timer's frequency): 19.2 MHz. */
+export const ARM64_CNTFRQ_HZ = 19200000;
 
 /** The ABI configuration of a runtime (or of `{ arm64 }`): "arm64" when the ARM64 interpreter option is on, else "default". */
 export const abiConfiguration = source => (source?.arm64 ? 'arm64' : 'default');

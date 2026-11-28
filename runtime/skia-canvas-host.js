@@ -1,20 +1,21 @@
-import {APKError} from './apk-runtime.js?v=28012a33f717';
-import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=28012a33f717';
-import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=28012a33f717';
-import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=28012a33f717';
-import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=28012a33f717';
-import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=28012a33f717';
-import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=28012a33f717';
-import {makeSkiaColorFilter} from './color-filter-native.js?v=28012a33f717';
-import {createBitmapHost} from './bitmap-host.js?v=28012a33f717';
-import { gcRoot } from './heap-gc.js?v=28012a33f717';
-import {sha256Hex} from './sha256-sync.js?v=28012a33f717';
-import {colorLongToArgb} from './color-long.js?v=28012a33f717';
-import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=28012a33f717';
-import {GpuRasterError,bitmapRasterUsable,SHARED_MAX} from './gpu-raster.js?v=28012a33f717';
-import {renderNodeByHandle} from './rendernode-native.js?v=28012a33f717';
-import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=28012a33f717';
-import {BUCKET} from './time-breakdown.js?v=28012a33f717';
+import {APKError} from './apk-runtime.js?v=e0932d3cf1f5';
+import {getVectorGraphics,preConcatCanvasMatrix} from './vector-native.js?v=e0932d3cf1f5';
+import {getSolidPaint,getPaintState,pushPaintState} from './paint-host.js?v=e0932d3cf1f5';
+import {createMatrixAllocationHost,getMatrixValues} from './matrix-native.js?v=e0932d3cf1f5';
+import {measureSkiaRun,measureSkiaRunAdvances,measureSkiaTextBounds,drawSkiaTextRun,measureSkiaShapedText,disposeShapedRuns,parseFontFeatureSettings} from './skia-paragraph.js?v=e0932d3cf1f5';
+import {DEFAULT_SYSTEM_FAMILY,systemFamilyOf} from './system-fonts.js?v=e0932d3cf1f5';
+import {getRenderNodeSnapshot,renderNodeShadowCaster,renderLightInfo,renderNodeStretchMatrix} from './rendernode-native.js?v=e0932d3cf1f5';
+import {makeSkiaColorFilter} from './color-filter-native.js?v=e0932d3cf1f5';
+import {createBitmapHost} from './bitmap-host.js?v=e0932d3cf1f5';
+import { gcRoot } from './heap-gc.js?v=e0932d3cf1f5';
+import {sha256Hex} from './sha256-sync.js?v=e0932d3cf1f5';
+import {colorLongToArgb} from './color-long.js?v=e0932d3cf1f5';
+import {sfntMember,sfntAxes,sfntStyle,sfntBounds} from './sfnt.js?v=e0932d3cf1f5';
+import {GpuRasterError,bitmapRasterUsable,SHARED_MAX} from './gpu-raster.js?v=e0932d3cf1f5';
+import {renderNodeByHandle} from './rendernode-native.js?v=e0932d3cf1f5';
+import {transformPaint,transformColor,transformColorInverse,bitmapPalette,fillColorsPalette,bitmapShouldInvert,invertLightnessPixels,invertLightnessColor,nodeTransform} from './force-dark.js?v=e0932d3cf1f5';
+import {BUCKET} from './time-breakdown.js?v=e0932d3cf1f5';
+import { bitmapExtentProblem } from './bitmap-extent.js?v=e0932d3cf1f5';
 const PATH='Landroid/graphics/Path;',CANVAS='Landroid/graphics/Canvas;';
 const bits=new DataView(new ArrayBuffer(4));const number=n=>{bits.setInt32(0,n,true);return bits.getFloat32(0,true);};
 const fail=message=>{throw new APKError(message,{kind:'skia-backend-unsupported'});};
@@ -450,7 +451,7 @@ function rasterizeSkiaCanvasGpu(runtime,backend,graphics,receiver,width,height,o
  return result;
 }
 function rasterizeSkiaCanvasUncached(runtime,backend,graphics,receiver,width,height,options={}){
- if(!(Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0&&width<=4096&&height<=4096&&width*height<=4*1024*1024))fail('Skia raster extent exceeds4096px/4Mpixel VM limit');
+ {const problem=bitmapExtentProblem(width,height,4);if(problem)fail(`Skia raster: ${problem}`);}   // the raster of a bitmap or a View: as large as Android allows a bitmap (src/bitmap-extent.js)
  // options.scale (0 < scale < 1): the same recording replayed on a surface of round(width*scale) x round(height*scale) pixels (progressive raster while the screen is moving, src/compose-canvas-host.js
  // setContentRaster); the page stretches the smaller bitmap over the View's box. Pixel read-backs (Bitmap.getPixel) and typed surfaces are never scaled: they are the bitmap's own memory.
  const scale=options?.scale??1;if(!(Number.isFinite(scale)&&scale>0&&scale<=1))fail('Skia raster scale must be in (0, 1]');if(scale!==1&&(options?.pixels||options?.surfaceType))fail('Skia raster scale applies to display rasters only');

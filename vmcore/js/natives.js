@@ -40,6 +40,12 @@ export const NATIVE_KEYS = [
   ...new Array(5).fill(null),    // AtomicReferenceArray: length, get, set (lazySet), getAndSet, compareAndSet (weakCompareAndSet) over the array payload (ARRAY_FIRST)
   ...new Array(29).fill(null),   // AtomicInteger, AtomicLong, AtomicBoolean, AtomicReference over their payloads (ATOMICS_FIRST, ATOMIC_OPERATIONS)
   null,   // bound by bridge: Boolean.valueOf(boolean) over HostState.booleanBox (BOOLEAN_VALUE_OF)
+  // java.lang methods a decoding loop calls once per token (vmcore/test/jdk-natives-bench.mjs)
+  `${STRING}->indexOf(II)I`,
+  null,   // bound by bridge: Enum.ordinal() over the ordinal payload (ENUM_ORDINAL)
+  `${STRING}->equalsIgnoreCase(Ljava/lang/String;)Z`,   // what ASCII decides; the rest deferred to the bridge
+  null,   // bound by bridge: Integer.doubleValue() over the box payload
+  null,   // bound by bridge: Arrays.copyOf(Object[], int)
 ];
 const BRIDGE_FIRST = NATIVE_KEYS.indexOf(`${STRING}-><init>([CII)V`) + 1;   // natives.h NATIVE_BOX_VALUE_OF_B
 const IDENTITY_FIRST = NATIVE_KEYS.indexOf('Ljava/lang/Integer;->hashCode(I)I') + 1;   // natives.h NATIVE_THREAD_CURRENT
@@ -85,6 +91,8 @@ const ATOMIC_OPERATIONS = (() => {
     ...basic(ATOMIC_REFERENCE, 'Ljava/lang/Object;', ['set', 'getAndSet', 'cas'])];
 })();
 const BOOLEAN_VALUE_OF = ATOMICS_FIRST + ATOMIC_OPERATIONS.length;   // natives.h NATIVE_BOOLEAN_VALUE_OF
+const ENUM_ORDINAL = NATIVE_KEYS.indexOf(`${STRING}->indexOf(II)I`) + 1;   // natives.h NATIVE_ENUM_ORDINAL
+export const ENUM = 'Ljava/lang/Enum;', ENUM_ORDINAL_METHOD = 'ordinal()I';
 export const THREAD = 'Ljava/lang/Thread;', CURRENT_THREAD_KEY = `${THREAD}->currentThread()${THREAD}`, THREAD_GET_ID_KEY = `${THREAD}->getId()J`;
 /** The java.lang box classes by kind (natives.h BOX_*: Z B S C I J F D). */
 export const BOX_CLASSES = ['Ljava/lang/Boolean;', 'Ljava/lang/Byte;', 'Ljava/lang/Short;', 'Ljava/lang/Character;', 'Ljava/lang/Integer;', 'Ljava/lang/Long;', 'Ljava/lang/Float;', 'Ljava/lang/Double;'];
@@ -129,6 +137,13 @@ export const BRIDGE_NATIVES = new Map([
   ...ATOMIC_OPERATIONS.flatMap(([owner, type, names, params, result], id) => names.map(name => [`${owner}->${name}(${params.replaceAll('T', type)})${result.replace('T', type)}`, { id: ATOMICS_FIRST + id, anyReceiver: true }])),
   // Boolean.valueOf(boolean): the host's TRUE or FALSE record (host-bridge.js fills HostState.booleanBox when boxPrimitive('Z') answers it)
   ['Ljava/lang/Boolean;->valueOf(Z)Ljava/lang/Boolean;', { id: BOOLEAN_VALUE_OF }],
+  // Enum's own ordinal bridge (`enumOrdinal`) over the ordinal payload every record below java.lang.Enum carries (host-linking.js); the native checks the receiver's class and
+  // the payload's state itself. ordinal() is final: no class below Enum has another (one that declares it switches the native off, host-linking.js)
+  [`${ENUM}->${ENUM_ORDINAL_METHOD}`, { id: ENUM_ORDINAL, anyReceiver: true }],
+  // the Number conversions' bridge of Integer.doubleValue (src/system-services-host.js) over the box payload: a final box class's own record
+  ['Ljava/lang/Integer;->doubleValue()D', { id: ENUM_ORDINAL + 2 }],
+  // the bridge of Arrays.copyOf(Object[], int) (a static call: java.util.Arrays is in the boot DEX without this method)
+  ['Ljava/util/Arrays;->copyOf([Ljava/lang/Object;I)[Ljava/lang/Object;', { id: ENUM_ORDINAL + 3 }],
   // the paint host's own bridges (src/paint-host.js) over the Paint record's payload; the natives check the receiver's class flag and the payload's state themselves (paint.h)
   // `superCalls`: also a super call's host-method record (TextPaint.set's super.set(Paint)): its target is Paint's own method whatever the receiver (paint.h)
   ...PAINT_NATIVES.map((method, i) => [`${PAINT}->${method}`, { id: PAINT_FIRST + i, anyReceiver: true, superCalls: true }]),

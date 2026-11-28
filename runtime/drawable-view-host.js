@@ -1,11 +1,12 @@
-import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=28012a33f717';
-import { APKError } from './apk-runtime.js?v=28012a33f717';
-import { getVectorGraphics } from './vector-native.js?v=28012a33f717';
-import { deferRaster } from './deferred-raster.js?v=28012a33f717';
-import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=28012a33f717';
-import { createSwitchWidgetHost } from './switch-widget-host.js?v=28012a33f717';
-import { createForceDarkHost } from './force-dark-host.js?v=28012a33f717';
-import { renderNodeByHandle } from './rendernode-native.js?v=28012a33f717';
+import {prepareCpuAnimatedVector} from './animated-vector-native.js?v=e0932d3cf1f5';
+import { APKError } from './apk-runtime.js?v=e0932d3cf1f5';
+import { getVectorGraphics } from './vector-native.js?v=e0932d3cf1f5';
+import { deferRaster } from './deferred-raster.js?v=e0932d3cf1f5';
+import { createNinePatchDrawableHost } from './ninepatch-drawable-host.js?v=e0932d3cf1f5';
+import { createSwitchWidgetHost } from './switch-widget-host.js?v=e0932d3cf1f5';
+import { createForceDarkHost } from './force-dark-host.js?v=e0932d3cf1f5';
+import { renderNodeByHandle } from './rendernode-native.js?v=e0932d3cf1f5';
+import { bitmapExtentProblem } from './bitmap-extent.js?v=e0932d3cf1f5';
 const COMPOUND='Landroid/widget/CompoundButton;',TEXT='Landroid/widget/TextView;',TINT='Landroid/content/res/ColorStateList;',BLEND='Landroid/graphics/BlendMode;',MODE='Landroid/graphics/PorterDuff$Mode;';
 const IMAGE = 'Landroid/widget/ImageView;', VIEW = 'Landroid/view/View;', DRAWABLE = 'Landroid/graphics/drawable/Drawable;', CANVAS = 'Landroid/graphics/Canvas;';
 const keys = new Set(), add = (owner, methods) => methods.forEach(method => keys.add(owner + '->' + method));
@@ -75,7 +76,7 @@ export function createDrawableViewHost(platform) {
     let width = view.laidOut && view.bounds ? view.bounds.right - view.bounds.left : view.layoutWidth > 0 ? view.layoutWidth : null, height = view.laidOut && view.bounds ? view.bounds.bottom - view.bounds.top : view.layoutHeight > 0 ? view.layoutHeight : null;
     if ((!width || !height) && view.imageDrawable) { width ||= dispatch(runtime, DRAWABLE, 'getIntrinsicWidth', [], 'I', view.imageDrawable); height ||= dispatch(runtime, DRAWABLE, 'getIntrinsicHeight', [], 'I', view.imageDrawable); }
     if (!(width > 0 && height > 0)) { view.needsDrawableDraw = true; return; }
-    if (width > 4096 || height > 4096) fail('Drawable View extent exceeds 4096 px');
+    { const problem = bitmapExtentProblem(Math.ceil(width), Math.ceil(height), 4); if (problem) fail(`Drawable View raster: ${problem}`); }   // a View taller than the screen draws its drawable at its size (src/bitmap-extent.js)
     view.drawingDrawable = true;
     try {
       if (!view.drawableCanvas) { view.drawableCanvas = runtime.allocate(CANVAS); dispatch(runtime, CANVAS, '<init>', [], 'V', view.drawableCanvas); }

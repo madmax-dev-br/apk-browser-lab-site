@@ -1,5 +1,5 @@
-import { createHostRegistry } from './host-contract.js?v=28012a33f717';
-import { FRAMEWORK_RESOURCES } from './jca-resources.js?v=28012a33f717';
+import { createHostRegistry } from './host-contract.js?v=e0932d3cf1f5';
+import { FRAMEWORK_RESOURCES } from './jca-resources.js?v=e0932d3cf1f5';
 
 // Platform boundary of the original java.security / javax.crypto / Conscrypt classes in the framework DEX (framework-aosp/jca-sources.txt):
 //   * java.lang.System.logE/logW/logI (libcore hidden logging helpers the Provider framework calls) go to the VM trace like logcat lines;

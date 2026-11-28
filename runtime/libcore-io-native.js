@@ -1,12 +1,13 @@
-import { APKError } from './apk-error.js?v=28012a33f717';
-import { throwNew } from './java-throw.js?v=28012a33f717';
-import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=28012a33f717';
-import { networkOf, isIpLiteral } from './network-native.js?v=28012a33f717';
-import { Blocked } from './scheduler.js?v=28012a33f717';
-import { installUdp } from './udp-native.js?v=28012a33f717';
-import { createLoopback } from './loopback-socket.js?v=28012a33f717';
-import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=28012a33f717';
-import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=28012a33f717';
+import { APKError } from './apk-error.js?v=e0932d3cf1f5';
+import { DEVICE_CPU_COUNT } from './device-identity.js?v=e0932d3cf1f5';
+import { throwNew } from './java-throw.js?v=e0932d3cf1f5';
+import { OS_CONSTANTS, STRERROR } from './os-constants-data.js?v=e0932d3cf1f5';
+import { networkOf, isIpLiteral } from './network-native.js?v=e0932d3cf1f5';
+import { Blocked } from './scheduler.js?v=e0932d3cf1f5';
+import { installUdp } from './udp-native.js?v=e0932d3cf1f5';
+import { createLoopback } from './loopback-socket.js?v=e0932d3cf1f5';
+import { VirtualHttpSocket, SocketFailure, NotServed } from './virtual-http-socket.js?v=e0932d3cf1f5';
+import { allocateNativeBlock, freeNativeBlock, readNativeBytes, writeNativeBytes } from './unsafe-native.js?v=e0932d3cf1f5';
 
 // Natives of libcore.io.Linux (the real syscall layer under android.system.Os / libcore.io.Libcore.os), android.system.OsConstants, java.io.UnixFileSystem,
 // java.io.FileDescriptor and java.io.FileInputStream behind the original Android 13 libcore classes. libcore_io_Linux.cpp, OsConstants.cpp and the OpenJDK
@@ -554,7 +555,7 @@ export function createLibcoreIoNativeBindings() {
   L('getenv(Ljava/lang/String;)Ljava/lang/String;', (runtime, [, name]) => runtime.platform.environment[requireString(runtime, name)] ?? null);
   L('environ()[Ljava/lang/String;', runtime => { const entries = Object.entries(runtime.platform.environment).map(([k, v]) => `${k}=${v}`), array = runtime.newArray('[Ljava/lang/String;', entries.length); runtime.array(array).elements = entries; return array; });
   L('sysconf(I)J', (runtime, [, name]) => {
-    const table = { [C._SC_PAGESIZE]: 4096n, [C._SC_PAGE_SIZE]: 4096n, [C._SC_NPROCESSORS_CONF]: 8n, [C._SC_NPROCESSORS_ONLN]: 8n, [C._SC_CLK_TCK]: 100n, [C._SC_OPEN_MAX]: 1024n, [C._SC_ARG_MAX]: 131072n, [C._SC_IOV_MAX]: 1024n, [C._SC_NGROUPS_MAX]: 65536n };
+    const table = { [C._SC_PAGESIZE]: 4096n, [C._SC_PAGE_SIZE]: 4096n, [C._SC_NPROCESSORS_CONF]: BigInt(DEVICE_CPU_COUNT), [C._SC_NPROCESSORS_ONLN]: BigInt(DEVICE_CPU_COUNT), [C._SC_CLK_TCK]: 100n, [C._SC_OPEN_MAX]: 1024n, [C._SC_ARG_MAX]: 131072n, [C._SC_IOV_MAX]: 1024n, [C._SC_NGROUPS_MAX]: 65536n };
     return table[name] ?? -1n;                                                // sysconf returns -1 for a name the kernel does not report
   });
   L('uname()Landroid/system/StructUtsname;', runtime => {

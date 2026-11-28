@@ -1,17 +1,17 @@
 // The compact block at the very top of "Copy diagnostics" and "Screen state": what a person photographing the screen needs first -- memory, who holds it, the one-line uncaught exceptions,
 // the main thread and the busiest methods. The long sections (threads, queue, profile, log) follow it.
-import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=28012a33f717';
-import { staticRetentionLines } from './heap-gc.js?v=28012a33f717';
-import { overrideSummaryLines } from './method-overrides.js?v=28012a33f717';
-import { ignoredActivitiesLine } from './ignored-activities.js?v=28012a33f717';
-import { endpointMockSummaryLines } from './endpoint-mocks.js?v=28012a33f717';
-import { blockedCallSummaryLines } from './blocked-calls.js?v=28012a33f717';
-import { configImportSummaryLines } from './config-import-note.js?v=28012a33f717';
-import { networkRouteSummaryLines } from './network-routes.js?v=28012a33f717';
-import { hostMapSummaryLines } from './host-map.js?v=28012a33f717';
-import { attributeGap } from './worker-task-log.js?v=28012a33f717';
-import { loadImageText } from './load-image.js?v=28012a33f717';
-import { identityText } from './device-identity.js?v=28012a33f717';
+import { TimeBreakdown, BUCKET, BUCKET_COUNT, bucketsText, loadTimingText } from './time-breakdown.js?v=e0932d3cf1f5';
+import { staticRetentionLines } from './heap-gc.js?v=e0932d3cf1f5';
+import { overrideSummaryLines } from './method-overrides.js?v=e0932d3cf1f5';
+import { ignoredActivitiesLine } from './ignored-activities.js?v=e0932d3cf1f5';
+import { endpointMockSummaryLines } from './endpoint-mocks.js?v=e0932d3cf1f5';
+import { blockedCallSummaryLines } from './blocked-calls.js?v=e0932d3cf1f5';
+import { configImportSummaryLines } from './config-import-note.js?v=e0932d3cf1f5';
+import { networkRouteSummaryLines } from './network-routes.js?v=e0932d3cf1f5';
+import { hostMapSummaryLines } from './host-map.js?v=e0932d3cf1f5';
+import { attributeGap } from './worker-task-log.js?v=e0932d3cf1f5';
+import { loadImageText } from './load-image.js?v=e0932d3cf1f5';
+import { identityText } from './device-identity.js?v=e0932d3cf1f5';
 const dotted = type => String(type ?? '?').replace(/^L|;$/g, '').replaceAll('/', '.');
 const MiB = 1048576, BYTES_PER_OBJECT = 1600;
 
@@ -263,6 +263,7 @@ export function reportSummary(runtime, { heartbeat = null, error = null, tela = 
     if (busiest?.length) out.push(`busiest methods: ${busiest.slice(0, 5).join(', ')}`);
   });
   if (out.length <= 1) return [];
+  part(() => { const stretches = runtime.wasm?.stretches; if (stretches) out.push(...stretches.format()); });   // the host-free stretch measurement, only when it was switched on (vmcore/js/host-free-stretches.js)
   part(() => out.push(`Device identity (${runtime?.customIdentity ? 'CUSTOM, typed by the user in the Device panel' : 'fixed, the same for every app'}): ${identityText(runtime)}`));   // src/device-identity.js; a custom identity is marked as such (CLAUDE.md, 2026-11-21); last, the summary leads with what went wrong
   return [...out, '== end of summary =='];
 }

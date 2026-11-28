@@ -64,24 +64,25 @@
 // ---- Threads (vmcore/js/core-threads.js): every Java thread a core Thread record of its own, green, driven by the JavaScript VM's Scheduler; this.t is the current thread's.
 // Not done here: real threads (Workers); JNI natives in the same memory; a stack trace of an exception created in a nested run stops at the nested run's base frame.
 
-import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=28012a33f717';
-import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=28012a33f717';
-import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=28012a33f717';
-import { HandleTable } from './handles.js?v=28012a33f717';
-import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=28012a33f717';
-import { coreImports } from './boundary-imports.js?v=28012a33f717';
-import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=28012a33f717';
-import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=28012a33f717';
-import { scanHostRoots } from '../../runtime/heap-gc.js?v=28012a33f717';
-import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=28012a33f717';
-import { BUCKET } from '../../runtime/time-breakdown.js?v=28012a33f717';
-import { timedExports, timedBridge } from './core-timing.js?v=28012a33f717';
-import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=28012a33f717';
-import { Blocked } from '../../runtime/scheduler.js?v=28012a33f717';
-import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=28012a33f717';
-import { CoreDebugAdapter } from './core-debug.js?v=28012a33f717';
-import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=28012a33f717';
-import { PaintRecords } from './paint-record.js?v=28012a33f717';
+import { Linker, CLASS, METHOD, STATUS } from './linker.js?v=e0932d3cf1f5';
+import { CORE_NATIVES, NATIVE_COUNT, BRIDGE_NATIVES, BOX_CLASSES, BOX_LETTERS, CURRENT_THREAD_KEY, THREAD_GET_ID_KEY } from './natives.js?v=e0932d3cf1f5';
+import { RecordSpace, ObjectFacade, ArrayFacade } from './record-facade.js?v=e0932d3cf1f5';
+import { HandleTable } from './handles.js?v=e0932d3cf1f5';
+import { Exceptions, EVENT_ERRONEOUS, EVENT_WAITED, ERRONEOUS_STORED, ERRONEOUS_PENDING, ERRONEOUS_STOPPED } from './exceptions.js?v=e0932d3cf1f5';
+import { coreImports } from './boundary-imports.js?v=e0932d3cf1f5';
+import { installHostLinking, methodReference, HOST_STATE_THREAD } from './host-linking.js?v=e0932d3cf1f5';
+import { hookedMethodKeys } from '../../runtime/method-overrides.js?v=e0932d3cf1f5';
+import { scanHostRoots } from '../../runtime/heap-gc.js?v=e0932d3cf1f5';
+import { APKError, JavaException, LOOPER_PLUMBING, FRAMEWORK_NATIVE_GONE } from '../../runtime/apk-runtime.js?v=e0932d3cf1f5';
+import { BUCKET } from '../../runtime/time-breakdown.js?v=e0932d3cf1f5';
+import { timedExports, timedBridge } from './core-timing.js?v=e0932d3cf1f5';
+import { HostFreeStretches } from './host-free-stretches.js?v=e0932d3cf1f5';
+import { PendingCall, Invoke } from '../../runtime/interpreter.js?v=e0932d3cf1f5';
+import { Blocked } from '../../runtime/scheduler.js?v=e0932d3cf1f5';
+import { CoreThreads, CORE_STATUS, MAIN_SUSPEND } from './core-threads.js?v=e0932d3cf1f5';
+import { CoreDebugAdapter } from './core-debug.js?v=e0932d3cf1f5';
+import { coreLayout, CORE_MEMORY_DEFAULT } from '../../runtime/core-memory.js?v=e0932d3cf1f5';
+import { PaintRecords } from './paint-record.js?v=e0932d3cf1f5';
 
 const MiB = 1 << 20;
 /** Ids handed to hosts between two collections, at least (host-bridge.js requestCollection): about 30-60 MiB of facades and table entries in the Worker. */
@@ -130,18 +131,19 @@ export class CoreStop extends APKError {
  * `shared`: false for an unshared memory (one Worker, green threads: the page; `module` is then compiled from unsharedCore's bytes).
  * `trigger`: a fixed pacing threshold in bytes. `maxDepth`: Thread.maxDepth. Returns the engine (also runtime.wasm, not enumerable).
  */
-export async function attachWasmEngine(runtime, { module, shared = true, memory = null, pages = null, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
+export async function attachWasmEngine(runtime, { module, shared = true, memory = null, pages = null, stress = false, stressHost = false, trigger, maxDepth = (runtime.maxCallDepth ?? 2048) - 1, natives = CORE_NATIVES, hostFreeStretches = globalThis.__apkwebHostFreeStretches === true } = {}) {   // maxDepth: the JavaScript VM's maxCallDepth counts the frames below the call it refuses
   if (runtime.engine !== 'wasm') throw new Error(`vmcore: attachWasmEngine needs a runtime created with engine 'wasm' (this one has '${runtime.engine}')`);
   if (runtime.wasm) throw new Error('vmcore: a core is attached to this runtime already');
   if (runtime.heap.size !== 0) throw new Error(`vmcore: the runtime already has ${runtime.heap.size} objects on the JavaScript heap; attach the core before anything runs`);
-  const engine = new WasmEngine(runtime, { shared, memory, pages, stress, stressHost, trigger, maxDepth, natives });
+  const engine = new WasmEngine(runtime, { shared, memory, pages, stress, stressHost, trigger, maxDepth, natives, hostFreeStretches });
   await engine.instantiate(module);
   return engine;
 }
 
 export class WasmEngine {
-  constructor(runtime, { shared = true, memory = null, pages = null, stress, stressHost, trigger, maxDepth, natives }) {
+  constructor(runtime, { shared = true, memory = null, pages = null, stress, stressHost, trigger, maxDepth, natives, hostFreeStretches = false }) {
     this.runtime = runtime; this.stressHost = stressHost; this.fixedTrigger = trigger;
+    this.stretches = hostFreeStretches ? new HostFreeStretches(this) : null;   // the host-free stretch measurement (host-free-stretches.js): off unless asked for; instantiate() wraps the imports and the runs only then
     // `pages` given: a memory of exactly that size, laid out in the fixed mode (the default sizes unless `memory` says otherwise). Else the caller's mode, 'dynamic' by default.
     const layout = this.layout = coreLayout(pages != null ? { ...(memory ?? CORE_MEMORY_DEFAULT), mode: 'fixed' } : memory ?? CORE_MEMORY_DEFAULT), LAYOUT = layout; pages ??= layout.pages;
     this.dynamic = layout.dynamic && pages === layout.pages;
@@ -227,9 +229,10 @@ export class WasmEngine {
     // the linker's work (a method's code copied and its constants resolved the first time they are used) is first-time work: timed as the JavaScript VM times its method decoding
     const tbLink = this.runtime.tb, resolve = (t, method, what) => { const previous = tbLink.enter(BUCKET.DECODE); try { return linker.imports.resolve(t, method, what); } finally { tbLink.leave(previous); } };
     this.runtime.tb.setBase(BUCKET.OTHER);   // outside the core's runs the Worker runs host code and scheduler JavaScript (src/time-breakdown.js)
-    const imports = coreImports(memory, { resolve, exception: (...a) => this.exceptionEvent(...a), bridge: timedBridge(this.runtime.tb, (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0)),
-      field: (t, object, caller, constant, op, reg) => this.hostField(t >>> 0, object >>> 0, caller >>> 0, constant >>> 0, op >>> 0, reg >>> 0) });
-    const { exports: rawExports } = await WebAssembly.instantiate(module, imports), exports = timedExports(rawExports, this.runtime.tb);   // the core's runs own the clock (vmcore/js/core-timing.js)
+    const hostImports = { resolve, exception: (...a) => this.exceptionEvent(...a), bridge: timedBridge(this.runtime.tb, (m, c, t) => this.bridge(m >>> 0, c >>> 0, t >>> 0)),
+      field: (t, object, caller, constant, op, reg) => this.hostField(t >>> 0, object >>> 0, caller >>> 0, constant >>> 0, op >>> 0, reg >>> 0) };
+    const stretches = this.stretches, imports = coreImports(memory, stretches === null ? hostImports : stretches.wrapImports(hostImports));   // measuring host-free stretches: the same functions with the accounting around them, chosen here once
+    const { exports: rawExports } = await WebAssembly.instantiate(module, imports), timed = timedExports(rawExports, this.runtime.tb), exports = stretches === null ? timed : stretches.wrapExports(timed);   // the core's runs own the clock (vmcore/js/core-timing.js)
     this.x = exports;
     if (exports.vm_native_count() !== NATIVE_COUNT) throw new Error(`vmcore: core.wasm has ${exports.vm_native_count()} natives, vmcore/js/natives.js lists ${NATIVE_COUNT}`);
     const LAYOUT = this.layout; this.mainRecord = LAYOUT.THREADS;
@@ -1360,7 +1363,7 @@ function updaterFacade(engine) {
   };
 }
 
-const VALUE_PAYLOADS = new Set(['atomicValue', 'atomicLong', 'atomicBoolean', 'atomicReference']);
+const VALUE_PAYLOADS = new Set(['atomicValue', 'atomicLong', 'atomicBoolean', 'atomicReference', 'enumOrdinal']);
 
 /** Class layouts for the record facades, made from the linker's records on first use (a Map whose get() lays the layout out). */
 export class LazyLayouts extends Map {
@@ -1380,6 +1383,7 @@ export class LazyLayouts extends Map {
     else if (payload === 'atomicLong') layout.facadeClass = boxFacade('J', 'atomicValue');
     else if (payload === 'atomicBoolean') layout.facadeClass = boxFacade('I', 'atomicValue');
     else if (payload === 'atomicReference') layout.facadeClass = referenceFacade('atomicValue');
+    else if (payload === 'enumOrdinal') layout.facadeClass = boxFacade('I', 'enumOrdinal');   // every enum class: the ordinal its constructor bridge (or the host that made the constant) stores is in memory, where the ordinal native reads it
     else if (info.memoryProperty === 'atomicArray') layout.facadeClass = referenceFacade('atomicArray');
     else if (info.memoryProperty === 'updater') layout.facadeClass = updaterFacade(this.engine);
     return layout;
